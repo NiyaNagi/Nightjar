@@ -1,0 +1,273 @@
+/**
+ * CreateFolder Dialog Styles
+ */
+
+.create-folder-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.create-folder {
+  background: var(--bg-primary, #ffffff);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.create-folder__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.create-folder__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #e4e4e7);
+  margin: 0;
+}
+
+.create-folder__close {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary, #a1a1aa);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.create-folder__close:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.create-folder__close:focus-visible {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: 1px;
+}
+
+.create-folder__form {
+  padding: 20px;
+}
+
+/* Workspace indicator */
+.create-folder__workspace {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.create-folder__workspace-icon {
+  font-size: 18px;
+}
+
+.create-folder__workspace-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #e4e4e7);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Form sections */
+.create-folder__section {
+  margin-bottom: 20px;
+}
+
+.create-folder__label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #e4e4e7);
+  margin-bottom: 8px;
+}
+
+.create-folder__input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #e4e4e7);
+  background: var(--bg-primary, #ffffff);
+}
+
+.create-folder__input:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 3px var(--accent-color-alpha, rgba(59, 130, 246, 0.1));
+}
+
+.create-folder__select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary, #e4e4e7);
+  background: var(--bg-primary, #ffffff);
+  cursor: pointer;
+}
+
+/* Icon grid */
+.create-folder__icons {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.create-folder__icon {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.create-folder__icon:hover {
+  background: var(--bg-hover, #e5e7eb);
+}
+
+.create-folder__icon--selected {
+  border-color: var(--accent-color, #3b82f6);
+  background: var(--accent-color-alpha, rgba(59, 130, 246, 0.1));
+}
+
+.create-folder__icon:focus-visible {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: 1px;
+}
+
+/* Color picker */
+.create-folder__colors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.create-folder__color {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.create-folder__color:hover {
+  transform: scale(1.1);
+}
+
+.create-folder__color--selected {
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.create-folder__color:focus-visible {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: 2px;
+}
+
+/* Error message */
+.create-folder__error {
+  padding: 12px;
+  background: var(--error-bg, #fef2f2);
+  border: 1px solid var(--error-border, #fecaca);
+  border-radius: 8px;
+  color: var(--error-color, var(--error-hover));
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Actions */
+.create-folder__actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.create-folder__btn {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.create-folder__btn--secondary {
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.create-folder__btn--secondary:hover {
+  background: var(--bg-hover, #e5e7eb);
+}
+
+.create-folder__btn--primary {
+  background: var(--accent-color, #3b82f6);
+  border: none;
+  color: white;
+}
+
+.create-folder__btn--primary:hover:not(:disabled) {
+  background: var(--accent-color-dark, #2563eb);
+}
+
+.create-folder__btn--primary:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.create-folder__btn:focus-visible {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: 2px;
+}
+
+.create-folder__select:focus-visible {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 3px var(--accent-color-alpha, rgba(59, 130, 246, 0.1));
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .create-folder {
+    --bg-primary: #1f2937;
+    --bg-secondary: #374151;
+    --bg-hover: #4b5563;
+    --border-color: #4b5563;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+  }
+  
+  .create-folder__error {
+    background: #450a0a;
+    border-color: #7f1d1d;
+  }
+}

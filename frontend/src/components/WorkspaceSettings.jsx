@@ -1,0 +1,700 @@
+/**
+ * WorkspaceSettings Panel
+ * 
+ * Displays workspace settings and management options.
+ * Shows collaborators list.
+ * Allows owners to delete workspace.
+ * Allows renaming workspace (editors+).
+ * Shows share link generation.
+ */
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useWorkspaces } from '../contexts/WorkspaceContext';
+import { usePermissions } from '../contexts/PermissionContext';
+import { useIdentity } from '../contexts/IdentityContext';
+import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink } from '../utils/sharing';
+import { getStoredKeyChain } from '../utils/keyDerivation';
+import { signData, uint8ToBase62 } from '../utils/identity';
+import { isElectron } from '../hooks/useEnvironment';
+import { IconColorPicker } from './common';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import './WorkspaceSettings.css';
+
+// Expiry options for signed invites
+const EXPIRY_OPTIONS = [
+  { value: 15, label: '15 minutes' },
+  { value: 60, label: '1 hour' },
+  { value: 240, label: '4 hours' },
+  { value: 1440, label: '24 hours' },
+];
+
+// Permission level info
+const PERMISSION_INFO = {
+  owner: {
+    label: 'Owner',
+    description: 'Full access. Can delete workspace and promote others to owner.',
+    color: '#10b981',
+  },
+  editor: {
+    label: 'Editor',
+    description: 'Can create, edit, and delete documents. Can share with editor or viewer access.',
+    color: '#3b82f6',
+  },
+  viewer: {
+    label: 'Viewer',
+    description: 'Read-only access. Can view documents but cannot edit.',
+    color: '#6b7280',
+  },
+};
+
+export default function WorkspaceSettings({ 
+  workspace, 
+  collaborators = [], 
+  members = {},
+  onClose,
+  onKickMember,
+  onTransferOwnership,
+}) {
+  const { updateWorkspace, deleteWorkspace, leaveWorkspace, workspaces } = useWorkspaces();
+  const { isOwner, canEditWorkspace, getAvailableShareLevels } = usePermissions();
+  const { identity: userIdentity } = useIdentity();
+  
+  const [name, setName] = useState(workspace?.name || '');
+  const [icon, setIcon] = useState(workspace?.icon || '📁');
+  const [color, setColor] = useState(workspace?.color || '#6366f1');
+  const [shareLevel, setShareLevel] = useState('viewer');
+  const [expiryMinutes, setExpiryMinutes] = useState(60); // Default 1 hour
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showOwnerLeaveConfirm, setShowOwnerLeaveConfirm] = useState(false); // Owner leave with transfer
+  const [selectedNewOwner, setSelectedNewOwner] = useState(null); // publicKey of new owner
+  const [kickingMember, setKickingMember] = useState(null); // publicKey of member being kicked
+  const [isSaving, setIsSaving] = useState(false);
+  const [memberSearch, setMemberSearch] = useState(''); // Search filter for collaborators
+  const shareMenuRef = useRef(null);
+  const modalRef = useRef(null);
+  
+  // Focus trap for modal accessibility
+  useFocusTrap(modalRef, true, { onEscape: onClose });
+  
+  // Close share menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target)) {
+        setShowShareMenu(false);
+      }
+    };
+    if (showShareMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showShareMenu]);
+  
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose?.();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+  
+  if (!workspace) return null;
+  
+  const myPermission = workspace.myPermission || 'viewer';
+  const availableShareLevels = getAvailableShareLevels('workspace', workspace.id);
+  const permissionInfo = PERMISSION_INFO[myPermission];
+  
+  // Save workspace name/icon/color changes
+  const handleSave = async () => {
+    if (!canEditWorkspace) return;
+    
+    setIsSaving(true);
+    try {
+      await updateWorkspace(workspace.id, { name, icon, color });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Generate self-contained P2P share link (no server dependency)
+  // Uses signed invites when owner identity is available
+  const createShareLink = useCallback(async (options = {}) => {
+    const { compress = false } = options;
+    
+    // Get the workspace encryption key from stored keychain
+    const keyChain = getStoredKeyChain(workspace.id);
+    const encryptionKey = keyChain?.workspaceKey || null;
+    
+    if (!encryptionKey) {
+      console.warn('No encryption key found for workspace, link may require password');
+    }
+    
+    // For web-hosted workspaces, include the server URL so Electron clients can connect
+    const serverUrl = !isElectron() ? window.location.origin : undefined;
+    
+    // If we have owner identity, use signed invite with expiry
+    if (isOwner && userIdentity?.privateKey && encryptionKey) {
+      try {
+        const signedInvite = generateSignedInviteLink({
+          workspaceId: workspace.id,
+          encryptionKey,
+          permission: shareLevel,
+          expiryMinutes,
+          ownerPrivateKey: userIdentity.privateKey,
+          ownerPublicKey: userIdentity.publicKeyBase62,
+        });
+        
+        return compress ? await compressShareLink(signedInvite.link) : signedInvite.link;
+      } catch (err) {
+        console.warn('Failed to generate signed invite, falling back to legacy:', err);
+      }
+    }
+    
+    // Fallback to legacy link format
+    const link = generateShareLink({
+      entityType: 'workspace',
+      entityId: workspace.id,
+      permission: shareLevel,
+      hasPassword: false,
+      password: null,
+      encryptionKey,
+      bootstrapPeers: [],
+      serverUrl,
+    });
+    
+    if (compress) {
+      try {
+        return await compressShareLink(link);
+      } catch (err) {
+        console.warn('Failed to compress link, using original:', err);
+        return link;
+      }
+    }
+    
+    return link;
+  }, [workspace.id, shareLevel, expiryMinutes, isOwner, userIdentity]);
+
+  // Copy different share formats
+  const handleCopyFormat = async (format) => {
+    const link = await createShareLink();
+    let textToCopy = link;
+    
+    switch (format) {
+      case 'message':
+        textToCopy = generateShareMessage({
+          link,
+          workspaceName: workspace.name,
+          permission: shareLevel,
+        });
+        break;
+      case 'link':
+      default:
+        textToCopy = link;
+    }
+    
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopiedLink(true);
+      setShowShareMenu(false);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Legacy copy handler (for backwards compat)
+  const handleCopyShareLink = () => handleCopyFormat('link');
+  
+  // Delete workspace (owners only)
+  const handleDelete = async () => {
+    if (!isOwner) return;
+    
+    await deleteWorkspace(workspace.id);
+    onClose?.();
+  };
+  
+  // Leave workspace (editors/viewers only, or owners after transferring)
+  const handleLeave = async () => {
+    await leaveWorkspace(workspace.id);
+    onClose?.();
+  };
+  
+  // Owner leave with ownership transfer
+  const handleOwnerLeave = async () => {
+    if (!selectedNewOwner || !onTransferOwnership) return;
+    
+    // Transfer ownership first
+    await onTransferOwnership(selectedNewOwner);
+    
+    // Then leave
+    await leaveWorkspace(workspace.id);
+    onClose?.();
+  };
+  
+  // Kick a member from workspace (owners only)
+  const handleKickMember = async (publicKey) => {
+    if (!isOwner || !onKickMember) return;
+    
+    // Find member name for toast feedback
+    const member = Object.values(members).find(m => m.publicKey === publicKey);
+    const memberName = member?.displayName || member?.handle || publicKey?.slice(0, 8) || 'member';
+    
+    // Call the kick handler (which handles toast feedback in AppNew.jsx)
+    onKickMember(publicKey, memberName);
+    setKickingMember(null);
+  };
+  
+  // Get deduplicated member list from members map
+  const memberList = Object.values(members);
+  
+  // Filter members by search term
+  const filteredMembers = memberSearch 
+    ? memberList.filter(m => 
+        (m.displayName || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (m.handle || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (m.publicKey || '').toLowerCase().includes(memberSearch.toLowerCase())
+      )
+    : memberList;
+  
+  // Determine leave eligibility
+  // - Can't leave if you're the only member
+  // - Owners must transfer ownership first
+  const totalMembers = memberList.length || collaborators.length || 1; // At least 1 (self)
+  const isOnlyMember = totalMembers <= 1;
+  const nonOwnerMembers = memberList.filter(m => m.permission !== 'owner');
+  const canOwnerLeave = isOwner && !isOnlyMember && nonOwnerMembers.length > 0;
+  
+  return (
+    <div className="workspace-settings__overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+      <div 
+        className="workspace-settings" 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workspace-settings-title"
+      >
+        <div className="workspace-settings__header">
+          <h2 id="workspace-settings-title" className="workspace-settings__title">Workspace Settings</h2>
+          <button className="workspace-settings__close" onClick={onClose} aria-label="Close workspace settings">×</button>
+        </div>
+        
+        <div className="workspace-settings__content">
+          {/* Workspace Info */}
+          <section className="workspace-settings__section">
+            <h3 className="workspace-settings__section-title">Workspace Info</h3>
+            
+            <div className="workspace-settings__field workspace-settings__field--row">
+              <IconColorPicker
+                icon={icon}
+                color={color}
+                onIconChange={setIcon}
+                onColorChange={setColor}
+                disabled={!canEditWorkspace}
+                size="medium"
+              />
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="workspace-settings__input workspace-settings__input--name"
+                disabled={!canEditWorkspace}
+                placeholder="Workspace name"
+              />
+            </div>
+            
+            {canEditWorkspace && (
+              <button 
+                className="workspace-settings__save-btn"
+                onClick={handleSave}
+                disabled={isSaving || (name === workspace.name && icon === workspace.icon && color === workspace.color)}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            )}
+          </section>
+        
+        {/* Your Permission */}
+        <section className="workspace-settings__section">
+          <h3 className="workspace-settings__section-title">Your Permission</h3>
+          <div 
+            className="workspace-settings__permission-badge"
+            style={{ backgroundColor: permissionInfo?.color }}
+          >
+            {permissionInfo?.label}
+          </div>
+          <p className="workspace-settings__permission-desc">
+            {permissionInfo?.description}
+          </p>
+        </section>
+        
+        {/* Share Workspace */}
+        {availableShareLevels.length > 0 && (
+          <section className="workspace-settings__section">
+            <h3 className="workspace-settings__section-title">Share Workspace</h3>
+            <p className="workspace-settings__description">
+              Anyone with this link will have access to all folders and documents in this workspace.
+              {isOwner && userIdentity && ' Links are time-limited and signed for security.'}
+            </p>
+            
+            <div className="workspace-settings__share-controls">
+              <div className="workspace-settings__share-controls-row">
+                <select
+                  value={shareLevel}
+                  onChange={(e) => setShareLevel(e.target.value)}
+                  className="workspace-settings__select"
+                >
+                  {availableShareLevels.map(level => (
+                    <option key={level} value={level}>
+                      {PERMISSION_INFO[level]?.label} access
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Expiry picker - only shown for owners with identity */}
+                {isOwner && userIdentity && (
+                  <select
+                    value={expiryMinutes}
+                    onChange={(e) => setExpiryMinutes(parseInt(e.target.value, 10))}
+                    className="workspace-settings__select workspace-settings__select--expiry"
+                    title="Link expiry time"
+                  >
+                    {EXPIRY_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        Expires in {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                
+                <div className="workspace-settings__share-btn-group" ref={shareMenuRef}>
+                  <button 
+                    className={`workspace-settings__copy-btn ${copiedLink ? 'workspace-settings__copy-btn--copied' : ''}`}
+                    onClick={() => handleCopyFormat('link')}
+                    type="button"
+                  >
+                    {copiedLink ? '✓ Copied!' : '📋 Copy Link'}
+                  </button>
+                  <button 
+                    className="workspace-settings__copy-btn workspace-settings__copy-btn--dropdown"
+                    onClick={() => setShowShareMenu(!showShareMenu)}
+                    aria-label="More share options"
+                    aria-expanded={showShareMenu}
+                    type="button"
+                  >
+                    ▾
+                  </button>
+                  
+                  {showShareMenu && (
+                    <div className="workspace-settings__share-menu">
+                      <button 
+                        className="workspace-settings__share-menu-item"
+                        onClick={() => handleCopyFormat('link')}
+                      >
+                        <span className="workspace-settings__share-menu-icon">🔗</span>
+                        <span>Copy Link</span>
+                        <span className="workspace-settings__share-menu-desc">Full nahma:// URL</span>
+                      </button>
+                      <button 
+                        className="workspace-settings__share-menu-item"
+                        onClick={() => handleCopyFormat('message')}
+                      >
+                        <span className="workspace-settings__share-menu-icon">💬</span>
+                        <span>Copy Message</span>
+                        <span className="workspace-settings__share-menu-desc">Invite text with link</span>
+                      </button>
+                      <button 
+                        className="workspace-settings__share-menu-item"
+                        onClick={() => handleCopyFormat('code')}
+                      >
+                        <span className="workspace-settings__share-menu-icon">🔑</span>
+                        <span>Copy Code</span>
+                        <span className="workspace-settings__share-menu-desc">Compact share code</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {copiedLink && (
+                <div className="workspace-settings__copied-feedback">
+                  ✓ Link copied to clipboard
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+        
+        {/* Collaborators */}
+        <section className="workspace-settings__section">
+          <h3 className="workspace-settings__section-title">
+            Collaborators
+            {(memberList.length > 0 || collaborators.length > 0) && (
+              <span className="workspace-settings__count">
+                ({memberList.length || collaborators.length})
+              </span>
+            )}
+          </h3>
+          
+          {/* Search filter - shown when there are many collaborators */}
+          {(memberList.length > 5 || collaborators.length > 5) && (
+            <div className="workspace-settings__search">
+              <input
+                type="text"
+                placeholder="Search collaborators..."
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="workspace-settings__search-input"
+              />
+              {memberSearch && (
+                <button 
+                  className="workspace-settings__search-clear"
+                  onClick={() => setMemberSearch('')}
+                  title="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+          
+          {/* Members list - scrollable container */}
+          <div className="workspace-settings__collaborators-container">
+            {/* Members list - uses new members map, keyed by publicKey */}
+            {filteredMembers.length > 0 ? (
+              <ul className="workspace-settings__collaborators">
+                {filteredMembers.map((member) => (
+                  <li key={member.publicKey} className="workspace-settings__collaborator">
+                    <span 
+                      className="workspace-settings__collaborator-avatar"
+                      style={{ backgroundColor: member.color || '#888888' }}
+                    >
+                      {member.icon || member.displayName?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                    <div className="workspace-settings__collaborator-info">
+                      <span className="workspace-settings__collaborator-name">
+                        {member.displayName || member.handle || member.publicKey?.slice(0, 8) || 'Anonymous'}
+                        {member.publicKey === userIdentity?.publicKeyBase62 && (
+                          <span className="workspace-settings__you-badge">(you)</span>
+                        )}
+                      </span>
+                      <span className="workspace-settings__collaborator-id">
+                        {member.publicKey?.slice(0, 10)}...
+                      </span>
+                    </div>
+                    <span 
+                      className="workspace-settings__collaborator-badge"
+                      style={{ backgroundColor: PERMISSION_INFO[member.permission]?.color || '#6b7280' }}
+                    >
+                      {PERMISSION_INFO[member.permission]?.label || 'Viewer'}
+                    </span>
+                    
+                    {/* Kick button - only for owners, not self */}
+                    {isOwner && member.publicKey !== userIdentity?.publicKeyBase62 && onKickMember && (
+                      kickingMember === member.publicKey ? (
+                        <div className="workspace-settings__kick-confirm">
+                          <button 
+                            className="workspace-settings__kick-yes"
+                            onClick={() => handleKickMember(member.publicKey)}
+                            title="Confirm removal"
+                          >
+                            ✓
+                          </button>
+                          <button 
+                            className="workspace-settings__kick-no"
+                            onClick={() => setKickingMember(null)}
+                            title="Cancel"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          className="workspace-settings__kick-btn"
+                          onClick={() => setKickingMember(member.publicKey)}
+                          title="Remove from workspace"
+                        >
+                          🚫
+                        </button>
+                      )
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : memberList.length > 0 && memberSearch ? (
+              <p className="workspace-settings__empty">
+                No collaborators match "{memberSearch}"
+              </p>
+            ) : collaborators.length > 0 ? (
+            // Legacy collaborators list (backwards compatibility)
+            <ul className="workspace-settings__collaborators">
+              {collaborators.map((collab, index) => (
+                <li key={collab.peerId || collab.identityId || index} className="workspace-settings__collaborator">
+                  <span 
+                    className="workspace-settings__collaborator-avatar"
+                    style={{ backgroundColor: collab.color || '#888888' }}
+                  >
+                    {collab.icon || collab.displayName?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                  <span className="workspace-settings__collaborator-name">
+                    {collab.displayName || collab.handle || collab.identityId?.slice(0, 8) || 'Anonymous'}
+                  </span>
+                  <span 
+                    className="workspace-settings__collaborator-badge"
+                    style={{ backgroundColor: PERMISSION_INFO[collab.permission]?.color || '#6b7280' }}
+                  >
+                    {PERMISSION_INFO[collab.permission]?.label || 'Viewer'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="workspace-settings__empty">
+              No collaborators yet. Share the workspace link to invite others.
+            </p>
+          )}
+          </div>{/* End scrollable container */}
+        </section>
+        
+        {/* Danger Zone - Delete/Leave for owners, Leave for others */}
+        <section className="workspace-settings__section workspace-settings__section--danger">
+          <h3 className="workspace-settings__section-title">Danger Zone</h3>
+          
+          <div className="workspace-settings__danger-buttons">
+            {/* Delete Workspace - owners only */}
+            {isOwner && (
+              !showDeleteConfirm ? (
+                <button 
+                  className="workspace-settings__delete-btn"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete Workspace
+                </button>
+              ) : (
+                <div className="workspace-settings__delete-confirm">
+                  <p>Are you sure? This will remove the workspace from your device.</p>
+                  <p className="workspace-settings__delete-note">
+                    Note: Other collaborators will still have their copies.
+                  </p>
+                  <div className="workspace-settings__delete-actions">
+                    <button 
+                      className="workspace-settings__cancel-btn"
+                      onClick={() => setShowDeleteConfirm(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      className="workspace-settings__confirm-delete-btn"
+                      onClick={handleDelete}
+                    >
+                      Yes, Delete
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+            
+            {/* Leave Workspace - shown for non-owners, or owners with other members */}
+            {isOwner ? (
+              // Owner leave - requires transfer if there are other members
+              canOwnerLeave && (
+                !showOwnerLeaveConfirm ? (
+                  <button 
+                    className="workspace-settings__delete-btn workspace-settings__leave-btn"
+                    onClick={() => setShowOwnerLeaveConfirm(true)}
+                  >
+                    Leave Workspace
+                  </button>
+                ) : (
+                  <div className="workspace-settings__delete-confirm workspace-settings__transfer-confirm">
+                    <p>Before leaving, you must transfer ownership to another member:</p>
+                    <select
+                      value={selectedNewOwner || ''}
+                      onChange={(e) => setSelectedNewOwner(e.target.value)}
+                      className="workspace-settings__select workspace-settings__owner-select"
+                    >
+                      <option value="">Select new owner...</option>
+                      {nonOwnerMembers.map((member) => (
+                        <option key={member.publicKey} value={member.publicKey}>
+                          {member.displayName || member.handle || member.publicKey?.slice(0, 12)}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="workspace-settings__delete-actions">
+                      <button 
+                        className="workspace-settings__cancel-btn"
+                        onClick={() => {
+                          setShowOwnerLeaveConfirm(false);
+                          setSelectedNewOwner(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        className="workspace-settings__confirm-delete-btn workspace-settings__confirm-leave-btn"
+                        onClick={handleOwnerLeave}
+                        disabled={!selectedNewOwner}
+                      >
+                        Transfer & Leave
+                      </button>
+                    </div>
+                  </div>
+                )
+              )
+            ) : (
+              // Non-owner leave - disabled if only member
+              !isOnlyMember && (
+                !showLeaveConfirm ? (
+                  <button 
+                    className="workspace-settings__delete-btn workspace-settings__leave-btn"
+                    onClick={() => setShowLeaveConfirm(true)}
+                  >
+                    Leave Workspace
+                  </button>
+                ) : (
+                  <div className="workspace-settings__delete-confirm">
+                    <p>Are you sure you want to leave this workspace?</p>
+                    <p className="workspace-settings__delete-note">
+                      You will lose access to all documents. You can rejoin with a new invite link.
+                    </p>
+                    <div className="workspace-settings__delete-actions">
+                      <button 
+                        className="workspace-settings__cancel-btn"
+                        onClick={() => setShowLeaveConfirm(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        className="workspace-settings__confirm-delete-btn workspace-settings__confirm-leave-btn"
+                        onClick={handleLeave}
+                      >
+                        Yes, Leave
+                      </button>
+                    </div>
+                  </div>
+                )
+              )
+            )}
+            
+            {/* Show message when leave is disabled */}
+            {isOnlyMember && !isOwner && (
+              <p className="workspace-settings__disabled-note">
+                You are the only member. You cannot leave this workspace.
+              </p>
+            )}
+            {isOwner && isOnlyMember && (
+              <p className="workspace-settings__disabled-note">
+                You are the only member. Use "Delete Workspace" to remove it.
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  );
+}

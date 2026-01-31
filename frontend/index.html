@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Security: Prevent referrer leakage of URL fragments containing secrets -->
+    <meta name="referrer" content="no-referrer" />
+    <!-- Security: Prevent MIME type sniffing -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <!-- 
+      Note: X-Frame-Options and frame-ancestors only work as HTTP response headers, not meta tags.
+      For Electron apps, clickjacking protection is handled by the app container itself.
+      For web deployment, configure these headers on your server/CDN.
+    -->
+    <!-- Security: Content Security Policy - Defense in depth -->
+    <!-- Note: For production, use server-side CSP headers. This meta tag provides baseline protection. -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:;
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob:;
+      font-src 'self' data:;
+      connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*;
+      worker-src 'self' blob:;
+      child-src 'self' blob:;
+      form-action 'self';
+      base-uri 'self';
+      object-src 'none';
+    " />
+    <!-- 
+      Note: Permissions-Policy only works as an HTTP header, not a meta tag.
+      For web deployment, configure this header on your server.
+    -->
+    <title>Nahma - Secure P2P Collaboration</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

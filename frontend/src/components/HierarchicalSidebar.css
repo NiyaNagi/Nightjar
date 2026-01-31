@@ -1,0 +1,578 @@
+/**
+ * HierarchicalSidebar Styles
+ * 
+ * Clean, hierarchical tree view design
+ */
+
+.hierarchical-sidebar {
+    width: 280px;
+    min-width: 280px;
+    height: 100vh;
+    background: var(--sidebar-bg, #1a1a2e);
+    border-right: 1px solid var(--border-color, #2d2d44);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease, min-width 0.2s ease;
+}
+
+.hierarchical-sidebar--collapsed {
+    width: 48px;
+    min-width: 48px;
+    align-items: center;
+    padding-top: 12px;
+}
+
+.hierarchical-sidebar__expand-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #a1a1aa);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.hierarchical-sidebar__expand-btn:hover {
+    background: var(--hover-bg, #2d2d44);
+    color: var(--text-primary, #e4e4e7);
+}
+
+.hierarchical-sidebar__expand-btn:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: 2px;
+}
+
+/* ========== Welcome/Onboarding State ========== */
+.sidebar-welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+}
+
+/* ========== Loading State ========== */
+.sidebar-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+}
+
+.sidebar-loading__spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color, #2d2d44);
+    border-top-color: var(--accent-color, #6366f1);
+    border-radius: 50%;
+    animation: sidebar-spin 0.8s linear infinite;
+}
+
+@keyframes sidebar-spin {
+    to { transform: rotate(360deg); }
+}
+
+.sidebar-loading__text {
+    color: var(--text-secondary, #a1a1aa);
+    font-size: 0.9rem;
+    margin-top: 16px;
+}
+
+.sidebar-welcome__icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.sidebar-welcome__title {
+    color: var(--text-primary, #e4e4e7);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+}
+
+.sidebar-welcome__text {
+    color: var(--text-secondary, #a1a1aa);
+    font-size: 0.9rem;
+    margin: 0 0 24px 0;
+    line-height: 1.5;
+}
+
+.sidebar-welcome__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.sidebar-welcome__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.sidebar-welcome__btn:hover {
+    background: var(--hover-bg, #2d2d44);
+    border-color: var(--text-secondary, #a1a1aa);
+}
+
+.sidebar-welcome__btn:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: 2px;
+}
+
+.sidebar-welcome__btn--primary {
+    background: var(--accent-color, #6366f1);
+    border-color: var(--accent-color, #6366f1);
+    color: white;
+}
+
+.sidebar-welcome__btn--primary:hover {
+    background: var(--accent-hover, #4f46e5);
+    border-color: var(--accent-hover, #4f46e5);
+}
+
+.sidebar-welcome__btn--primary:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+/* ========== Empty Workspace State ========== */
+.sidebar-empty {
+    padding: 32px 20px;
+    text-align: center;
+}
+
+.sidebar-empty__text {
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.95rem;
+    margin: 0 0 8px 0;
+}
+
+.sidebar-empty__hint {
+    color: var(--text-secondary, #a1a1aa);
+    font-size: 0.85rem;
+    margin: 0 0 16px 0;
+}
+
+.sidebar-empty__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.sidebar-empty__btn {
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 6px;
+    background: var(--hover-bg, #2d2d44);
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.sidebar-empty__btn:hover {
+    background: var(--active-bg, #3d3d5c);
+}
+
+.sidebar-empty__btn--primary {
+    background: var(--accent-color, #6366f1);
+    border-color: var(--accent-color, #6366f1);
+    color: #fff;
+}
+
+.sidebar-empty__btn--primary:hover {
+    background: var(--accent-hover, #4f46e5);
+    border-color: var(--accent-hover, #4f46e5);
+}
+
+/* ========== Action Bar ========== */
+.hierarchical-sidebar__actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color, #2d2d44);
+}
+
+.hierarchical-sidebar__action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: var(--hover-bg, #2d2d44);
+    border: none;
+    border-radius: 6px;
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.hierarchical-sidebar__action-btn:hover {
+    background: var(--border-color, #3d3d54);
+}
+
+.hierarchical-sidebar__action-btn:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: -2px;
+}
+
+.hierarchical-sidebar__action-btn--share {
+    background: var(--accent-color, #6366f1);
+    color: white;
+    font-weight: 500;
+}
+
+.hierarchical-sidebar__action-btn--share:hover {
+    background: var(--accent-hover, #4f46e5);
+}
+
+.hierarchical-sidebar__action-btn--share:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+/* ========== Create Form ========== */
+.hierarchical-sidebar__create-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 12px 16px;
+    background: var(--hover-bg, #2d2d44);
+    border-bottom: 1px solid var(--border-color, #2d2d44);
+}
+
+.hierarchical-sidebar__type-selector {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+    margin-bottom: 4px;
+}
+
+.hierarchical-sidebar__type-selector .type-btn {
+    flex: 1;
+    padding: 6px;
+    background: transparent;
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.hierarchical-sidebar__type-selector .type-btn:hover,
+.hierarchical-sidebar__type-selector .type-btn.active {
+    background: var(--accent-color, #6366f1);
+    border-color: var(--accent-color, #6366f1);
+}
+
+.hierarchical-sidebar__create-input {
+    flex: 1;
+    min-width: 120px;
+    padding: 8px 10px;
+    background: var(--input-bg, #0f0f1a);
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 6px;
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.9rem;
+}
+
+.hierarchical-sidebar__create-input:focus {
+    outline: none;
+    border-color: var(--accent-color, #6366f1);
+}
+
+.hierarchical-sidebar__create-form .btn-confirm,
+.hierarchical-sidebar__create-form .btn-cancel {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+}
+
+.hierarchical-sidebar__create-form .btn-confirm {
+    background: var(--success-color, #10b981);
+    color: white;
+}
+
+.hierarchical-sidebar__create-form .btn-confirm:hover {
+    background: #0d9668;
+}
+
+.hierarchical-sidebar__create-form .btn-cancel {
+    background: var(--error-color, #ef4444);
+    color: white;
+}
+
+.hierarchical-sidebar__create-form .btn-cancel:hover {
+    background: #dc2626;
+}
+
+/* ========== Tree Container ========== */
+.hierarchical-sidebar__tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+/* ========== Tree Items ========== */
+.tree-item-wrapper {
+    /* Container for item + children - enables proper nesting */
+    display: contents;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--text-primary, #e4e4e7);
+    transition: background 0.15s;
+    position: relative;
+}
+
+.tree-item:hover {
+    background: var(--hover-bg, #2d2d44);
+}
+
+.tree-item:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: -2px;
+}
+
+.tree-item--selected {
+    background: var(--selected-bg, #3d3d54);
+}
+
+.tree-item--selected::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--accent-color, #6366f1);
+}
+
+.tree-item--drag-over {
+    background: var(--accent-color-faded, rgba(99, 102, 241, 0.2));
+    outline: 2px dashed var(--accent-color, #6366f1);
+    outline-offset: -2px;
+}
+
+.tree-item--dragging {
+    opacity: 0.5;
+    background: var(--hover-bg, #2d2d44);
+}
+
+.tree-item--document {
+    cursor: grab;
+}
+
+.tree-item--document:active {
+    cursor: grabbing;
+}
+
+.tree-item__toggle {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #a1a1aa);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.tree-item__toggle--hidden {
+    visibility: hidden;
+}
+
+.tree-item__arrow {
+    font-size: 0.65rem;
+    transition: transform 0.15s;
+}
+
+.tree-item__arrow--expanded {
+    transform: rotate(90deg);
+}
+
+.tree-item__spacer {
+    width: 16px;
+    flex-shrink: 0;
+}
+
+.tree-item__icon {
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.tree-item__name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+}
+
+.tree-item__rename-input {
+    flex: 1;
+    background: var(--input-bg, #27272a);
+    border: 1px solid var(--accent-color, #3b82f6);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--text-primary, #fafafa);
+    font-size: 0.9rem;
+    min-width: 0;
+    outline: none;
+}
+
+.tree-item__rename-input:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.tree-item--renaming {
+    background: var(--active-bg, rgba(59, 130, 246, 0.1));
+}
+
+.tree-item__collaborators {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.tree-item__pip {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    color: white;
+    font-weight: 600;
+}
+
+.tree-item__pip--more {
+    background: var(--text-secondary, #a1a1aa);
+    font-size: 0.55rem;
+}
+
+.tree-item__delete {
+    opacity: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #a1a1aa);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 0.8rem;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.tree-item:hover .tree-item__delete {
+    opacity: 1;
+}
+
+.tree-item__delete:hover {
+    color: var(--error-color, #ef4444);
+}
+
+/* Nested items styling */
+.tree-item--document {
+    font-size: 0.9rem;
+}
+
+.tree-item--folder {
+    font-weight: 500;
+}
+
+/* ========== Footer ========== */
+.hierarchical-sidebar__footer {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-color, #2d2d44);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* App Settings button in footer */
+.hierarchical-sidebar__settings-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #a1a1aa);
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hierarchical-sidebar__settings-btn:hover {
+    background: var(--hover-bg, #2d2d44);
+    color: var(--text-primary, #e4e4e7);
+}
+
+.hierarchical-sidebar__settings-btn:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: 2px;
+}
+
+.hierarchical-sidebar__collapse-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #a1a1aa);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: background 0.15s, color 0.15s;
+}
+
+.hierarchical-sidebar__collapse-btn:hover {
+    background: var(--hover-bg, #2d2d44);
+    color: var(--text-primary, #e4e4e7);
+}
+
+/* ========== Scrollbar ========== */
+.hierarchical-sidebar__tree::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hierarchical-sidebar__tree::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.hierarchical-sidebar__tree::-webkit-scrollbar-thumb {
+    background: var(--border-color, #2d2d44);
+    border-radius: 3px;
+}
+
+.hierarchical-sidebar__tree::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary, #a1a1aa);
+}

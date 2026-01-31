@@ -1,0 +1,903 @@
+/**
+ * WorkspaceSettings Styles
+ */
+
+/* Modal overlay */
+.workspace-settings__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.workspace-settings {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  background: var(--bg-primary, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.workspace-settings__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.workspace-settings__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.workspace-settings__close {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.workspace-settings__close:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+.workspace-settings__close:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.3));
+}
+
+.workspace-settings__close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-color, #3b82f6);
+}
+
+.workspace-settings__content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.workspace-settings__section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  overflow: visible;
+  word-wrap: break-word;
+}
+
+.workspace-settings__section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.workspace-settings__section--danger {
+  background: #fef2f2;
+  margin: 0 -20px -20px;
+  padding: 20px;
+  border-radius: 0 0 8px 8px;
+}
+
+.workspace-settings__section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-settings__count {
+  font-weight: 400;
+  color: var(--text-secondary, #6b7280);
+}
+
+.workspace-settings__description {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 12px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Form fields */
+.workspace-settings__field {
+  margin-bottom: 16px;
+}
+
+.workspace-settings__field--row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-settings__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 6px;
+}
+
+.workspace-settings__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary, #111827);
+  background: var(--bg-primary, #ffffff);
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.workspace-settings__input--name {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.workspace-settings__input:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.1));
+}
+
+.workspace-settings__input:disabled {
+  background: var(--bg-secondary, #f9fafb);
+  color: var(--text-secondary, #6b7280);
+  cursor: not-allowed;
+}
+
+.workspace-settings__icon-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.workspace-settings__icon-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-settings__icon-btn:hover:not(:disabled) {
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.workspace-settings__icon-btn:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.15));
+}
+
+.workspace-settings__icon-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.workspace-settings__icon-input {
+  width: 64px;
+  padding: 10px;
+  text-align: center;
+  font-size: 20px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  background: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #111827);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-settings__icon-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.15));
+}
+
+.workspace-settings__save-btn {
+  padding: 10px 16px;
+  background: var(--accent-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-settings__save-btn:hover:not(:disabled) {
+  background: var(--accent-color-dark, #2563eb);
+}
+
+.workspace-settings__save-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #3b82f6);
+}
+
+.workspace-settings__save-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #3b82f6);
+}
+
+.workspace-settings__save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Permission badge */
+.workspace-settings__permission-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.workspace-settings__permission-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+  line-height: 1.5;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Share controls */
+.workspace-settings__share-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: visible;
+}
+
+/* Ensure share controls row doesn't create stray elements */
+.workspace-settings__share-controls-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  list-style: none;
+}
+
+.workspace-settings__select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #374151);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary, #e4e4e7);
+  background: var(--input-bg, #252538);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.workspace-settings__select option {
+  background: var(--input-bg, #252538);
+  color: var(--text-primary, #e4e4e7);
+}
+
+.workspace-settings__select:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.15));
+}
+
+.workspace-settings__copy-btn {
+  padding: 10px 16px;
+  background: var(--accent-color, #6366f1);
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  color: white;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.workspace-settings__copy-btn:hover {
+  background: var(--accent-hover, #4f46e5);
+}
+
+.workspace-settings__copy-btn--copied {
+  background: var(--success-color, #22c55e) !important;
+}
+
+.workspace-settings__copy-btn--copied:hover {
+  background: var(--success-hover, #16a34a) !important;
+}
+
+.workspace-settings__copy-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #6366f1);
+}
+
+.workspace-settings__copy-btn:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+.workspace-settings__copy-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #6366f1);
+}
+
+/* Share button group with dropdown */
+.workspace-settings__share-btn-group {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  overflow: visible;
+}
+
+/* Hide any stray pseudo-elements or bullets */
+.workspace-settings__share-btn-group::before,
+.workspace-settings__share-btn-group::after {
+  display: none !important;
+}
+
+.workspace-settings__share-btn-group .workspace-settings__copy-btn:first-child {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.workspace-settings__copy-btn--dropdown {
+  border-radius: 0 6px 6px 0;
+  padding: 10px 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  min-width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-settings__copy-btn--dropdown:hover {
+  background: var(--accent-hover, #4f46e5);
+}
+
+/* Share menu dropdown */
+.workspace-settings__share-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 220px;
+  max-width: 280px;
+  background: var(--bg-secondary, #1f2937);
+  border: 1px solid var(--border-color, #374151);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  overflow: visible;
+}
+
+/* Copied feedback message */
+.workspace-settings__copied-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: var(--success-bg, rgba(34, 197, 94, 0.15));
+  border: 1px solid var(--success-color, #22c55e);
+  border-radius: 6px;
+  color: var(--success-color, #22c55e);
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.workspace-settings__share-menu-item {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.workspace-settings__share-menu-item:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.workspace-settings__share-menu-item:focus {
+  outline: none;
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.workspace-settings__share-menu-item:focus-visible {
+  outline: none;
+  background: var(--bg-hover, #f3f4f6);
+  box-shadow: inset 0 0 0 2px var(--accent-color, #6366f1);
+}
+
+.workspace-settings__share-menu-item:not(:last-child) {
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.workspace-settings__share-menu-icon {
+  grid-row: span 2;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-settings__share-menu-item > span:nth-child(2) {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.workspace-settings__share-menu-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  grid-column: 2;
+}
+
+/* Collaborators list */
+.workspace-settings__collaborators {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.workspace-settings__collaborator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #374151);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.workspace-settings__collaborator:last-child {
+  margin-bottom: 0;
+}
+
+.workspace-settings__collaborator-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.workspace-settings__collaborator-name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary, #e4e4e7);
+}
+
+.workspace-settings__collaborator-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workspace-settings__collaborator-info .workspace-settings__collaborator-name {
+  flex: none;
+}
+
+.workspace-settings__collaborator-id {
+  font-size: 11px;
+  color: var(--text-tertiary, #6b7280);
+  font-family: ui-monospace, monospace;
+}
+
+.workspace-settings__collaborator-badge {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Kick button */
+.workspace-settings__kick-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.15s ease;
+}
+
+.workspace-settings__collaborator:hover .workspace-settings__kick-btn {
+  opacity: 1;
+}
+
+.workspace-settings__kick-btn:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.workspace-settings__kick-confirm {
+  display: flex;
+  gap: 4px;
+}
+
+.workspace-settings__kick-yes,
+.workspace-settings__kick-no {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.workspace-settings__kick-yes {
+  background: #dc2626;
+  color: white;
+}
+
+.workspace-settings__kick-yes:hover {
+  background: #b91c1c;
+}
+
+.workspace-settings__kick-no {
+  background: var(--bg-tertiary, #374151);
+  color: var(--text-primary, #e4e4e7);
+}
+
+.workspace-settings__kick-no:hover {
+  background: var(--bg-secondary, #4b5563);
+}
+
+/* Expiry picker */
+.workspace-settings__select--expiry {
+  min-width: 140px;
+}
+
+.workspace-settings__empty {
+  font-size: 13px;
+  color: var(--text-tertiary, #9ca3af);
+  font-style: italic;
+  margin: 0;
+  padding: 16px;
+  text-align: center;
+  background: var(--bg-secondary, #16161e);
+  border-radius: 6px;
+  border: 1px dashed var(--border-color, #374151);
+}
+
+/* Danger zone */
+.workspace-settings__section--danger .workspace-settings__section-title {
+  color: #dc2626;
+}
+
+.workspace-settings__delete-btn {
+  padding: 10px 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-settings__delete-btn:hover {
+  background: #b91c1c;
+}
+
+.workspace-settings__delete-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
+}
+
+.workspace-settings__delete-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
+}
+
+.workspace-settings__delete-confirm {
+  padding: 12px;
+  background: white;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+}
+
+.workspace-settings__delete-confirm p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.workspace-settings__delete-note {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.workspace-settings__delete-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.workspace-settings__cancel-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-settings__cancel-btn:hover {
+  background: var(--bg-hover, #f3f4f6);
+}
+
+.workspace-settings__cancel-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.3));
+}
+
+.workspace-settings__cancel-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-color, #3b82f6);
+}
+
+.workspace-settings__confirm-delete-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-settings__confirm-delete-btn:hover {
+  background: #b91c1c;
+}
+
+.workspace-settings__confirm-delete-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
+}
+
+.workspace-settings__confirm-delete-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
+}
+
+/* Leave button variant - orange/amber instead of red */
+.workspace-settings__leave-btn {
+  background: #f59e0b;
+}
+
+.workspace-settings__leave-btn:hover {
+  background: #d97706;
+}
+
+.workspace-settings__leave-btn:focus {
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
+}
+
+.workspace-settings__leave-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
+}
+
+.workspace-settings__confirm-leave-btn {
+  background: #f59e0b;
+}
+
+.workspace-settings__confirm-leave-btn:hover {
+  background: #d97706;
+}
+
+.workspace-settings__confirm-leave-btn:focus {
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
+}
+
+.workspace-settings__confirm-leave-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
+}
+
+/* Scrollable collaborators container */
+.workspace-settings__collaborators-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.workspace-settings__collaborators-container .workspace-settings__collaborators {
+  margin: 0;
+  border: none;
+}
+
+.workspace-settings__collaborators-container .workspace-settings__empty {
+  padding: 16px;
+  margin: 0;
+}
+
+/* Search input for collaborators */
+.workspace-settings__search {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.workspace-settings__search-input {
+  width: 100%;
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-secondary, #f9fafb);
+  color: var(--text-primary, #111827);
+  box-sizing: border-box;
+}
+
+.workspace-settings__search-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(59, 130, 246, 0.2));
+}
+
+.workspace-settings__search-input::placeholder {
+  color: var(--text-tertiary, #9ca3af);
+}
+
+.workspace-settings__search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.workspace-settings__search-clear:hover {
+  background: var(--bg-hover, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+/* You badge in collaborator list */
+.workspace-settings__you-badge {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--accent-color, #3b82f6);
+  font-weight: 500;
+}
+
+/* Owner transfer select */
+.workspace-settings__owner-select {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* Transfer confirmation styling */
+.workspace-settings__transfer-confirm p {
+  margin-bottom: 12px;
+}
+
+/* Danger zone buttons container */
+.workspace-settings__danger-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Disabled note in danger zone */
+.workspace-settings__disabled-note {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .workspace-settings {
+    --bg-primary: #1f2937;
+    --bg-secondary: #111827;
+    --bg-hover: #374151;
+    --border-color: #374151;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --text-tertiary: #6b7280;
+  }
+  
+  .workspace-settings__section--danger {
+    background: rgba(127, 29, 29, 0.3);
+  }
+  
+  .workspace-settings__delete-confirm {
+    background: #1f2937;
+    border-color: #7f1d1d;
+  }
+  
+  .workspace-settings__delete-confirm p {
+    color: #f9fafb;
+  }
+  
+  .workspace-settings__icon-btn {
+    background: var(--bg-secondary, #111827);
+  }
+  
+  .workspace-settings__icon-input {
+    background: var(--bg-secondary, #111827);
+    color: var(--text-primary, #f9fafb);
+  }
+  
+  .workspace-settings__select {
+    background: var(--bg-secondary, #111827);
+    color: var(--text-primary, #f9fafb);
+  }
+  
+  .workspace-settings__share-menu {
+    background: var(--bg-primary, #1f2937);
+    border-color: var(--border-color, #374151);
+  }
+}

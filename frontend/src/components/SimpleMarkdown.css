@@ -1,0 +1,55 @@
+.simple-markdown {
+    font-size: inherit;
+    line-height: 1.5;
+}
+
+.simple-markdown strong {
+    font-weight: 600;
+}
+
+.simple-markdown em {
+    font-style: italic;
+}
+
+.simple-markdown del {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.simple-markdown code {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+}
+
+.simple-markdown a {
+    color: var(--accent-color, #6366f1);
+    text-decoration: underline;
+}
+
+.simple-markdown a:hover {
+    opacity: 0.8;
+}
+
+.simple-markdown ul,
+.simple-markdown ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+.simple-markdown li {
+    margin: 2px 0;
+}
+
+.simple-markdown input[type="checkbox"] {
+    margin-right: 6px;
+    vertical-align: middle;
+    pointer-events: none;
+    accent-color: var(--accent-color, #6366f1);
+}
+
+.simple-markdown input[type="checkbox"]:checked {
+    opacity: 0.8;
+}

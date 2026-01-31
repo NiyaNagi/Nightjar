@@ -1,0 +1,100 @@
+{
+  "startTime": 1769840872420,
+  "endTime": 1769840872426,
+  "suites": [
+    {
+      "name": "cross-platform-sharing",
+      "tests": [
+        {
+          "name": "All platforms generate valid share links",
+          "status": "passed",
+          "duration": 1
+        },
+        {
+          "name": "Web embeds server URL in share links",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Web → Electron link compatibility",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Electron → Web link compatibility",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Web → iOS link compatibility",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "iOS → Android link compatibility",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Android → Electron link compatibility",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Full cross-platform matrix (12 combos)",
+          "status": "passed",
+          "duration": 1
+        },
+        {
+          "name": "All permission levels preserved cross-platform",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "All entity types work cross-platform",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Valid links are recognized",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Invalid links are rejected",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Password-protected links work cross-platform",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Special character passwords work cross-platform",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Server URLs are preserved in links",
+          "status": "passed",
+          "duration": 0
+        },
+        {
+          "name": "Links without server URL parse correctly",
+          "status": "passed",
+          "duration": 0
+        }
+      ],
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "summary": {
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0
+  }
+}

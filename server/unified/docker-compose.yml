@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  nahma:
+    build:
+      context: ../..
+      dockerfile: server/unified/Dockerfile
+    container_name: nahma
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist encrypted workspace data
+      - nahma-data:/app/server/unified/data
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  nahma-data:
+    driver: local

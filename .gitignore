@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+release/
+dist/
+frontend/dist/
+out/
+
+# Coverage & test results
+coverage/
+test-results/
+playwright-report/
+tests/e2e-report/
+
+# Storage & databases (local development data)
+storage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tor binaries (downloaded per-platform during npm install)
+tor/tor.exe
+tor/tor
+tor/tor.tar.gz
+tor/data/
+tor/Data/
+
+# Editor & IDE
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Debug
+.eslintcache
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
