@@ -141,36 +141,268 @@ Nightjar is built with security as the foundation, not an afterthought.
 
 ## Architecture
 
-Nightjar uses an **Electron + Sidecar** architecture:
+Nightjar uses an **Electron + Sidecar** architecture that separates the UI from heavy networking operations for security and stability.
+
+### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     NIGHTJAR APP                        │
-├─────────────────────────────────────────────────────────┤
-│  Electron Main     │        React Frontend             │
-│  • Window mgmt     │  • TipTap Editor                  │
-│  • IPC bridge      │  • Fortune Sheet                  │
-│  • Protocol        │  • Workspace/Folder UI            │
-├────────────────────┴────────────────────────────────────┤
-│                  SIDECAR (Node.js)                      │
-│  • Yjs sync server (port 8080)                          │
-│  • Metadata server (port 8081)                          │
-│  • P2P: Hyperswarm + libp2p + Tor                       │
-│  • LevelDB encrypted storage                            │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         NIGHTJAR CLIENT                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                          Application Layer                           │
+│  ┌─────────────┐  ┌──────────────────┐  ┌────────────────────────┐  │
+│  │  React UI   │  │  TipTap Editor   │  │   Workspace Manager    │  │
+│  │             │  │  Fortune Sheet   │  │   Folder/Doc Tree      │  │
+│  └─────────────┘  └──────────────────┘  └────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────────┤
+│                          Yjs CRDT Layer                              │
+│  ┌─────────────┐  ┌──────────────────┐  ┌────────────────────────┐  │
+│  │   Y.Doc     │  │  Y.XmlFragment   │  │   Awareness            │  │
+│  │  (document) │  │  (rich text)     │  │   (presence/cursors)   │  │
+│  └─────────────┘  └──────────────────┘  └────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────────┤
+│                        P2P Service Layer                             │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                      PeerManager                              │   │
+│  │  ┌─────────────────┐  ┌────────────────────────────────────┐ │   │
+│  │  │ BootstrapManager│  │       AwarenessManager             │ │   │
+│  │  │ (peer discovery)│  │       (cursor sync)                │ │   │
+│  │  └─────────────────┘  └────────────────────────────────────┘ │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                        Transport Layer                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌───────────┐  ┌─────────────┐   │
+│  │ WebSocket   │  │  WebRTC     │  │ Hyperswarm│  │   mDNS      │   │
+│  │ (relay)     │  │  (direct)   │  │   (DHT)   │  │  (LAN)      │   │
+│  └─────────────┘  └─────────────┘  └───────────┘  └─────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                        Sidecar (Node.js)                             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
+│  │ y-websocket     │  │  LevelDB        │  │  libp2p + Tor       │  │
+│  │ server (:8080)  │  │  Persistence    │  │  GossipSub          │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Technology Stack
+### How Clients Connect
 
-| Layer | Technology |
-|-------|------------|
-| **Desktop** | Electron |
-| **Frontend** | React, TipTap, Fortune Sheet |
-| **CRDT** | Yjs, y-websocket |
-| **P2P** | Hyperswarm, libp2p |
-| **Crypto** | TweetNaCl, Argon2 (hash-wasm) |
-| **Storage** | LevelDB |
-| **Anonymity** | Tor (optional) |
+```
+   Client A                    Client B                    Client C
+      │                           │                           │
+      │     1. Join workspace topic (SHA256 hash)             │
+      ├───────────────────────────┼───────────────────────────┤
+      │                           │                           │
+      │  2. DHT Discovery (Hyperswarm)                        │
+      │◄─────────────────────────►│◄─────────────────────────►│
+      │                           │                           │
+      │  3. Exchange Ed25519-signed identity                  │
+      │◄─────────────────────────►│◄─────────────────────────►│
+      │                           │                           │
+      │  4. Encrypted Yjs sync (XSalsa20-Poly1305)            │
+      │◄═════════════════════════►│◄═════════════════════════►│
+      │                           │                           │
+      │  5. Awareness updates (cursors, presence)             │
+      │◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─►│◄─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─►│
+```
+
+### Transport Priority
+
+Nightjar automatically selects the best available transport:
+
+| Transport | Use Case | Platforms | Priority |
+|-----------|----------|-----------|----------|
+| **mDNS** | Same local network | Electron | 1 (fastest) |
+| **Hyperswarm** | DHT-based discovery | Electron | 2 |
+| **WebRTC** | Direct browser P2P | All | 3 |
+| **WebSocket** | Relay fallback | All | 4 (always available) |
+| **Tor** | Anonymous routing | Electron | Optional overlay |
+
+### Data Flow
+
+```
+User types "Hello" in document
+         │
+         ▼
+┌─────────────────────────────┐
+│  TipTap Editor captures     │
+│  keystrokes, updates DOM    │
+└─────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────┐
+│  Yjs applies operation to   │
+│  Y.XmlFragment (CRDT)       │
+└─────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────┐
+│  Encryption Layer           │
+│  • Derive document key      │
+│  • Pad to 4KB block         │
+│  • XSalsa20-Poly1305        │
+└─────────────────────────────┘
+         │
+         ├──────────────────────────────┐
+         ▼                              ▼
+┌─────────────────────┐    ┌─────────────────────┐
+│  LevelDB (local)    │    │  P2P Broadcast      │
+│  Encrypted storage  │    │  To all peers       │
+└─────────────────────┘    └─────────────────────┘
+```
+
+---
+
+## Technology Stack
+
+### Core Technologies
+
+| Category | Technology | Purpose |
+|----------|------------|---------|
+| **Runtime** | Electron 30 | Cross-platform desktop app |
+| **Frontend** | React 18 | UI framework |
+| **Bundler** | Vite 5 | Fast development and builds |
+| **Rich Text** | TipTap / ProseMirror | Collaborative text editor |
+| **Spreadsheet** | Fortune Sheet | Excel-like spreadsheets |
+| **CRDT** | Yjs | Conflict-free real-time sync |
+
+### Networking
+
+| Technology | Purpose |
+|------------|---------|
+| **Hyperswarm** | DHT-based peer discovery (Electron) |
+| **libp2p** | Modular P2P networking with GossipSub |
+| **y-websocket** | Yjs WebSocket sync protocol |
+| **WebRTC** | Direct browser-to-browser connections |
+| **Tor** | Anonymous hidden service routing |
+
+### Cryptography
+
+| Library | Algorithm | Use |
+|---------|-----------|-----|
+| **TweetNaCl** | Ed25519 | Identity signing keys |
+| **TweetNaCl** | XSalsa20-Poly1305 | Authenticated encryption |
+| **hash-wasm** | Argon2id | Password-based key derivation |
+| **bip39** | BIP39 | Mnemonic recovery phrases |
+
+### Storage
+
+| Technology | Purpose |
+|------------|---------|
+| **LevelDB** | Local encrypted document storage |
+| **IndexedDB** | Browser-based storage fallback |
+
+---
+
+## Security Deep Dive
+
+### Identity System
+
+Your identity is a cryptographic keypair that you fully control:
+
+```
+12-word mnemonic (BIP39)
+         │
+         ▼ PBKDF2-SHA512
+    512-bit seed
+         │
+         ▼ First 32 bytes
+  Ed25519 secret key ──────► Ed25519 public key
+         │                          │
+         ▼                          ▼
+   Sign messages            Your "identity"
+   Decrypt data             Share with others
+```
+
+- **Generation**: Cryptographically random 128-bit entropy → 12-word BIP39 mnemonic
+- **Storage**: Mnemonic encrypted with machine-specific key (XSalsa20-Poly1305)
+- **Backup**: Export encrypted with user password (Argon2id + XSalsa20-Poly1305)
+- **Recovery**: Re-derive full keypair from 12 words on any device
+
+### Key Hierarchy
+
+Each level in the hierarchy has its own derived key:
+
+```
+Workspace Password (user-chosen or generated)
+         │
+         ▼ Argon2id (64MB, 4 iterations)
+   Workspace Key (256-bit)
+         │
+         ├────────────────────────────────────┐
+         ▼                                    ▼
+   Folder Key (derived)              Document Key (derived)
+         │
+         ▼
+   Sub-document Keys
+```
+
+**Argon2id Parameters:**
+- Memory: 64 MB (65,536 KB)
+- Iterations: 4
+- Parallelism: 4
+- Output: 256 bits
+
+This memory-hard KDF makes brute-force attacks extremely expensive.
+
+### Encryption Details
+
+All document content uses **XSalsa20-Poly1305** authenticated encryption:
+
+| Property | Value |
+|----------|-------|
+| Cipher | XSalsa20 (stream cipher) |
+| MAC | Poly1305 (authentication) |
+| Key size | 256 bits |
+| Nonce size | 192 bits (random per message) |
+| Padding | 4KB blocks (traffic analysis resistance) |
+
+### Share Link Security
+
+When you share a workspace, the encryption key is embedded in the URL fragment:
+
+```
+nightjar://w/abc123#p:azure-dolphin-7-bright&perm:e&exp:1706745600&sig:base64...
+           │        │                        │       │            │
+           │        │                        │       │            └─ Ed25519 signature
+           │        │                        │       └─ Expiration timestamp
+           │        │                        └─ Permission level (e=editor)
+           │        └─ Password (never sent to servers)
+           └─ Workspace ID
+```
+
+- **URL fragment (#)** is never sent to servers in HTTP requests
+- **Ed25519 signature** prevents tampering
+- **Expiration** limits window for compromise
+- **Password format** uses memorable word combinations
+
+### Security Hardening
+
+Built-in protections against common attacks:
+
+| Attack | Mitigation |
+|--------|------------|
+| **Brute force** | Rate limiting (5 attempts/60s, 5min lockout) |
+| **Prototype pollution** | Safe JSON parsing with Object.create(null) |
+| **Path traversal** | Path sanitization and validation |
+| **SSRF** | URL validation blocking localhost/internal IPs |
+| **Replay attacks** | Timestamps in signed messages |
+| **Traffic analysis** | 4KB padding on all encrypted payloads |
+| **Timing attacks** | Constant-time comparison for crypto operations |
+
+### Threat Model
+
+**Nightjar protects against:**
+- ✅ Mass surveillance (E2E encryption)
+- ✅ Server compromise (no plaintext on servers)
+- ✅ Network eavesdropping (all traffic encrypted)
+- ✅ Metadata correlation (with Tor enabled)
+- ✅ Credential theft (no passwords to steal)
+
+**Nightjar does NOT protect against:**
+- ❌ Malware on your device
+- ❌ Malicious collaborators you invited
+- ❌ Screenshots or physical access
+- ❌ Advanced nation-state attackers targeting you specifically
 
 ---
 
