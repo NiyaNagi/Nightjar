@@ -1,0 +1,112 @@
+/**
+ * UserFlyout Styles
+ */
+
+.user-flyout {
+    position: fixed;
+    z-index: 1100;
+    background: var(--bg-secondary, #16161e);
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    min-width: 200px;
+    overflow: hidden;
+    animation: flyoutIn 0.15s ease-out;
+}
+
+@keyframes flyoutIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.user-flyout__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-tertiary, #1a1a2e);
+}
+
+.user-flyout__avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.user-flyout__info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.user-flyout__name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #e4e4e7);
+}
+
+.user-flyout__status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--success-color, var(--success-color));
+}
+
+.user-flyout__status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success-color, var(--success-color));
+}
+
+.user-flyout__divider {
+    height: 1px;
+    background: var(--border-color, #2d2d44);
+}
+
+.user-flyout__actions {
+    padding: 8px;
+}
+
+.user-flyout__action {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-align: left;
+}
+
+.user-flyout__action:hover {
+    background: var(--hover-bg, #2d2d44);
+}
+
+.user-flyout__action:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: -2px;
+    background: var(--hover-bg, #2d2d44);
+}
+
+.user-flyout__action-icon {
+    font-size: 1.1rem;
+}

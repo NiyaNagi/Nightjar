@@ -1,0 +1,632 @@
+/* Share Dialog Styles */
+
+.share-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.share-dialog {
+  background: var(--bg-tertiary, #1a1a2e);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.share-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #2a2a4a);
+}
+
+.share-dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.share-dialog-header .close-button {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.share-dialog-header .close-button:hover {
+  color: #fff;
+}
+
+.share-dialog-header .close-button:focus-visible {
+  outline: 2px solid var(--accent-color, #6366f1);
+  outline-offset: 2px;
+}
+
+/* Tabs */
+.share-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #2a2a4a);
+}
+
+.share-tab {
+  flex: 1;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.share-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.share-tab:focus-visible {
+  outline: 2px solid var(--accent-color, #6366f1);
+  outline-offset: -2px;
+}
+
+.share-tab.active {
+  color: var(--accent-color, #6366f1);
+}
+
+.share-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-color, #6366f1);
+}
+
+/* Content */
+.share-content {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Share Panel */
+.share-panel,
+.join-panel,
+.new-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.share-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.share-option input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.share-password input,
+.join-password-section input {
+  width: 100%;
+  padding: 10px 14px;
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.share-password input:focus,
+.join-password-section input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+/* Share Link */
+.share-link-section {
+  margin-top: 8px;
+}
+
+.share-link-container {
+  display: flex;
+  gap: 8px;
+}
+
+.share-link-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.copy-button {
+  padding: 10px 20px;
+  background: #6366f1;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.copy-button:hover {
+  background: #5558e3;
+}
+
+.copy-button:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+.copy-button.copied {
+  background: var(--success-color);
+}
+
+/* QR Code */
+.share-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  margin-top: 8px;
+}
+
+.qr-label {
+  color: #666;
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.share-qr-code {
+  width: 200px;
+  height: 200px;
+}
+
+/* No Document */
+.no-document {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+}
+
+.no-document p {
+  margin: 8px 0;
+}
+
+/* Join Panel */
+.join-input-section label,
+.join-password-section label {
+  display: block;
+  color: #aaa;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.join-input-container {
+  display: flex;
+  gap: 8px;
+}
+
+.join-input-container input {
+  flex: 1;
+  padding: 10px 14px;
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.join-input-container input.error {
+  border-color: var(--error-color);
+}
+
+.join-input-container input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.paste-button {
+  padding: 10px 16px;
+  background: #2a2a4a;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.paste-button:hover {
+  background: #3a3a5a;
+}
+
+.join-error {
+  color: var(--error-color);
+  font-size: 13px;
+  margin: 8px 0 0 0;
+}
+
+.join-password-section {
+  margin-top: 8px;
+}
+
+.join-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.scan-button {
+  flex: 1;
+  padding: 12px 20px;
+  background: #2a2a4a;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.scan-button:hover {
+  background: #3a3a5a;
+}
+
+.join-button {
+  flex: 1;
+  padding: 12px 20px;
+  background: #6366f1;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.join-button:hover:not(:disabled) {
+  background: #5558e3;
+}
+
+.join-button:disabled {
+  background: #3a3a5a;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* QR Scanner */
+.qr-scanner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.qr-reader-element {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.scanner-error {
+  color: var(--error-color);
+  text-align: center;
+  margin: 0;
+}
+
+.scanner-close {
+  padding: 10px 24px;
+  background: #2a2a4a;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.scanner-close:hover {
+  background: #3a3a5a;
+}
+
+/* New Panel */
+.new-description {
+  color: #aaa;
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+
+.create-new-button {
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.create-new-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.create-new-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Format Section */
+.share-format-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.share-format-section label {
+  color: #aaa;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.share-format-select {
+  flex: 1;
+  padding: 10px 14px;
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.share-format-select:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+/* Password Section */
+.share-password-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-password-section label {
+  color: #aaa;
+  font-size: 14px;
+}
+
+.password-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.password-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.password-input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.regenerate-button {
+  padding: 10px 14px;
+  background: #2a2a4a;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.regenerate-button:hover {
+  background: #3a3a5a;
+}
+
+.password-hint {
+  color: #666;
+  font-size: 12px;
+  margin: 0;
+}
+
+/* Preview Section */
+.share-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-preview-section label {
+  color: #aaa;
+  font-size: 14px;
+}
+
+.share-preview-box {
+  padding: 12px;
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.message-preview {
+  color: #ccc;
+  font-size: 13px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.password-preview {
+  color: #6366f1;
+  font-size: 16px;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* QR Hint */
+.qr-hint {
+  color: #666;
+  font-size: 12px;
+  margin: 8px 0 0 0;
+  text-align: center;
+}
+
+/* Large Copy Button */
+.copy-button-large {
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.copy-button-large:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.copy-button-large:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.copy-button-large.copied {
+  background: linear-gradient(135deg, var(--success-color), var(--success-hover));
+}
+
+/* Scanner Container */
+.scanner-container {
+  min-height: 350px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile Responsive */
+@media (max-width: 500px) {
+  .share-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .share-qr-code {
+    width: 160px;
+    height: 160px;
+  }
+
+  .share-link-container {
+    flex-direction: column;
+  }
+
+  .copy-button {
+    width: 100%;
+  }
+
+  .join-input-container {
+    flex-direction: column;
+  }
+
+  .paste-button {
+    width: 100%;
+  }
+
+  .join-actions {
+    flex-direction: column;
+  }
+  
+  .share-format-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .password-input-row {
+    flex-direction: column;
+  }
+}

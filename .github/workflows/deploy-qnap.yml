@@ -1,0 +1,99 @@
+# GitHub Actions workflow for auto-deploying Nahma to QNAP NAS
+# 
+# This workflow:
+# 1. Builds the Docker image on push to main
+# 2. Pushes to GitHub Container Registry
+# 3. QNAP's Watchtower automatically pulls the new image
+#
+# Prerequisites:
+# - Enable "Read and write permissions" in repo Settings → Actions → General
+# - Set up Watchtower on QNAP (see deploy/QNAP_AUTO_DEPLOY.md)
+
+name: Build & Deploy to QNAP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'server/**'
+      - 'Dockerfile*'
+      - '.github/workflows/deploy-qnap.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=
+
+      # Build the web (nginx + frontend) image
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: server/docker/Dockerfile.web
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build the signaling server image
+      - name: Build and push signaling image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: server/docker/Dockerfile.signal
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/signal:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build the persistence node image
+      - name: Build and push persistence image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: server/docker/Dockerfile.persist
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/persist:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "### 🚀 Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/signal:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/persist:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Watchtower on QNAP will auto-pull within 5 minutes." >> $GITHUB_STEP_SUMMARY

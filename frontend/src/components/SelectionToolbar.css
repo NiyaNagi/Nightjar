@@ -1,0 +1,301 @@
+/**
+ * SelectionToolbar Styles
+ * 
+ * Floating toolbar that appears on text selection
+ */
+
+.selection-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    z-index: 1200;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-color, #2d2d44);
+    margin: 0 4px;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary, #a1a1aa);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+    background: var(--bg-hover, #2d2d44);
+    color: var(--text-primary, #e4e4e7);
+}
+
+.toolbar-btn:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: 2px;
+}
+
+.toolbar-btn.active {
+    background: var(--accent-color, #6366f1);
+    color: white;
+}
+
+.toolbar-btn strong {
+    font-weight: 700;
+}
+
+.toolbar-btn em {
+    font-style: italic;
+}
+
+.toolbar-btn.heading-btn {
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.toolbar-btn.comment-btn {
+    padding: 0 10px;
+    font-size: 0.8rem;
+    gap: 4px;
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--accent-color, #6366f1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.toolbar-btn.comment-btn:hover {
+    background: var(--accent-color, #6366f1);
+    color: white;
+    border-color: var(--accent-color, #6366f1);
+}
+
+.highlight-icon {
+    font-size: 0.9rem;
+}
+
+.code-icon {
+    font-family: monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* Link Input */
+.link-input-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.link-input {
+    width: 200px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 6px;
+    background: var(--bg-primary, #0d0d14);
+    color: var(--text-primary, #e4e4e7);
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.link-input:focus {
+    border-color: var(--accent-color, #6366f1);
+}
+
+.link-input:focus-visible {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.link-input::placeholder {
+    color: var(--text-muted, #8b8b96);
+}
+
+.link-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+}
+
+.link-btn.apply {
+    background: var(--success-color);
+    color: white;
+}
+
+.link-btn.apply:hover {
+    background: var(--success-hover);
+}
+
+.link-btn.apply:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+.link-btn.remove {
+    background: var(--error-color);
+    color: white;
+}
+
+.link-btn.remove:hover {
+    background: var(--error-hover);
+}
+
+.link-btn.remove:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+.link-btn.cancel {
+    background: var(--bg-hover, #2d2d44);
+    color: var(--text-secondary, #a1a1aa);
+}
+
+.link-btn.cancel:hover {
+    background: var(--border-color, #3d3d54);
+    color: var(--text-primary, #e4e4e7);
+}
+
+.link-btn.cancel:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: 2px;
+}
+
+/* Tippy/Popper animations */
+.tippy-box[data-animation='shift-away'][data-state='hidden'] {
+    opacity: 0;
+    transform: translateY(5px);
+}
+
+.tippy-box[data-animation='shift-away'][data-state='visible'] {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Sheet Selection Toolbar Styles */
+.sheet-selection-toolbar {
+    animation: fadeInUp 0.15s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cell-ref-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: rgba(99, 102, 241, 0.2);
+    color: var(--accent-color, #6366f1);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+/* Color picker button wrapper */
+.color-btn-wrapper {
+    position: relative;
+}
+
+/* Color picker dropdown */
+.color-picker-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--border-color, #2d2d44);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1300;
+}
+
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+}
+
+.color-swatch {
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+}
+
+/* Color icon styles */
+.color-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+}
+
+.color-icon.text-color {
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-underline-offset: 3px;
+}
+
+/* Kanban Selection Toolbar */
+.kanban-selection-toolbar {
+    animation: fadeInUp 0.15s ease-out;
+}
+
+.card-ref-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

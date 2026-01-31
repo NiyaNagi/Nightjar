@@ -1,0 +1,19 @@
+{
+  "name": "nahma-signaling",
+  "version": "1.0.0",
+  "description": "WebRTC signaling server for Nahma",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "nanoid": "^5.0.4"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

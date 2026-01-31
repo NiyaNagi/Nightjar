@@ -1,0 +1,37 @@
+# Dockerfile for Nahma Persistence Node
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install build dependencies for better-sqlite3
+RUN apk add --no-cache python3 make g++
+
+# Copy package files
+COPY server/persistence/package*.json ./
+
+# Install dependencies (using npm install since package-lock.json may not exist)
+RUN npm install --only=production
+
+# Copy source
+COPY server/persistence/ ./
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Create non-root user and set permissions
+RUN addgroup -g 1001 -S nahma && \
+    adduser -S nahma -u 1001 -G nahma && \
+    chown -R nahma:nahma /app
+
+USER nahma
+
+# Health check (just verify process is running)
+HEALTHCHECK --interval=60s --timeout=5s \
+  CMD pgrep -x node || exit 1
+
+# Volume for persistent data
+VOLUME ["/app/data"]
+
+ENV DB_PATH=/app/data/persistence.db
+
+CMD ["node", "index.js"]

@@ -1,0 +1,31 @@
+{
+  "model": "claude-sonnet-4-20250514",
+  "permissions": {
+    "allow_file_write": true,
+    "allow_file_read": true,
+    "allow_terminal": true,
+    "allow_browser": false
+  },
+  "context": {
+    "include": [
+      "CLAUDE.md",
+      "package.json",
+      "frontend/src/**/*.jsx",
+      "frontend/src/**/*.js",
+      "server/**/*.js",
+      "tests/**/*.js"
+    ],
+    "exclude": [
+      "node_modules",
+      "dist",
+      "storage",
+      ".git",
+      "*.log",
+      "*.ldb"
+    ]
+  },
+  "memory": {
+    "enabled": true,
+    "project_path": ".claude/memory"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "nahma-persistence",
+  "version": "1.0.0",
+  "description": "Persistence node for Nahma - stores encrypted document state",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0",
+    "yjs": "^13.6.10",
+    "lib0": "^0.2.88",
+    "better-sqlite3": "^9.4.3",
+    "nanoid": "^5.0.4"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,271 @@
+/* Editor Pane Styles */
+.editor-pane {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.editor-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 16px;
+    color: var(--text-secondary);
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.editor-content-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--editor-bg);
+    padding: 24px;
+}
+
+.editor-content {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    padding: 0 16px;
+    box-sizing: border-box;
+}
+
+/* ProseMirror Editor Styling */
+.ProseMirror {
+    min-height: 100%;
+    padding: 24px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: var(--editor-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+    font-size: var(--editor-font-size, 16px);
+    line-height: var(--editor-line-height, 1.6);
+    white-space: var(--editor-white-space, pre-wrap);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Word wrap disabled mode */
+.ProseMirror[data-word-wrap="false"] {
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.ProseMirror:focus {
+    outline: none;
+}
+
+.ProseMirror > * + * {
+    margin-top: 0.75em;
+}
+
+/* Headings */
+.ProseMirror h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror h4, .ProseMirror h5, .ProseMirror h6 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}
+
+/* Paragraphs */
+.ProseMirror p {
+    color: var(--text-primary);
+}
+
+/* Links */
+.ProseMirror a {
+    color: var(--accent-light);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.ProseMirror a:hover {
+    color: var(--accent-color);
+}
+
+/* Code */
+.ProseMirror code {
+    background: var(--hover-bg);
+    color: var(--accent-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+    font-size: 0.9em;
+}
+
+.ProseMirror pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+}
+
+.ProseMirror pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+/* Blockquotes */
+.ProseMirror blockquote {
+    border-left: 4px solid var(--accent-color);
+    padding-left: 16px;
+    margin-left: 0;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Lists */
+.ProseMirror ul, .ProseMirror ol {
+    padding-left: 24px;
+}
+
+.ProseMirror li {
+    margin-bottom: 4px;
+}
+
+.ProseMirror li > p {
+    margin: 0;
+}
+
+/* Horizontal rule */
+.ProseMirror hr {
+    border: none;
+    border-top: 2px solid var(--border-color);
+    margin: 2em 0;
+}
+
+/* Tables */
+.ProseMirror table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    overflow: hidden;
+}
+
+.ProseMirror th, .ProseMirror td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+    position: relative;
+}
+
+.ProseMirror th {
+    background: var(--hover-bg);
+    font-weight: 600;
+}
+
+.ProseMirror td {
+    background: var(--bg-secondary);
+}
+
+.ProseMirror .selectedCell {
+    background: var(--accent-color) !important;
+    color: white;
+}
+
+/* Table resize handle */
+.ProseMirror .column-resize-handle {
+    position: absolute;
+    right: -2px;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--accent-color);
+    cursor: col-resize;
+}
+
+/* Collaboration cursors */
+.collaboration-cursor__caret {
+    position: relative;
+    margin-left: -1px;
+    margin-right: -1px;
+    border-left: 1px solid;
+    border-right: 1px solid;
+    word-break: normal;
+    pointer-events: none;
+}
+
+.collaboration-cursor__label {
+    position: absolute;
+    top: -1.4em;
+    left: -1px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: normal;
+    white-space: nowrap;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px 4px 4px 0;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* Placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--text-muted);
+    pointer-events: none;
+    height: 0;
+}
+
+/* Selection highlight */
+.ProseMirror .selection {
+    background: var(--accent-color);
+}
+
+/* Mark styles */
+.ProseMirror strong {
+    font-weight: 700;
+}
+
+.ProseMirror em {
+    font-style: italic;
+}
+
+.ProseMirror s {
+    text-decoration: line-through;
+}

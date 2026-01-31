@@ -1,0 +1,29 @@
+# Dockerfile for Nahma Web (static files + nginx)
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy frontend source
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
+# Production image
+FROM nginx:alpine
+
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copy nginx config
+COPY server/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY server/nginx/locations.conf /etc/nginx/conf.d/locations.conf
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

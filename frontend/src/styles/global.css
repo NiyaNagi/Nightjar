@@ -1,0 +1,488 @@
+/* CSS Variables for theming */
+:root {
+    /* Dark theme (default) */
+    --bg-primary: #0f0f17;
+    --bg-secondary: #16161e;
+    --bg-tertiary: #1a1a2e;
+    --sidebar-bg: #1a1a2e;
+    --editor-bg: #1e1e2e;
+    --toolbar-bg: #1e1e2e;
+    --tab-bar-bg: #16161e;
+    --status-bar-bg: #16161e;
+    --input-bg: #252538;
+    
+    --text-primary: #e4e4e7;
+    --text-secondary: #a1a1aa;
+    --text-muted: #8b8b96;
+    --text-tertiary: #9ca3af;
+    
+    --border-color: #2d2d44;
+    --hover-bg: #2d2d44;
+    --active-bg: #3d3d5c;
+    --selected-bg: #3d3d5c;
+    
+    --accent-color: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-light: #818cf8;
+    --accent-alpha: rgba(99, 102, 241, 0.1);
+    
+    --success-color: #22c55e;
+    --success-hover: #16a34a;
+    --warning-color: #f59e0b;
+    --warning-hover: #d97706;
+    --error-color: #ef4444;
+    --error-hover: #dc2626;
+    
+    --error-bg: rgba(239, 68, 68, 0.1);
+    --error-border: #fca5a5;
+    --success-bg: rgba(34, 197, 94, 0.1);
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --code-bg: rgba(255, 255, 255, 0.1);
+    
+    --cursor-colors: #ff6b6b, #4ecdc4, #ffe66d, #95e1d3, #f38181, #aa96da;
+}
+
+/* Light theme */
+:root[data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --bg-tertiary: #f3f4f6;
+    --sidebar-bg: #f9fafb;
+    --editor-bg: #ffffff;
+    --toolbar-bg: #f9fafb;
+    --tab-bar-bg: #f3f4f6;
+    --status-bar-bg: #f3f4f6;
+    --input-bg: #ffffff;
+    
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #6b7280;
+    --text-tertiary: #9ca3af;
+    
+    --border-color: #e5e7eb;
+    --hover-bg: #f3f4f6;
+    --active-bg: #e5e7eb;
+    --selected-bg: #e5e7eb;
+    
+    --accent-color: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-light: #818cf8;
+    --accent-alpha: rgba(99, 102, 241, 0.1);
+    
+    --success-color: #16a34a;
+    --success-hover: #15803d;
+    --warning-color: #d97706;
+    --warning-hover: #b45309;
+    --error-color: #dc2626;
+    --error-hover: #b91c1c;
+    
+    --error-bg: rgba(239, 68, 68, 0.1);
+    --error-border: #fca5a5;
+    --success-bg: rgba(34, 197, 94, 0.1);
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --code-bg: rgba(0, 0, 0, 0.05);
+}
+
+/* Global resets */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Visually hidden - for screen readers only */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+html, body, #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+/* App Layout */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Editor with Comments wrapper */
+.editor-with-comments {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.editor-with-comments > .empty-editor-state,
+.editor-with-comments > .split-pane-container,
+.editor-with-comments > .kanban-container {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Empty State */
+.empty-editor-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    background: var(--editor-bg);
+    color: var(--text-secondary);
+}
+
+.empty-editor-state h2 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.empty-editor-state p {
+    max-width: 400px;
+    text-align: center;
+}
+
+.empty-editor-state .btn-create {
+    padding: 12px 24px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.empty-editor-state .btn-create:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+}
+
+.empty-editor-state .btn-create.sheet {
+    background: #22c55e;
+}
+
+.empty-editor-state .btn-create.sheet:hover {
+    background: #16a34a;
+}
+
+.empty-editor-state .btn-create.kanban {
+    background: var(--success-color);
+}
+
+.empty-editor-state .btn-create.kanban:hover {
+    background: #16a34a;
+}
+
+.empty-editor-state .create-buttons {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.empty-editor-state .welcome-icon {
+    font-size: 4rem;
+    margin-bottom: 8px;
+}
+
+.empty-editor-state .hint {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-top: -8px;
+}
+
+.empty-editor-state .btn-create.primary {
+    font-size: 1.1rem;
+    padding: 14px 32px;
+}
+
+.empty-editor-state .btn-create.secondary {
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+}
+
+.empty-editor-state .btn-create.secondary:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--accent-hover);
+    color: var(--accent-hover);
+}
+
+/* Onboarding mode - no workspaces */
+.app-container.onboarding .main-content {
+    background: linear-gradient(135deg, var(--bg-primary) 0%, var(--sidebar-bg) 100%);
+}
+
+.onboarding-welcome {
+    max-width: 500px;
+    text-align: center;
+}
+
+.onboarding-welcome h2 {
+    font-size: 2rem !important;
+    margin-bottom: 8px;
+}
+
+.onboarding-welcome p {
+    font-size: 1.1rem;
+    margin-bottom: 24px;
+}
+
+.onboarding-welcome .create-buttons {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 300px;
+}
+
+.onboarding-welcome .btn-create {
+    width: 100%;
+    justify-content: center;
+}
+
+/* Loading state */
+.loading-state {
+    max-width: 400px;
+    text-align: center;
+}
+
+.loading-state .loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color, #2d2d44);
+    border-top-color: var(--accent-color, #6366f1);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-state h2 {
+    font-size: 1.5rem;
+    margin-top: 16px;
+    margin-bottom: 8px;
+}
+
+.loading-state p {
+    opacity: 0.7;
+}
+
+/* Fullscreen mode */
+.app-container.fullscreen .hierarchical-sidebar {
+    display: none;
+}
+
+.app-container.fullscreen .status-bar-bottom {
+    display: none;
+}
+
+/* Fullscreen mode hides main header but shows exit button */
+.app-container.fullscreen .main-header {
+    display: none;
+}
+
+/* Fullscreen exit button */
+.fullscreen-exit-btn {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    z-index: 1000;
+    opacity: 0.3;
+    transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.fullscreen-exit-btn:hover {
+    opacity: 1;
+    background: var(--hover-bg);
+}
+
+/* Header bar minimal (when no tabs open) */
+.header-bar-minimal {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px 16px;
+    background: var(--tab-bar-bg, #16161e);
+    border-bottom: 1px solid var(--border-color, #2d2d44);
+    min-height: 48px;
+}
+
+.header-spacer {
+    flex: 1;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Main header wrapper */
+.main-header {
+    flex-shrink: 0;
+}
+
+/* Toast notifications */
+.toast {
+    position: fixed;
+    bottom: 60px;
+    right: 20px;
+    padding: 12px 20px;
+    background: var(--hover-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    z-index: 10000;
+    animation: slideIn 0.2s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 400px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.toast__icon {
+    flex-shrink: 0;
+    font-size: 1.1rem;
+}
+
+.toast__message {
+    flex: 1;
+}
+
+.toast__close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 1rem;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.toast__close:hover {
+    background: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+.toast.success {
+    border-color: var(--success-color);
+    background: var(--success-bg, rgba(34, 197, 94, 0.1));
+}
+
+.toast.error {
+    border-color: var(--error-color);
+    background: var(--error-bg, rgba(239, 68, 68, 0.1));
+}
+
+.toast.info {
+    border-color: var(--accent-color);
+    background: var(--accent-alpha, rgba(99, 102, 241, 0.1));
+}
+
+.toast.warning {
+    border-color: var(--warning-color);
+    background: var(--warning-bg, rgba(245, 158, 11, 0.1));
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--hover-bg);
+}
+
+/* Selection styling */
+::selection {
+    background: var(--accent-color);
+    color: white;
+}
+
+/* Focus styling */
+:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}

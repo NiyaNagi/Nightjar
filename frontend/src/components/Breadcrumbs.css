@@ -1,0 +1,127 @@
+/* Breadcrumbs Navigation */
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #a1a1aa);
+  padding: 8px 0;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-separator {
+  margin: 0 6px;
+  color: var(--text-tertiary, #a1a1aa);
+  font-weight: 300;
+}
+
+.breadcrumb-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #a1a1aa);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.breadcrumb-link:hover {
+  background: var(--hover-bg, #2d2d44);
+  color: var(--text-primary, #e4e4e7);
+}
+
+.breadcrumb-link:focus {
+  outline: 2px solid var(--accent-color, #6366f1);
+  outline-offset: 1px;
+}
+
+.breadcrumb-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.breadcrumb-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.breadcrumb-name {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.breadcrumb-ellipsis {
+  padding: 4px 8px;
+  color: var(--text-tertiary, #a1a1aa);
+}
+
+/* Current item */
+.breadcrumb-item.current .breadcrumb-text {
+  color: var(--text-primary, #e4e4e7);
+  font-weight: 500;
+}
+
+/* Inaccessible item */
+.breadcrumb-item.inaccessible .breadcrumb-text {
+  color: var(--text-tertiary, #a1a1aa);
+  opacity: 0.85;
+}
+
+.breadcrumb-lock {
+  margin-left: 4px;
+  font-size: 0.75rem;
+}
+
+/* Compact mode */
+.breadcrumbs.compact .breadcrumb-name {
+  max-width: 100px;
+}
+
+.breadcrumbs.compact .breadcrumb-separator {
+  margin: 0 4px;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .breadcrumb-link:hover {
+    background: var(--hover-bg, #3d3d5c);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .breadcrumbs {
+    font-size: 0.8rem;
+  }
+
+  .breadcrumb-name {
+    max-width: 80px;
+  }
+
+  .breadcrumbs.compact .breadcrumb-name {
+    max-width: 60px;
+  }
+}
