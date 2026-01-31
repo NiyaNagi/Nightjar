@@ -1,4 +1,4 @@
-# Nahma Unified Server
+# Nightjar Unified Server
 
 A single server that provides everything needed for browser-based P2P collaboration.
 
@@ -6,7 +6,7 @@ A single server that provides everything needed for browser-based P2P collaborat
 
 | Feature | Description |
 |---------|-------------|
-| **Static Hosting** | Serves the Nahma React app |
+| **Static Hosting** | Serves the Nightjar React app |
 | **Signaling** | WebSocket server for WebRTC peer discovery |
 | **Optional Persistence** | Stores encrypted workspace data (user choice) |
 
@@ -81,7 +81,7 @@ cd server/unified
 docker compose up -d
 
 # Check logs
-docker logs nahma
+docker logs Nightjar
 
 # Check health
 curl http://localhost:3000/health
@@ -93,7 +93,7 @@ curl http://localhost:3000/health
 |----------|---------|-------------|
 | `PORT` | 3000 | Server port |
 | `STATIC_PATH` | `../../frontend/dist` | Path to built React app |
-| `DB_PATH` | `./data/nahma.db` | SQLite database path |
+| `DB_PATH` | `./data/Nightjar.db` | SQLite database path |
 | `MAX_PEERS_PER_ROOM` | 100 | Max concurrent users per workspace |
 
 ## API

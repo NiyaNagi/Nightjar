@@ -40,7 +40,7 @@ const isProduction = () => {
       return true;
     }
     // Check window-based env (set by build process)
-    if (typeof window !== 'undefined' && window.__NAHMA_ENV__ === 'production') {
+    if (typeof window !== 'undefined' && window.__Nightjar_ENV__ === 'production') {
       return true;
     }
     return false;

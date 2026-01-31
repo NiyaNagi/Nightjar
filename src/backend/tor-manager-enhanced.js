@@ -79,7 +79,7 @@ class TorManager extends EventEmitter {
     }
     
     const torrcContent = `
-# Nahma Tor Configuration
+# Nightjar Tor Configuration
 DataDirectory ${this.options.dataDir.replace(/\\/g, '/')}
 SocksPort ${this.options.socksPort}
 ControlPort ${this.options.controlPort}

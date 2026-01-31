@@ -75,7 +75,7 @@ function createMockNativeBridge(windowObj, storage) {
                 if (platform.isElectron()) {
                     return windowObj.electronAPI.identity.load();
                 }
-                const stored = storage.get('nahma_identity');
+                const stored = storage.get('Nightjar_identity');
                 return stored ? JSON.parse(stored) : null;
             },
             
@@ -83,7 +83,7 @@ function createMockNativeBridge(windowObj, storage) {
                 if (platform.isElectron()) {
                     return windowObj.electronAPI.identity.store(identity);
                 }
-                storage.set('nahma_identity', JSON.stringify(identity));
+                storage.set('Nightjar_identity', JSON.stringify(identity));
                 return true;
             },
             
@@ -100,7 +100,7 @@ function createMockNativeBridge(windowObj, storage) {
                 if (platform.isElectron()) {
                     return windowObj.electronAPI.identity.delete();
                 }
-                storage.delete('nahma_identity');
+                storage.delete('Nightjar_identity');
                 return true;
             },
             
@@ -108,7 +108,7 @@ function createMockNativeBridge(windowObj, storage) {
                 if (platform.isElectron()) {
                     return windowObj.electronAPI.identity.hasIdentity();
                 }
-                return storage.has('nahma_identity');
+                return storage.has('Nightjar_identity');
             }
         }
     };

@@ -38,12 +38,12 @@ describe('Migration', () => {
     });
 
     test('returns true when version is old', () => {
-      localStorage.setItem('nahma-migration-version', '1');
+      localStorage.setItem('Nightjar-migration-version', '1');
       expect(needsMigration()).toBe(true);
     });
 
     test('returns false when version is current', () => {
-      localStorage.setItem('nahma-migration-version', '2');
+      localStorage.setItem('Nightjar-migration-version', '2');
       expect(needsMigration()).toBe(false);
     });
   });
@@ -54,7 +54,7 @@ describe('Migration', () => {
     });
 
     test('returns stored version', () => {
-      localStorage.setItem('nahma-migration-version', '1');
+      localStorage.setItem('Nightjar-migration-version', '1');
       expect(getSchemaVersion()).toBe(1);
     });
   });
@@ -70,7 +70,7 @@ describe('Migration', () => {
     });
 
     test('detects legacy documents without workspaceId', () => {
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1' },
         { id: 'doc2', name: 'Doc 2' },
       ]));
@@ -83,7 +83,7 @@ describe('Migration', () => {
     });
 
     test('detects legacy folders without workspaceId', () => {
-      localStorage.setItem('nahma-folders', JSON.stringify([
+      localStorage.setItem('Nightjar-folders', JSON.stringify([
         { id: 'folder1', name: 'Folder 1' },
       ]));
 
@@ -95,7 +95,7 @@ describe('Migration', () => {
     });
 
     test('ignores already-migrated items', () => {
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1', workspaceId: 'ws-123' },
         { id: 'doc2', name: 'Doc 2' }, // Only this needs migration
       ]));
@@ -115,7 +115,7 @@ describe('Migration', () => {
     });
 
     test('succeeds with no legacy data', async () => {
-      localStorage.setItem('nahma-migration-version', '2');
+      localStorage.setItem('Nightjar-migration-version', '2');
       
       const result = await runMigration({
         identity: mockIdentity,
@@ -126,7 +126,7 @@ describe('Migration', () => {
     });
 
     test('creates default workspace for legacy data', async () => {
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1' },
       ]));
 
@@ -144,7 +144,7 @@ describe('Migration', () => {
     });
 
     test('migrates legacy documents', async () => {
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1' },
         { id: 'doc2', name: 'Doc 2' },
       ]));
@@ -159,11 +159,11 @@ describe('Migration', () => {
     });
 
     test('migrates legacy folders', async () => {
-      localStorage.setItem('nahma-folders', JSON.stringify([
+      localStorage.setItem('Nightjar-folders', JSON.stringify([
         { id: 'folder1', name: 'Folder 1' },
         { id: 'folder2', name: 'Folder 2' },
       ]));
-      localStorage.setItem('nahma-documents', JSON.stringify([]));
+      localStorage.setItem('Nightjar-documents', JSON.stringify([]));
 
       const result = await runMigration({
         identity: mockIdentity,
@@ -175,7 +175,7 @@ describe('Migration', () => {
     });
 
     test('calls progress callback', async () => {
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1' },
       ]));
 
@@ -199,11 +199,11 @@ describe('Migration', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(localStorage.getItem('nahma-migration-version')).toBe('2');
+      expect(localStorage.getItem('Nightjar-migration-version')).toBe('2');
     });
 
     test('sends workspace creation to sidecar', async () => {
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1' },
       ]));
 
@@ -222,14 +222,14 @@ describe('Migration', () => {
 
   describe('rollbackMigration', () => {
     test('removes migration flags', () => {
-      localStorage.setItem('nahma-migration-version', '2');
-      localStorage.setItem('nahma-migration-record', JSON.stringify({ test: true }));
+      localStorage.setItem('Nightjar-migration-version', '2');
+      localStorage.setItem('Nightjar-migration-record', JSON.stringify({ test: true }));
 
       const result = rollbackMigration();
 
       expect(result).toBe(true);
-      expect(localStorage.getItem('nahma-migration-version')).toBeNull();
-      expect(localStorage.getItem('nahma-migration-record')).toBeNull();
+      expect(localStorage.getItem('Nightjar-migration-version')).toBeNull();
+      expect(localStorage.getItem('Nightjar-migration-record')).toBeNull();
     });
   });
 
@@ -244,7 +244,7 @@ describe('Migration', () => {
         fromVersion: 1,
         toVersion: 2,
       };
-      localStorage.setItem('nahma-migration-record', JSON.stringify(record));
+      localStorage.setItem('Nightjar-migration-record', JSON.stringify(record));
 
       const result = getMigrationRecord();
       
@@ -256,8 +256,8 @@ describe('Migration', () => {
 
   describe('getMigrationStatus', () => {
     test('returns complete status object', () => {
-      localStorage.setItem('nahma-migration-version', '1');
-      localStorage.setItem('nahma-documents', JSON.stringify([
+      localStorage.setItem('Nightjar-migration-version', '1');
+      localStorage.setItem('Nightjar-documents', JSON.stringify([
         { id: 'doc1', name: 'Doc 1' },
       ]));
 
@@ -270,7 +270,7 @@ describe('Migration', () => {
     });
 
     test('shows no migration needed when current', () => {
-      localStorage.setItem('nahma-migration-version', '2');
+      localStorage.setItem('Nightjar-migration-version', '2');
 
       const status = getMigrationStatus();
 

@@ -1,5 +1,5 @@
 /**
- * Nahma Integration Test Runner
+ * Nightjar Integration Test Runner
  * 
  * This is the main entry point for the Ralph Wiggum autonomous testing loop.
  * It runs all integration tests and outputs machine-parseable results.
@@ -410,7 +410,7 @@ function printSummary() {
  */
 async function main() {
     console.log('╔══════════════════════════════════════════════════════════╗');
-    console.log('║       NAHMA INTEGRATION TEST SUITE                       ║');
+    console.log('║       Nightjar INTEGRATION TEST SUITE                       ║');
     console.log('║       For Ralph Wiggum Autonomous Testing Loop           ║');
     console.log('╚══════════════════════════════════════════════════════════╝');
 

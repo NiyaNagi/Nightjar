@@ -14,7 +14,7 @@ const crypto = require('crypto');
 const readline = require('readline');
 
 // Use a fixed topic for testing - both machines must use the same one
-const TOPIC_NAME = process.argv[2] || 'nahma-test-topic';
+const TOPIC_NAME = process.argv[2] || 'Nightjar-test-topic';
 const topic = crypto.createHash('sha256').update(TOPIC_NAME).digest();
 
 console.log('='.repeat(60));

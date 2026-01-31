@@ -63,7 +63,7 @@ const loadUserProfile = () => {
     }
     
     try {
-        const saved = localStorage.getItem('nahma-user-profile');
+        const saved = localStorage.getItem('Nightjar-user-profile');
         if (saved) {
             return JSON.parse(saved);
         }
@@ -80,7 +80,7 @@ const loadUserProfile = () => {
 // Save user profile to localStorage
 const saveUserProfile = (profile) => {
     try {
-        localStorage.setItem('nahma-user-profile', JSON.stringify(profile));
+        localStorage.setItem('Nightjar-user-profile', JSON.stringify(profile));
     } catch (e) {
         console.error('Failed to save user profile:', e);
     }
@@ -114,7 +114,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
     const [success, setSuccess] = useState(null);
     const [preferences, setPreferences] = useState(() => {
         try {
-            const saved = localStorage.getItem('nahma_preferences');
+            const saved = localStorage.getItem('Nightjar_preferences');
             return saved ? JSON.parse(saved) : {
                 showCursor: true,
                 showSelection: true,
@@ -194,7 +194,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
         setPreferences(prev => {
             const updated = { ...prev, [key]: value };
             try {
-                localStorage.setItem('nahma_preferences', JSON.stringify(updated));
+                localStorage.setItem('Nightjar_preferences', JSON.stringify(updated));
             } catch (e) {
                 console.error('Failed to save preferences:', e);
             }
@@ -206,7 +206,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
         if (!identity) return;
         try {
             // Get workspaces from localStorage for backup
-            const workspacesData = localStorage.getItem('nahma-workspaces');
+            const workspacesData = localStorage.getItem('Nightjar-workspaces');
             const workspaces = workspacesData ? JSON.parse(workspacesData) : [];
             const backup = createBackup(identity, workspaces);
             downloadBackup(backup);

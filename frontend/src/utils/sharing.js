@@ -28,7 +28,7 @@
  *   - Each link is unique - you can't change permission by editing the URL
  * 
  * Legacy formats still supported for backwards compatibility:
- *   - nahma://{type}/{id}#p:{password}&perm:{level}
+ *   - Nightjar://{type}/{id}#p:{password}&perm:{level}
  */
 
 import { secureError, secureWarn } from './secureLogger';
@@ -153,7 +153,7 @@ function decodePeerList(encoded) {
  * Share link format:
  * 
  * New format (v3):
- *   nahma://{type}/{base62(payload)}#p:{password}&perm:{level}
+ *   Nightjar://{type}/{base62(payload)}#p:{password}&perm:{level}
  * 
  * Entity Type Codes:
  *   - w: workspace
@@ -178,7 +178,7 @@ function decodePeerList(encoded) {
  * - bit 3-7: reserved
  * 
  * Legacy format (v2) still supported for backwards compatibility:
- *   nahma://d/{payload}#p:{password}
+ *   Nightjar://d/{payload}#p:{password}
  */
 
 const PROTOCOL_VERSION = 4; // Version 4: P2P with bootstrap peers
@@ -213,7 +213,7 @@ const CODE_TO_PERMISSION = {
 };
 
 // Legacy prefix for backwards compatibility
-const LEGACY_LINK_PREFIX = 'nahma://d/';
+const LEGACY_LINK_PREFIX = 'Nightjar://d/';
 
 /**
  * Generate a shareable link for a workspace, folder, or document
@@ -274,7 +274,7 @@ export function generateShareLink(options) {
   
   // Build link with entity type prefix
   const typeCode = ENTITY_TYPES[entityType] || 'd';
-  let link = `nahma://${typeCode}/${encoded}`;
+  let link = `Nightjar://${typeCode}/${encoded}`;
   
   // Build fragment with password and permission
   const fragmentParts = [];
@@ -334,7 +334,7 @@ export function parseShareLink(link) {
   let entityType = 'document'; // Default for legacy links
   
   // Check for compressed format - cannot parse synchronously
-  if (encoded.startsWith('nahma://c/')) {
+  if (encoded.startsWith('Nightjar://c/')) {
     throw new Error('Compressed link detected. Use parseShareLinkAsync() instead.');
   }
   
@@ -346,8 +346,8 @@ export function parseShareLink(link) {
   }
   
   // Parse entity type from protocol prefix
-  if (encoded.startsWith('nahma://')) {
-    const afterProtocol = encoded.slice('nahma://'.length);
+  if (encoded.startsWith('Nightjar://')) {
+    const afterProtocol = encoded.slice('Nightjar://'.length);
     const slashIndex = afterProtocol.indexOf('/');
     
     if (slashIndex !== -1) {
@@ -358,7 +358,7 @@ export function parseShareLink(link) {
         entityType = CODE_TO_ENTITY[typeCode];
         encoded = afterProtocol.slice(slashIndex + 1);
       } else if (typeCode === 'd') {
-        // Legacy format: nahma://d/...
+        // Legacy format: Nightjar://d/...
         entityType = 'document';
         encoded = afterProtocol.slice(slashIndex + 1);
       } else {
@@ -491,26 +491,26 @@ export function isValidShareLink(link) {
 
 /**
  * Extract a compact share code from a full share link
- * The code is just the entity type + encoded payload (without nahma:// prefix)
- * @param {string} link - Full nahma:// share link
+ * The code is just the entity type + encoded payload (without Nightjar:// prefix)
+ * @param {string} link - Full Nightjar:// share link
  * @returns {string} Compact share code (e.g., "w/abc123#p:mypass&perm:e")
  */
 export function extractShareCode(link) {
   if (!link) return '';
-  // Remove the nahma:// prefix
-  return link.replace(/^nahma:\/\//, '');
+  // Remove the Nightjar:// prefix
+  return link.replace(/^Nightjar:\/\//, '');
 }
 
 /**
  * Expand a share code back to a full link
  * @param {string} code - Compact share code
- * @returns {string} Full nahma:// link
+ * @returns {string} Full Nightjar:// link
  */
 export function expandShareCode(code) {
   if (!code) return '';
-  // Add the nahma:// prefix if not present
-  if (code.startsWith('nahma://')) return code;
-  return `nahma://${code}`;
+  // Add the Nightjar:// prefix if not present
+  if (code.startsWith('Nightjar://')) return code;
+  return `Nightjar://${code}`;
 }
 
 /**
@@ -527,7 +527,7 @@ export function generateShareMessage(options) {
     : permission === 'editor' ? 'editor' 
     : 'view-only';
   
-  return `Join my Nahma workspace "${workspaceName}" with ${permLabel} access:\n\n${link}\n\nOpen the link in Nahma to connect.`;
+  return `Join my Nightjar workspace "${workspaceName}" with ${permLabel} access:\n\n${link}\n\nOpen the link in Nightjar to connect.`;
 }
 
 /**
@@ -905,8 +905,8 @@ export function parseInviteLink(link) {
     return { token: trimmed };
   }
   
-  // Try legacy nahma:// format
-  if (trimmed.startsWith('nahma://')) {
+  // Try legacy Nightjar:// format
+  if (trimmed.startsWith('Nightjar://')) {
     try {
       const parsed = parseShareLink(trimmed);
       return {
@@ -929,7 +929,7 @@ export function parseInviteLink(link) {
  * - Is signed by the workspace owner
  * - Can be verified by any peer without server
  * 
- * Format: nahma://w/{payload}#key:{encKey}&exp:{timestamp}&perm:{permission}&sig:{signature}
+ * Format: Nightjar://w/{payload}#key:{encKey}&exp:{timestamp}&perm:{permission}&sig:{signature}
  * 
  * @param {Object} options - Invite options
  * @param {string} options.workspaceId - Workspace ID (32 hex chars)
@@ -1082,16 +1082,16 @@ export function isInviteLink(link) {
  * Preserves all information - can be fully decompressed
  * Uses Web Compression API (CompressionStream) where available
  * 
- * @param {string} link - Full nahma:// link
- * @returns {Promise<string>} Compressed link in format: nahma://c/{compressedData}
+ * @param {string} link - Full Nightjar:// link
+ * @returns {Promise<string>} Compressed link in format: Nightjar://c/{compressedData}
  */
 export async function compressShareLink(link) {
-  if (!link || !link.startsWith('nahma://')) {
+  if (!link || !link.startsWith('Nightjar://')) {
     return link;
   }
   
-  // Extract everything after nahma://
-  const content = link.slice('nahma://'.length);
+  // Extract everything after Nightjar://
+  const content = link.slice('Nightjar://'.length);
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
   
@@ -1121,7 +1121,7 @@ export async function compressShareLink(link) {
       
       // Only use compressed if it's actually shorter
       if (compressed.length < data.length) {
-        return 'nahma://c/' + base62Encode(compressed);
+        return 'Nightjar://c/' + base62Encode(compressed);
       }
     }
   } catch (e) {
@@ -1134,15 +1134,15 @@ export async function compressShareLink(link) {
 
 /**
  * Decompress a compressed share link
- * @param {string} link - Compressed nahma://c/... link
+ * @param {string} link - Compressed Nightjar://c/... link
  * @returns {Promise<string>} Original full link
  */
 export async function decompressShareLink(link) {
-  if (!link || !link.startsWith('nahma://c/')) {
+  if (!link || !link.startsWith('Nightjar://c/')) {
     return link; // Not compressed, return as-is
   }
   
-  const compressed = link.slice('nahma://c/'.length);
+  const compressed = link.slice('Nightjar://c/'.length);
   const compressedBytes = base62Decode(compressed);
   
   try {
@@ -1169,7 +1169,7 @@ export async function decompressShareLink(link) {
       }
       
       const decoder = new TextDecoder();
-      return 'nahma://' + decoder.decode(decompressed);
+      return 'Nightjar://' + decoder.decode(decompressed);
     }
   } catch (e) {
     secureError('Decompression failed:', e);
@@ -1184,7 +1184,7 @@ export async function decompressShareLink(link) {
  * @returns {boolean}
  */
 export function isCompressedLink(link) {
-  return link && link.startsWith('nahma://c/');
+  return link && link.startsWith('Nightjar://c/');
 }
 
 /**

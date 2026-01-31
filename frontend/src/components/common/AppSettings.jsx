@@ -37,7 +37,7 @@ const FONT_OPTIONS = [
 // Load settings from localStorage
 const loadSettings = () => {
   try {
-    const saved = localStorage.getItem('nahma-app-settings');
+    const saved = localStorage.getItem('Nightjar-app-settings');
     if (saved) {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
     }
@@ -50,7 +50,7 @@ const loadSettings = () => {
 // Save settings to localStorage
 const saveSettings = (settings) => {
   try {
-    localStorage.setItem('nahma-app-settings', JSON.stringify(settings));
+    localStorage.setItem('Nightjar-app-settings', JSON.stringify(settings));
   } catch (e) {
     console.error('Failed to save settings:', e);
   }
@@ -140,7 +140,7 @@ export default function AppSettings({ isOpen, onClose }) {
       if (window.electronAPI?.tor) {
         const status = await window.electronAPI.tor.getStatus();
         setTorStatus(status);
-        const savedMode = localStorage.getItem('nahma_tor_mode') || 'disabled';
+        const savedMode = localStorage.getItem('Nightjar_tor_mode') || 'disabled';
         setTorMode(savedMode);
       }
       
@@ -233,7 +233,7 @@ export default function AppSettings({ isOpen, onClose }) {
   // Handle Tor mode change
   const handleTorModeChange = async (newMode) => {
     setTorMode(newMode);
-    localStorage.setItem('nahma_tor_mode', newMode);
+    localStorage.setItem('Nightjar_tor_mode', newMode);
     
     if (window.electronAPI?.tor) {
       if (newMode === 'disabled') {
@@ -635,20 +635,20 @@ export default function AppSettings({ isOpen, onClose }) {
               <div className="app-settings__section">
                 <div className="app-settings__about">
                   <div className="app-settings__about-logo">📝</div>
-                  <h3 className="app-settings__about-name">Nahma</h3>
+                  <h3 className="app-settings__about-name">Nightjar</h3>
                   <p className="app-settings__about-version">Version 1.0.0</p>
                   <p className="app-settings__about-desc">
                     Secure, decentralized collaborative text editor with end-to-end encryption and peer-to-peer sync.
                   </p>
                   
                   <div className="app-settings__about-links">
-                    <a href="https://github.com/nahma/nahma" target="_blank" rel="noopener noreferrer">
+                    <a href="https://github.com/Nightjar/Nightjar" target="_blank" rel="noopener noreferrer">
                       GitHub Repository
                     </a>
-                    <a href="https://nahma.dev/docs" target="_blank" rel="noopener noreferrer">
+                    <a href="https://Nightjar.dev/docs" target="_blank" rel="noopener noreferrer">
                       Documentation
                     </a>
-                    <a href="https://nahma.dev/support" target="_blank" rel="noopener noreferrer">
+                    <a href="https://Nightjar.dev/support" target="_blank" rel="noopener noreferrer">
                       Support
                     </a>
                   </div>

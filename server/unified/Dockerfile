@@ -25,15 +25,15 @@ RUN mkdir -p /app/server/unified/data
 # Environment
 ENV PORT=3000
 ENV STATIC_PATH=/app/frontend/dist
-ENV DB_PATH=/app/server/unified/data/nahma.db
+ENV DB_PATH=/app/server/unified/data/Nightjar.db
 
 EXPOSE 3000
 
 WORKDIR /app/server/unified
 
 # Run as non-root
-RUN addgroup -S nahma && adduser -S nahma -G nahma
-RUN chown -R nahma:nahma /app
-USER nahma
+RUN addgroup -S Nightjar && adduser -S Nightjar -G Nightjar
+RUN chown -R Nightjar:Nightjar /app
+USER Nightjar
 
 CMD ["node", "index.js"]

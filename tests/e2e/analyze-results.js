@@ -1,5 +1,5 @@
 /**
- * Nahma E2E Test Report Analyzer
+ * Nightjar E2E Test Report Analyzer
  * 
  * This script analyzes Playwright test results and generates a structured report
  * that can be fed to AI for bug analysis and fixing.

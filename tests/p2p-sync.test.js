@@ -1,5 +1,5 @@
 /**
- * P2P Synchronization Test Suite for Nahma
+ * P2P Synchronization Test Suite for Nightjar
  * 
  * This test suite covers:
  * - Local WebSocket sync between multiple clients
@@ -313,7 +313,7 @@ const testGetStatus = test('Get Status Command', async () => {
 
 async function runAllTests() {
     console.log('╔══════════════════════════════════════════╗');
-    console.log('║     NAHMA P2P SYNCHRONIZATION TESTS     ║');
+    console.log('║     Nightjar P2P SYNCHRONIZATION TESTS     ║');
     console.log('╚══════════════════════════════════════════╝');
     console.log('\nMake sure the sidecar is running: node sidecar/index.js\n');
     

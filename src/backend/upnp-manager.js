@@ -1,5 +1,5 @@
 /**
- * UPnP Manager for Nahma Electron App
+ * UPnP Manager for Nightjar Electron App
  * 
  * Handles UPnP port mapping to make the local relay server
  * accessible from the internet. This enables peer-to-peer
@@ -25,7 +25,7 @@ class UPnPManager {
     this.client = null;
     this.internalPort = options.internalPort || DEFAULT_INTERNAL_PORT;
     this.externalPort = options.externalPort || DEFAULT_EXTERNAL_PORT;
-    this.description = options.description || 'Nahma P2P Relay';
+    this.description = options.description || 'Nightjar P2P Relay';
     
     // State
     this.isEnabled = false;
@@ -250,7 +250,7 @@ class UPnPManager {
         `  - Internal IP: Your computer's local IP address`,
         `Save and apply the settings`,
       ],
-      note: 'After setting up port forwarding, restart Nahma to enable relay mode.',
+      note: 'After setting up port forwarding, restart Nightjar to enable relay mode.',
     };
   }
 }

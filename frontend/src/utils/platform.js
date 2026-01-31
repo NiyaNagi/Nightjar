@@ -50,7 +50,7 @@ export const NativeBridge = {
         return window.electronAPI.identity.load();
       }
       // For Capacitor, use localStorage with encryption
-      const stored = localStorage.getItem('nahma_identity');
+      const stored = localStorage.getItem('Nightjar_identity');
       return stored ? JSON.parse(stored) : null;
     },
     
@@ -59,7 +59,7 @@ export const NativeBridge = {
         return window.electronAPI.identity.store(identity);
       }
       // For Capacitor, use localStorage
-      localStorage.setItem('nahma_identity', JSON.stringify(identity));
+      localStorage.setItem('Nightjar_identity', JSON.stringify(identity));
       return true;
     },
     
@@ -79,7 +79,7 @@ export const NativeBridge = {
       if (Platform.isElectron()) {
         return window.electronAPI.identity.delete();
       }
-      localStorage.removeItem('nahma_identity');
+      localStorage.removeItem('Nightjar_identity');
       return true;
     },
     
@@ -87,7 +87,7 @@ export const NativeBridge = {
       if (Platform.isElectron()) {
         return window.electronAPI.identity.hasIdentity();
       }
-      return localStorage.getItem('nahma_identity') !== null;
+      return localStorage.getItem('Nightjar_identity') !== null;
     },
     
     async export(password) {

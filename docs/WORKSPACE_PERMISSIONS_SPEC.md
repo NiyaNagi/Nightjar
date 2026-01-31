@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-Nahma supports hierarchical content organization with workspaces, folders, and documents. Users can share at any level of the hierarchy, with permissions that automatically apply to all content beneath the shared entity.
+Nightjar supports hierarchical content organization with workspaces, folders, and documents. Users can share at any level of the hierarchy, with permissions that automatically apply to all content beneath the shared entity.
 
 ### Content Hierarchy
 
@@ -72,9 +72,9 @@ User
 Keys are derived using Argon2id from parent key + entity ID:
 
 ```
-workspaceKey = Argon2id(password, salt="nahma-v1-workspace-{workspaceId}")
-folderKey    = Argon2id(workspaceKey, salt="nahma-v1-folder-{folderId}")
-documentKey  = Argon2id(folderKey, salt="nahma-v1-document-{documentId}")
+workspaceKey = Argon2id(password, salt="Nightjar-v1-workspace-{workspaceId}")
+folderKey    = Argon2id(workspaceKey, salt="Nightjar-v1-folder-{folderId}")
+documentKey  = Argon2id(folderKey, salt="Nightjar-v1-document-{documentId}")
 ```
 
 ### 3.2 Key Derivation Parameters
@@ -188,7 +188,7 @@ interface Document {
 ### 7.1 Link Format
 
 ```
-nahma://{type}/{id}#p:{password}&perm:{level}
+Nightjar://{type}/{id}#p:{password}&perm:{level}
 ```
 
 - **type**: `w` (workspace), `f` (folder), `d` (document)
@@ -199,9 +199,9 @@ nahma://{type}/{id}#p:{password}&perm:{level}
 ### 7.2 Examples
 
 ```
-nahma://w/abc123#p:azure-dolphin-7-bright-falcon&perm:o
-nahma://f/def456#p:swift-tiger-3-calm-river&perm:e
-nahma://d/ghi789#p:gentle-wave-9-bold-mountain&perm:v
+Nightjar://w/abc123#p:azure-dolphin-7-bright-falcon&perm:o
+Nightjar://f/def456#p:swift-tiger-3-calm-river&perm:e
+Nightjar://d/ghi789#p:gentle-wave-9-bold-mountain&perm:v
 ```
 
 ### 7.3 Link Behavior

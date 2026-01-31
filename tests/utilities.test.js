@@ -307,7 +307,7 @@ describe('NativeBridge', () => {
 
     test('returns stored identity from localStorage', async () => {
       const mockIdentity = { handle: 'TestUser', publicKey: 'abc123' };
-      localStorage.setItem('nahma_identity', JSON.stringify(mockIdentity));
+      localStorage.setItem('Nightjar_identity', JSON.stringify(mockIdentity));
       
       const identity = await NativeBridge.identity.load();
       expect(identity.handle).toBe('TestUser');
@@ -321,7 +321,7 @@ describe('NativeBridge', () => {
       const result = await NativeBridge.identity.store(mockIdentity);
       
       expect(result).toBe(true);
-      const stored = JSON.parse(localStorage.getItem('nahma_identity'));
+      const stored = JSON.parse(localStorage.getItem('Nightjar_identity'));
       expect(stored.handle).toBe('TestUser');
     });
   });
@@ -329,11 +329,11 @@ describe('NativeBridge', () => {
   describe('identity.update (web fallback)', () => {
     test('updates existing identity', async () => {
       const mockIdentity = { handle: 'OldName', publicKey: 'abc123' };
-      localStorage.setItem('nahma_identity', JSON.stringify(mockIdentity));
+      localStorage.setItem('Nightjar_identity', JSON.stringify(mockIdentity));
       
       await NativeBridge.identity.update({ handle: 'NewName' });
       
-      const stored = JSON.parse(localStorage.getItem('nahma_identity'));
+      const stored = JSON.parse(localStorage.getItem('Nightjar_identity'));
       expect(stored.handle).toBe('NewName');
       expect(stored.publicKey).toBe('abc123');
     });

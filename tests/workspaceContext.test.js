@@ -219,11 +219,11 @@ describe('Workspace Persistence', () => {
 
   describe('Save and Load', () => {
     const saveWorkspaces = (workspaces) => {
-      localStorage.setItem('nahma-workspaces', JSON.stringify(workspaces));
+      localStorage.setItem('Nightjar-workspaces', JSON.stringify(workspaces));
     };
 
     const loadWorkspaces = () => {
-      const stored = localStorage.getItem('nahma-workspaces');
+      const stored = localStorage.getItem('Nightjar-workspaces');
       if (!stored) return [];
       try {
         return JSON.parse(stored);
@@ -236,13 +236,13 @@ describe('Workspace Persistence', () => {
       const workspaces = [{ id: 'ws-1', name: 'Test' }];
       saveWorkspaces(workspaces);
       
-      const stored = localStorage.getItem('nahma-workspaces');
+      const stored = localStorage.getItem('Nightjar-workspaces');
       expect(stored).toBeDefined();
       expect(JSON.parse(stored)).toEqual(workspaces);
     });
 
     test('loads workspaces from localStorage', () => {
-      localStorage.setItem('nahma-workspaces', JSON.stringify([
+      localStorage.setItem('Nightjar-workspaces', JSON.stringify([
         { id: 'ws-1', name: 'Test' }
       ]));
       
@@ -258,7 +258,7 @@ describe('Workspace Persistence', () => {
     });
 
     test('returns empty array for invalid JSON', () => {
-      localStorage.setItem('nahma-workspaces', 'invalid json');
+      localStorage.setItem('Nightjar-workspaces', 'invalid json');
       
       const loaded = loadWorkspaces();
       expect(loaded).toEqual([]);
@@ -268,30 +268,30 @@ describe('Workspace Persistence', () => {
   describe('Current Workspace Persistence', () => {
     const saveCurrentWorkspaceId = (id) => {
       if (id) {
-        localStorage.setItem('nahma-current-workspace', id);
+        localStorage.setItem('Nightjar-current-workspace', id);
       } else {
-        localStorage.removeItem('nahma-current-workspace');
+        localStorage.removeItem('Nightjar-current-workspace');
       }
     };
 
     const loadCurrentWorkspaceId = () => {
-      return localStorage.getItem('nahma-current-workspace');
+      return localStorage.getItem('Nightjar-current-workspace');
     };
 
     test('saves current workspace ID', () => {
       saveCurrentWorkspaceId('ws-123');
-      expect(localStorage.getItem('nahma-current-workspace')).toBe('ws-123');
+      expect(localStorage.getItem('Nightjar-current-workspace')).toBe('ws-123');
     });
 
     test('loads current workspace ID', () => {
-      localStorage.setItem('nahma-current-workspace', 'ws-456');
+      localStorage.setItem('Nightjar-current-workspace', 'ws-456');
       expect(loadCurrentWorkspaceId()).toBe('ws-456');
     });
 
     test('removes current workspace ID when null', () => {
-      localStorage.setItem('nahma-current-workspace', 'ws-123');
+      localStorage.setItem('Nightjar-current-workspace', 'ws-123');
       saveCurrentWorkspaceId(null);
-      expect(localStorage.getItem('nahma-current-workspace')).toBeNull();
+      expect(localStorage.getItem('Nightjar-current-workspace')).toBeNull();
     });
   });
 });

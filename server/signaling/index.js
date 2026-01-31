@@ -1,5 +1,5 @@
 /**
- * Nahma Signaling Server
+ * Nightjar Signaling Server
  * 
  * Minimal WebSocket server for WebRTC peer discovery.
  * This server ONLY routes signaling messages - it never sees document content.
@@ -345,7 +345,7 @@ setInterval(() => {
 
 console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║           Nahma Signaling Server                          ║
+║           Nightjar Signaling Server                          ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Port: ${PORT.toString().padEnd(49)}║
 ║  Max peers per room: ${MAX_PEERS_PER_ROOM.toString().padEnd(36)}║

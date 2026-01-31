@@ -1,4 +1,4 @@
-# Visual UI Testing for Nahma
+# Visual UI Testing for Nightjar
 
 This document explains the autonomous visual UI testing system that allows AI to inspect, reason over, and fix UI bugs.
 

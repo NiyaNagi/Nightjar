@@ -28,7 +28,7 @@ describe('Sharing Utilities', () => {
         password: 'test-password',
       });
 
-      expect(link).toMatch(/^nahma:\/\/w\//);
+      expect(link).toMatch(/^Nightjar:\/\/w\//);
       expect(link).toContain('perm:o');
       expect(link).toContain('p:test-password');
     });
@@ -42,7 +42,7 @@ describe('Sharing Utilities', () => {
         password: 'folder-pass',
       });
 
-      expect(link).toMatch(/^nahma:\/\/f\//);
+      expect(link).toMatch(/^Nightjar:\/\/f\//);
       expect(link).toContain('perm:e');
     });
 
@@ -55,7 +55,7 @@ describe('Sharing Utilities', () => {
         password: 'doc-pass',
       });
 
-      expect(link).toMatch(/^nahma:\/\/d\//);
+      expect(link).toMatch(/^Nightjar:\/\/d\//);
       expect(link).toContain('perm:v');
     });
 
@@ -136,7 +136,7 @@ describe('Sharing Utilities', () => {
 
     test('throws on invalid link format', () => {
       expect(() => parseShareLink('invalid')).toThrow();
-      expect(() => parseShareLink('nahma://x/abc')).toThrow();
+      expect(() => parseShareLink('Nightjar://x/abc')).toThrow();
     });
 
     test('round-trip: generate then parse returns same data', () => {
@@ -174,7 +174,7 @@ describe('Sharing Utilities', () => {
     test('rejects invalid links', () => {
       expect(isValidShareLink('')).toBe(false);
       expect(isValidShareLink('http://example.com')).toBe(false);
-      expect(isValidShareLink('nahma://invalid')).toBe(false);
+      expect(isValidShareLink('Nightjar://invalid')).toBe(false);
       expect(isValidShareLink(null)).toBe(false);
       expect(isValidShareLink(undefined)).toBe(false);
     });
@@ -189,7 +189,7 @@ describe('Sharing Utilities', () => {
 
       expect(result.entityId).toBeDefined();
       expect(result.entityId.length).toBe(32);
-      expect(result.shareLink).toMatch(/^nahma:\/\/w\//);
+      expect(result.shareLink).toMatch(/^Nightjar:\/\/w\//);
     });
 
     test('creates new folder with ID and share link', () => {
@@ -199,7 +199,7 @@ describe('Sharing Utilities', () => {
       });
 
       expect(result.entityId).toBeDefined();
-      expect(result.shareLink).toMatch(/^nahma:\/\/f\//);
+      expect(result.shareLink).toMatch(/^Nightjar:\/\/f\//);
     });
 
     test('creates new document with ID and share link', () => {
@@ -209,7 +209,7 @@ describe('Sharing Utilities', () => {
       });
 
       expect(result.entityId).toBeDefined();
-      expect(result.shareLink).toMatch(/^nahma:\/\/d\//);
+      expect(result.shareLink).toMatch(/^Nightjar:\/\/d\//);
     });
 
     test('generated IDs are unique', () => {

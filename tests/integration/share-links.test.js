@@ -44,7 +44,7 @@ const mockSharing = {
         
         // Simple base64 encoding for testing
         const payload = Buffer.from(entityId, 'hex').toString('base64url');
-        let link = `nahma://${typeCode}/${payload}`;
+        let link = `Nightjar://${typeCode}/${payload}`;
         
         const fragments = [];
         if (password) fragments.push(`p:${encodeURIComponent(password)}`);
@@ -74,8 +74,8 @@ const mockSharing = {
         }
         
         let entityType = 'document';
-        if (encoded.startsWith('nahma://')) {
-            const afterProtocol = encoded.slice('nahma://'.length);
+        if (encoded.startsWith('Nightjar://')) {
+            const afterProtocol = encoded.slice('Nightjar://'.length);
             const slashIndex = afterProtocol.indexOf('/');
             if (slashIndex !== -1) {
                 const typeCode = afterProtocol[0];
@@ -145,7 +145,7 @@ async function testGenerateDocumentLink() {
         permission: 'editor',
     });
 
-    assert.ok(link.startsWith('nahma://d/'), 'Document link should start with nahma://d/');
+    assert.ok(link.startsWith('Nightjar://d/'), 'Document link should start with Nightjar://d/');
     assert.contains(link, 'perm:e', 'Should have editor permission');
 }
 
@@ -161,7 +161,7 @@ async function testGenerateWorkspaceLink() {
         permission: 'owner',
     });
 
-    assert.ok(link.startsWith('nahma://w/'), 'Workspace link should start with nahma://w/');
+    assert.ok(link.startsWith('Nightjar://w/'), 'Workspace link should start with Nightjar://w/');
     assert.contains(link, 'perm:o', 'Should have owner permission');
 }
 
@@ -177,7 +177,7 @@ async function testGenerateFolderLink() {
         permission: 'viewer',
     });
 
-    assert.ok(link.startsWith('nahma://f/'), 'Folder link should start with nahma://f/');
+    assert.ok(link.startsWith('Nightjar://f/'), 'Folder link should start with Nightjar://f/');
     assert.contains(link, 'perm:v', 'Should have viewer permission');
 }
 
@@ -245,14 +245,14 @@ async function testInvalidLinkDetection() {
         '',
         'not-a-link',
         'https://example.com',
-        'nahma://',
-        'nahma://x/invalid',
+        'Nightjar://',
+        'Nightjar://x/invalid',
     ];
 
     for (const link of invalidLinks) {
         const isValid = mockSharing.isValidShareLink(link);
         // Empty entity ID means invalid
-        if (link && link.includes('nahma://') && link.length > 10) {
+        if (link && link.includes('Nightjar://') && link.length > 10) {
             // These might parse but have invalid structure
         }
     }

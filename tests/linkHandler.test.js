@@ -7,7 +7,7 @@ import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import {
   handleShareLink,
   handleShareLinkWithPassword,
-  isNahmaShareLink,
+  isNightjarShareLink,
   peekShareLink,
   copyShareLink,
 } from '../frontend/src/utils/linkHandler';
@@ -37,20 +37,20 @@ describe('Link Handler', () => {
     mockOptions.getDocument.mockReturnValue(null);
   });
 
-  describe('isNahmaShareLink', () => {
-    test('recognizes valid nahma links', () => {
-      expect(isNahmaShareLink('nahma://w/abc123')).toBe(true);
-      expect(isNahmaShareLink('nahma://f/xyz789')).toBe(true);
-      expect(isNahmaShareLink('nahma://d/def456')).toBe(true);
+  describe('isNightjarShareLink', () => {
+    test('recognizes valid Nightjar links', () => {
+      expect(isNightjarShareLink('Nightjar://w/abc123')).toBe(true);
+      expect(isNightjarShareLink('Nightjar://f/xyz789')).toBe(true);
+      expect(isNightjarShareLink('Nightjar://d/def456')).toBe(true);
     });
 
     test('rejects invalid links', () => {
-      expect(isNahmaShareLink('')).toBe(false);
-      expect(isNahmaShareLink('http://example.com')).toBe(false);
-      expect(isNahmaShareLink('https://nahma.com')).toBe(false);
-      expect(isNahmaShareLink(null)).toBe(false);
-      expect(isNahmaShareLink(undefined)).toBe(false);
-      expect(isNahmaShareLink(123)).toBe(false);
+      expect(isNightjarShareLink('')).toBe(false);
+      expect(isNightjarShareLink('http://example.com')).toBe(false);
+      expect(isNightjarShareLink('https://Nightjar.com')).toBe(false);
+      expect(isNightjarShareLink(null)).toBe(false);
+      expect(isNightjarShareLink(undefined)).toBe(false);
+      expect(isNightjarShareLink(123)).toBe(false);
     });
   });
 
@@ -289,9 +289,9 @@ describe('Link Handler', () => {
       const onSuccess = jest.fn();
       const onError = jest.fn();
 
-      await copyShareLink('nahma://test', { onSuccess, onError });
+      await copyShareLink('Nightjar://test', { onSuccess, onError });
 
-      expect(mockWriteText).toHaveBeenCalledWith('nahma://test');
+      expect(mockWriteText).toHaveBeenCalledWith('Nightjar://test');
       expect(onSuccess).toHaveBeenCalled();
       expect(onError).not.toHaveBeenCalled();
     });

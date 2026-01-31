@@ -11,10 +11,10 @@
  * - Falls back to localStorage if IndexedDB unavailable
  */
 
-const DB_NAME = 'nahma-identity';
+const DB_NAME = 'Nightjar-identity';
 const DB_VERSION = 1;
 const STORE_NAME = 'identity';
-const SALT_KEY = 'nahma-salt';
+const SALT_KEY = 'Nightjar-salt';
 
 /**
  * Generate cryptographically secure random bytes
@@ -224,7 +224,7 @@ export class WebIdentityStore {
       return !!data;
     } catch (e) {
       // Fallback to localStorage
-      return !!localStorage.getItem('nahma-identity');
+      return !!localStorage.getItem('Nightjar-identity');
     }
   }
 
@@ -236,7 +236,7 @@ export class WebIdentityStore {
       const data = await dbGet('identity');
       return data?.encrypted === true;
     } catch (e) {
-      const stored = localStorage.getItem('nahma-identity');
+      const stored = localStorage.getItem('Nightjar-identity');
       if (stored) {
         const data = JSON.parse(stored);
         return data?.encrypted === true;
@@ -271,7 +271,7 @@ export class WebIdentityStore {
     } catch (e) {
       // Fallback to localStorage
       console.warn('[WebIdentityStore] IndexedDB failed, using localStorage');
-      localStorage.setItem('nahma-identity', JSON.stringify(data));
+      localStorage.setItem('Nightjar-identity', JSON.stringify(data));
     }
   }
 
@@ -284,7 +284,7 @@ export class WebIdentityStore {
       data = await dbGet('identity');
     } catch (e) {
       // Fallback to localStorage
-      const stored = localStorage.getItem('nahma-identity');
+      const stored = localStorage.getItem('Nightjar-identity');
       if (stored) {
         data = JSON.parse(stored);
       }
@@ -318,7 +318,7 @@ export class WebIdentityStore {
     } catch (e) {
       // Ignore
     }
-    localStorage.removeItem('nahma-identity');
+    localStorage.removeItem('Nightjar-identity');
   }
 
   /**

@@ -1,6 +1,6 @@
-# Nahma QNAP NAS Deployment Guide
+# Nightjar QNAP NAS Deployment Guide
 
-This guide walks you through securely deploying Nahma on a QNAP NAS using Container Station. The deployment is designed with security as the primary concern.
+This guide walks you through securely deploying Nightjar on a QNAP NAS using Container Station. The deployment is designed with security as the primary concern.
 
 ## Table of Contents
 
@@ -136,13 +136,13 @@ certbot certonly --standalone -d yourdomain.com
 
 ```bash
 # Create SSL directory
-mkdir -p /share/Container/nahma/ssl
+mkdir -p /share/Container/Nightjar/ssl
 
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout /share/Container/nahma/ssl/privkey.pem \
-  -out /share/Container/nahma/ssl/fullchain.pem \
-  -subj "/CN=nahma.local"
+  -keyout /share/Container/Nightjar/ssl/privkey.pem \
+  -out /share/Container/Nightjar/ssl/fullchain.pem \
+  -subj "/CN=Nightjar.local"
 ```
 
 ⚠️ Self-signed certificates will show browser warnings.
@@ -156,41 +156,41 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 SSH into your NAS:
 
 ```bash
-# Create Nahma directory structure
-mkdir -p /share/Container/nahma/{ssl,data}
+# Create Nightjar directory structure
+mkdir -p /share/Container/Nightjar/{ssl,data}
 
 # Set permissions
-chmod 755 /share/Container/nahma
-chmod 700 /share/Container/nahma/ssl
-chmod 755 /share/Container/nahma/data
+chmod 755 /share/Container/Nightjar
+chmod 700 /share/Container/Nightjar/ssl
+chmod 755 /share/Container/Nightjar/data
 ```
 
 ### Step 2: Upload Application Files
 
 Option A: Via File Station
 1. Open **File Station**
-2. Navigate to `Container/nahma`
-3. Upload the entire `server` folder from the Nahma repository
+2. Navigate to `Container/Nightjar`
+3. Upload the entire `server` folder from the Nightjar repository
 
 Option B: Via SCP
 ```bash
-scp -r server/ admin@NAS-IP:/share/Container/nahma/
+scp -r server/ admin@NAS-IP:/share/Container/Nightjar/
 ```
 
 ### Step 3: Upload SSL Certificates
 
 ```bash
 # Copy your certificates
-cp /path/to/fullchain.pem /share/Container/nahma/ssl/
-cp /path/to/privkey.pem /share/Container/nahma/ssl/
+cp /path/to/fullchain.pem /share/Container/Nightjar/ssl/
+cp /path/to/privkey.pem /share/Container/Nightjar/ssl/
 
 # Secure permissions
-chmod 600 /share/Container/nahma/ssl/*.pem
+chmod 600 /share/Container/Nightjar/ssl/*.pem
 ```
 
 ### Step 4: Create Docker Compose File for QNAP
 
-Create `/share/Container/nahma/docker-compose.yml`:
+Create `/share/Container/Nightjar/docker-compose.yml`:
 
 ```yaml
 version: '3.8'
@@ -200,7 +200,7 @@ services:
     build:
       context: .
       dockerfile: server/docker/Dockerfile.web
-    container_name: nahma-web
+    container_name: Nightjar-web
     restart: unless-stopped
     ports:
       - "443:443"
@@ -210,7 +210,7 @@ services:
     depends_on:
       - signaling
     networks:
-      - nahma-internal
+      - Nightjar-internal
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -222,13 +222,13 @@ services:
     build:
       context: .
       dockerfile: server/docker/Dockerfile.signal
-    container_name: nahma-signal
+    container_name: Nightjar-signal
     restart: unless-stopped
     environment:
       - PORT=4444
       - MAX_PEERS_PER_ROOM=50
     networks:
-      - nahma-internal
+      - Nightjar-internal
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -237,7 +237,7 @@ services:
     build:
       context: .
       dockerfile: server/docker/Dockerfile.persist
-    container_name: nahma-persist
+    container_name: Nightjar-persist
     restart: unless-stopped
     environment:
       - SIGNALING_URL=ws://signaling:4444
@@ -247,19 +247,19 @@ services:
     depends_on:
       - signaling
     networks:
-      - nahma-internal
+      - Nightjar-internal
     security_opt:
       - no-new-privileges:true
 
 networks:
-  nahma-internal:
+  Nightjar-internal:
     driver: bridge
     internal: false  # Needs internet for WebRTC ICE
 ```
 
 ### Step 5: Create Production Nginx Config
 
-Create `/share/Container/nahma/nginx-prod.conf`:
+Create `/share/Container/Nightjar/nginx-prod.conf`:
 
 ```nginx
 worker_processes auto;
@@ -358,13 +358,13 @@ http {
 1. Open **Container Station**
 2. Click **Create** → **Create Application**
 3. Choose **Docker Compose**
-4. Browse to `/share/Container/nahma/docker-compose.yml`
+4. Browse to `/share/Container/Nightjar/docker-compose.yml`
 5. Click **Create**
 
 **Option B: Via SSH**
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 docker-compose up -d --build
 ```
 
@@ -375,9 +375,9 @@ docker-compose up -d --build
 docker ps
 
 # Check logs
-docker logs nahma-web
-docker logs nahma-signal
-docker logs nahma-persist
+docker logs Nightjar-web
+docker logs Nightjar-signal
+docker logs Nightjar-persist
 
 # Test HTTPS
 curl -k https://localhost/health
@@ -423,16 +423,16 @@ curl -k https://localhost/health
 
 ```bash
 # Nginx access logs
-docker exec nahma-web cat /var/log/nginx/access.log
+docker exec Nightjar-web cat /var/log/nginx/access.log
 
 # Nginx error logs
-docker exec nahma-web cat /var/log/nginx/error.log
+docker exec Nightjar-web cat /var/log/nginx/error.log
 
 # Signaling server logs
-docker logs nahma-signal
+docker logs Nightjar-signal
 
 # Persistence node logs
-docker logs nahma-persist
+docker logs Nightjar-persist
 ```
 
 ### Health Checks
@@ -445,16 +445,16 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 docker system df
 
 # Check persistence database size
-du -sh /share/Container/nahma/data/
+du -sh /share/Container/Nightjar/data/
 ```
 
 ### Automatic Updates
 
-Create a script at `/share/Container/nahma/update.sh`:
+Create a script at `/share/Container/Nightjar/update.sh`:
 
 ```bash
 #!/bin/bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 
 # Pull latest images
 docker-compose pull
@@ -470,7 +470,7 @@ echo "Update complete: $(date)"
 
 Add to crontab for weekly updates:
 ```bash
-0 3 * * 0 /share/Container/nahma/update.sh >> /share/Container/nahma/update.log 2>&1
+0 3 * * 0 /share/Container/Nightjar/update.sh >> /share/Container/Nightjar/update.log 2>&1
 ```
 
 ### SSL Certificate Renewal
@@ -479,7 +479,7 @@ If using Let's Encrypt, add renewal to crontab:
 
 ```bash
 # Renew certificate monthly
-0 3 1 * * certbot renew --quiet && docker exec nahma-web nginx -s reload
+0 3 1 * * certbot renew --quiet && docker exec Nightjar-web nginx -s reload
 ```
 
 ---
@@ -490,7 +490,7 @@ If using Let's Encrypt, add renewal to crontab:
 
 ```bash
 # Check logs
-docker logs nahma-web 2>&1 | tail -50
+docker logs Nightjar-web 2>&1 | tail -50
 
 # Common issues:
 # - SSL certificate path incorrect
@@ -526,16 +526,16 @@ docker stats
 
 ```bash
 # Stop persistence container
-docker stop nahma-persist
+docker stop Nightjar-persist
 
 # Backup current database
-cp /share/Container/nahma/data/persistence.db{,.backup}
+cp /share/Container/Nightjar/data/persistence.db{,.backup}
 
 # Delete corrupted database (will start fresh)
-rm /share/Container/nahma/data/persistence.db
+rm /share/Container/Nightjar/data/persistence.db
 
 # Restart
-docker start nahma-persist
+docker start Nightjar-persist
 ```
 
 ---
@@ -550,7 +550,7 @@ Before going live, verify:
 - [ ] Security headers configured
 - [ ] QNAP firewall rules active
 - [ ] Container auto-restart enabled
-- [ ] Backups configured for `/share/Container/nahma/data`
+- [ ] Backups configured for `/share/Container/Nightjar/data`
 - [ ] Admin password is strong
 - [ ] 2FA enabled on QNAP admin account
 - [ ] Auto-update disabled on QTS (use scheduled maintenance)
@@ -563,7 +563,7 @@ Before going live, verify:
 ### Start/Stop Commands
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 
 # Start all containers
 docker-compose up -d
@@ -582,11 +582,11 @@ docker-compose logs -f
 
 | Item | Path |
 |------|------|
-| Docker Compose | `/share/Container/nahma/docker-compose.yml` |
-| Nginx Config | `/share/Container/nahma/nginx-prod.conf` |
-| SSL Certificates | `/share/Container/nahma/ssl/` |
-| Persistence Data | `/share/Container/nahma/data/` |
-| Update Script | `/share/Container/nahma/update.sh` |
+| Docker Compose | `/share/Container/Nightjar/docker-compose.yml` |
+| Nginx Config | `/share/Container/Nightjar/nginx-prod.conf` |
+| SSL Certificates | `/share/Container/Nightjar/ssl/` |
+| Persistence Data | `/share/Container/Nightjar/data/` |
+| Update Script | `/share/Container/Nightjar/update.sh` |
 
 ### Ports
 
@@ -606,4 +606,4 @@ For issues specific to this deployment:
 3. Test with curl from NAS itself
 4. Check QNAP system logs
 
-For Nahma application issues, refer to the main repository documentation.
+For Nightjar application issues, refer to the main repository documentation.

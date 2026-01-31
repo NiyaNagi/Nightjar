@@ -251,7 +251,7 @@ function WelcomeState({ onCreateWorkspace, onJoinWorkspace }) {
     return (
         <div className="sidebar-welcome">
             <div className="sidebar-welcome__icon">🚀</div>
-            <h3 className="sidebar-welcome__title">Welcome to Nahma</h3>
+            <h3 className="sidebar-welcome__title">Welcome to Nightjar</h3>
             <p className="sidebar-welcome__text">
                 Create a workspace to start collaborating on documents securely.
             </p>

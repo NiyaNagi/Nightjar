@@ -4,7 +4,7 @@ import './SplitPane.css';
 // Load split state from localStorage
 const loadSplitState = (docId) => {
     try {
-        const saved = localStorage.getItem(`nahma-split-${docId}`);
+        const saved = localStorage.getItem(`Nightjar-split-${docId}`);
         if (saved) {
             return JSON.parse(saved);
         }
@@ -20,7 +20,7 @@ const loadSplitState = (docId) => {
 // Save split state to localStorage
 const saveSplitState = (docId, state) => {
     try {
-        localStorage.setItem(`nahma-split-${docId}`, JSON.stringify(state));
+        localStorage.setItem(`Nightjar-split-${docId}`, JSON.stringify(state));
     } catch (e) {
         console.error('Failed to save split state:', e);
     }

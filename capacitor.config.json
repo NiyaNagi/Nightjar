@@ -1,6 +1,6 @@
 {
-  "appId": "com.nightjarx.nahma",
-  "appName": "Nahma",
+  "appId": "com.nightjarx.Nightjar",
+  "appName": "Nightjar",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

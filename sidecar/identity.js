@@ -9,7 +9,7 @@ const crypto = require('crypto');
 // Get app data directory
 function getIdentityDir() {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
-    const appDir = path.join(homeDir, '.nahma');
+    const appDir = path.join(homeDir, '.Nightjar');
     
     if (!fs.existsSync(appDir)) {
         fs.mkdirSync(appDir, { recursive: true });
@@ -138,11 +138,11 @@ function getMachineKey() {
         os.hostname(),
         os.platform(),
         os.homedir(),
-        'nahma-identity-key-v1'
+        'Nightjar-identity-key-v1'
     ].join(':');
     
     // Use PBKDF2 to derive a proper 32-byte key
-    const salt = Buffer.from('nahma-machine-key-salt', 'utf-8');
+    const salt = Buffer.from('Nightjar-machine-key-salt', 'utf-8');
     const key = crypto.pbkdf2Sync(info, salt, 10000, 32, 'sha256');
     
     return new Uint8Array(key);
@@ -264,7 +264,7 @@ function importIdentity(exportedData, password) {
 function deriveKeyFromPassword(password) {
     // Use PBKDF2 with SHA-512 for proper key derivation
     // 100,000 iterations provides reasonable security for export passwords
-    const salt = Buffer.from('nahma-identity-export-salt-v1', 'utf-8');
+    const salt = Buffer.from('Nightjar-identity-export-salt-v1', 'utf-8');
     const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha512');
     return new Uint8Array(key);
 }

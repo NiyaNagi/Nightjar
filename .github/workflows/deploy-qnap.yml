@@ -1,4 +1,4 @@
-# GitHub Actions workflow for auto-deploying Nahma to QNAP NAS
+# GitHub Actions workflow for auto-deploying Nightjar to QNAP NAS
 # 
 # This workflow:
 # 1. Builds the Docker image on push to main

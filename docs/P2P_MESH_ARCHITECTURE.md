@@ -1,4 +1,4 @@
-# Nahma P2P Mesh Architecture Specification
+# Nightjar P2P Mesh Architecture Specification
 
 **Version:** 1.0  
 **Last Updated:** January 2026  
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-Nahma is a secure, peer-to-peer collaborative text editor with end-to-end encryption. This document describes the full P2P mesh architecture where all clients (Electron, Browser, Mobile) participate as equal peers using transport abstraction. Peers recursively bootstrap to create a maximally connected mesh with graceful degradation when any peer disconnects.
+Nightjar is a secure, peer-to-peer collaborative text editor with end-to-end encryption. This document describes the full P2P mesh architecture where all clients (Electron, Browser, Mobile) participate as equal peers using transport abstraction. Peers recursively bootstrap to create a maximally connected mesh with graceful degradation when any peer disconnects.
 
 ---
 
@@ -38,7 +38,7 @@ Nahma is a secure, peer-to-peer collaborative text editor with end-to-end encryp
 
 ### Design Philosophy
 
-Nahma prioritizes **unlinkability** and **unobservability** over raw performance. The system uses a "Local-First" software model where:
+Nightjar prioritizes **unlinkability** and **unobservability** over raw performance. The system uses a "Local-First" software model where:
 
 - Primary data copy resides on user's encrypted local storage
 - Network serves as a synchronization bus for encrypted CRDT updates
@@ -251,7 +251,7 @@ class HyperswarmTransport extends BaseTransport {
 **Features:**
 - Bonjour/Avahi service advertisement
 - Zero-config LAN discovery
-- Service name: `nahma-p2p`
+- Service name: `Nightjar-p2p`
 
 **Implementation:** `frontend/src/services/p2p/transports/mDNSTransport.js`
 
@@ -564,7 +564,7 @@ await peerManager.initialize({
 
 // Join workspace
 await peerManager.joinWorkspace(workspaceId, {
-  serverUrl: 'wss://sync.nahma.app',
+  serverUrl: 'wss://sync.Nightjar.app',
   topic: await generateTopic(workspaceId)
 });
 

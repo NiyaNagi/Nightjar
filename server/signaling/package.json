@@ -1,7 +1,7 @@
 {
-  "name": "nahma-signaling",
+  "name": "Nightjar-signaling",
   "version": "1.0.0",
-  "description": "WebRTC signaling server for Nahma",
+  "description": "WebRTC signaling server for Nightjar",
   "main": "index.js",
   "type": "module",
   "scripts": {

@@ -79,7 +79,7 @@ function WelcomeStep({ onCreateNew, onRestore, onScan }) {
     return (
         <div className="onboarding-step welcome-step">
             <div className="onboarding-logo">✨</div>
-            <h1>Welcome to Nahma</h1>
+            <h1>Welcome to Nightjar</h1>
             <p className="onboarding-subtitle">
                 Secure, decentralized collaborative writing
             </p>

@@ -337,7 +337,7 @@ function App() {
         
         if (!key || key.length !== nacl.secretbox.keyLength) {
             // Try to load from localStorage
-            const storedKey = localStorage.getItem('nahma-session-key');
+            const storedKey = localStorage.getItem('Nightjar-session-key');
             if (storedKey) {
                 try {
                     key = uint8ArrayFromString(storedKey, 'base64url');
@@ -355,7 +355,7 @@ function App() {
         // Always persist to URL and localStorage
         const keyString = uint8ArrayToString(key, 'base64url');
         window.history.replaceState(null, '', '#' + keyString);
-        localStorage.setItem('nahma-session-key', keyString);
+        localStorage.setItem('Nightjar-session-key', keyString);
         
         setSessionKey(key);
 
@@ -974,7 +974,7 @@ function App() {
                     ) : !hasWorkspaces ? (
                         <div className="empty-editor-state onboarding-welcome">
                         <div className="welcome-icon">🚀</div>
-                        <h2>Welcome to Nahma</h2>
+                        <h2>Welcome to Nightjar</h2>
                         <p>Secure P2P Collaboration. Create a workspace or join an existing one.</p>
                         <div className="create-buttons">
                             <button className="btn-create primary" onClick={() => {

@@ -1,5 +1,5 @@
 /**
- * Nahma UI Visual Testing - Complete UI Crawler
+ * Nightjar UI Visual Testing - Complete UI Crawler
  * 
  * COMPREHENSIVE TEST SUITE - Tests EVERY UI control combination
  * 
@@ -137,23 +137,23 @@ async function injectTestIdentity(page, options = {}) {
   
   // Set localStorage for identity
   await page.evaluate((identity) => {
-    localStorage.setItem('nahma-identity', JSON.stringify(identity));
-    localStorage.setItem('nahma_identity', JSON.stringify(identity));
+    localStorage.setItem('Nightjar-identity', JSON.stringify(identity));
+    localStorage.setItem('Nightjar_identity', JSON.stringify(identity));
   }, TEST_IDENTITY);
   
   // Set localStorage for workspaces (unless explicitly skipped)
   if (!options.skipWorkspace) {
     await page.evaluate(({ workspaces, currentId, userProfile }) => {
-      localStorage.setItem('nahma-workspaces', JSON.stringify(workspaces));
-      localStorage.setItem('nahma-current-workspace', currentId);
-      localStorage.setItem('nahma-user-profile', JSON.stringify(userProfile));
+      localStorage.setItem('Nightjar-workspaces', JSON.stringify(workspaces));
+      localStorage.setItem('Nightjar-current-workspace', currentId);
+      localStorage.setItem('Nightjar-user-profile', JSON.stringify(userProfile));
     }, { workspaces: TEST_WORKSPACES, currentId: TEST_WORKSPACE_ID, userProfile: TEST_USER_PROFILE });
   }
   
   // Set open document if specified
   if (options.openDocId) {
     await page.evaluate(({ docId, docType }) => {
-      localStorage.setItem('nahma-open-document', JSON.stringify({ id: docId, type: docType || 'text' }));
+      localStorage.setItem('Nightjar-open-document', JSON.stringify({ id: docId, type: docType || 'text' }));
     }, { docId: options.openDocId, docType: options.openDocType });
   }
   
@@ -166,7 +166,7 @@ async function injectTestIdentity(page, options = {}) {
  * Helper: Check if we're on the onboarding screen
  */
 async function isOnOnboarding(page) {
-  const welcomeText = page.locator('text=Welcome to Nahma');
+  const welcomeText = page.locator('text=Welcome to Nightjar');
   return await welcomeText.isVisible({ timeout: 1000 }).catch(() => false);
 }
 
@@ -241,9 +241,9 @@ test.describe('UI Crawler - Complete Visual Inspection', () => {
       // The app may show either:
       // 1. Identity Onboarding ("Create New Identity" button) - when no identity exists
       // 2. Workspace Welcome ("Create Workspace" button) - when identity exists but no workspaces
-      // Both are valid "Welcome to Nahma" states depending on app configuration
+      // Both are valid "Welcome to Nightjar" states depending on app configuration
       
-      const welcomeTitle = page.locator('text=Welcome to Nahma');
+      const welcomeTitle = page.locator('text=Welcome to Nightjar');
       await expect(welcomeTitle.first()).toBeVisible({ timeout: 5000 });
       
       // Check for either Create Identity or Create Workspace button
@@ -1651,7 +1651,7 @@ test.describe('UI Crawler - Complete Visual Inspection', () => {
       // Create new workspace with no documents
       await page.goto('/');
       await page.evaluate((identity) => {
-        localStorage.setItem('nahma-identity', JSON.stringify(identity));
+        localStorage.setItem('Nightjar-identity', JSON.stringify(identity));
       }, TEST_IDENTITY);
       
       // Set empty workspace
@@ -1661,8 +1661,8 @@ test.describe('UI Crawler - Complete Visual Inspection', () => {
           folders: [],
           documents: []
         }];
-        localStorage.setItem('nahma-workspaces', JSON.stringify(emptyWs));
-        localStorage.setItem('nahma-current-workspace', currentId);
+        localStorage.setItem('Nightjar-workspaces', JSON.stringify(emptyWs));
+        localStorage.setItem('Nightjar-current-workspace', currentId);
       }, { workspaces: TEST_WORKSPACES, currentId: TEST_WORKSPACE_ID });
       
       await page.reload();

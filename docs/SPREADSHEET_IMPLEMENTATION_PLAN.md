@@ -7,7 +7,7 @@
 
 ## Overview
 
-This document outlines the implementation plan for adding a new "Sheet" document type to Nahma using Fortune Sheet, with full P2P sync integration via Yjs CRDT.
+This document outlines the implementation plan for adding a new "Sheet" document type to Nightjar using Fortune Sheet, with full P2P sync integration via Yjs CRDT.
 
 ## User Requirements Summary
 

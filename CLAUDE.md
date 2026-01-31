@@ -1,7 +1,7 @@
-# Nahma - Project Context for Claude
+# Nightjar - Project Context for Claude
 
-## What is Nahma?
-Nahma is a secure, peer-to-peer collaborative text editor with end-to-end encryption. It allows multiple users to edit documents in real-time without a central server storing their data.
+## What is Nightjar?
+Nightjar is a secure, peer-to-peer collaborative text editor with end-to-end encryption. It allows multiple users to edit documents in real-time without a central server storing their data.
 
 ## Tech Stack
 - **Frontend**: React 18 + Vite

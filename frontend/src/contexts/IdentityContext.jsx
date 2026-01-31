@@ -9,7 +9,7 @@ const IdentityContext = createContext(null);
 
 // Storage key for identity
 const IDENTITY_KEY = 'identity';
-const LEGACY_KEY = 'nahma-identity';
+const LEGACY_KEY = 'Nightjar-identity';
 
 export function useIdentity() {
     const context = useContext(IdentityContext);

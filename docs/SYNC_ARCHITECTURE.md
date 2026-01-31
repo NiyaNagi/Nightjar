@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nahma uses a hybrid synchronization approach combining:
+Nightjar uses a hybrid synchronization approach combining:
 1. **Local-first editing** via Yjs CRDTs
 2. **WebSocket sync** for same-machine/LAN collaboration
 3. **P2P sync over Tor** for anonymous internet collaboration
@@ -47,7 +47,7 @@ To test on the same machine with multiple windows:
 
 ```bash
 # Terminal 1: Start the sidecar
-cd Nahma
+cd Nightjar
 node sidecar/index.js
 
 # Terminal 2: Open first Electron window

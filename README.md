@@ -1,8 +1,8 @@
-# Nahma
+# Nightjar
 
 **Secure P2P Collaboration**
 
-Nahma is a secure, peer-to-peer collaboration platform packaged as a multi-platform desktop application using Electron.
+Nightjar is a secure, peer-to-peer collaboration platform packaged as a multi-platform desktop application using Electron.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ The application needs to communicate with the Tor daemon on its control port. Yo
 
 ### 2. Install Dependencies
 
-Open a terminal in the project's root directory (`Nahma/`) and run:
+Open a terminal in the project's root directory (`Nightjar/`) and run:
 ```bash
 npm install
 ```
@@ -74,7 +74,7 @@ This command uses `electron-builder` to create a distributable application file 
 
 1.  **Start Tor first!** Just like in development mode, you must have the Tor Browser running with its control port enabled.
 2.  Navigate to the `dist` directory.
-3.  Double-click the application file (e.g., `Nahma Editor.exe`) to launch it.
+3.  Double-click the application file (e.g., `Nightjar Editor.exe`) to launch it.
 
 ---
 
@@ -82,6 +82,6 @@ This command uses `electron-builder` to create a distributable application file 
 
 1.  When you launch the application, it will automatically connect to the Tor network and generate a unique, secret **Invite Link**.
 2.  To start a session with others, copy this link and send it to them via a secure channel.
-3.  The other user must have the Nahma Editor application running on their computer.
+3.  The other user must have the Nightjar Editor application running on their computer.
 4.  When they paste the link into their browser and are prompted to open the application, or if they have a mechanism to open it, the key in the link will load the encrypted document and connect them to the P2P session. (Note: A more robust invitation system is a future goal).
 5.  You can change your handle in the text box provided. Your cursor and future edits will be attributed to this handle.

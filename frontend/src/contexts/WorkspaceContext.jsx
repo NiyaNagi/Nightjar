@@ -151,14 +151,14 @@ export function WorkspaceProvider({ children }) {
   // Persist workspaces to localStorage in web mode
   useEffect(() => {
     if (!isElectron && workspaces.length > 0) {
-      localStorage.setItem('nahma-workspaces', JSON.stringify(workspaces));
+      localStorage.setItem('Nightjar-workspaces', JSON.stringify(workspaces));
     }
   }, [workspaces, isElectron]);
   
   // Persist current workspace selection
   useEffect(() => {
     if (!isElectron && currentWorkspaceId) {
-      localStorage.setItem('nahma-current-workspace', currentWorkspaceId);
+      localStorage.setItem('Nightjar-current-workspace', currentWorkspaceId);
     }
   }, [currentWorkspaceId, isElectron]);
 
@@ -252,7 +252,7 @@ export function WorkspaceProvider({ children }) {
       secureLog('[WorkspaceContext] Running in web mode (localStorage)');
       
       try {
-        const stored = localStorage.getItem('nahma-workspaces');
+        const stored = localStorage.getItem('Nightjar-workspaces');
         const storedWorkspaces = stored ? JSON.parse(stored) : [];
         setWorkspaces(storedWorkspaces);
         
@@ -282,7 +282,7 @@ export function WorkspaceProvider({ children }) {
           if (anyUpdated) {
             secureLog('[WorkspaceContext] Persisting updated workspaces with generated keys');
             setWorkspaces(updatedWorkspaces);
-            localStorage.setItem('nahma-workspaces', JSON.stringify(updatedWorkspaces));
+            localStorage.setItem('Nightjar-workspaces', JSON.stringify(updatedWorkspaces));
           }
         };
         
@@ -290,7 +290,7 @@ export function WorkspaceProvider({ children }) {
         
         if (storedWorkspaces.length > 0) {
           // Restore last selected workspace
-          const lastWorkspaceId = localStorage.getItem('nahma-current-workspace');
+          const lastWorkspaceId = localStorage.getItem('Nightjar-current-workspace');
           setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
         }
       } catch (e) {

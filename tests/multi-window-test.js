@@ -1,5 +1,5 @@
 /**
- * Interactive Multi-Window Test for Nahma
+ * Interactive Multi-Window Test for Nightjar
  * 
  * This script helps you test real-time sync between multiple windows
  * on the same machine.
@@ -50,7 +50,7 @@ function checkPort(port) {
 
 async function main() {
     console.log('╔═══════════════════════════════════════════════════════════╗');
-    console.log('║           NAHMA MULTI-WINDOW SYNC TEST                   ║');
+    console.log('║           Nightjar MULTI-WINDOW SYNC TEST                   ║');
     console.log('╚═══════════════════════════════════════════════════════════╝');
     console.log('');
     
@@ -62,7 +62,7 @@ async function main() {
         console.log('⚠️  Sidecar not running!');
         console.log('');
         console.log('Please start the sidecar in a separate terminal:');
-        console.log('  cd Nahma');
+        console.log('  cd Nightjar');
         console.log('  node sidecar/index.js');
         console.log('');
         await question('Press Enter when sidecar is running...');
@@ -86,7 +86,7 @@ async function main() {
         console.log('⚠️  Dev server not running!');
         console.log('');
         console.log('Please start the dev server in a separate terminal:');
-        console.log('  cd Nahma');
+        console.log('  cd Nightjar');
         console.log('  npm run dev:react');
         console.log('');
         await question('Press Enter when dev server is running...');

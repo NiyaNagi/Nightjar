@@ -397,7 +397,7 @@ export default function WorkspaceSettings({
                       >
                         <span className="workspace-settings__share-menu-icon">🔗</span>
                         <span>Copy Link</span>
-                        <span className="workspace-settings__share-menu-desc">Full nahma:// URL</span>
+                        <span className="workspace-settings__share-menu-desc">Full Nightjar:// URL</span>
                       </button>
                       <button 
                         className="workspace-settings__share-menu-item"

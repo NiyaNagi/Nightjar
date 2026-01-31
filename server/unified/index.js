@@ -1,5 +1,5 @@
 /**
- * Nahma Unified Server
+ * Nightjar Unified Server
  * 
  * A single server that provides:
  * 1. Static file hosting (React app)
@@ -42,15 +42,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3000;
 const STATIC_PATH = process.env.STATIC_PATH || join(__dirname, '../../frontend/dist');
-const DB_PATH = process.env.DB_PATH || join(__dirname, 'data/nahma.db');
+const DB_PATH = process.env.DB_PATH || join(__dirname, 'data/Nightjar.db');
 const MAX_PEERS_PER_ROOM = parseInt(process.env.MAX_PEERS_PER_ROOM || '100');
 const RATE_LIMIT_WINDOW = 1000;
 const RATE_LIMIT_MAX = 50;
 
 // Persistence toggle: disable to run in pure relay mode
-// Set via NAHMA_DISABLE_PERSISTENCE=1 or --no-persist CLI flag
-const DISABLE_PERSISTENCE = process.env.NAHMA_DISABLE_PERSISTENCE === '1' || 
-                            process.env.NAHMA_DISABLE_PERSISTENCE === 'true' ||
+// Set via Nightjar_DISABLE_PERSISTENCE=1 or --no-persist CLI flag
+const DISABLE_PERSISTENCE = process.env.Nightjar_DISABLE_PERSISTENCE === '1' || 
+                            process.env.Nightjar_DISABLE_PERSISTENCE === 'true' ||
                             process.argv.includes('--no-persist');
 
 if (DISABLE_PERSISTENCE) {
@@ -1093,7 +1093,7 @@ server.listen(PORT, () => {
   const persistMode = DISABLE_PERSISTENCE ? 'DISABLED (relay only)' : 'ENABLED';
   console.log('');
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║              Nahma Unified Server                         ║');
+  console.log('║              Nightjar Unified Server                         ║');
   console.log('╠═══════════════════════════════════════════════════════════╣');
   console.log(`║  HTTP:      http://localhost:${PORT}                         ║`);
   console.log(`║  Y-WS:      ws://localhost:${PORT}/<room>                    ║`);

@@ -1,6 +1,6 @@
 # Multi-Client End-to-End Testing Framework
 
-This document describes Nahma's comprehensive multi-client E2E testing framework designed to test real-time collaborative editing scenarios with actual network connections.
+This document describes Nightjar's comprehensive multi-client E2E testing framework designed to test real-time collaborative editing scenarios with actual network connections.
 
 ## Overview
 

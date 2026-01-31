@@ -1,7 +1,7 @@
 # **As-Built Specification: Secure P2P Collaborative Editing System**
 
 ## **1. Executive Summary**
-This document defines the functional and technical specification for the "Nahma" Secure P2P Collaborative Editing System. The system is implemented as a "Sidecar" architecture using Node.js, designed to provide **Unlinkability**, **Unobservability**, and **End-to-End Encryption (E2EE)**. It leverages Tor Onion Services for network anonymity, Libp2p for transport abstraction, and Yjs for conflict-free data synchronization.
+This document defines the functional and technical specification for the "Nightjar" Secure P2P Collaborative Editing System. The system is implemented as a "Sidecar" architecture using Node.js, designed to provide **Unlinkability**, **Unobservability**, and **End-to-End Encryption (E2EE)**. It leverages Tor Onion Services for network anonymity, Libp2p for transport abstraction, and Yjs for conflict-free data synchronization.
 
 ## **2. System Architecture**
 

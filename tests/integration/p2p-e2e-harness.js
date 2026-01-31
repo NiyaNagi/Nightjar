@@ -62,7 +62,7 @@ class UnifiedServerProcess {
       this.process.stdout.on('data', (data) => {
         output += data.toString();
         // Check for server ready message
-        if (output.includes('Nahma Unified Server') || output.includes(`http://localhost:${this.port}`)) {
+        if (output.includes('Nightjar Unified Server') || output.includes(`http://localhost:${this.port}`)) {
           this.ready = true;
           clearTimeout(timeout);
           resolve();

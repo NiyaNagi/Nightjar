@@ -12,7 +12,7 @@
 import nacl from 'tweetnacl';
 
 // Storage key prefix
-const STORAGE_PREFIX = 'nahma_secure_';
+const STORAGE_PREFIX = 'Nightjar_secure_';
 
 // Session encryption key (derived from a random value per browser session)
 let sessionKey = null;
@@ -25,7 +25,7 @@ function ensureSessionKey() {
   if (sessionKey) return sessionKey;
   
   // Check if we have a session key in sessionStorage (survives page refresh within tab)
-  const storedKey = sessionStorage.getItem('nahma_session_enc_key');
+  const storedKey = sessionStorage.getItem('Nightjar_session_enc_key');
   if (storedKey) {
     try {
       sessionKey = new Uint8Array(JSON.parse(storedKey));
@@ -39,7 +39,7 @@ function ensureSessionKey() {
   sessionKey = nacl.randomBytes(nacl.secretbox.keyLength);
   
   // Store in sessionStorage (cleared when browser/tab closes)
-  sessionStorage.setItem('nahma_session_enc_key', JSON.stringify(Array.from(sessionKey)));
+  sessionStorage.setItem('Nightjar_session_enc_key', JSON.stringify(Array.from(sessionKey)));
   
   return sessionKey;
 }
@@ -221,7 +221,7 @@ export function secureClear() {
   keysToRemove.forEach(key => localStorage.removeItem(key));
   
   // Also clear session key
-  sessionStorage.removeItem('nahma_session_enc_key');
+  sessionStorage.removeItem('Nightjar_session_enc_key');
   sessionKey = null;
 }
 
