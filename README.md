@@ -1,87 +1,213 @@
-# Nightjar
+<p align="center">
+  <img src="assets/icon.png" alt="Nightjar" width="128" height="128">
+</p>
 
-**Secure P2P Collaboration**
+<h1 align="center">Nightjar</h1>
 
-Nightjar is a secure, peer-to-peer collaboration platform packaged as a multi-platform desktop application using Electron.
+<p align="center">
+  <strong>Private, Peer-to-Peer Collaborative Editing</strong>
+</p>
+
+<p align="center">
+  <a href="#why-nightjar">Why Nightjar</a> •
+  <a href="#features">Features</a> •
+  <a href="#download">Download</a> •
+  <a href="#security">Security</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#development">Development</a>
+</p>
+
+---
+
+## Why Nightjar?
+
+**Your documents belong to you, not the cloud.**
+
+Traditional collaboration tools require trusting a third party with your most sensitive information. Every document you create, every edit you make, every comment you leave—all stored on servers you don't control, accessible to companies, hackers, and governments.
+
+Nightjar takes a different approach:
+
+- 🔐 **End-to-End Encrypted** — Your content is encrypted before it leaves your device. Not even relay servers can read your documents.
+- 🌐 **Peer-to-Peer** — Connect directly with collaborators. No central server stores your data.
+- 🧅 **Tor-Ready** — Optional Tor integration for anonymous collaboration when privacy is critical.
+- 💾 **Local-First** — Your documents live on your device. Work offline, sync when connected.
+- 🔑 **Self-Sovereign Identity** — Your cryptographic identity is yours. Back it up with a 12-word recovery phrase.
+
+Whether you're a journalist protecting sources, an activist organizing securely, a business handling sensitive contracts, or simply someone who believes privacy is a fundamental right—Nightjar gives you collaboration without compromise.
+
+---
+
+## Features
+
+### 📝 Rich Text Editor
+- Full formatting: bold, italic, underline, strikethrough, highlight
+- Headings, lists, blockquotes, code blocks
+- Tables with resizable columns
+- Import/export: Markdown, HTML, JSON, plain text
+
+### 📊 Spreadsheets
+- Multi-sheet workbooks with formula support
+- Cell formatting and number formats
+- Real-time collaborative editing
+
+### 📋 Kanban Boards
+- Visual project management with drag-and-drop cards
+
+### 👥 Real-Time Collaboration
+- See collaborators' cursors in real-time
+- Presence indicators showing who's online
+- Comments on text selections or cells
+- Built-in chat with direct messaging
+
+### 📁 Organization
+- Workspaces to separate projects
+- Nested folder hierarchy
+- Drag-and-drop document management
+
+### 🔗 Sharing
+- Password-protected invite links
+- QR codes for easy mobile sharing
+- Granular permissions: Owner, Editor, Viewer
+- Time-limited invitations
+
+### 🌐 Privacy & Networking
+- Tor hidden service support (Electron)
+- Act as a relay for other peers
+- Local network discovery via mDNS
+- Works offline with automatic sync
+
+---
+
+## Download
+
+Download the latest version for your platform:
+
+| Platform | Download |
+|----------|----------|
+| **Windows** | [Nightjar Setup.exe](https://github.com/InyanRock/Nightjar/releases/latest) |
+| **macOS** | [Nightjar.dmg](https://github.com/InyanRock/Nightjar/releases/latest) |
+| **Linux** | [Nightjar.AppImage](https://github.com/InyanRock/Nightjar/releases/latest) |
+
+**Requirements:** Windows 10+ / macOS 10.15+ / Ubuntu 20.04+, 4GB RAM, 200MB disk
+
+---
+
+## Quick Start
+
+1. **Download and install** Nightjar for your platform
+2. **Create your identity** — Choose a display name and avatar
+3. **Save your recovery phrase** — 12 words that can restore your identity anywhere
+4. **Create a workspace** — Your private container for documents
+5. **Invite collaborators** — Share a password-protected link or QR code
+6. **Start collaborating** — Edits sync in real-time, encrypted end-to-end
+
+---
+
+## Security
+
+Nightjar is built with security as the foundation, not an afterthought.
+
+### Cryptographic Primitives
+
+| Component | Algorithm | Details |
+|-----------|-----------|---------|
+| **Identity Keys** | Ed25519 | Signing keypairs for authentication |
+| **Encryption** | XSalsa20-Poly1305 | Authenticated encryption (NaCl) |
+| **Key Derivation** | Argon2id | Memory-hard KDF (64MB, 4 iterations) |
+| **Recovery Phrase** | BIP39 | 12-word mnemonic (128-bit entropy) |
+
+### How Your Data is Protected
+
+1. **Hierarchical Key Derivation** — Workspace password → Workspace key → Folder key → Document key
+2. **Zero-Knowledge Sharing** — Share links contain the encryption key in the URL fragment (never sent to servers)
+3. **Traffic Analysis Resistance** — All encrypted payloads padded to 4KB blocks
+4. **Signed Invitations** — Invite links are Ed25519-signed with configurable expiry
+
+### Privacy Features
+
+- **No accounts** — Your identity is a keypair you control
+- **No tracking** — No analytics, no telemetry, no phone home
+- **No cloud storage** — Documents exist only on participants' devices
+- **Tor support** — Route all traffic through Tor for anonymity
+
+### What Nightjar Does NOT Protect Against
+
+- Malware on your device
+- Collaborators you choose to share with
+- Screenshots or copy/paste by authorized users
+- Metadata visible to network observers (unless using Tor)
+
+---
 
 ## Architecture
 
-This is a unified Electron application that bundles a Node.js backend and a React frontend.
+Nightjar uses an **Electron + Sidecar** architecture:
 
-*   **Backend (Electron Main Process):** A Node.js environment that runs in the background. It manages the connection to the Tor network, establishes a Libp2p peer-to-peer node, and handles the encrypted persistence of the document in a local database.
-*   **Frontend (Electron Renderer Process):** A React application providing the rich text editor UI, which is displayed in the main application window. It communicates securely with the backend via Electron's IPC bridge (not WebSockets).
+```
+┌─────────────────────────────────────────────────────────┐
+│                     NIGHTJAR APP                        │
+├─────────────────────────────────────────────────────────┤
+│  Electron Main     │        React Frontend             │
+│  • Window mgmt     │  • TipTap Editor                  │
+│  • IPC bridge      │  • Fortune Sheet                  │
+│  • Protocol        │  • Workspace/Folder UI            │
+├────────────────────┴────────────────────────────────────┤
+│                  SIDECAR (Node.js)                      │
+│  • Yjs sync server (port 8080)                          │
+│  • Metadata server (port 8081)                          │
+│  • P2P: Hyperswarm + libp2p + Tor                       │
+│  • LevelDB encrypted storage                            │
+└─────────────────────────────────────────────────────────┘
+```
 
-## Prerequisites
+### Technology Stack
 
-1.  **Node.js and npm:** Required for installing and running the application in development mode. [Download here](https://nodejs.org/).
-2.  **Tor:** The application requires a running Tor instance to provide anonymity. The easiest way to get this is to install the [Tor Browser](https://www.torproject.org/download/).
+| Layer | Technology |
+|-------|------------|
+| **Desktop** | Electron |
+| **Frontend** | React, TipTap, Fortune Sheet |
+| **CRDT** | Yjs, y-websocket |
+| **P2P** | Hyperswarm, libp2p |
+| **Crypto** | TweetNaCl, Argon2 (hash-wasm) |
+| **Storage** | LevelDB |
+| **Anonymity** | Tor (optional) |
 
 ---
 
-## How to Run (Development Mode)
+## Development
 
-This mode is for developers who want to work on the code.
+### Setup
 
-### 1. Start Tor
-
-The application needs to communicate with the Tor daemon on its control port. You must launch the Tor Browser from a terminal with the port enabled.
-
-*   **On macOS:**
-    ```bash
-    /Applications/Tor\ Browser.app/Contents/MacOS/tor-browser --Tor-ControlPort 9051
-    ```
-*   **On Linux:**
-    ```bash
-    ./start-tor-browser.desktop --Tor-ControlPort 9051
-    ```
-*   **On Windows:** Find the path to `tor.exe` in your Tor Browser installation and run:
-    ```powershell
-    & "C:\path\to\Tor Browser\Browser\TorBrowser\Tor\tor.exe" -f "C:\path\to\Tor Browser\Browser\TorBrowser\Data\Tor\torrc-defaults" --ControlPort 9051
-    ```
-**Leave this terminal running.**
-
-### 2. Install Dependencies
-
-Open a terminal in the project's root directory (`Nightjar/`) and run:
 ```bash
+git clone https://github.com/InyanRock/Nightjar.git
+cd Nightjar
 npm install
-```
-This will install all dependencies for both the Electron app and the React frontend.
-
-### 3. Run the App
-
-In the same terminal, run the `dev` command:
-```bash
 npm run dev
 ```
-This command will concurrently start the React development server and launch the Electron application. The app window will open automatically.
 
----
+### Build
 
-## How to Build and Run (Packaged Application)
-
-This is how an end-user would run the application.
-
-### 1. Build the Application
-
-From the project's root directory, run:
 ```bash
-npm run package
+npm run package:win    # Windows
+npm run package:mac    # macOS
+npm run package:linux  # Linux
 ```
-This command uses `electron-builder` to create a distributable application file for your current operating system (e.g., a `.dmg` for macOS, `.exe` for Windows, `.AppImage` for Linux). The output will be in a new `dist` directory.
 
-### 2. Run the Application
+### Tests
 
-1.  **Start Tor first!** Just like in development mode, you must have the Tor Browser running with its control port enabled.
-2.  Navigate to the `dist` directory.
-3.  Double-click the application file (e.g., `Nightjar Editor.exe`) to launch it.
+```bash
+npm test                    # Unit tests
+npm run test:integration    # Integration tests
+```
 
 ---
 
-## How to Use the Editor
+## License
 
-1.  When you launch the application, it will automatically connect to the Tor network and generate a unique, secret **Invite Link**.
-2.  To start a session with others, copy this link and send it to them via a secure channel.
-3.  The other user must have the Nightjar Editor application running on their computer.
-4.  When they paste the link into their browser and are prompted to open the application, or if they have a mechanism to open it, the key in the link will load the encrypted document and connect them to the P2P session. (Note: A more robust invitation system is a future goal).
-5.  You can change your handle in the text box provided. Your cursor and future edits will be attributed to this handle.
+ISC License
+
+---
+
+<p align="center">
+  <strong>Privacy is not about having something to hide.<br>It's about having something to protect.</strong>
+</p>

@@ -1,33 +1,37 @@
 # Nightjar - Project Context for Claude
 
 ## What is Nightjar?
-Nightjar is a secure, peer-to-peer collaborative text editor with end-to-end encryption. It allows multiple users to edit documents in real-time without a central server storing their data.
+Nightjar is a secure, peer-to-peer collaborative editor with end-to-end encryption. It allows multiple users to edit documents, spreadsheets, and kanban boards in real-time without a central server storing their data.
 
 ## Tech Stack
 - **Frontend**: React 18 + Vite
 - **Editor**: TipTap (ProseMirror-based)
-- **Real-time Sync**: Yjs (CRDT) + y-webrtc
-- **Encryption**: TweetNaCl (NaCl cryptography)
-- **Desktop**: Electron + Capacitor
-- **P2P**: Hyperswarm (for Electron), WebRTC (for web)
-- **Persistence**: SQLite (server), IndexedDB (browser)
-- **Styling**: CSS Modules
+- **Spreadsheet**: Fortune Sheet
+- **Real-time Sync**: Yjs (CRDT) + y-websocket
+- **Encryption**: TweetNaCl (XSalsa20-Poly1305), Argon2id (hash-wasm)
+- **Desktop**: Electron
+- **P2P**: Hyperswarm (DHT) + libp2p + WebRTC
+- **Persistence**: LevelDB (local), IndexedDB (browser)
+- **Anonymity**: Tor hidden services (optional)
 
 ## Architecture
 
+Nightjar uses an **Electron + Sidecar** pattern:
+
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Frontend (React)                    │
+│                     Electron App                        │
 ├─────────────────────────────────────────────────────────┤
-│  TipTap Editor  │  Workspace Manager  │  Identity/Keys  │
-├─────────────────────────────────────────────────────────┤
-│                    Yjs Document Layer                   │
-├─────────────────────────────────────────────────────────┤
-│  y-webrtc Provider  │  Encryption Layer (NaCl)          │
-├─────────────────────────────────────────────────────────┤
-│         Signaling Server (WebSocket)                    │
-├─────────────────────────────────────────────────────────┤
-│         Persistence Node (SQLite + Yjs)                 │
+│  Main Process      │        Renderer (React)           │
+│  • Window mgmt     │  • TipTap Editor                  │
+│  • IPC bridge      │  • Fortune Sheet                  │
+│  • Loading screen  │  • Workspace/Folder UI            │
+├────────────────────┴────────────────────────────────────┤
+│                  SIDECAR (Node.js)                      │
+│  • Yjs WebSocket server (port 8080)                     │
+│  • Metadata WebSocket server (port 8081)                │
+│  • P2P: Hyperswarm + libp2p + Tor                       │
+│  • LevelDB encrypted storage                            │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -35,133 +39,86 @@ Nightjar is a secure, peer-to-peer collaborative text editor with end-to-end enc
 
 | Directory | Purpose |
 |-----------|---------|
-| `frontend/` | React application source |
-| `frontend/src/components/` | Reusable UI components |
-| `frontend/src/contexts/` | React contexts (workspace, identity, theme) |
-| `frontend/src/hooks/` | Custom React hooks |
-| `frontend/src/utils/` | Crypto, sync, storage utilities |
-| `server/signaling/` | WebRTC signaling server |
-| `server/persistence/` | Document persistence node |
-| `server/nginx/` | Nginx configuration |
-| `server/docker/` | Docker build files |
-| `server/deploy/` | Deployment guides |
-| `sidecar/` | Electron sidecar (Hyperswarm P2P) |
-| `tests/` | Jest test suites |
+| `frontend/src/components/` | UI components (editor, sidebar, modals) |
+| `frontend/src/contexts/` | React contexts (Workspace, Identity, Folder, Permission, Presence) |
+| `frontend/src/hooks/` | Custom hooks (useWorkspaceSync, usePeerManager, etc.) |
+| `frontend/src/services/p2p/` | P2P transport layer (WebSocket, WebRTC, Hyperswarm) |
+| `frontend/src/utils/` | Crypto, sharing, key derivation utilities |
+| `sidecar/` | Node.js backend (P2P, storage, identity) |
+| `src/` | Electron main process |
+| `server/` | Optional relay/persistence servers |
+| `tests/` | Jest unit tests and integration tests |
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `frontend/src/App.jsx` | Main application component |
-| `frontend/src/utils/crypto.js` | Encryption/decryption with NaCl |
-| `frontend/src/utils/sync.js` | Yjs document synchronization |
-| `frontend/src/contexts/WorkspaceContext.jsx` | Workspace state management |
+| `src/main.js` | Electron main process, spawns sidecar |
+| `sidecar/index.js` | Sidecar entry, Yjs server, metadata server |
+| `sidecar/identity.js` | Ed25519 keypair, BIP39 mnemonic |
+| `sidecar/crypto.js` | Encryption (XSalsa20-Poly1305) |
+| `frontend/src/contexts/WorkspaceContext.jsx` | Workspace state, WebSocket to sidecar |
 | `frontend/src/contexts/IdentityContext.jsx` | User identity and keys |
-| `server/signaling/index.js` | WebSocket signaling server |
-| `server/persistence/index.js` | Persistence node |
+| `frontend/src/utils/keyDerivation.js` | Argon2id key derivation |
+| `frontend/src/services/p2p/PeerManager.js` | Unified P2P API |
 
 ## Common Commands
 
 ```bash
 # Development
-npm run dev              # Start Vite dev server
-npm run electron:dev     # Start Electron app
+npm run dev              # Start Vite + Electron dev mode
 
 # Testing
 npm test                 # Run Jest tests
-npm run test:watch       # Watch mode
+npm run test:integration # Integration tests
 
 # Building
-npm run build            # Build for production
-npm run electron:build   # Build Electron app
-
-# Docker
-docker-compose -f server/docker/docker-compose.yml up
+npm run build            # Build frontend
+npm run package:win      # Package Windows installer
+npm run package:mac      # Package macOS DMG
+npm run package:linux    # Package Linux AppImage
 ```
-
-## Code Conventions
-
-1. **React Components**: Functional components with hooks
-2. **State Management**: React Context (no Redux)
-3. **Async**: async/await, no callbacks
-4. **Encryption**: All document content encrypted before leaving device
-5. **Error Handling**: Try/catch with user-friendly error messages
-6. **Testing**: Jest + React Testing Library
 
 ## Security Model
 
-- User generates Ed25519 keypair on first use
-- Workspace has its own symmetric key (XSalsa20-Poly1305)
-- Only encrypted Yjs updates transmitted over network
-- Signaling server never sees plaintext
-- No user accounts or passwords (identity = keypair)
+1. **Identity**: Ed25519 keypair from BIP39 mnemonic (12 words)
+2. **Key Hierarchy**: Password → Argon2id → Workspace key → Folder key → Document key
+3. **Encryption**: XSalsa20-Poly1305 (authenticated) with 4KB padding
+4. **Sharing**: Password-protected links with Ed25519 signatures
+5. **No accounts**: Identity = keypair you control
 
-## Current Focus Areas
+## Context Hierarchy
 
-1. **P2P Sync**: WebRTC for browser, Hyperswarm for Electron
-2. **Persistence**: Server nodes that store encrypted state
-3. **Permissions**: Read/write/admin per workspace
-4. **Offline**: Full offline support with sync on reconnect
-
-## Testing
-
-Tests are in `tests/` directory:
-- Unit tests for crypto, hooks, utilities
-- Integration tests for sync behavior
-- E2E tests for UI flows
-
-Run specific test: `npm test -- keyDerivation`
-
-## Deployment
-
-- Docker images built via GitHub Actions
-- Auto-deploy to QNAP NAS with Watchtower
-- Cloudflare Tunnel for public access
-- See `server/deploy/QNAP_AUTO_DEPLOY.md`
+```jsx
+<IdentityProvider>      // 1. User identity (no deps)
+  <WorkspaceProvider>   // 2. Workspaces (needs identity)
+    <FolderProvider>    // 3. Folders (needs workspace)
+      <PermissionProvider>  // 4. Permissions
+        <PresenceProvider>  // 5. Collaboration presence
+          <App />
+        </PresenceProvider>
+      </PermissionProvider>
+    </FolderProvider>
+  </WorkspaceProvider>
+</IdentityProvider>
+```
 
 ## AI Assistant Commands
 
 ### Command: "start"
-
-When the user says **"start"**, execute these steps:
-
-1. **Kill existing processes** - Terminate any running Electron, Node sidecar, and unified server processes
-   ```powershell
-   Get-Process -Name "electron", "node" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-   ```
-
-2. **Start the sidecar** (in a background terminal) - Required for P2P and crypto operations
-   ```bash
-   node sidecar/index.js
-   ```
-
-3. **Build and start the unified server** (in a background terminal)
-   ```bash
-   cd server/unified && npm start
-   ```
-
-4. **Build and start the Electron app** (in a background terminal)
-   ```bash
-   npm run dev
-   ```
-
-This provides a clean development environment by ensuring no stale processes are running.
+Kill existing processes and start development environment:
+```bash
+npm run dev
+```
 
 ### Command: "test all"
+Run all tests and fix failures:
+```bash
+npm test
+```
 
-When the user says **"test all"**, execute this automated bug-fixing loop:
-
-1. **Run all tests** using Ralph Wiggum mode (`npm run test:ralph`)
-2. **Analyze all output** for any test failures
-3. **Fix bugs one by one** - identify root causes and implement fixes
-4. **Re-run failing tests** after each fix to verify they pass
-5. **Run full test suite again** once individual fixes are verified
-6. **Repeat until 0 failures** - the goal is to achieve a completely green test suite
-
-### Command: "help"
-
-When the user says **"help"**, display available AI assistant commands:
-- `start` - Kill stale processes and start the full development environment
-- `test all` - Run all tests and fix any failures in a loop until green
-- `npm test` - Run unit tests once
-- `npm run test:coverage` - Run tests with coverage report
+### Command: "package"
+Build distributable:
+```bash
+npm run package:win  # or :mac or :linux
+```
