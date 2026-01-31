@@ -5,9 +5,9 @@
  * designed to resist brute-force attacks for 1000+ years.
  * 
  * Key Hierarchy (from WORKSPACE_PERMISSIONS_SPEC.md):
- *   workspaceKey = Argon2id(password, salt="nahma-v1-workspace-{workspaceId}")
- *   folderKey    = Argon2id(workspaceKey, salt="nahma-v1-folder-{folderId}")
- *   documentKey  = Argon2id(folderKey, salt="nahma-v1-document-{documentId}")
+ *   workspaceKey = Argon2id(password, salt="Nightjar-v1-workspace-{workspaceId}")
+ *   folderKey    = Argon2id(workspaceKey, salt="Nightjar-v1-folder-{folderId}")
+ *   documentKey  = Argon2id(folderKey, salt="Nightjar-v1-document-{documentId}")
  * 
  * This hierarchy ensures:
  * - Access to a parent grants automatic access to all children
@@ -53,7 +53,7 @@ export async function deriveKey(password, documentId, purpose = 'encryption') {
 
   // Construct salt: version + purpose + documentId
   // This ensures different keys for different purposes/documents
-  const saltString = `nahma-v${KDF_VERSION}-${purpose}-${documentId}`;
+  const saltString = `Nightjar-v${KDF_VERSION}-${purpose}-${documentId}`;
   const salt = new TextEncoder().encode(saltString);
   
   // Ensure salt is at least 16 bytes (Argon2 requirement)

@@ -1,6 +1,6 @@
-# Nahma Server Stack
+# Nightjar Server Stack
 # 
-# This docker-compose file runs the complete Nahma web deployment:
+# This docker-compose file runs the complete Nightjar web deployment:
 # - nginx: Serves static frontend + reverse proxy for signaling
 # - signaling: WebRTC signaling server
 # - persistence: Document persistence node (stores encrypted blobs)
@@ -18,7 +18,7 @@ services:
     build:
       context: ../..
       dockerfile: server/docker/Dockerfile.web
-    container_name: nahma-web
+    container_name: Nightjar-web
     restart: unless-stopped
     ports:
       - "80:80"
@@ -31,7 +31,7 @@ services:
     depends_on:
       - signaling
     networks:
-      - nahma-network
+      - Nightjar-network
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
@@ -43,13 +43,13 @@ services:
     build:
       context: ../..
       dockerfile: server/docker/Dockerfile.signal
-    container_name: nahma-signal
+    container_name: Nightjar-signal
     restart: unless-stopped
     environment:
       - PORT=4444
       - MAX_PEERS_PER_ROOM=50
     networks:
-      - nahma-network
+      - Nightjar-network
     # Not exposed directly - accessed via nginx reverse proxy
     healthcheck:
       test: ["CMD", "node", "-e", "require('net').connect(4444, () => process.exit(0))"]
@@ -62,22 +62,22 @@ services:
     build:
       context: ../..
       dockerfile: server/docker/Dockerfile.persist
-    container_name: nahma-persist
+    container_name: Nightjar-persist
     restart: unless-stopped
     environment:
       - SIGNALING_URL=ws://signaling:4444
       - DB_PATH=/app/data/persistence.db
     volumes:
-      - nahma-data:/app/data
+      - Nightjar-data:/app/data
     depends_on:
       - signaling
     networks:
-      - nahma-network
+      - Nightjar-network
 
 networks:
-  nahma-network:
+  Nightjar-network:
     driver: bridge
 
 volumes:
-  nahma-data:
+  Nightjar-data:
     driver: local

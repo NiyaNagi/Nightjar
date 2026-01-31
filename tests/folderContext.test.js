@@ -309,9 +309,9 @@ describe('Folder State', () => {
     test('returns full path for nested folder', () => {
       folders.push({ id: 'f1', name: 'Documents', parentId: null });
       folders.push({ id: 'f2', name: 'Projects', parentId: 'f1' });
-      folders.push({ id: 'f3', name: 'Nahma', parentId: 'f2' });
+      folders.push({ id: 'f3', name: 'Nightjar', parentId: 'f2' });
       
-      expect(getFolderPath('f3')).toBe('Documents/Projects/Nahma');
+      expect(getFolderPath('f3')).toBe('Documents/Projects/Nightjar');
     });
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Nahma Persistence Node
+ * Nightjar Persistence Node
  * 
  * A headless Yjs peer that:
  * 1. Connects to the signaling server
@@ -332,7 +332,7 @@ class PersistenceNode {
       type: 'join',
       roomId,
       profile: {
-        name: 'Nahma Persistence',
+        name: 'Nightjar Persistence',
         icon: '💾',
         color: '#64748b'
       }
@@ -455,7 +455,7 @@ class PersistenceNode {
 async function main() {
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║           Nahma Persistence Node                          ║
+║           Nightjar Persistence Node                          ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  Signaling: ${SIGNALING_URL.padEnd(44)}║
 ║  Database:  ${DB_PATH.slice(-44).padEnd(44)}║

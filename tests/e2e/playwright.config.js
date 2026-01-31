@@ -2,7 +2,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright configuration for Nahma E2E and visual testing
+ * Playwright configuration for Nightjar E2E and visual testing
  * 
  * This config supports:
  * - Screenshot capture on every test

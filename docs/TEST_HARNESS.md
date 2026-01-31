@@ -1,10 +1,10 @@
 # Test Harness Documentation
 
-> Complete testing infrastructure for the Nahma collaborative editor
+> Complete testing infrastructure for the Nightjar collaborative editor
 
 ## Overview
 
-This document describes the comprehensive test suite for Nahma, covering identity management, cryptographic operations, workspace collaboration, and UI components.
+This document describes the comprehensive test suite for Nightjar, covering identity management, cryptographic operations, workspace collaboration, and UI components.
 
 ## AI Assistant Command: "start"
 
@@ -217,7 +217,7 @@ Tests time-limited, cryptographically signed workspace invitations.
 
 **Invite Link Format:**
 ```
-nahma://join/<workspaceId>/<encryptedKey>?perm=<permission>&exp=<timestamp>&sig=<signature>&by=<ownerKey>
+Nightjar://join/<workspaceId>/<encryptedKey>?perm=<permission>&exp=<timestamp>&sig=<signature>&by=<ownerKey>
 ```
 
 ### 6. Membership Tests

@@ -32,9 +32,9 @@ export function TorSettings({ isOpen, onClose }) {
   
   // Load saved settings
   useEffect(() => {
-    const savedMode = localStorage.getItem('nahma_tor_mode') || 'disabled';
-    const savedRelayUrl = localStorage.getItem('nahma_relay_url') || '';
-    const savedUseRelay = localStorage.getItem('nahma_use_relay') === 'true';
+    const savedMode = localStorage.getItem('Nightjar_tor_mode') || 'disabled';
+    const savedRelayUrl = localStorage.getItem('Nightjar_relay_url') || '';
+    const savedUseRelay = localStorage.getItem('Nightjar_use_relay') === 'true';
     
     setTorMode(savedMode);
     setRelayUrl(savedRelayUrl);
@@ -69,7 +69,7 @@ export function TorSettings({ isOpen, onClose }) {
   const handleModeChange = async (newMode) => {
     setError('');
     setTorMode(newMode);
-    localStorage.setItem('nahma_tor_mode', newMode);
+    localStorage.setItem('Nightjar_tor_mode', newMode);
     
     if (window.electronAPI?.tor) {
       if (newMode === 'disabled') {
@@ -129,8 +129,8 @@ export function TorSettings({ isOpen, onClose }) {
   };
   
   const handleSaveRelaySettings = () => {
-    localStorage.setItem('nahma_relay_url', relayUrl);
-    localStorage.setItem('nahma_use_relay', useRelay.toString());
+    localStorage.setItem('Nightjar_relay_url', relayUrl);
+    localStorage.setItem('Nightjar_use_relay', useRelay.toString());
   };
   
   const copyOnionAddress = () => {

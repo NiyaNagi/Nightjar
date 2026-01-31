@@ -1,5 +1,5 @@
 /**
- * Nahma Visual UI Testing - Test Fixtures
+ * Nightjar Visual UI Testing - Test Fixtures
  * 
  * Extended Playwright test fixtures that:
  * - Capture screenshots at key points

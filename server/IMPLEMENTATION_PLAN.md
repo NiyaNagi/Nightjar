@@ -1,8 +1,8 @@
-# Nahma Web Deployment - Implementation Plan
+# Nightjar Web Deployment - Implementation Plan
 
 ## Overview
 
-Transform Nahma from Electron-only to a hybrid web/desktop application with:
+Transform Nightjar from Electron-only to a hybrid web/desktop application with:
 - Zero-trust server architecture
 - E2E encrypted collaboration
 - Cryptographic identity
@@ -79,9 +79,9 @@ Transform Nahma from Electron-only to a hybrid web/desktop application with:
 ## Phase 4: Deployment
 
 ### 4.1 Docker Containers
-- `nahma-web`: Nginx + static files
-- `nahma-signal`: Signaling server
-- `nahma-persist`: Persistence node
+- `Nightjar-web`: Nginx + static files
+- `Nightjar-signal`: Signaling server
+- `Nightjar-persist`: Persistence node
 
 ### 4.2 QNAP Configuration
 - Container Station setup

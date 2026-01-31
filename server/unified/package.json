@@ -1,7 +1,7 @@
 {
-  "name": "nahma-server",
+  "name": "Nightjar-server",
   "version": "1.0.0",
-  "description": "Unified Nahma server - signaling, persistence, and static hosting",
+  "description": "Unified Nightjar server - signaling, persistence, and static hosting",
   "type": "module",
   "main": "index.js",
   "scripts": {

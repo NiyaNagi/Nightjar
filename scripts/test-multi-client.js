@@ -33,8 +33,8 @@ for (let i = 1; i <= NUM_CLIENTS; i++) {
   const env = {
     ...process.env,
     ELECTRON_USER_DATA: userDataDir,
-    NAHMA_STORAGE_DIR: storageDir,
-    NAHMA_CLIENT_ID: `test-client-${i}`,
+    Nightjar_STORAGE_DIR: storageDir,
+    Nightjar_CLIENT_ID: `test-client-${i}`,
     // Offset ports for each client to avoid conflicts
     SIDECAR_PORT: String(8081 + (i - 1)),
   };

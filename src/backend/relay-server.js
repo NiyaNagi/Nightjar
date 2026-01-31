@@ -1,5 +1,5 @@
 /**
- * Embedded Relay Server for Nahma Electron App
+ * Embedded Relay Server for Nightjar Electron App
  * 
  * A lightweight WebSocket relay server that enables Electron users
  * to serve as relay nodes for other peers (both Electron and browser).

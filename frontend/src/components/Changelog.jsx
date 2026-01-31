@@ -13,7 +13,7 @@ import './Changelog.css';
 // }
 
 // Storage key prefix for changelog
-const CHANGELOG_STORAGE_KEY = 'nahma-changelog-';
+const CHANGELOG_STORAGE_KEY = 'Nightjar-changelog-';
 
 // Convert Uint8Array to base64 for storage
 const uint8ToBase64 = (arr) => {

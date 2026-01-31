@@ -13,7 +13,7 @@ export class mDNSTransport extends BaseTransport {
     super('mdns');
     this.socket = null;
     this.sidecarUrl = 'ws://localhost:8081';
-    this.serviceName = 'nahma-p2p';
+    this.serviceName = 'Nightjar-p2p';
     this.discoveredPeers = new Map();
     this.isElectron = false;
     this.isAdvertising = false;

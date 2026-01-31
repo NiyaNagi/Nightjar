@@ -89,7 +89,7 @@ function generateKey() {
 }
 
 /**
- * TestClient - Simulates a Nahma client for testing
+ * TestClient - Simulates a Nightjar client for testing
  */
 class TestClient {
     constructor(name, options = {}) {
@@ -438,7 +438,7 @@ class SidecarProcess {
                 ...process.env,
                 SIDECAR_META_PORT: String(this.port),
                 SIDECAR_YJS_PORT: String(this.yjsPort),
-                NAHMA_STORAGE_DIR: this.storageDir,
+                Nightjar_STORAGE_DIR: this.storageDir,
             };
 
             // Ensure storage directory exists

@@ -161,7 +161,7 @@ export function createBackup(identity, workspaces = [], passphrase = null) {
  */
 function deriveKeyFromPassphrase(passphrase) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(passphrase + 'nahma-backup-salt-v1');
+  const data = encoder.encode(passphrase + 'Nightjar-backup-salt-v1');
   
   // Simple key stretching - hash multiple times
   let key = new Uint8Array(32);
@@ -205,7 +205,7 @@ export function downloadBackup(backup, filename = null) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `nahma-backup-${new Date().toISOString().split('T')[0]}.json`;
+  link.download = filename || `Nightjar-backup-${new Date().toISOString().split('T')[0]}.json`;
   
   document.body.appendChild(link);
   link.click();

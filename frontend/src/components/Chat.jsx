@@ -4,7 +4,7 @@ import './Chat.css';
 // Load persisted chat state from localStorage with bounds checking
 const loadChatState = () => {
     try {
-        const saved = localStorage.getItem('nahma-chat-state');
+        const saved = localStorage.getItem('Nightjar-chat-state');
         if (saved) {
             const state = JSON.parse(saved);
             // Ensure position is within visible bounds
@@ -37,7 +37,7 @@ const loadChatState = () => {
 // Save chat state to localStorage
 const saveChatState = (state) => {
     try {
-        localStorage.setItem('nahma-chat-state', JSON.stringify(state));
+        localStorage.setItem('Nightjar-chat-state', JSON.stringify(state));
     } catch (e) {
         console.error('Failed to save chat state:', e);
     }

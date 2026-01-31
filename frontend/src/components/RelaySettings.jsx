@@ -230,7 +230,7 @@ export default function RelaySettings({ isOpen, onClose }) {
             <div className="info-message">
               <span className="info-icon">ℹ️</span>
               <p>
-                Relay functionality is only available in the Nahma desktop app. 
+                Relay functionality is only available in the Nightjar desktop app. 
                 Download it to help strengthen the P2P network and improve 
                 connectivity for all users.
               </p>

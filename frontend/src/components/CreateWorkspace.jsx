@@ -104,7 +104,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       }
     }
     
-    // Try legacy nahma:// format (may have bootstrap peers embedded)
+    // Try legacy Nightjar:// format (may have bootstrap peers embedded)
     try {
       const parsed = parseShareLink(value);
       setParsedLink({ 

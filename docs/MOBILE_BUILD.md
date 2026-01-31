@@ -1,6 +1,6 @@
 # Mobile Build Guide (iOS & Android)
 
-This guide covers building Nahma for iOS and Android using Capacitor.
+This guide covers building Nightjar for iOS and Android using Capacitor.
 
 ## Prerequisites
 
@@ -157,7 +157,7 @@ When sharing from mobile:
 
 Example mobile-generated link:
 ```
-nahma://w/abc123#k:base64key&perm:e&srv:https%3A%2F%2Fapp.nahma.io
+Nightjar://w/abc123#k:base64key&perm:e&srv:https%3A%2F%2Fapp.Nightjar.io
 ```
 
 ### Identity Storage
@@ -259,8 +259,8 @@ cd android
 
 ```json
 {
-  "appId": "com.nightjarx.nahma",
-  "appName": "Nahma",
+  "appId": "com.nightjarx.Nightjar",
+  "appName": "Nightjar",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

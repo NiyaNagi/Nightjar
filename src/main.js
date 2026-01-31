@@ -9,15 +9,15 @@ const hyperswarm = require('../sidecar/hyperswarm');
 const Y = require('yjs');
 const awarenessProtocol = require('y-protocols/awareness');
 
-// Register nahma:// as the default protocol handler for this app
+// Register Nightjar:// as the default protocol handler for this app
 if (process.defaultApp) {
     // Development mode - need to pass app path
     if (process.argv.length >= 2) {
-        app.setAsDefaultProtocolClient('nahma', process.execPath, [path.resolve(process.argv[1])]);
+        app.setAsDefaultProtocolClient('Nightjar', process.execPath, [path.resolve(process.argv[1])]);
     }
 } else {
     // Production mode
-    app.setAsDefaultProtocolClient('nahma');
+    app.setAsDefaultProtocolClient('Nightjar');
 }
 
 // Disable GPU acceleration BEFORE any app initialization
@@ -137,10 +137,10 @@ function createWindow() {
     }
 }
 
-// Handle nahma:// protocol links
+// Handle Nightjar:// protocol links
 function handleProtocolLink(url) {
     console.log('[Protocol] Received link:', url);
-    // Parse the nahma:// URL and send to renderer
+    // Parse the Nightjar:// URL and send to renderer
     if (mainWindow) {
         mainWindow.webContents.send('protocol-link', url);
         // Bring window to front
@@ -157,7 +157,7 @@ app.on('second-instance', (event, commandLine) => {
         mainWindow.focus();
     }
     // Protocol link is in commandLine on Windows
-    const protocolLink = commandLine.find(arg => arg.startsWith('nahma://'));
+    const protocolLink = commandLine.find(arg => arg.startsWith('Nightjar://'));
     if (protocolLink) {
         handleProtocolLink(protocolLink);
     }
@@ -183,7 +183,7 @@ app.on('ready', async () => {
     await startBackendWithLoadingScreen();
     
     // Handle protocol link if app was opened with one (Windows)
-    const protocolLink = process.argv.find(arg => arg.startsWith('nahma://'));
+    const protocolLink = process.argv.find(arg => arg.startsWith('Nightjar://'));
     if (protocolLink) {
         // Wait for window to be ready
         mainWindow.webContents.once('did-finish-load', () => {
@@ -221,7 +221,7 @@ function getLoadingScreenHtml(step = 0, message = '') {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Nahma - Loading</title>
+    <title>Nightjar - Loading</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -304,7 +304,7 @@ function getLoadingScreenHtml(step = 0, message = '') {
 <body>
     <div class="container">
         <div class="logo">📝</div>
-        <h1>Nahma</h1>
+        <h1>Nightjar</h1>
         <div class="progress-container">
             <div class="progress-bar" id="progress"></div>
         </div>

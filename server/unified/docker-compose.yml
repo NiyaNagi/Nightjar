@@ -1,17 +1,17 @@
 version: '3.8'
 
 services:
-  nahma:
+  Nightjar:
     build:
       context: ../..
       dockerfile: server/unified/Dockerfile
-    container_name: nahma
+    container_name: Nightjar
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
       # Persist encrypted workspace data
-      - nahma-data:/app/server/unified/data
+      - Nightjar-data:/app/server/unified/data
     environment:
       - PORT=3000
       - NODE_ENV=production
@@ -22,5 +22,5 @@ services:
       retries: 3
 
 volumes:
-  nahma-data:
+  Nightjar-data:
     driver: local

@@ -1,5 +1,5 @@
 /**
- * Nahma Autonomous UI Testing Loop
+ * Nightjar Autonomous UI Testing Loop
  * 
  * This script implements a "Ralph Wiggum"-style autonomous testing loop:
  * 1. Run Playwright E2E tests
@@ -154,7 +154,7 @@ function readAnalysisReport() {
  */
 function generateAIPrompt(report, iteration) {
   const prompt = {
-    role: 'You are analyzing UI test results for Nahma, a P2P collaborative text editor.',
+    role: 'You are analyzing UI test results for Nightjar, a P2P collaborative text editor.',
     context: {
       iteration,
       maxIterations: CONFIG.maxIterations,
@@ -301,7 +301,7 @@ ${prompt.instructions}
  * Main function
  */
 async function main() {
-  logSection('Nahma Visual UI Testing');
+  logSection('Nightjar Visual UI Testing');
   
   // Check/install Playwright
   if (!checkPlaywright()) {

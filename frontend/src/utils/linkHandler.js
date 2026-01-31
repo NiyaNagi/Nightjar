@@ -246,13 +246,13 @@ export async function handleShareLinkWithPassword(link, password, options) {
 }
 
 /**
- * Check if a link is a valid Nahma share link
+ * Check if a link is a valid Nightjar share link
  * @param {string} link - Link to check
  * @returns {boolean}
  */
-export function isNahmaShareLink(link) {
+export function isNightjarShareLink(link) {
   if (!link || typeof link !== 'string') return false;
-  return link.startsWith('nahma://');
+  return link.startsWith('Nightjar://');
 }
 
 /**
@@ -289,7 +289,7 @@ export function registerLinkHandler(handler) {
     const params = new URLSearchParams(window.location.search);
     const shareLink = params.get('share');
 
-    if (shareLink && isNahmaShareLink(shareLink)) {
+    if (shareLink && isNightjarShareLink(shareLink)) {
       handler(shareLink);
     }
   };
@@ -297,7 +297,7 @@ export function registerLinkHandler(handler) {
   // Handle custom protocol from Electron
   if (window.electronAPI?.onShareLink) {
     const cleanup = window.electronAPI.onShareLink((link) => {
-      if (isNahmaShareLink(link)) {
+      if (isNightjarShareLink(link)) {
         handler(link);
       }
     });

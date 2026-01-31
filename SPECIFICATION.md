@@ -1,14 +1,14 @@
-## Nahma: Secure P2P Collaborative Text Editor - Technical Specification
+## Nightjar: Secure P2P Collaborative Text Editor - Technical Specification
 
 ### 1. Introduction
 
-Nahma is a Secure Peer-to-Peer (P2P) Collaborative Text Editor designed for real-time document editing without reliance on centralized servers. It leverages modern web technologies (React, Tiptap), P2P networking (libp2p), and anonymizing overlay networks (Tor) to provide a private and resilient collaboration experience. Documents are shared via unique links containing a symmetric encryption key, ensuring that only those with the key can access and participate in editing.
+Nightjar is a Secure Peer-to-Peer (P2P) Collaborative Text Editor designed for real-time document editing without reliance on centralized servers. It leverages modern web technologies (React, Tiptap), P2P networking (libp2p), and anonymizing overlay networks (Tor) to provide a private and resilient collaboration experience. Documents are shared via unique links containing a symmetric encryption key, ensuring that only those with the key can access and participate in editing.
 
 The primary goal is to provide a platform for secure, server-less, and censorship-resistant collaborative document creation.
 
 ### 2. High-Level Architecture
 
-The Nahma application employs a multi-process architecture, primarily consisting of:
+The Nightjar application employs a multi-process architecture, primarily consisting of:
 
 1.  **Frontend (Electron Renderer Process):** A React-based web application providing the user interface and the Tiptap rich text editor.
 2.  **Electron Main Process:** Manages the Electron application window and lifecycle. Its intended role is to launch and manage the Sidecar Backend.
@@ -140,7 +140,7 @@ There are two distinct backend implementations present in the codebase: one dire
 6.  **Collaborative Editing:**
     *   **User Action (Frontend):** Changes in the Tiptap editor are captured by Yjs and sent as Yjs updates to the Sidecar Backend via `y-websocket` (`ws://localhost:8080`).
     *   **Sidecar Processing:** The Sidecar Backend receives the Yjs update, encrypts it using the `sessionKey`, persists it to LevelDB, and publishes it to the `libp2p` PubSub topic.
-    *   **Peer Propagation:** Other peers (also running the Nahma application) receive the encrypted update via `libp2p` PubSub.
+    *   **Peer Propagation:** Other peers (also running the Nightjar application) receive the encrypted update via `libp2p` PubSub.
     *   **Peer Sidecar Processing:** The receiving peer's Sidecar Backend decrypts the update (if it has the `sessionKey`), persists it locally, and sends it to its own Frontend via `y-websocket`.
     *   **Peer Frontend Display:** The receiving peer's Frontend applies the Yjs update to its Tiptap editor, reflecting the changes in real-time.
     *   **Awareness:** Cursor movements and selections are handled similarly, using Yjs awareness protocols, broadcasted via `libp2p` PubSub.

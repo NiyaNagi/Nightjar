@@ -1,5 +1,5 @@
 /**
- * Peer Relay Integration for Nahma
+ * Peer Relay Integration for Nightjar
  * 
  * Combines UPnP, embedded relay server, and Hyperswarm to enable
  * any Electron user to serve as a relay node for others.
@@ -15,8 +15,8 @@ import { getUPnPManager } from './upnp-manager.js';
 import { getRelayServer } from './relay-server.js';
 import crypto from 'crypto';
 
-// Well-known topic for relay discovery (SHA256 of "nahma-relays-v1")
-const RELAY_DISCOVERY_TOPIC = crypto.createHash('sha256').update('nahma-relays-v1').digest();
+// Well-known topic for relay discovery (SHA256 of "Nightjar-relays-v1")
+const RELAY_DISCOVERY_TOPIC = crypto.createHash('sha256').update('Nightjar-relays-v1').digest();
 
 class PeerRelayManager {
   constructor(options = {}) {
@@ -74,7 +74,7 @@ class PeerRelayManager {
       this.upnpManager = getUPnPManager({
         internalPort: this.relayPort,
         externalPort: this.relayPort,
-        description: 'Nahma P2P Relay',
+        description: 'Nightjar P2P Relay',
         onStatusChange: (status) => this._handleUPnPStatus(status),
         onError: (err) => this.onError(err),
       });

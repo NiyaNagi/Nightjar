@@ -1,9 +1,9 @@
 {
-  "name": "nahma",
+  "name": "Nightjar",
   "version": "1.0.0",
-  "description": "Nahma - Secure P2P Collaboration",
+  "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
-  "author": "Nahma",
+  "author": "Nightjar",
   "license": "ISC",
   "scripts": {
     "start": "node sidecar/index.js & electron .",
@@ -24,7 +24,7 @@
     "package:linux": "npm run build && electron-builder --linux",
     "postinstall": "node scripts/setup-tor.js && electron-builder install-app-deps",
     "rebuild": "npm rebuild",
-    "cap:init": "npx cap init Nahma com.nightjarx.nahma --web-dir dist",
+    "cap:init": "npx cap init Nightjar com.nightjarx.Nightjar --web-dir dist",
     "cap:add:android": "npx cap add android",
     "cap:add:ios": "npx cap add ios",
     "cap:sync": "npm run build && npx cap sync",
@@ -55,8 +55,8 @@
     "test:e2e:report": "npx playwright show-report tests/e2e-report"
   },
   "build": {
-    "appId": "com.nightjarx.nahma",
-    "productName": "Nahma",
+    "appId": "com.nightjarx.Nightjar",
+    "productName": "Nightjar",
     "directories": {
       "output": "release"
     },

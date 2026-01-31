@@ -338,7 +338,7 @@ function AppContent() {
                     >
                         ☰
                     </button>
-                    <h1>Nahma</h1>
+                    <h1>Nightjar</h1>
                     {currentDocumentName && (
                         <span className="current-doc-name">{currentDocumentName}</span>
                     )}
@@ -397,7 +397,7 @@ function AppContent() {
                     ) : (
                         <div className="no-document-selected">
                             <div className="welcome-message">
-                                <h2>Welcome to Nahma</h2>
+                                <h2>Welcome to Nightjar</h2>
                                 <p>Select a document from the sidebar or create a new one to get started.</p>
                                 <button onClick={handleCreateDocument} className="create-doc-btn">
                                     + Create New Document

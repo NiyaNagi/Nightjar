@@ -10,8 +10,8 @@ import './JoinWithLink.css';
 
 // Regex patterns for different link types
 const LINK_PATTERNS = {
-  workspace: /^nahma:\/\/workspace\/([a-zA-Z0-9_-]+)(?:\?.*)?$/,
-  document: /^nahma:\/\/doc\/([a-zA-Z0-9_-]+)(?:\?.*)?$/,
+  workspace: /^Nightjar:\/\/workspace\/([a-zA-Z0-9_-]+)(?:\?.*)?$/,
+  document: /^Nightjar:\/\/doc\/([a-zA-Z0-9_-]+)(?:\?.*)?$/,
   shortCode: /^[A-Z0-9]{6,12}$/i,
 };
 
@@ -40,13 +40,13 @@ const validateLink = (link) => {
     return { valid: true, type: 'code', id: trimmed.toUpperCase(), error: null };
   }
 
-  // Check if it looks like a partial nahma:// link
-  if (trimmed.startsWith('nahma://')) {
+  // Check if it looks like a partial Nightjar:// link
+  if (trimmed.startsWith('Nightjar://')) {
     return { valid: false, type: null, id: null, error: 'Invalid link format' };
   }
 
   // Unknown format
-  return { valid: false, type: null, id: null, error: 'Paste a nahma:// link or share code' };
+  return { valid: false, type: null, id: null, error: 'Paste a Nightjar:// link or share code' };
 };
 
 export default function JoinWithLink({ isOpen, onClose, onJoin }) {
@@ -180,7 +180,7 @@ export default function JoinWithLink({ isOpen, onClose, onJoin }) {
                 className="join-modal__input"
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
-                placeholder="nahma://workspace/abc123 or SHARE-CODE"
+                placeholder="Nightjar://workspace/abc123 or SHARE-CODE"
                 autoComplete="off"
                 spellCheck="false"
               />

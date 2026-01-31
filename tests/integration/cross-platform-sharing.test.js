@@ -61,7 +61,7 @@ const mockSharing = {
         const permCode = { owner: 'o', editor: 'e', viewer: 'v' }[permission] || 'e';
         
         const payload = Buffer.from(entityId, 'hex').toString('base64url');
-        let link = `nahma://${typeCode}/${payload}`;
+        let link = `Nightjar://${typeCode}/${payload}`;
         
         const fragments = [];
         if (password) fragments.push(`p:${encodeURIComponent(password)}`);
@@ -92,8 +92,8 @@ const mockSharing = {
         }
         
         let entityType = 'document';
-        if (encoded.startsWith('nahma://')) {
-            const afterProtocol = encoded.slice('nahma://'.length);
+        if (encoded.startsWith('Nightjar://')) {
+            const afterProtocol = encoded.slice('Nightjar://'.length);
             const slashIndex = afterProtocol.indexOf('/');
             if (slashIndex !== -1) {
                 const typeCode = afterProtocol[0];
@@ -135,8 +135,8 @@ const mockSharing = {
     isValidShareLink(link) {
         try {
             if (!link || typeof link !== 'string') return false;
-            // Must start with nahma:// protocol
-            if (!link.startsWith('nahma://')) return false;
+            // Must start with Nightjar:// protocol
+            if (!link.startsWith('Nightjar://')) return false;
             const parsed = this.parseShareLink(link);
             return parsed.entityId && parsed.entityId.length > 0;
         } catch {
@@ -177,7 +177,7 @@ async function testAllPlatformsGenerateValidLinks() {
             permission: 'editor',
         });
         
-        assert.ok(link.startsWith('nahma://'), `${platform.name} should generate nahma:// links`);
+        assert.ok(link.startsWith('Nightjar://'), `${platform.name} should generate Nightjar:// links`);
         assert.ok(mockSharing.isValidShareLink(link), `${platform.name} links should be valid`);
     }
 }
@@ -187,7 +187,7 @@ async function testAllPlatformsGenerateValidLinks() {
  */
 async function testWebEmbedServerUrl() {
     const entityId = randomHex(32);
-    const serverUrl = 'https://sync.nahma.io';
+    const serverUrl = 'https://sync.Nightjar.io';
     
     const link = mockSharing.generateShareLink({
         entityType: 'workspace',
@@ -217,7 +217,7 @@ async function testWebToElectron() {
         entityType: 'workspace',
         entityId,
         permission: 'editor',
-        serverUrl: 'https://sync.nahma.io',
+        serverUrl: 'https://sync.Nightjar.io',
     });
     
     // "Parse" on Electron
@@ -226,7 +226,7 @@ async function testWebToElectron() {
     assert.equal(parsed.entityType, 'workspace');
     assert.equal(parsed.entityId, entityId);
     assert.equal(parsed.permission, 'editor');
-    assert.equal(parsed.serverUrl, 'https://sync.nahma.io');
+    assert.equal(parsed.serverUrl, 'https://sync.Nightjar.io');
 }
 
 /**
@@ -260,7 +260,7 @@ async function testWebToIOS() {
         entityType: 'folder',
         entityId,
         permission: 'editor',
-        serverUrl: 'https://sync.nahma.io',
+        serverUrl: 'https://sync.Nightjar.io',
     });
     
     const parsed = mockSharing.parseShareLink(link);
@@ -299,14 +299,14 @@ async function testAndroidToElectron() {
         entityType: 'document',
         entityId,
         permission: 'editor',
-        serverUrl: 'https://relay.nahma.io',
+        serverUrl: 'https://relay.Nightjar.io',
     });
     
     const parsed = mockSharing.parseShareLink(link);
     
     assert.equal(parsed.entityType, 'document');
     assert.equal(parsed.entityId, entityId);
-    assert.equal(parsed.serverUrl, 'https://relay.nahma.io');
+    assert.equal(parsed.serverUrl, 'https://relay.Nightjar.io');
 }
 
 /**
@@ -504,10 +504,10 @@ async function testSpecialCharacterPasswordsCrossPlatform() {
  */
 async function testServerUrlPreservation() {
     const serverUrls = [
-        'https://sync.nahma.io',
+        'https://sync.Nightjar.io',
         'https://relay.example.com',
         'http://localhost:8080',
-        'wss://websocket.nahma.io',
+        'wss://websocket.Nightjar.io',
     ];
     
     const entityId = randomHex(32);

@@ -61,7 +61,7 @@ function verifyMessage(signedMessage, publicKeyHex) {
  * Returns hex string (64 chars)
  */
 function generateTopic(documentId, password = '') {
-    const input = password ? `nahma:${documentId}:${password}` : `nahma:${documentId}`;
+    const input = password ? `Nightjar:${documentId}:${password}` : `Nightjar:${documentId}`;
     return crypto.createHash('sha256').update(input).digest('hex');
 }
 

@@ -1,5 +1,5 @@
 /**
- * WebRTC Provider for Nahma
+ * WebRTC Provider for Nightjar
  * 
  * Handles WebRTC peer connections for browser-based collaboration.
  * Uses a signaling server for peer discovery, then establishes
@@ -124,7 +124,7 @@ export class WebRTCProvider {
    */
   _loadCachedPeers() {
     try {
-      const cached = localStorage.getItem('nahma_cached_peers');
+      const cached = localStorage.getItem('Nightjar_cached_peers');
       return cached ? JSON.parse(cached) : [];
     } catch {
       return [];
@@ -141,7 +141,7 @@ export class WebRTCProvider {
         cached.unshift(address); // Add to front
         // Keep only last 10
         const trimmed = cached.slice(0, 10);
-        localStorage.setItem('nahma_cached_peers', JSON.stringify(trimmed));
+        localStorage.setItem('Nightjar_cached_peers', JSON.stringify(trimmed));
       }
     } catch (e) {
       console.warn('[WebRTCProvider] Failed to cache peer:', e);
@@ -390,7 +390,7 @@ export class WebRTCProvider {
     // Handle data channel
     if (initiator) {
       // Create data channel for sync
-      const channel = connection.createDataChannel('nahma-sync', {
+      const channel = connection.createDataChannel('Nightjar-sync', {
         ordered: false, // Allow out-of-order for lower latency
       });
       this._setupDataChannel(peerId, channel);

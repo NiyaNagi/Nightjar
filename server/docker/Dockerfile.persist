@@ -1,4 +1,4 @@
-# Dockerfile for Nahma Persistence Node
+# Dockerfile for Nightjar Persistence Node
 FROM node:20-alpine
 
 WORKDIR /app
@@ -19,11 +19,11 @@ COPY server/persistence/ ./
 RUN mkdir -p /app/data
 
 # Create non-root user and set permissions
-RUN addgroup -g 1001 -S nahma && \
-    adduser -S nahma -u 1001 -G nahma && \
-    chown -R nahma:nahma /app
+RUN addgroup -g 1001 -S Nightjar && \
+    adduser -S Nightjar -u 1001 -G Nightjar && \
+    chown -R Nightjar:Nightjar /app
 
-USER nahma
+USER Nightjar
 
 # Health check (just verify process is running)
 HEALTHCHECK --interval=60s --timeout=5s \

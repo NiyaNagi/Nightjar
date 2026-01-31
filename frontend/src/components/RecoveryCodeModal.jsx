@@ -58,7 +58,7 @@ export default function RecoveryCodeModal({
   };
   
   const handleSaveToFile = () => {
-    const content = `Nahma Recovery Phrase
+    const content = `Nightjar Recovery Phrase
 =====================
 Generated: ${new Date().toISOString()}
 
@@ -71,14 +71,14 @@ IMPORTANT:
 - Anyone with this phrase can access your identity
 - Store it offline in a safe place
 - Never share it with anyone
-- Nahma will never ask for your recovery phrase
+- Nightjar will never ask for your recovery phrase
 `;
     
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `nahma-recovery-phrase-${Date.now()}.txt`;
+    link.download = `Nightjar-recovery-phrase-${Date.now()}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

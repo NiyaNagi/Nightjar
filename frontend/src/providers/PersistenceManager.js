@@ -34,7 +34,7 @@ export async function deriveWorkspaceKey(workspaceId, userSecret) {
   const key = await crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: encoder.encode(`nahma-workspace-${workspaceId}`),
+      salt: encoder.encode(`Nightjar-workspace-${workspaceId}`),
       iterations: 100000,
       hash: 'SHA-256'
     },

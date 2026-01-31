@@ -266,7 +266,7 @@ class TestServerManager {
       
       this.process.stdout.on('data', (data) => {
         const output = data.toString();
-        if (output.includes('Nahma') || output.includes('listening') || output.includes('started')) {
+        if (output.includes('Nightjar') || output.includes('listening') || output.includes('started')) {
           this.ready = true;
           clearTimeout(timeout);
           resolve();

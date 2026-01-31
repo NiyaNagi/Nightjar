@@ -1,4 +1,4 @@
-# Dockerfile for Nahma Signaling Server
+# Dockerfile for Nightjar Signaling Server
 FROM node:20-alpine
 
 WORKDIR /app
@@ -13,10 +13,10 @@ RUN npm ci --only=production
 COPY server/signaling/ ./
 
 # Create non-root user
-RUN addgroup -g 1001 -S nahma && \
-    adduser -S nahma -u 1001 -G nahma
+RUN addgroup -g 1001 -S Nightjar && \
+    adduser -S Nightjar -u 1001 -G Nightjar
 
-USER nahma
+USER Nightjar
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s \

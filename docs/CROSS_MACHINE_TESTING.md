@@ -1,6 +1,6 @@
 # Cross-Machine Network Testing Guide
 
-This guide explains how to build Nahma for Mac and Windows, and test P2P collaboration over the internet.
+This guide explains how to build Nightjar for Mac and Windows, and test P2P collaboration over the internet.
 
 ## Quick Start
 
@@ -8,7 +8,7 @@ This guide explains how to build Nahma for Mac and Windows, and test P2P collabo
 ```bash
 npm run package:win
 ```
-Output: `release/Nahma Setup 1.0.0.exe` (installer) and `release/Nahma 1.0.0.exe` (portable)
+Output: `release/Nightjar Setup 1.0.0.exe` (installer) and `release/Nightjar 1.0.0.exe` (portable)
 
 ### 2. Build for Mac (requires a Mac)
 On the Mac, clone the repo and run:
@@ -16,7 +16,7 @@ On the Mac, clone the repo and run:
 npm install
 npm run package:mac
 ```
-Output: `release/Nahma-1.0.0.dmg` or `release/Nahma-1.0.0-mac.zip`
+Output: `release/Nightjar-1.0.0.dmg` or `release/Nightjar-1.0.0-mac.zip`
 
 > **Note**: Cross-compiling Mac apps from Windows is not supported by Electron. You must build on a Mac for Mac distribution.
 
@@ -24,7 +24,7 @@ Output: `release/Nahma-1.0.0.dmg` or `release/Nahma-1.0.0-mac.zip`
 
 ## Network Architecture
 
-Nahma uses **Hyperswarm** for P2P discovery, which:
+Nightjar uses **Hyperswarm** for P2P discovery, which:
 - Uses a DHT (Distributed Hash Table) for peer discovery over the internet
 - Establishes direct peer-to-peer connections via hole-punching
 - Falls back to relay servers when direct connection fails
@@ -44,7 +44,7 @@ If both machines have relatively open networks (home WiFi, not strict corporate 
 
 1. **On PC**: Run `npm run package:win`, send the executable to Mac user
 2. **On Mac**: Build locally with `npm run package:mac`
-3. Both launch Nahma and create/join the same room
+3. Both launch Nightjar and create/join the same room
 4. Hyperswarm handles discovery automatically
 
 ### Scenario B: Using the Relay Server
@@ -61,7 +61,7 @@ Both clients can connect through this relay for guaranteed connectivity.
 
 ### Scenario C: Via Tor (Most Private)
 
-Nahma includes Tor support. Both machines need:
+Nightjar includes Tor support. Both machines need:
 1. Tor running locally (port 9050)
 2. The app will create .onion addresses for private connectivity
 
@@ -110,7 +110,7 @@ node scripts/test-hyperswarm-connectivity.js
 ## Sending the Windows Build to Mac
 
 1. Run `npm run package:win` on your PC
-2. The portable executable is at: `release/Nahma 1.0.0.exe`
+2. The portable executable is at: `release/Nightjar 1.0.0.exe`
 3. Share via cloud storage (Dropbox, Google Drive, etc.)
 
 > **Important**: Windows executables won't run on Mac! You need to build on Mac for Mac users.
@@ -124,7 +124,7 @@ On your Mac:
 ```bash
 # Clone your repo
 git clone <your-repo-url>
-cd Nahma
+cd Nightjar
 
 # Install dependencies
 npm install
@@ -134,7 +134,7 @@ npm run package:mac
 
 # Find your build
 ls release/
-# Should see: Nahma-1.0.0.dmg, Nahma-1.0.0-arm64.dmg, etc.
+# Should see: Nightjar-1.0.0.dmg, Nightjar-1.0.0-arm64.dmg, etc.
 ```
 
 ---
@@ -174,7 +174,7 @@ jobs:
       
       - uses: actions/upload-artifact@v4
         with:
-          name: nahma-${{ matrix.os }}
+          name: Nightjar-${{ matrix.os }}
           path: release/*
 ```
 

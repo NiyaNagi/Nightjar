@@ -1,6 +1,6 @@
-# Nahma QNAP Auto-Deploy with Cloudflare Tunnel
+# Nightjar QNAP Auto-Deploy with Cloudflare Tunnel
 
-This guide sets up **automatic deployment** of Nahma to your QNAP NAS with **Cloudflare Tunnel** for secure public access - no port forwarding required!
+This guide sets up **automatic deployment** of Nightjar to your QNAP NAS with **Cloudflare Tunnel** for secure public access - no port forwarding required!
 
 ## What You'll Get
 
@@ -147,8 +147,8 @@ Your images will be published to:
 - `ghcr.io/YOUR_USERNAME/YOUR_REPO/signal:latest`
 - `ghcr.io/YOUR_USERNAME/YOUR_REPO/persist:latest`
 
-Example: If your repo is `johndoe/nahma`, images will be at:
-- `ghcr.io/johndoe/nahma/web:latest`
+Example: If your repo is `johndoe/Nightjar`, images will be at:
+- `ghcr.io/johndoe/Nightjar/web:latest`
 
 ---
 
@@ -226,7 +226,7 @@ Check status in Cloudflare Dashboard - it will show "Active" when ready.
 3. Navigate to **Networks** → **Tunnels**
 4. Click **Create a tunnel**
 5. Select **Cloudflared** as connector type
-6. Name it: `nahma-qnap`
+6. Name it: `Nightjar-qnap`
 7. Click **Save tunnel**
 
 ### Step 3.4: Get Your Tunnel Token
@@ -265,11 +265,11 @@ Enter your admin password when prompted.
 ### Step 4.2: Create Directory Structure
 
 ```bash
-# Create the Nahma directory
-mkdir -p /share/Container/nahma/data
+# Create the Nightjar directory
+mkdir -p /share/Container/Nightjar/data
 
 # Navigate to it
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 ```
 
 ### Step 4.3: Create the Docker Compose File
@@ -281,7 +281,7 @@ cat > docker-compose.yml << 'ENDOFFILE'
 version: '3.8'
 
 # ============================================
-# Nahma Auto-Deploy Stack with Cloudflare Tunnel
+# Nightjar Auto-Deploy Stack with Cloudflare Tunnel
 # ============================================
 # 
 # Before running:
@@ -298,13 +298,13 @@ services:
   # No ports need to be opened on your router!
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: nahma-tunnel
+    container_name: Nightjar-tunnel
     restart: unless-stopped
     command: tunnel run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
-      - nahma-network
+      - Nightjar-network
     depends_on:
       - nginx
       - signaling
@@ -316,7 +316,7 @@ services:
   # Automatically pulls new images and restarts containers
   watchtower:
     image: containrrr/watchtower:latest
-    container_name: nahma-watchtower
+    container_name: Nightjar-watchtower
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -333,12 +333,12 @@ services:
   # Serves the frontend and proxies API requests
   nginx:
     image: ghcr.io/${GITHUB_USER}/${GITHUB_REPO}/web:latest
-    container_name: nahma-web
+    container_name: Nightjar-web
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
-      - nahma-network
+      - Nightjar-network
     depends_on:
       - signaling
     healthcheck:
@@ -353,7 +353,7 @@ services:
   # WebRTC signaling for peer discovery
   signaling:
     image: ghcr.io/${GITHUB_USER}/${GITHUB_REPO}/signal:latest
-    container_name: nahma-signal
+    container_name: Nightjar-signal
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -361,7 +361,7 @@ services:
       - PORT=4444
       - MAX_PEERS_PER_ROOM=50
     networks:
-      - nahma-network
+      - Nightjar-network
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('net').connect(4444).on('error', () => process.exit(1)).on('connect', () => process.exit(0))\""]
       interval: 30s
@@ -374,7 +374,7 @@ services:
   # Stores encrypted document state in SQLite
   persistence:
     image: ghcr.io/${GITHUB_USER}/${GITHUB_REPO}/persist:latest
-    container_name: nahma-persist
+    container_name: Nightjar-persist
     restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
@@ -386,12 +386,12 @@ services:
     depends_on:
       - signaling
     networks:
-      - nahma-network
+      - Nightjar-network
 
 networks:
-  nahma-network:
+  Nightjar-network:
     driver: bridge
-    name: nahma-network
+    name: Nightjar-network
 ENDOFFILE
 ```
 
@@ -402,7 +402,7 @@ Create the `.env` file with your settings:
 ```bash
 cat > .env << 'ENDOFFILE'
 # ============================================
-# Nahma Environment Configuration
+# Nightjar Environment Configuration
 # ============================================
 
 # Cloudflare Tunnel Token
@@ -431,7 +431,7 @@ Replace:
 ```
 CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoiZjQ1NjM4...
 GITHUB_USER=johndoe
-GITHUB_REPO=nahma
+GITHUB_REPO=Nightjar
 ```
 
 Press `Ctrl+O` to save, `Enter` to confirm, `Ctrl+X` to exit.
@@ -460,20 +460,20 @@ If your packages are private, authenticate with GitHub Container Registry:
 
 3. **Copy credentials for Watchtower:**
    ```bash
-   mkdir -p /share/Container/nahma/docker-config
-   cp ~/.docker/config.json /share/Container/nahma/docker-config/
+   mkdir -p /share/Container/Nightjar/docker-config
+   cp ~/.docker/config.json /share/Container/Nightjar/docker-config/
    ```
 
 4. **Update docker-compose.yml** to mount the config:
    Add this under the watchtower service's volumes:
    ```yaml
-   - /share/Container/nahma/docker-config/config.json:/config.json:ro
+   - /share/Container/Nightjar/docker-config/config.json:/config.json:ro
    ```
 
 ### Step 4.6: Pull Images and Start Containers
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 
 # Pull all images first (see any errors early)
 docker-compose pull
@@ -492,17 +492,17 @@ You should see 5 containers with STATUS "Up":
 
 | CONTAINER | IMAGE | STATUS |
 |-----------|-------|--------|
-| nahma-tunnel | cloudflare/cloudflared:latest | Up |
-| nahma-watchtower | containrrr/watchtower:latest | Up |
-| nahma-web | ghcr.io/.../web:latest | Up |
-| nahma-signal | ghcr.io/.../signal:latest | Up |
-| nahma-persist | ghcr.io/.../persist:latest | Up |
+| Nightjar-tunnel | cloudflare/cloudflared:latest | Up |
+| Nightjar-watchtower | containrrr/watchtower:latest | Up |
+| Nightjar-web | ghcr.io/.../web:latest | Up |
+| Nightjar-signal | ghcr.io/.../signal:latest | Up |
+| Nightjar-persist | ghcr.io/.../persist:latest | Up |
 
 If any container is not running, check logs:
 
 ```bash
-docker logs nahma-tunnel
-docker logs nahma-web
+docker logs Nightjar-tunnel
+docker logs Nightjar-web
 ```
 
 ---
@@ -515,18 +515,18 @@ Now we tell Cloudflare how to route traffic to your containers.
 
 1. Go to Cloudflare Dashboard → **Zero Trust**
 2. Navigate to **Networks** → **Tunnels**
-3. Click on your tunnel (`nahma-qnap`)
+3. Click on your tunnel (`Nightjar-qnap`)
 4. Go to the **Public Hostname** tab
 5. Click **Add a public hostname**
 
 Configure the main app:
 | Field | Value |
 |-------|-------|
-| Subdomain | `nahma` (or your choice) |
+| Subdomain | `Nightjar` (or your choice) |
 | Domain | Select your domain |
 | Path | (leave empty) |
 | Type | HTTP |
-| URL | `nahma-web:80` |
+| URL | `Nightjar-web:80` |
 
 Click **Save hostname**.
 
@@ -536,11 +536,11 @@ Click **Add a public hostname** again:
 
 | Field | Value |
 |-------|-------|
-| Subdomain | `nahma` (same as above) |
+| Subdomain | `Nightjar` (same as above) |
 | Domain | Select your domain |
 | Path | `signal` |
 | Type | HTTP |
-| URL | `nahma-signal:4444` |
+| URL | `Nightjar-signal:4444` |
 
 **Important - Enable WebSockets:**
 
@@ -557,7 +557,7 @@ Check that the tunnel shows as **Healthy** in the Cloudflare Dashboard.
 You can also verify from QNAP:
 
 ```bash
-docker logs nahma-tunnel --tail 20
+docker logs Nightjar-tunnel --tail 20
 ```
 
 Look for messages like:
@@ -575,10 +575,10 @@ Registered tunnel connection ...
 Open your browser and go to:
 
 ```
-https://nahma.yourdomain.com
+https://Nightjar.yourdomain.com
 ```
 
-You should see the Nahma welcome screen!
+You should see the Nightjar welcome screen!
 
 ### Step 6.2: Test P2P Sync
 
@@ -598,14 +598,14 @@ You should see the Nahma welcome screen!
 
 Verify with:
 ```bash
-docker logs nahma-watchtower --tail 50
+docker logs Nightjar-watchtower --tail 50
 ```
 
 Look for:
 ```
 Found new ghcr.io/.../web:latest image
-Stopping container nahma-web
-Creating container nahma-web
+Stopping container Nightjar-web
+Creating container Nightjar-web
 ```
 
 ---
@@ -662,7 +662,7 @@ Creating container nahma-web
 │         │ Internal Network                             │
 │         ▼                                              │
 │  ┌─────────────┐    ┌─────────────┐    ┌────────────┐  │
-│  │  nahma-web  │◄──►│nahma-signal │◄──►│nahma-persist│ │
+│  │  Nightjar-web  │◄──►│Nightjar-signal │◄──►│Nightjar-persist│ │
 │  │   (nginx)   │    │  (WebRTC)   │    │  (SQLite)  │  │
 │  └─────────────┘    └─────────────┘    └────────────┘  │
 └────────────────────────────────────────────────────────┘
@@ -683,15 +683,15 @@ Creating container nahma-web
 
 ```bash
 # All containers
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 docker-compose logs -f
 
 # Specific container
-docker logs nahma-web
-docker logs nahma-tunnel
-docker logs nahma-watchtower
-docker logs nahma-signal
-docker logs nahma-persist
+docker logs Nightjar-web
+docker logs Nightjar-tunnel
+docker logs Nightjar-watchtower
+docker logs Nightjar-signal
+docker logs Nightjar-persist
 ```
 
 ### Check Container Status
@@ -704,7 +704,7 @@ docker-compose ps
 ### Manual Update (Skip Watchtower Wait)
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 docker-compose pull
 docker-compose up -d
 ```
@@ -712,21 +712,21 @@ docker-compose up -d
 ### Restart All Containers
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 docker-compose restart
 ```
 
 ### Stop Everything
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 docker-compose down
 ```
 
 ### Start Everything
 
 ```bash
-cd /share/Container/nahma
+cd /share/Container/Nightjar
 docker-compose up -d
 ```
 
@@ -764,7 +764,7 @@ If it fails:
 ### Problem: Tunnel Not Connecting
 
 ```bash
-docker logs nahma-tunnel
+docker logs Nightjar-tunnel
 ```
 
 Common issues:
@@ -780,7 +780,7 @@ Common issues:
 
 2. **Check nginx logs:**
    ```bash
-   docker logs nahma-web
+   docker logs Nightjar-web
    ```
 
 3. **Test locally on NAS:**
@@ -795,14 +795,14 @@ Common issues:
 1. **Verify WebSockets enabled** in Cloudflare tunnel route settings
 2. **Check signaling server:**
    ```bash
-   docker logs nahma-signal
+   docker logs Nightjar-signal
    ```
 3. **Check browser console** for WebSocket connection errors
 
 ### Problem: Watchtower Not Updating
 
 ```bash
-docker logs nahma-watchtower
+docker logs Nightjar-watchtower
 ```
 
 Common issues:
@@ -825,7 +825,7 @@ Add to your GitHub workflow (`.github/workflows/deploy-qnap.yml`):
     DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
   run: |
     curl -H "Content-Type: application/json" \
-      -d "{\"content\": \"🚀 Nahma deployed! Commit: ${{ github.sha }}\"}" \
+      -d "{\"content\": \"🚀 Nightjar deployed! Commit: ${{ github.sha }}\"}" \
       $DISCORD_WEBHOOK
 ```
 
@@ -840,11 +840,11 @@ Free options:
 
 ### Backup Data Volume
 
-Schedule regular backups of `/share/Container/nahma/data/`:
+Schedule regular backups of `/share/Container/Nightjar/data/`:
 
 ```bash
 # Simple backup script
-cp -r /share/Container/nahma/data /share/Backup/nahma-$(date +%Y%m%d)
+cp -r /share/Container/Nightjar/data /share/Backup/Nightjar-$(date +%Y%m%d)
 ```
 
 ### Add Cloudflare Access (Optional Authentication)
@@ -877,7 +877,7 @@ If you want to require login:
 - [ ] GitHub PAT has minimal scopes (read:packages only)
 - [ ] QNAP admin account has strong password
 - [ ] QNAP 2FA enabled (if available)
-- [ ] Regular backups of `/share/Container/nahma/data/`
+- [ ] Regular backups of `/share/Container/Nightjar/data/`
 - [ ] Watchtower only updates labeled containers
 - [ ] Consider Cloudflare Access for additional auth
 
@@ -892,8 +892,8 @@ If you want to require login:
 | Manual update | `docker-compose pull && docker-compose up -d` |
 | Restart all | `docker-compose restart` |
 | Stop all | `docker-compose down` |
-| View Watchtower | `docker logs nahma-watchtower --tail 50` |
-| View tunnel | `docker logs nahma-tunnel --tail 50` |
+| View Watchtower | `docker logs Nightjar-watchtower --tail 50` |
+| View tunnel | `docker logs Nightjar-tunnel --tail 50` |
 
 ---
 

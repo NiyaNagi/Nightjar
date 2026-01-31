@@ -135,7 +135,7 @@ export function EntityShareDialog({
       `Access: ${PERMISSION_OPTIONS.find(p => p.value === selectedPermission)?.label}\n\n` +
       (includePassword ? '' : `Password: ${password}\n\n`) +
       `Link: ${shareLink}\n\n` +
-      `Open this link with Nahma to access.`;
+      `Open this link with Nightjar to access.`;
     
     await copyToClipboard(message);
   };

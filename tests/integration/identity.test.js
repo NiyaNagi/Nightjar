@@ -62,7 +62,7 @@ let mockIdentityStore = null;
 let mockIdentityPath = null;
 
 function getIdentityDir() {
-    const dir = path.join(os.homedir(), '.nahma');
+    const dir = path.join(os.homedir(), '.Nightjar');
     // Create directory if it doesn't exist (for tests that check this)
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -812,7 +812,7 @@ async function testGetIdentityPathFormat() {
     const identityPath = getIdentityPath();
     
     assert.ok(identityPath.endsWith('identity.json'), 'Path should end with identity.json');
-    assert.contains(identityPath, '.nahma', 'Path should contain .nahma');
+    assert.contains(identityPath, '.Nightjar', 'Path should contain .Nightjar');
 }
 
 // Export test suite

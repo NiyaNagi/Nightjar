@@ -114,7 +114,7 @@ export function ShareDialog({
   // Generate the share message
   const getShareMessage = useCallback(() => {
     const pwdText = usePassword ? `Use the password: ${password}` : '';
-    return `${userName} shared "${documentName}" with you. Download Nahma to open. ${pwdText}\n${shareLink}`;
+    return `${userName} shared "${documentName}" with you. Download Nightjar to open. ${pwdText}\n${shareLink}`;
   }, [userName, documentName, usePassword, password, shareLink]);
 
   // Get content to copy based on format
@@ -415,7 +415,7 @@ export function ShareDialog({
                     <div className="join-input-container">
                       <input
                         type="text"
-                        placeholder="nahma://d/..."
+                        placeholder="Nightjar://d/..."
                         value={joinLink}
                         onChange={e => {
                           setJoinLink(e.target.value);

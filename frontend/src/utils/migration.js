@@ -20,9 +20,9 @@ import { createNewEntity } from './sharing';
 
 // Migration versions
 const CURRENT_SCHEMA_VERSION = 2;
-const MIGRATION_KEY = 'nahma-migration-version';
-const LEGACY_DOCS_KEY = 'nahma-documents';
-const LEGACY_FOLDERS_KEY = 'nahma-folders';
+const MIGRATION_KEY = 'Nightjar-migration-version';
+const LEGACY_DOCS_KEY = 'Nightjar-documents';
+const LEGACY_FOLDERS_KEY = 'Nightjar-folders';
 
 /**
  * Check if migration is needed
@@ -285,7 +285,7 @@ export async function runMigration(options = {}) {
     localStorage.setItem(MIGRATION_KEY, CURRENT_SCHEMA_VERSION.toString());
     
     // Store migration record
-    localStorage.setItem('nahma-migration-record', JSON.stringify({
+    localStorage.setItem('Nightjar-migration-record', JSON.stringify({
       completedAt: Date.now(),
       fromVersion: currentVersion,
       toVersion: CURRENT_SCHEMA_VERSION,
@@ -313,7 +313,7 @@ export async function runMigration(options = {}) {
 export function rollbackMigration() {
   try {
     localStorage.removeItem(MIGRATION_KEY);
-    localStorage.removeItem('nahma-migration-record');
+    localStorage.removeItem('Nightjar-migration-record');
     console.log('[Migration] Rolled back migration flags');
     return true;
   } catch (error) {
@@ -328,7 +328,7 @@ export function rollbackMigration() {
  */
 export function getMigrationRecord() {
   try {
-    const record = localStorage.getItem('nahma-migration-record');
+    const record = localStorage.getItem('Nightjar-migration-record');
     return record ? JSON.parse(record) : null;
   } catch {
     return null;

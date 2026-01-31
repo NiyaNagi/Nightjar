@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation of a cryptographic identity system for Nahma, enabling:
+This document outlines the implementation of a cryptographic identity system for Nightjar, enabling:
 - **Device-bound identity** - Ed25519 keypair derived from BIP39 mnemonic
 - **Time-limited signed invites** - Owner-signed invitations with configurable expiry
 - **Cryptographic kick system** - Owner can remove collaborators with signed proof
@@ -36,7 +36,7 @@ restoreFromMnemonic()     // Restores from backup words
 
 ### 1.2 Identity Storage
 
-- **Location:** `localStorage` key `nahma_identity`
+- **Location:** `localStorage` key `Nightjar_identity`
 - **Format:** `{ publicKey: hex, secretKey: hex, mnemonic: encrypted }`
 - **Mnemonic encryption:** XSalsa20-Poly1305 with user passphrase (optional)
 
@@ -90,7 +90,7 @@ On peer connection:
 ### 3.1 Invite Link Format
 
 ```
-nahma://workspace/{workspaceId}#key={encKey}&exp={timestamp}&perm={permission}&sig={signature}
+Nightjar://workspace/{workspaceId}#key={encKey}&exp={timestamp}&perm={permission}&sig={signature}
 ```
 
 - **exp:** Unix timestamp when invite expires (max 24 hours from creation)
@@ -259,7 +259,7 @@ async function cloneWorkspace(sourceWorkspaceId) {
 4. Content syncs from peers
 
 **From backup file:**
-1. User selects .nahma-backup file
+1. User selects .Nightjar-backup file
 2. Enter passphrase if required
 3. Decrypt and restore identity + workspace keys
 4. Rejoin all workspaces
