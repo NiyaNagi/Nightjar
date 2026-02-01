@@ -481,7 +481,7 @@ describe('ShareDialog Component', () => {
   describe('Share Link Generation', () => {
     test('generates invite link with workspace key', () => {
       const generateLink = (workspaceId, key) => {
-        const base = window.location?.origin || 'https://app.Nightjar.io';
+        const base = window.location?.origin || 'https://app.nightjar.io';
         return `${base}/join/${workspaceId}#${key}`;
       };
       
@@ -493,7 +493,7 @@ describe('ShareDialog Component', () => {
 
     test('copies link to clipboard', async () => {
       const mockClipboard = { writeText: jest.fn() };
-      const link = 'https://app.Nightjar.io/join/ws-123#key';
+      const link = 'https://app.nightjar.io/join/ws-123#key';
       
       await mockClipboard.writeText(link);
       
@@ -743,7 +743,7 @@ describe('CreateWorkspace Dialog', () => {
         return null;
       };
       
-      const result = parseInviteLink('https://app.Nightjar.io/join/ws-123#secretkey');
+      const result = parseInviteLink('https://app.nightjar.io/join/ws-123#secretkey');
       
       expect(result.workspaceId).toBe('ws-123');
       expect(result.key).toBe('secretkey');

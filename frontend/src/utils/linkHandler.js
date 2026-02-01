@@ -252,7 +252,7 @@ export async function handleShareLinkWithPassword(link, password, options) {
  */
 export function isNightjarShareLink(link) {
   if (!link || typeof link !== 'string') return false;
-  return link.startsWith('Nightjar://');
+  return link.startsWith('nightjar://');
 }
 
 /**

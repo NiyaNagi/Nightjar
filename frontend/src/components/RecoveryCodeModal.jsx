@@ -59,7 +59,7 @@ export default function RecoveryCodeModal({
   
   const handleSaveToFile = () => {
     const content = `Nightjar Recovery Phrase
-=====================
+========================
 Generated: ${new Date().toISOString()}
 
 Your 12-word recovery phrase:
@@ -78,7 +78,7 @@ IMPORTANT:
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Nightjar-recovery-phrase-${Date.now()}.txt`;
+    link.download = `nightjar-recovery-phrase-${Date.now()}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

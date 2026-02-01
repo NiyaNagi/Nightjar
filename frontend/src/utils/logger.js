@@ -299,7 +299,7 @@ export function exportLogs(filename) {
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   
-  const defaultFilename = `Nightjar-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const defaultFilename = `nightjar-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   const downloadName = filename || defaultFilename;
   
   const a = document.createElement('a');

@@ -40,13 +40,13 @@ const validateLink = (link) => {
     return { valid: true, type: 'code', id: trimmed.toUpperCase(), error: null };
   }
 
-  // Check if it looks like a partial Nightjar:// link
-  if (trimmed.startsWith('Nightjar://')) {
+  // Check if it looks like a partial nightjar:// link
+  if (trimmed.startsWith('nightjar://')) {
     return { valid: false, type: null, id: null, error: 'Invalid link format' };
   }
 
   // Unknown format
-  return { valid: false, type: null, id: null, error: 'Paste a Nightjar:// link or share code' };
+  return { valid: false, type: null, id: null, error: 'Paste a nightjar:// link or share code' };
 };
 
 export default function JoinWithLink({ isOpen, onClose, onJoin }) {
@@ -180,7 +180,7 @@ export default function JoinWithLink({ isOpen, onClose, onJoin }) {
                 className="join-modal__input"
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
-                placeholder="Nightjar://workspace/abc123 or SHARE-CODE"
+                placeholder="nightjar://workspace/abc123 or SHARE-CODE"
                 autoComplete="off"
                 spellCheck="false"
               />

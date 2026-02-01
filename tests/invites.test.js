@@ -158,7 +158,7 @@ describe('Signed Invites', () => {
     
     test('accepts legacy links without expiry', () => {
       // Create a simple legacy link without signing
-      const legacyLink = `Nightjar://w/abcdef#k:${Buffer.from(mockEncryptionKey).toString('base64')}&perm:e`;
+      const legacyLink = `nightjar://w/abcdef#k:${Buffer.from(mockEncryptionKey).toString('base64')}&perm:e`;
       
       const validation = validateSignedInvite(legacyLink);
       

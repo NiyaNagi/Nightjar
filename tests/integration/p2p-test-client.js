@@ -65,7 +65,7 @@ function generateKey() {
  * Generate topic from workspace ID
  */
 function generateTopic(workspaceId) {
-  return crypto.createHash('sha256').update(`Nightjar:${workspaceId}`).digest('hex');
+  return crypto.createHash('sha256').update(`nightjar:${workspaceId}`).digest('hex');
 }
 
 /**
@@ -391,7 +391,7 @@ class P2PTestClient extends EventEmitter {
     this.rtcConnections.set(peerId, pc);
     
     // Create data channel
-    const dc = pc.createDataChannel('Nightjar-sync', {
+    const dc = pc.createDataChannel('nightjar-sync', {
       ordered: true,
     });
     
