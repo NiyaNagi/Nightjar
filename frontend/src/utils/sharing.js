@@ -231,6 +231,7 @@ const LEGACY_LINK_PREFIX = 'nightjar://d/';
  * @param {Array<string>} options.bootstrapPeers - Array of peer addresses (ip:port or host:port) - legacy WebSocket
  * @param {Array<string>} options.hyperswarmPeers - Array of Hyperswarm public keys (64-char hex)
  * @param {string} options.topicHash - Full 64-char hex Hyperswarm topic hash
+ * @param {string} options.directAddress - Direct connection address (ip:port for P2P)
  * @param {string} options.serverUrl - Sync server URL for fallback
  * @returns {string} Shareable link
  */
@@ -243,8 +244,9 @@ export function generateShareLink(options) {
     password = null,
     encryptionKey = null,
     bootstrapPeers = [],
-    hyperswarmPeers = [], // NEW: Hyperswarm peer public keys
-    topicHash = null, // NEW: Full topic hash for DHT discovery
+    hyperswarmPeers = [], // Hyperswarm peer public keys
+    topicHash = null, // Full topic hash for DHT discovery
+    directAddress = null, // Direct P2P address (ip:port)
     serverUrl = null, // Sync server URL for cross-platform sharing
     // Legacy support
     documentId,
@@ -299,6 +301,12 @@ export function generateShareLink(options) {
   const permCode = PERMISSION_CODES[permission] || 'e';
   fragmentParts.push('perm:' + permCode);
   
+  // Add direct P2P connection address (public IP:port)
+  // This allows direct connections without DHT lookup
+  if (directAddress) {
+    fragmentParts.push('addr:' + encodeURIComponent(directAddress));
+  }
+  
   // Add bootstrap peers (limit to MAX_EMBEDDED_PEERS) - legacy WebSocket format
   if (bootstrapPeers && bootstrapPeers.length > 0) {
     const peersToEmbed = bootstrapPeers.slice(0, MAX_EMBEDDED_PEERS);
@@ -313,7 +321,7 @@ export function generateShareLink(options) {
     fragmentParts.push('hpeer:' + hpeersToEmbed.join(','));
   }
   
-  // Add sync server URL for cross-platform sharing
+  // Add sync server URL for cross-platform sharing (fallback only)
   // This allows Electron apps to connect to web-hosted workspaces
   if (serverUrl) {
     fragmentParts.push('srv:' + encodeURIComponent(serverUrl));
@@ -423,6 +431,7 @@ export function parseShareLink(link) {
   let permission = 'editor'; // Default permission
   let bootstrapPeers = [];
   let hyperswarmPeers = []; // Hyperswarm peer public keys
+  let directAddress = null; // Direct P2P connection address (ip:port)
   let serverUrl = null; // Remote sync server URL (for Electron joining web workspaces)
   let topic = null; // Hyperswarm topic for P2P discovery
   
@@ -441,6 +450,9 @@ export function parseShareLink(link) {
       if (permCode in CODE_TO_PERMISSION) {
         permission = CODE_TO_PERMISSION[permCode];
       }
+    } else if (param.startsWith('addr:')) {
+      // Direct P2P address (ip:port)
+      directAddress = decodeURIComponent(param.slice(5));
     } else if (param.startsWith('peers:')) {
       // Bootstrap peers for P2P connection (legacy WebSocket format)
       bootstrapPeers = decodePeerList(param.slice(6));
@@ -476,6 +488,7 @@ export function parseShareLink(link) {
     permission,
     bootstrapPeers, // Legacy WebSocket peers
     hyperswarmPeers, // Hyperswarm peer public keys
+    directAddress, // Direct P2P address (ip:port)
     serverUrl, // Sync server URL for remote workspaces
     topic, // Hyperswarm topic for P2P discovery
     raw: encoded

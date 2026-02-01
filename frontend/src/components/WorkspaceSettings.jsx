@@ -158,6 +158,7 @@ export default function WorkspaceSettings({
     // Get P2P info for true serverless sharing (Electron only)
     let hyperswarmPeers = [];
     let topicHash = null;
+    let directAddress = null;
     
     if (isElectron()) {
       try {
@@ -168,6 +169,10 @@ export default function WorkspaceSettings({
           // Also include connected peers for mesh discovery
           if (p2pInfo.connectedPeers && p2pInfo.connectedPeers.length > 0) {
             hyperswarmPeers = [...hyperswarmPeers, ...p2pInfo.connectedPeers.slice(0, 2)];
+          }
+          // Include direct address (public IP:port) for true P2P without DHT
+          if (p2pInfo.directAddress?.address) {
+            directAddress = p2pInfo.directAddress.address;
           }
         }
       } catch (e) {
@@ -205,8 +210,9 @@ export default function WorkspaceSettings({
       password: null,
       encryptionKey,
       bootstrapPeers: [],
-      hyperswarmPeers, // NEW: Include Hyperswarm peer public keys
-      topicHash, // NEW: Include topic hash for DHT discovery
+      hyperswarmPeers, // Include Hyperswarm peer public keys
+      topicHash, // Include topic hash for DHT discovery
+      directAddress, // Include direct P2P address (public IP:port)
       serverUrl,
     });
     
@@ -415,27 +421,35 @@ export default function WorkspaceSettings({
                 )}
               </div>
               
-              {/* P2P Status and Server URL for fallback */}
+              {/* P2P Status - show direct address when available */}
               {isElectron() && (
                 <div className="workspace-settings__server-url">
                   {p2pStatus.initialized ? (
                     <>
                       <div className="workspace-settings__p2p-status workspace-settings__p2p-status--connected">
                         <span className="workspace-settings__p2p-icon">🟢</span>
-                        <span>P2P Ready - Direct peer connections enabled</span>
-                      </div>
-                      <label className="workspace-settings__server-label">
-                        <span className="workspace-settings__server-title">📡 Relay Server (Optional)</span>
-                        <span className="workspace-settings__server-desc">
-                          Leave empty for direct P2P. Add a server URL only if peers can't connect directly.
+                        <span>
+                          P2P Ready
+                          {p2pStatus.directAddress?.address && (
+                            <span className="workspace-settings__p2p-address"> ({p2pStatus.directAddress.address})</span>
+                          )}
                         </span>
-                      </label>
+                      </div>
+                      {p2pStatus.directAddress?.address ? (
+                        <div className="workspace-settings__p2p-info">
+                          Share links include your public address for direct P2P connections. No relay server needed.
+                        </div>
+                      ) : (
+                        <div className="workspace-settings__p2p-info workspace-settings__p2p-info--warning">
+                          Could not detect public IP. Links will use DHT discovery. Add a relay server URL below if peers can't connect.
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
                       <div className="workspace-settings__p2p-status workspace-settings__p2p-status--offline">
                         <span className="workspace-settings__p2p-icon">🔴</span>
-                        <span>P2P Offline - Using relay mode</span>
+                        <span>P2P Offline - Relay server required</span>
                       </div>
                       <label className="workspace-settings__server-label">
                         <span className="workspace-settings__server-title">🌐 Relay Server URL</span>
@@ -443,15 +457,15 @@ export default function WorkspaceSettings({
                           Enter your server URL for sharing (e.g., http://192.168.1.x:3000)
                         </span>
                       </label>
+                      <input
+                        type="text"
+                        value={customServerUrl}
+                        onChange={(e) => setCustomServerUrl(e.target.value)}
+                        placeholder="http://192.168.1.x:3000"
+                        className="workspace-settings__input workspace-settings__input--server"
+                      />
                     </>
                   )}
-                  <input
-                    type="text"
-                    value={customServerUrl}
-                    onChange={(e) => setCustomServerUrl(e.target.value)}
-                    placeholder={p2pStatus.initialized ? "Optional - leave empty for direct P2P" : "http://192.168.1.x:3000"}
-                    className="workspace-settings__input workspace-settings__input--server"
-                  />
                 </div>
               )}
               

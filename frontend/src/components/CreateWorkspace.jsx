@@ -109,12 +109,15 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       const parsed = parseShareLink(value);
       const hasHyperswarmPeers = parsed.hyperswarmPeers?.length > 0;
       const hasBootstrapPeers = parsed.bootstrapPeers?.length > 0;
+      const hasDirectAddress = !!parsed.directAddress;
+      const hasTopic = !!parsed.topic;
       setParsedLink({ 
         ...parsed, 
         isNewStyle: false,
-        isP2P: hasHyperswarmPeers || hasBootstrapPeers,
+        isP2P: hasHyperswarmPeers || hasBootstrapPeers || hasDirectAddress || hasTopic,
         hasBootstrapPeers,
         hasHyperswarmPeers,
+        hasDirectAddress,
       });
       // If link contains embedded password, pre-fill it
       if (parsed.embeddedPassword) {
@@ -225,6 +228,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           permission: parsedLink.permission || 'editor',
           bootstrapPeers: parsedLink.hyperswarmPeers || parsedLink.bootstrapPeers || [], // Prefer hyperswarm peers
           topicHash: parsedLink.topic || null, // Include topic hash for DHT
+          directAddress: parsedLink.directAddress || null, // Direct P2P address (ip:port)
           serverUrl: parsedLink.serverUrl || null, // For cross-platform workspace sync
           onConnectionProgress: (progress) => {
             setConnectionProgress(progress);

@@ -518,6 +518,15 @@ class P2PBridge extends EventEmitter {
   }
 
   /**
+   * Get our direct connection address (public IP:port)
+   * @returns {Promise<Object|null>} { host, port, publicKey, address } or null
+   */
+  async getDirectAddress() {
+    if (!this.hyperswarm || !this.isInitialized) return null;
+    return this.hyperswarm.getDirectAddress();
+  }
+
+  /**
    * Get all connected peer public keys
    * @returns {string[]} Array of hex public keys
    */
