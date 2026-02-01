@@ -56,7 +56,14 @@ let mainWindow;
 let p2pNode = null;
 let sessionKey = null;
 const ydocs = new Map();
-const db = new Level(path.join(app.getPath('userData'), 'storage'), { valueEncoding: 'binary' });
+const userDataPath = app.getPath('userData');
+const db = new Level(path.join(userDataPath, 'storage'), { valueEncoding: 'binary' });
+
+// Initialize identity storage path to match userData for consistency
+// This ensures identity.json is stored in the same location as other app data
+// and enables migration from the legacy ~/.Nightjar path
+identity.setBasePath(userDataPath);
+identity.migrateIdentityIfNeeded();
 
 // Helper to safely check if mainWindow is usable
 function isWindowUsable() {
@@ -344,6 +351,58 @@ function getLoadingScreenHtml(step = 0, message = '') {
 // --- Backend Initialization with Loading Screen ---
 let loadingWindow = null;
 let sidecarProcess = null;
+let sidecarRestartAttempts = 0;
+const SIDECAR_MAX_RESTART_ATTEMPTS = 3;
+
+/**
+ * Restart sidecar after a crash
+ * Limited to SIDECAR_MAX_RESTART_ATTEMPTS to prevent infinite loops
+ */
+function restartSidecar(nodeExecutable, nodeArgs, sidecarCwd, spawnEnv) {
+    sidecarRestartAttempts++;
+    
+    if (sidecarRestartAttempts > SIDECAR_MAX_RESTART_ATTEMPTS) {
+        console.error(`[Sidecar] Max restart attempts (${SIDECAR_MAX_RESTART_ATTEMPTS}) reached, giving up`);
+        return;
+    }
+    
+    console.log(`[Sidecar] Restart attempt ${sidecarRestartAttempts}/${SIDECAR_MAX_RESTART_ATTEMPTS}`);
+    
+    sidecarProcess = spawn(nodeExecutable, nodeArgs, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: sidecarCwd,
+        env: spawnEnv,
+    });
+    
+    sidecarProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        console.log(`[Sidecar] ${output}`);
+        
+        // Reset restart counter on successful startup
+        if (output.includes('Metadata WebSocket server listening')) {
+            console.log('[Sidecar] Successfully restarted');
+            sidecarRestartAttempts = 0;
+        }
+    });
+    
+    sidecarProcess.stderr.on('data', (data) => {
+        console.error(`[Sidecar Error] ${data}`);
+    });
+    
+    sidecarProcess.on('error', (err) => {
+        console.error('[Sidecar] Failed to restart:', err);
+    });
+    
+    sidecarProcess.on('close', (code) => {
+        console.log(`[Sidecar] Restarted process exited with code ${code}`);
+        if (code !== 0) {
+            console.log('[Sidecar] Crashed again, attempting restart...');
+            setTimeout(() => {
+                restartSidecar(nodeExecutable, nodeArgs, sidecarCwd, spawnEnv);
+            }, 2000);
+        }
+    });
+}
 
 async function startBackendWithLoadingScreen() {
     return new Promise((resolve, reject) => {
@@ -488,6 +547,14 @@ async function startBackendWithLoadingScreen() {
             console.log(`[Sidecar] Process exited with code ${code}`);
             if (code !== 0 && !wsReady) {
                 reject(new Error(`Sidecar exited with code ${code}`));
+            }
+            
+            // Auto-restart sidecar on crash (after initial startup succeeds)
+            if (code !== 0 && wsReady && metaWsReady) {
+                console.log('[Sidecar] Crashed after startup, attempting restart...');
+                setTimeout(() => {
+                    restartSidecar(nodeExecutable, nodeArgs, sidecarCwd, spawnEnv);
+                }, 1000);
             }
         });
 

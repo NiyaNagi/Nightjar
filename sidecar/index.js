@@ -8,7 +8,7 @@ const { Level } = require('level');
 const TorControl = require('tor-control');
 const EventEmitter = require('events');
 const { P2PBridge } = require('./p2p-bridge');
-const { loadIdentity, hasIdentity } = require('./identity');
+const identity = require('./identity');
 
 // Initialize P2P Bridge for unified P2P layer
 const p2pBridge = new P2PBridge();
@@ -36,6 +36,14 @@ const PUBSUB_TOPIC = '/nightjarx/1.0.0';
 // otherwise fall back to relative path (development mode)
 const USER_DATA_PATH = process.argv[2] || '.';
 const DB_PATH = path.join(USER_DATA_PATH, 'storage');
+
+// Initialize identity storage path to match sidecar storage
+// This ensures identity.json is stored alongside other sidecar data
+identity.setBasePath(USER_DATA_PATH);
+
+// Migrate identity from legacy path (~/.Nightjar) to new path if needed
+// This is a one-time operation that preserves the legacy file for safety
+identity.migrateIdentityIfNeeded();
 
 // --- Security Constants ---
 const MAX_MESSAGE_SIZE = 10 * 1024 * 1024; // 10MB max message size
@@ -696,19 +704,19 @@ async function initializeP2P(force = false) {
     }
     
     try {
-        if (hasIdentity()) {
-            const identity = loadIdentity();
-            if (identity) {
+        if (identity.hasIdentity()) {
+            const userIdentity = identity.loadIdentity();
+            if (userIdentity) {
                 const p2pIdentity = {
-                    publicKey: Buffer.from(identity.publicKey).toString('hex'),
-                    secretKey: Buffer.from(identity.privateKey).toString('hex'),
-                    displayName: identity.handle || 'Anonymous',
-                    color: identity.color || '#6366f1',
+                    publicKey: Buffer.from(userIdentity.publicKey).toString('hex'),
+                    secretKey: Buffer.from(userIdentity.privateKey).toString('hex'),
+                    displayName: userIdentity.handle || 'Anonymous',
+                    color: userIdentity.color || '#6366f1',
                 };
                 
                 await p2pBridge.initialize(p2pIdentity);
                 p2pInitialized = true;
-                console.log('[Sidecar] P2P initialized with identity:', identity.handle);
+                console.log('[Sidecar] P2P initialized with identity:', userIdentity.handle);
                 
                 // Set up Yjs sync bridging via P2P
                 setupYjsP2PBridge();
@@ -952,8 +960,46 @@ async function autoRejoinWorkspaces() {
     }
 }
 
-// Initialize P2P after a short delay to let everything start up
-setTimeout(initializeP2P, 1000);
+// P2P initialization with retry loop
+// Retries initialization until identity is available or max attempts reached
+const P2P_INIT_MAX_ATTEMPTS = 20;
+const P2P_INIT_RETRY_INTERVAL_MS = 3000;
+let p2pInitAttempts = 0;
+
+async function initializeP2PWithRetry() {
+    p2pInitAttempts++;
+    console.log(`[Sidecar] P2P initialization attempt ${p2pInitAttempts}/${P2P_INIT_MAX_ATTEMPTS}`);
+    
+    const result = await initializeP2P();
+    
+    if (result.success) {
+        console.log('[Sidecar] P2P initialization successful!');
+        return;
+    }
+    
+    if (result.reason === 'no_identity') {
+        // Identity doesn't exist yet - user hasn't set up their identity
+        // Schedule retry so P2P auto-starts once identity is created
+        if (p2pInitAttempts < P2P_INIT_MAX_ATTEMPTS) {
+            console.log(`[Sidecar] Will retry P2P init in ${P2P_INIT_RETRY_INTERVAL_MS/1000}s...`);
+            setTimeout(initializeP2PWithRetry, P2P_INIT_RETRY_INTERVAL_MS);
+        } else {
+            console.log('[Sidecar] P2P init max attempts reached. Waiting for identity creation...');
+            console.log('[Sidecar] P2P will be initialized when get-p2p-info or reinitialize-p2p is called');
+        }
+    } else {
+        // Some other error - may be transient, retry
+        if (p2pInitAttempts < P2P_INIT_MAX_ATTEMPTS) {
+            console.log(`[Sidecar] P2P init failed (${result.reason}), retrying in ${P2P_INIT_RETRY_INTERVAL_MS/1000}s...`);
+            setTimeout(initializeP2PWithRetry, P2P_INIT_RETRY_INTERVAL_MS);
+        } else {
+            console.error('[Sidecar] P2P init failed after max attempts:', result.reason);
+        }
+    }
+}
+
+// Start P2P initialization after a short delay to let everything start up
+setTimeout(initializeP2PWithRetry, 1000);
 
 metaWss.on('connection', (ws, req) => {
     console.log('[Sidecar] Metadata client connected.');

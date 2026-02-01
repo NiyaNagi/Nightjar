@@ -6,10 +6,52 @@ const path = require('path');
 const nacl = require('tweetnacl');
 const crypto = require('crypto');
 
+// Configurable base path - set by sidecar/index.js on startup
+// When set, identity is stored in {basePath}/identity/identity.json
+// When null, falls back to legacy HOME-based path ~/.Nightjar/identity.json
+let configuredBasePath = null;
+
+/**
+ * Set the base path for identity storage
+ * Should be called early in sidecar startup with userData path
+ * @param {string} basePath - Base directory for identity storage
+ */
+function setBasePath(basePath) {
+    if (basePath && typeof basePath === 'string') {
+        configuredBasePath = basePath;
+        console.log('[Identity] Base path set to:', basePath);
+    }
+}
+
+/**
+ * Get the legacy identity directory (HOME-based)
+ * Used for migration and fallback on all platforms
+ */
+function getLegacyIdentityDir() {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
+    return path.join(homeDir, '.Nightjar');
+}
+
+/**
+ * Get the legacy identity file path
+ */
+function getLegacyIdentityPath() {
+    return path.join(getLegacyIdentityDir(), 'identity.json');
+}
+
 // Get app data directory
 function getIdentityDir() {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
-    const appDir = path.join(homeDir, '.Nightjar');
+    // If configured base path is set, use it (preferred for Electron apps)
+    if (configuredBasePath) {
+        const identityDir = path.join(configuredBasePath, 'identity');
+        if (!fs.existsSync(identityDir)) {
+            fs.mkdirSync(identityDir, { recursive: true });
+        }
+        return identityDir;
+    }
+    
+    // Fallback to legacy HOME-based path
+    const appDir = getLegacyIdentityDir();
     
     if (!fs.existsSync(appDir)) {
         fs.mkdirSync(appDir, { recursive: true });
@@ -20,6 +62,59 @@ function getIdentityDir() {
 
 function getIdentityPath() {
     return path.join(getIdentityDir(), 'identity.json');
+}
+
+/**
+ * Migrate identity from legacy path to new path if needed
+ * Called at sidecar startup after setBasePath
+ * Preserves the legacy file for safety (Option A)
+ * @returns {boolean} Whether migration occurred
+ */
+function migrateIdentityIfNeeded() {
+    if (!configuredBasePath) {
+        // No configured path, nothing to migrate
+        return false;
+    }
+    
+    const newPath = getIdentityPath();
+    const legacyPath = getLegacyIdentityPath();
+    
+    console.log('[Identity] Checking migration...');
+    console.log('[Identity] New path:', newPath);
+    console.log('[Identity] Legacy path:', legacyPath);
+    
+    // Check if identity exists at new path
+    if (fs.existsSync(newPath)) {
+        console.log('[Identity] Identity already at new path, no migration needed');
+        return false;
+    }
+    
+    // Check if identity exists at legacy path
+    if (!fs.existsSync(legacyPath)) {
+        console.log('[Identity] No identity at legacy path, no migration needed');
+        return false;
+    }
+    
+    // Migrate: copy from legacy to new path (preserve legacy for safety)
+    try {
+        // Ensure new directory exists
+        const newDir = path.dirname(newPath);
+        if (!fs.existsSync(newDir)) {
+            fs.mkdirSync(newDir, { recursive: true });
+        }
+        
+        // Copy legacy identity to new path
+        fs.copyFileSync(legacyPath, newPath);
+        
+        console.log('[Identity] Successfully migrated identity from legacy path');
+        console.log('[Identity] Legacy file preserved at:', legacyPath);
+        
+        return true;
+    } catch (e) {
+        console.error('[Identity] Migration failed:', e);
+        // Don't throw - continue using legacy path as fallback
+        return false;
+    }
 }
 
 /**
@@ -324,6 +419,10 @@ function inferDeviceName() {
 }
 
 module.exports = {
+    // Configuration
+    setBasePath,
+    migrateIdentityIfNeeded,
+    // Core operations
     storeIdentity,
     loadIdentity,
     hasIdentity,
@@ -331,6 +430,9 @@ module.exports = {
     updateIdentity,
     exportIdentity,
     importIdentity,
+    // Path helpers
     getIdentityDir,
-    getIdentityPath
+    getIdentityPath,
+    getLegacyIdentityDir,
+    getLegacyIdentityPath
 };
