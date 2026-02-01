@@ -969,6 +969,8 @@ let p2pInitAttempts = 0;
 async function initializeP2PWithRetry() {
     p2pInitAttempts++;
     console.log(`[Sidecar] P2P initialization attempt ${p2pInitAttempts}/${P2P_INIT_MAX_ATTEMPTS}`);
+    console.log(`[Sidecar] Identity path configured: ${identity.getIdentityPath()}`);
+    console.log(`[Sidecar] Identity exists: ${identity.hasIdentity()}`);
     
     const result = await initializeP2P();
     
@@ -976,6 +978,8 @@ async function initializeP2PWithRetry() {
         console.log('[Sidecar] P2P initialization successful!');
         return;
     }
+    
+    console.log(`[Sidecar] P2P init failed: ${result.reason}`);
     
     if (result.reason === 'no_identity') {
         // Identity doesn't exist yet - user hasn't set up their identity
