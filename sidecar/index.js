@@ -706,6 +706,9 @@ async function initializeP2P() {
                 p2pInitialized = true;
                 console.log('[Sidecar] P2P initialized with identity:', identity.handle);
                 
+                // Set up Yjs sync bridging via P2P
+                setupYjsP2PBridge();
+                
                 // Auto-rejoin saved workspaces
                 await autoRejoinWorkspaces();
             }
@@ -714,6 +717,93 @@ async function initializeP2P() {
         }
     } catch (err) {
         console.error('[Sidecar] Failed to initialize P2P:', err);
+    }
+}
+
+// --- Yjs P2P Bridge ---
+// This bridges Hyperswarm P2P connections with Yjs document sync
+// When a peer sends a sync message, apply it to the local Yjs doc
+// When a local Yjs doc updates, broadcast to P2P peers
+
+// Map of topicHash -> workspaceId for reverse lookup
+const topicToWorkspace = new Map();
+
+function setupYjsP2PBridge() {
+    if (!p2pBridge || !p2pBridge.hyperswarm) {
+        console.warn('[Sidecar] Cannot setup Yjs P2P bridge - P2P not initialized');
+        return;
+    }
+    
+    const hyperswarm = p2pBridge.hyperswarm;
+    
+    // Listen for sync messages from P2P peers
+    hyperswarm.on('sync-message', ({ peerId, topic, data }) => {
+        handleP2PSyncMessage(peerId, topic, data);
+    });
+    
+    console.log('[Sidecar] Yjs P2P bridge initialized');
+}
+
+// Handle incoming sync message from a P2P peer
+function handleP2PSyncMessage(peerId, topicHex, data) {
+    try {
+        // Find the workspace ID for this topic
+        const workspaceId = topicToWorkspace.get(topicHex);
+        if (!workspaceId) {
+            console.warn(`[Sidecar] Received sync for unknown topic: ${topicHex?.slice(0, 16)}...`);
+            return;
+        }
+        
+        // Construct the Yjs room name
+        const roomName = `workspace-meta:${workspaceId}`;
+        
+        // Get or create the Yjs doc
+        let doc = docs.get(roomName);
+        if (!doc) {
+            doc = new Y.Doc();
+            docs.set(roomName, doc);
+            console.log(`[Sidecar] Created Yjs doc for room: ${roomName} (from P2P)`);
+        }
+        
+        // Decode and apply the sync update
+        const updateData = typeof data === 'string' ? Buffer.from(data, 'base64') : data;
+        Y.applyUpdate(doc, updateData);
+        
+        console.log(`[Sidecar] Applied P2P sync from peer ${peerId?.slice(0, 8)}... to ${roomName}`);
+    } catch (err) {
+        console.error('[Sidecar] Failed to handle P2P sync message:', err);
+    }
+}
+
+// Broadcast a Yjs update to all P2P peers for a workspace
+function broadcastYjsUpdate(workspaceId, topicHex, update) {
+    if (!p2pInitialized || !p2pBridge.hyperswarm) return;
+    
+    try {
+        const updateBase64 = Buffer.from(update).toString('base64');
+        p2pBridge.hyperswarm.broadcastSync(topicHex, updateBase64);
+    } catch (err) {
+        console.error('[Sidecar] Failed to broadcast Yjs update:', err);
+    }
+}
+
+// Register a workspace topic for Yjs bridging
+function registerWorkspaceTopic(workspaceId, topicHex) {
+    topicToWorkspace.set(topicHex, workspaceId);
+    
+    // Set up doc observer to broadcast updates
+    const roomName = `workspace-meta:${workspaceId}`;
+    let doc = docs.get(roomName);
+    
+    if (doc) {
+        // Add update observer to broadcast to P2P peers
+        doc.on('update', (update, origin) => {
+            // Don't re-broadcast updates that came from P2P
+            if (origin !== 'p2p') {
+                broadcastYjsUpdate(workspaceId, topicHex, update);
+            }
+        });
+        console.log(`[Sidecar] Registered P2P observer for ${roomName}`);
     }
 }
 
@@ -726,6 +816,9 @@ async function autoRejoinWorkspaces() {
                 try {
                     await p2pBridge.joinTopic(ws.topicHash);
                     console.log(`[Sidecar] Auto-rejoined workspace topic: ${ws.topicHash.slice(0, 16)}...`);
+                    
+                    // Register for Yjs P2P bridging
+                    registerWorkspaceTopic(ws.id, ws.topicHash);
                     
                     // Try to connect to last known peers
                     if (ws.lastKnownPeers && Array.isArray(ws.lastKnownPeers)) {
@@ -1367,6 +1460,9 @@ metaWss.on('connection', (ws, req) => {
                                     try {
                                         await p2pBridge.joinTopic(topicHash);
                                         console.log(`[Sidecar] Joined P2P topic: ${topicHash.slice(0, 16)}...`);
+                                        
+                                        // Register for Yjs P2P bridging
+                                        registerWorkspaceTopic(joinWsData.id, topicHash);
                                     } catch (e) {
                                         console.warn('[Sidecar] Failed to join P2P topic:', e.message);
                                     }

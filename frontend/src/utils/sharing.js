@@ -987,6 +987,9 @@ export function parseInviteLink(link) {
  * @param {number} options.expiryMinutes - Expiry time in minutes (15, 60, 240, 1440)
  * @param {Uint8Array} options.ownerPrivateKey - Owner's Ed25519 private key for signing
  * @param {string} options.ownerPublicKey - Owner's public key (base62)
+ * @param {Array<string>} options.hyperswarmPeers - Hyperswarm peer public keys for P2P
+ * @param {string} options.topicHash - DHT topic hash for P2P discovery
+ * @param {string} options.directAddress - Direct P2P address (ip:port)
  * @returns {Object} { link, expiry, signature }
  */
 export function generateSignedInviteLink(options) {
@@ -997,6 +1000,9 @@ export function generateSignedInviteLink(options) {
     expiryMinutes = 60, // Default 1 hour
     ownerPrivateKey,
     ownerPublicKey,
+    hyperswarmPeers = [],
+    topicHash = null,
+    directAddress = null,
   } = options;
   
   if (!workspaceId || !encryptionKey || !ownerPrivateKey) {
@@ -1016,12 +1022,16 @@ export function generateSignedInviteLink(options) {
   const signatureBase62 = uint8ToBase62(signature);
   
   // Build the base share link
+  // Build the base share link with P2P info
   const baseLink = generateShareLink({
     entityType: 'workspace',
     entityId: workspaceId,
     permission,
     hasPassword: false,
     encryptionKey,
+    hyperswarmPeers,
+    topicHash,
+    directAddress,
   });
   
   // Parse existing fragment and add new fields

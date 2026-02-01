@@ -193,6 +193,10 @@ export default function WorkspaceSettings({
           expiryMinutes,
           ownerPrivateKey: userIdentity.privateKey,
           ownerPublicKey: userIdentity.publicKeyBase62,
+          // Include P2P info for direct peer connections
+          hyperswarmPeers,
+          topicHash,
+          directAddress,
         });
         
         return compress ? await compressShareLink(signedInvite.link) : signedInvite.link;
