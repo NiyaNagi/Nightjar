@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
-  "author": "Nightjar",
+  "author": {
+    "name": "Nightjar",
+    "email": "nightjar@nightjarx.com"
+  },
   "license": "ISC",
   "scripts": {
     "start": "node sidecar/index.js & electron .",
