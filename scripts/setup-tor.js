@@ -54,26 +54,33 @@ function downloadTor() {
     
     console.log(`Downloading Tor from ${downloadUrl}...`);
     
+    // Create a temp extraction directory to avoid conflicts
+    const tempExtractDir = path.join(TOR_DIR, '_extract_temp');
+    if (fs.existsSync(tempExtractDir)) {
+        fs.rmSync(tempExtractDir, { recursive: true });
+    }
+    fs.mkdirSync(tempExtractDir, { recursive: true });
+    
     // Use curl or wget to download the Tor executable
     try {
+        const tarPath = path.join(TOR_DIR, 'tor.tar.gz');
+        
         if (platform === 'win32') {
-            execSync(`curl -L -o ${TOR_DIR}/tor.tar.gz ${downloadUrl}`, { stdio: 'inherit' });
+            execSync(`curl -L -o "${tarPath}" ${downloadUrl}`, { stdio: 'inherit' });
             
             // Verify the downloaded file exists and is not empty
-            if (!fs.existsSync(`${TOR_DIR}/tor.tar.gz`) || fs.statSync(`${TOR_DIR}/tor.tar.gz`).size === 0) {
+            if (!fs.existsSync(tarPath) || fs.statSync(tarPath).size === 0) {
                 throw new Error('Downloaded file is empty or does not exist.');
             }
             
-            // Use PowerShell to extract the tar.gz file on Windows
-            execSync(`powershell -command "tar -xf '${TOR_DIR}/tor.tar.gz' -C '${TOR_DIR}'"`, { stdio: 'inherit' });
+            // Use PowerShell to extract the tar.gz file on Windows to temp dir
+            execSync(`powershell -command "tar -xf '${tarPath}' -C '${tempExtractDir}'"`, { stdio: 'inherit' });
         } else {
-            execSync(`curl -L -o ${TOR_DIR}/tor.tar.gz ${downloadUrl}`, { stdio: 'inherit' });
-            execSync(`tar -xf ${TOR_DIR}/tor.tar.gz -C ${TOR_DIR}`, { stdio: 'inherit' });
+            execSync(`curl -L -o "${tarPath}" ${downloadUrl}`, { stdio: 'inherit' });
+            execSync(`tar -xf "${tarPath}" -C "${tempExtractDir}"`, { stdio: 'inherit' });
         }
         
-        // Move the Tor executable to the correct location
-        // The Tor expert bundle extracts to tor/tor/ with the executable inside
-        // We need to find the tor executable recursively
+        // Find the tor executable recursively in the temp extraction directory
         const findTorExecutable = (dir) => {
             const exeName = getTorExecutableName();
             const items = fs.readdirSync(dir, { withFileTypes: true });
@@ -89,28 +96,34 @@ function downloadTor() {
             return null;
         };
         
-        const torPath = findTorExecutable(TOR_DIR);
-        if (torPath && torPath !== TOR_EXECUTABLE) {
-            // Copy instead of rename to avoid directory conflicts
-            fs.copyFileSync(torPath, TOR_EXECUTABLE);
-            if (platform !== 'win32') {
-                fs.chmodSync(TOR_EXECUTABLE, 0o755);
-            }
-            console.log(`Copied Tor executable from ${torPath} to ${TOR_EXECUTABLE}`);
+        const torPath = findTorExecutable(tempExtractDir);
+        if (!torPath) {
+            throw new Error('Could not find tor executable in extracted archive');
         }
         
-        // Clean up the downloaded archive
-        const tarPath = path.join(TOR_DIR, 'tor.tar.gz');
+        // Remove any existing file/directory at the destination
+        if (fs.existsSync(TOR_EXECUTABLE)) {
+            const stat = fs.statSync(TOR_EXECUTABLE);
+            if (stat.isDirectory()) {
+                fs.rmSync(TOR_EXECUTABLE, { recursive: true });
+            } else {
+                fs.unlinkSync(TOR_EXECUTABLE);
+            }
+        }
+        
+        // Copy the executable to the correct location
+        fs.copyFileSync(torPath, TOR_EXECUTABLE);
+        if (platform !== 'win32') {
+            fs.chmodSync(TOR_EXECUTABLE, 0o755);
+        }
+        console.log(`Copied Tor executable from ${torPath} to ${TOR_EXECUTABLE}`);
+        
+        // Clean up the downloaded archive and temp directory
         if (fs.existsSync(tarPath)) {
             fs.unlinkSync(tarPath);
         }
-        
-        // Clean up extracted directories (everything except the tor executable and data dir)
-        const items = fs.readdirSync(TOR_DIR, { withFileTypes: true });
-        for (const item of items) {
-            if (item.isDirectory() && item.name !== 'data' && item.name !== 'docs') {
-                fs.rmSync(path.join(TOR_DIR, item.name), { recursive: true });
-            }
+        if (fs.existsSync(tempExtractDir)) {
+            fs.rmSync(tempExtractDir, { recursive: true });
         }
         
         console.log('Tor downloaded and extracted successfully.');
