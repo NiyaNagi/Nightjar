@@ -61,7 +61,9 @@ function getIdentityDir() {
 }
 
 function getIdentityPath() {
-    return path.join(getIdentityDir(), 'identity.json');
+    const identityPath = path.join(getIdentityDir(), 'identity.json');
+    console.log('[Identity] getIdentityPath() =>', identityPath);
+    return identityPath;
 }
 
 /**
@@ -153,6 +155,7 @@ function loadIdentity() {
     const identityPath = getIdentityPath();
     
     if (!fs.existsSync(identityPath)) {
+        console.log('[Identity] loadIdentity() => null (file does not exist)');
         return null;
     }
     
@@ -184,7 +187,10 @@ function loadIdentity() {
  * Check if identity exists
  */
 function hasIdentity() {
-    return fs.existsSync(getIdentityPath());
+    const identityPath = getIdentityPath();
+    const exists = fs.existsSync(identityPath);
+    console.log(`[Identity] hasIdentity() => ${exists} (checked: ${identityPath})`);
+    return exists;
 }
 
 /**
