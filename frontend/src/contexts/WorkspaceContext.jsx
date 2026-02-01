@@ -175,6 +175,27 @@ export function WorkspaceProvider({ children }) {
         if (data.workspaces?.length > 0) {
           setCurrentWorkspaceId(prev => prev || data.workspaces[0].id);
         }
+        
+        // Restore keychains for all loaded workspaces (async)
+        // This is critical for share link generation to work
+        const restoreAllKeychains = async () => {
+          for (const workspace of (data.workspaces || [])) {
+            try {
+              const updated = await restoreKeyChain(workspace);
+              if (updated) {
+                // Key was generated for legacy workspace, persist to sidecar
+                secureLog('[WorkspaceContext] Persisting generated key for workspace:', workspace.id);
+                sendMessage({
+                  type: 'update-workspace',
+                  workspace: updated,
+                });
+              }
+            } catch (e) {
+              secureError('[WorkspaceContext] Failed to restore keychain for:', workspace.id, e);
+            }
+          }
+        };
+        restoreAllKeychains();
         break;
         
       case 'workspace-created':
@@ -734,14 +755,14 @@ export function WorkspaceProvider({ children }) {
   }, [workspaces]);
 
   /**
-   * Get P2P info (our Hyperswarm public key and connected peers)
+   * Get P2P info (our Hyperswarm public key, connected peers, and direct address)
    * Used for generating share links with embedded peer info
-   * @returns {Promise<{initialized: boolean, ownPublicKey: string|null, connectedPeers: string[]}>}
+   * @returns {Promise<{initialized: boolean, ownPublicKey: string|null, connectedPeers: string[], directAddress: Object|null}>}
    */
   const getP2PInfo = useCallback(() => {
     return new Promise((resolve) => {
       if (!metaSocket.current || metaSocket.current.readyState !== WebSocket.OPEN) {
-        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [] });
+        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [], directAddress: null });
         return;
       }
       
@@ -755,6 +776,7 @@ export function WorkspaceProvider({ children }) {
               initialized: data.initialized || false,
               ownPublicKey: data.ownPublicKey || null,
               connectedPeers: data.connectedPeers || [],
+              directAddress: data.directAddress || null,
             });
           }
         } catch (e) {
@@ -768,7 +790,7 @@ export function WorkspaceProvider({ children }) {
       // Timeout after 2 seconds
       setTimeout(() => {
         metaSocket.current?.removeEventListener('message', handleMessage);
-        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [] });
+        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [], directAddress: null });
       }, 2000);
     });
   }, []);

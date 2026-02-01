@@ -143,8 +143,16 @@ export default function WorkspaceSettings({
     const keyChain = getStoredKeyChain(workspace.id);
     const encryptionKey = keyChain?.workspaceKey || null;
     
+    // DEBUG: Log share link generation details
+    console.log('[WorkspaceSettings] ===== SHARE LINK GENERATION =====');
+    console.log('[WorkspaceSettings] workspaceId:', workspace.id);
+    console.log('[WorkspaceSettings] hasKeyChain:', !!keyChain);
+    console.log('[WorkspaceSettings] hasEncryptionKey:', !!encryptionKey);
+    console.log('[WorkspaceSettings] isOwner:', isOwner);
+    console.log('[WorkspaceSettings] hasUserIdentity:', !!userIdentity?.privateKey);
+    
     if (!encryptionKey) {
-      console.warn('No encryption key found for workspace, link may require password');
+      console.warn('[WorkspaceSettings] No encryption key found for workspace, link may require password');
     }
     
     // For cross-network sharing, include the server URL
@@ -163,6 +171,8 @@ export default function WorkspaceSettings({
     if (isElectron()) {
       try {
         const p2pInfo = await getP2PInfo();
+        console.log('[WorkspaceSettings] p2pInfo:', p2pInfo);
+        
         if (p2pInfo.initialized && p2pInfo.ownPublicKey) {
           // Include our public key so receivers can connect directly
           hyperswarmPeers = [p2pInfo.ownPublicKey];
@@ -175,13 +185,19 @@ export default function WorkspaceSettings({
             directAddress = p2pInfo.directAddress.address;
           }
         }
+        
+        console.log('[WorkspaceSettings] hyperswarmPeers:', hyperswarmPeers);
+        console.log('[WorkspaceSettings] directAddress:', directAddress);
       } catch (e) {
-        console.warn('Failed to get P2P info:', e);
+        console.warn('[WorkspaceSettings] Failed to get P2P info:', e);
       }
       
       // Generate topic hash for DHT discovery
       topicHash = generateTopicHash(workspace.id, keyChain?.password || '');
+      console.log('[WorkspaceSettings] topicHash:', topicHash);
     }
+    
+    console.log('[WorkspaceSettings] ================================');
     
     // If we have owner identity, use signed invite with expiry
     if (isOwner && userIdentity?.privateKey && encryptionKey) {
