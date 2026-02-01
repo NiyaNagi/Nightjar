@@ -20,6 +20,7 @@ import UserProfile, { loadUserProfile } from './components/UserProfile';
 import ChangelogPanel from './components/Changelog';
 import CreateWorkspace from './components/CreateWorkspace';
 import KickedModal from './components/KickedModal';
+import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import { useAuthorAttribution } from './hooks/useAuthorAttribution';
 import { useChangelogObserver } from './hooks/useChangelogObserver';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
@@ -102,7 +103,12 @@ function getCellRangeRef(selection) {
 function App() {
     // --- Identity Context ---
     // Identity context is available for features like kick signatures, membership tracking
-    const { identity: userIdentity } = useIdentity();
+    const { 
+        identity: userIdentity, 
+        needsOnboarding, 
+        createIdentity,
+        loading: identityLoading 
+    } = useIdentity();
     
     // --- Workspace & Folder Context ---
     const { 
@@ -219,6 +225,25 @@ function App() {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     }, []);
+
+    // --- Onboarding Handler ---
+    const handleOnboardingComplete = useCallback(async (identity) => {
+        try {
+            console.log('[App] Creating identity from onboarding:', identity.handle);
+            const success = await createIdentity(identity);
+            if (success) {
+                console.log('[App] Identity created successfully');
+                showToast(`Welcome, ${identity.handle}! 👋`, 'success');
+                // Identity context will reload automatically
+            } else {
+                console.error('[App] Failed to create identity');
+                showToast('Failed to create identity. Please try again.', 'error');
+            }
+        } catch (error) {
+            console.error('[App] Error during identity creation:', error);
+            showToast('Error creating identity: ' + error.message, 'error');
+        }
+    }, [createIdentity, showToast]);
 
     // --- Kick Member Handler with Toast Feedback ---
     const handleKickMember = useCallback((publicKey, memberName = 'member') => {
@@ -809,6 +834,12 @@ function App() {
     }, [activeDoc?.ydoc, activeDoc?.provider, collaborators.length]);
 
     // --- Render ---
+    
+    // Show onboarding if identity doesn't exist and not loading
+    if (needsOnboarding && !userIdentity && !identityLoading) {
+        return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+    }
+    
     return (
         <div className={`app-container ${isFullscreen ? 'fullscreen' : ''} ${!hasWorkspaces && !workspacesLoading ? 'onboarding' : ''}`}>
             {/* Only show sidebar when we have workspaces (or while loading) */}

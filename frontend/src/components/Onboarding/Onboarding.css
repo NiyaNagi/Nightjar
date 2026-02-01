@@ -130,6 +130,26 @@
     outline-offset: 2px;
 }
 
+.btn-text {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 12px 24px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.btn-text:hover {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: underline;
+}
+
+.btn-text:focus-visible {
+    outline: 2px solid var(--accent-color, #3b82f6);
+    outline-offset: 2px;
+}
+
 .btn-back {
     background: none;
     border: none;

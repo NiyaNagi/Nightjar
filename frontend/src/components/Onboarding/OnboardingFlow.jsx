@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import CreateIdentity from './CreateIdentity';
 import RestoreIdentity from './RestoreIdentity';
 import ScanIdentity from './ScanIdentity';
+import { generateIdentity } from '../../utils/identity';
 import './Onboarding.css';
 
 const STEPS = {
@@ -32,6 +33,16 @@ export default function OnboardingFlow({ onComplete }) {
         onComplete(identity);
     };
     
+    // Handle skip - create default identity
+    const handleSkip = () => {
+        const defaultIdentity = generateIdentity();
+        // Auto-generate anonymous name with random number
+        defaultIdentity.handle = 'User' + Math.floor(Math.random() * 10000);
+        defaultIdentity.icon = '😊';
+        defaultIdentity.color = '#6366f1';
+        onComplete(defaultIdentity);
+    };
+    
     return (
         <div className="onboarding-overlay">
             <div className="onboarding-container">
@@ -40,6 +51,7 @@ export default function OnboardingFlow({ onComplete }) {
                         onCreateNew={() => setStep(STEPS.CREATE)}
                         onRestore={() => setStep(STEPS.RESTORE)}
                         onScan={() => setStep(STEPS.SCAN)}
+                        onSkip={handleSkip}
                     />
                 )}
                 
@@ -75,7 +87,7 @@ export default function OnboardingFlow({ onComplete }) {
     );
 }
 
-function WelcomeStep({ onCreateNew, onRestore, onScan }) {
+function WelcomeStep({ onCreateNew, onRestore, onScan, onSkip }) {
     return (
         <div className="onboarding-step welcome-step">
             <div className="onboarding-logo">✨</div>
@@ -100,6 +112,9 @@ function WelcomeStep({ onCreateNew, onRestore, onScan }) {
                 </button>
                 <button className="btn-secondary" onClick={onScan}>
                     📷 Scan QR from Another Device
+                </button>
+                <button className="btn-text" onClick={onSkip}>
+                    Skip for now (use defaults)
                 </button>
             </div>
         </div>
