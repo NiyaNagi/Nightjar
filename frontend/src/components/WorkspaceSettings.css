@@ -900,4 +900,57 @@
     background: var(--bg-primary, #1f2937);
     border-color: var(--border-color, #374151);
   }
+  
+  .workspace-settings__server-url {
+    background: #1f2937;
+  }
+  
+  .workspace-settings__input--server {
+    background: var(--bg-secondary, #111827);
+    color: var(--text-primary, #f9fafb);
+  }
+}
+
+/* Server URL section for cross-network sharing */
+.workspace-settings__server-url {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.workspace-settings__server-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.workspace-settings__server-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.workspace-settings__server-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.4;
+}
+
+.workspace-settings__input--server {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.workspace-settings__server-warning {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #b45309;
+  background: rgba(180, 83, 9, 0.1);
+  padding: 8px 10px;
+  border-radius: 4px;
+  line-height: 1.4;
 }

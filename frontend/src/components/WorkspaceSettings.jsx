@@ -64,6 +64,7 @@ export default function WorkspaceSettings({
   const [color, setColor] = useState(workspace?.color || '#6366f1');
   const [shareLevel, setShareLevel] = useState('viewer');
   const [expiryMinutes, setExpiryMinutes] = useState(60); // Default 1 hour
+  const [customServerUrl, setCustomServerUrl] = useState(workspace?.serverUrl || ''); // For cross-network sharing
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -134,8 +135,13 @@ export default function WorkspaceSettings({
       console.warn('No encryption key found for workspace, link may require password');
     }
     
-    // For web-hosted workspaces, include the server URL so Electron clients can connect
-    const serverUrl = !isElectron() ? window.location.origin : undefined;
+    // For cross-network sharing, include the server URL
+    // Priority: 1. User-entered customServerUrl, 2. Workspace's stored serverUrl, 3. Web mode uses window.location.origin
+    // In Electron, if no serverUrl is set, users need to run the unified server publicly
+    let serverUrl = customServerUrl?.trim() || workspace.serverUrl;
+    if (!serverUrl && !isElectron()) {
+      serverUrl = window.location.origin;
+    }
     
     // If we have owner identity, use signed invite with expiry
     if (isOwner && userIdentity?.privateKey && encryptionKey) {
@@ -177,7 +183,7 @@ export default function WorkspaceSettings({
     }
     
     return link;
-  }, [workspace.id, shareLevel, expiryMinutes, isOwner, userIdentity]);
+  }, [workspace.id, shareLevel, expiryMinutes, customServerUrl, isOwner, userIdentity]);
 
   // Copy different share formats
   const handleCopyFormat = async (format) => {
@@ -370,8 +376,33 @@ export default function WorkspaceSettings({
                     ))}
                   </select>
                 )}
-                
-                <div className="workspace-settings__share-btn-group" ref={shareMenuRef}>
+              </div>
+              
+              {/* Server URL for cross-network sharing */}
+              {isElectron() && (
+                <div className="workspace-settings__server-url">
+                  <label className="workspace-settings__server-label">
+                    <span className="workspace-settings__server-title">🌐 Cross-Network Server URL</span>
+                    <span className="workspace-settings__server-desc">
+                      For sharing across different networks, enter your public server URL (e.g., https://your-server.com)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customServerUrl}
+                    onChange={(e) => setCustomServerUrl(e.target.value)}
+                    placeholder="https://your-server.com or http://192.168.1.x:3000"
+                    className="workspace-settings__input workspace-settings__input--server"
+                  />
+                  {!customServerUrl && (
+                    <span className="workspace-settings__server-warning">
+                      ⚠️ Without a server URL, share links only work on the same machine
+                    </span>
+                  )}
+                </div>
+              )}
+              
+              <div className="workspace-settings__share-btn-group" ref={shareMenuRef}>
                   <button 
                     className={`workspace-settings__copy-btn ${copiedLink ? 'workspace-settings__copy-btn--copied' : ''}`}
                     onClick={() => handleCopyFormat('link')}
@@ -397,7 +428,7 @@ export default function WorkspaceSettings({
                       >
                         <span className="workspace-settings__share-menu-icon">🔗</span>
                         <span>Copy Link</span>
-                        <span className="workspace-settings__share-menu-desc">Full Nightjar:// URL</span>
+                        <span className="workspace-settings__share-menu-desc">Full nahma:// URL</span>
                       </button>
                       <button 
                         className="workspace-settings__share-menu-item"
