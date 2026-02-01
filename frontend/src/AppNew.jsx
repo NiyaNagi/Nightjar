@@ -476,7 +476,7 @@ function App() {
     }, []);
 
     // --- Document Management ---
-    const createDocument = useCallback((name, folderId = null, docType = DOC_TYPES.TEXT) => {
+    const createDocument = useCallback((name, folderId = null, docType = DOC_TYPES.TEXT, icon = null, color = null) => {
         // Require workspace to create documents
         if (!currentWorkspaceId) {
             showToast('Please create a workspace first', 'error');
@@ -488,6 +488,8 @@ function App() {
             id: docId,
             name: name,
             type: docType,
+            icon: icon || null,
+            color: color || null,
             workspaceId: currentWorkspaceId,
             folderId: folderId, // null = root level, or folder ID
             createdAt: Date.now(),
@@ -826,9 +828,9 @@ function App() {
                         }
                         openDocument(docId, doc?.name, docType || DOC_TYPES.TEXT);
                     }}
-                    onCreateDocument={(name, folderId) => createDocument(name, folderId, DOC_TYPES.TEXT)}
-                    onCreateSheet={(name, folderId) => createDocument(name || 'Spreadsheet', folderId, DOC_TYPES.SHEET)}
-                    onCreateKanban={(name, folderId) => createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN)}
+                    onCreateDocument={(name, folderId, icon, color) => createDocument(name, folderId, DOC_TYPES.TEXT, icon, color)}
+                    onCreateSheet={(name, folderId, icon, color) => createDocument(name || 'Spreadsheet', folderId, DOC_TYPES.SHEET, icon, color)}
+                    onCreateKanban={(name, folderId, icon, color) => createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN, icon, color)}
                     onDeleteDocument={deleteDocument}
                     onMoveDocument={handleMoveDocument}
                     documentCollaborators={documentCollaborators}
