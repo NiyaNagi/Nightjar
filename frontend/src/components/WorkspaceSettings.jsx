@@ -65,6 +65,7 @@ export default function WorkspaceSettings({
   const [shareLevel, setShareLevel] = useState('viewer');
   const [expiryMinutes, setExpiryMinutes] = useState(60); // Default 1 hour
   const [customServerUrl, setCustomServerUrl] = useState(workspace?.serverUrl || ''); // For cross-network sharing
+  const [p2pStatus, setP2pStatus] = useState({ initialized: false, ownPublicKey: null }); // P2P status
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -103,6 +104,17 @@ export default function WorkspaceSettings({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+  
+  // Fetch P2P status on mount (Electron only)
+  useEffect(() => {
+    if (isElectron()) {
+      getP2PInfo().then(info => {
+        setP2pStatus(info);
+      }).catch(() => {
+        setP2pStatus({ initialized: false, ownPublicKey: null });
+      });
+    }
+  }, [getP2PInfo]);
   
   if (!workspace) return null;
   
@@ -403,27 +415,43 @@ export default function WorkspaceSettings({
                 )}
               </div>
               
-              {/* Server URL for cross-network sharing */}
+              {/* P2P Status and Server URL for fallback */}
               {isElectron() && (
                 <div className="workspace-settings__server-url">
-                  <label className="workspace-settings__server-label">
-                    <span className="workspace-settings__server-title">🌐 Cross-Network Server URL</span>
-                    <span className="workspace-settings__server-desc">
-                      For sharing across different networks, enter your public server URL (e.g., https://your-server.com)
-                    </span>
-                  </label>
+                  {p2pStatus.initialized ? (
+                    <>
+                      <div className="workspace-settings__p2p-status workspace-settings__p2p-status--connected">
+                        <span className="workspace-settings__p2p-icon">🟢</span>
+                        <span>P2P Ready - Direct peer connections enabled</span>
+                      </div>
+                      <label className="workspace-settings__server-label">
+                        <span className="workspace-settings__server-title">📡 Relay Server (Optional)</span>
+                        <span className="workspace-settings__server-desc">
+                          Leave empty for direct P2P. Add a server URL only if peers can't connect directly.
+                        </span>
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <div className="workspace-settings__p2p-status workspace-settings__p2p-status--offline">
+                        <span className="workspace-settings__p2p-icon">🔴</span>
+                        <span>P2P Offline - Using relay mode</span>
+                      </div>
+                      <label className="workspace-settings__server-label">
+                        <span className="workspace-settings__server-title">🌐 Relay Server URL</span>
+                        <span className="workspace-settings__server-desc">
+                          Enter your server URL for sharing (e.g., http://192.168.1.x:3000)
+                        </span>
+                      </label>
+                    </>
+                  )}
                   <input
                     type="text"
                     value={customServerUrl}
                     onChange={(e) => setCustomServerUrl(e.target.value)}
-                    placeholder="https://your-server.com or http://192.168.1.x:3000"
+                    placeholder={p2pStatus.initialized ? "Optional - leave empty for direct P2P" : "http://192.168.1.x:3000"}
                     className="workspace-settings__input workspace-settings__input--server"
                   />
-                  {!customServerUrl && (
-                    <span className="workspace-settings__server-warning">
-                      ⚠️ Without a server URL, share links only work on the same machine
-                    </span>
-                  )}
                 </div>
               )}
               

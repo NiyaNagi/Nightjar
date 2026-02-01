@@ -205,10 +205,16 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       if (parsedLink.isP2P) {
         const password = parsedLink.embeddedPassword || joinPassword;
         // Allow join if we have password OR encryption key
+        // Key-embedded links (Option A) have encryptionKey directly in URL
         if (!password && !parsedLink.encryptionKey) {
-          setJoinError('Password is required');
-          setIsJoining(false);
-          return;
+          // Only require password if link expects one and we don't have a key
+          if (parsedLink.hasPassword) {
+            setJoinError('Password is required');
+            setIsJoining(false);
+            return;
+          }
+          // No password and no key - this shouldn't happen for valid links
+          // but allow proceeding for topic-only links
         }
         
         // Join with bootstrap peers for P2P connection
@@ -274,7 +280,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           permission: parsedLink.permission,
         });
         
-        if (!password && !parsedLink.encryptionKey) {
+        // Only require password if link expects one and we don't have a key
+        if (!password && !parsedLink.encryptionKey && parsedLink.hasPassword) {
           setJoinError('Password is required');
           setIsJoining(false);
           return;

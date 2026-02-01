@@ -954,3 +954,29 @@
   border-radius: 4px;
   line-height: 1.4;
 }
+
+/* P2P Status */
+.workspace-settings__p2p-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.workspace-settings__p2p-status--connected {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.workspace-settings__p2p-status--offline {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.workspace-settings__p2p-icon {
+  font-size: 10px;
+}
