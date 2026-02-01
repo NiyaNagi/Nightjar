@@ -320,6 +320,12 @@ class HyperswarmManager extends EventEmitter {
           };
           console.log('[Hyperswarm] Peer verified and identified:', message.displayName);
           this.emit('peer-identity', { peerId, identity: conn.identity });
+          
+          // After identity verified, send peer list for all topics we're in
+          // This ensures new peers immediately learn about the mesh
+          for (const topicHex of this.topics.keys()) {
+            this._sendPeerListToPeer(peerId, topicHex);
+          }
           break;
 
         case 'join-topic':
@@ -389,6 +395,34 @@ class HyperswarmManager extends EventEmitter {
     
     const signedMessage = signMessage(identityMessage, this.identity.secretKey);
     this._sendMessage(socket, signedMessage);
+  }
+
+  /**
+   * Send peer list to a specific peer for a topic
+   * This enables mesh networking - peers share their known peers
+   * @param {string} peerId - Target peer's public key hex
+   * @param {string} topicHex - Topic to send peers for
+   */
+  _sendPeerListToPeer(peerId, topicHex) {
+    const conn = this.connections.get(peerId);
+    if (!conn || !conn.authenticated) return;
+    
+    // Get all peers except the target peer
+    const allPeers = this.getConnectedPeerKeys().filter(pk => pk !== peerId);
+    // Include ourselves
+    const ownKey = this.getOwnPublicKey();
+    if (ownKey && !allPeers.includes(ownKey)) {
+      allPeers.push(ownKey);
+    }
+    
+    if (allPeers.length > 0) {
+      console.log(`[Hyperswarm] Sending peer list to ${peerId.slice(0, 16)}: ${allPeers.length} peers`);
+      this._sendMessage(conn.socket, {
+        type: 'peer-list',
+        topic: topicHex,
+        peers: allPeers,
+      });
+    }
   }
 
   /**

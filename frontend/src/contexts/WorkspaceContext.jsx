@@ -467,6 +467,8 @@ export function WorkspaceProvider({ children }) {
       // Store encryption key for passwordless workspaces (needed to restore after refresh)
       encryptionKey: !password ? keyToBase64(workspaceKey) : null,
       topic,
+      // Hyperswarm topic hash for P2P discovery (same as topic, explicit field for sidecar)
+      topicHash: topic,
     };
     
     // Send to sidecar (will queue if socket not ready)
