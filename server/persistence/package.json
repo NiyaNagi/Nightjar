@@ -1,5 +1,5 @@
 {
-  "name": "Nightjar-persistence",
+  "name": "nightjar-persistence",
   "version": "1.0.0",
   "description": "Persistence node for Nightjar - stores encrypted document state",
   "main": "index.js",

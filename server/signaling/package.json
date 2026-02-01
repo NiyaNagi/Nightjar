@@ -1,5 +1,5 @@
 {
-  "name": "Nightjar-signaling",
+  "name": "nightjar-signaling",
   "version": "1.0.0",
   "description": "WebRTC signaling server for Nightjar",
   "main": "index.js",

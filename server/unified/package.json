@@ -1,5 +1,5 @@
 {
-  "name": "Nightjar-server",
+  "name": "nightjar-server",
   "version": "1.0.0",
   "description": "Unified Nightjar server - signaling, persistence, and static hosting",
   "type": "module",
