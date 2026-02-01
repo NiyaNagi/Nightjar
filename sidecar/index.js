@@ -709,6 +709,9 @@ async function initializeP2P() {
                 // Set up Yjs sync bridging via P2P
                 setupYjsP2PBridge();
                 
+                // Set up peer persistence for mesh networking
+                setupPeerPersistence();
+                
                 // Auto-rejoin saved workspaces
                 await autoRejoinWorkspaces();
             }
@@ -804,6 +807,104 @@ function registerWorkspaceTopic(workspaceId, topicHex) {
             }
         });
         console.log(`[Sidecar] Registered P2P observer for ${roomName}`);
+    }
+}
+
+// Set up listeners to persist peer connections for mesh networking
+function setupPeerPersistence() {
+    if (!p2pBridge || !p2pBridge.hyperswarm) return;
+    
+    const hyperswarm = p2pBridge.hyperswarm;
+    
+    // When we verify a peer's identity, persist them for this workspace
+    hyperswarm.on('peer-identity', async ({ peerId, identity }) => {
+        try {
+            // Find all workspaces this peer might be connected to
+            // by checking which topics they're in
+            const conn = hyperswarm.connections.get(peerId);
+            if (!conn) return;
+            
+            for (const topicHex of conn.topics) {
+                const workspaceId = topicToWorkspace.get(topicHex);
+                if (!workspaceId) continue;
+                
+                // Update lastKnownPeers for this workspace
+                await updateWorkspacePeers(workspaceId, peerId, true);
+            }
+        } catch (err) {
+            console.error('[Sidecar] Failed to persist peer:', err);
+        }
+    });
+    
+    // When a peer joins a topic, persist them
+    hyperswarm.on('peer-joined', async ({ peerId, topic }) => {
+        try {
+            const workspaceId = topicToWorkspace.get(topic);
+            if (workspaceId) {
+                await updateWorkspacePeers(workspaceId, peerId, true);
+            }
+        } catch (err) {
+            console.error('[Sidecar] Failed to persist peer on join:', err);
+        }
+    });
+    
+    // Optionally mark peers as stale when they leave (don't remove, just update timestamp)
+    hyperswarm.on('peer-left', async ({ peerId, topic }) => {
+        try {
+            const workspaceId = topicToWorkspace.get(topic);
+            if (workspaceId) {
+                await updateWorkspacePeers(workspaceId, peerId, false);
+            }
+        } catch (err) {
+            console.error('[Sidecar] Failed to update peer status on leave:', err);
+        }
+    });
+    
+    console.log('[Sidecar] Peer persistence handlers initialized');
+}
+
+// Helper to update a workspace's lastKnownPeers
+async function updateWorkspacePeers(workspaceId, peerPublicKey, isConnected) {
+    try {
+        const existing = await metadataDb.get(`workspace:${workspaceId}`);
+        if (!existing) return;
+        
+        let peers = existing.lastKnownPeers || [];
+        
+        // Find existing peer entry
+        const existingIdx = peers.findIndex(p => p.publicKey === peerPublicKey);
+        
+        if (isConnected) {
+            const peerEntry = {
+                publicKey: peerPublicKey,
+                lastSeen: Date.now(),
+            };
+            
+            if (existingIdx >= 0) {
+                peers[existingIdx] = peerEntry;
+            } else {
+                peers.push(peerEntry);
+            }
+            console.log(`[Sidecar] Persisted peer ${peerPublicKey.slice(0, 16)}... for workspace ${workspaceId.slice(0, 8)}...`);
+        } else {
+            // Just update lastSeen, don't remove (they might come back)
+            if (existingIdx >= 0) {
+                peers[existingIdx].lastSeen = Date.now();
+                peers[existingIdx].disconnectedAt = Date.now();
+            }
+        }
+        
+        // Keep only the most recent 20 peers
+        peers = peers
+            .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+            .slice(0, 20);
+        
+        await saveWorkspaceMetadata(workspaceId, { ...existing, lastKnownPeers: peers });
+    } catch (err) {
+        // Workspace might not exist yet
+        if (err.code !== 'LEVEL_NOT_FOUND') {
+            console.error('[Sidecar] Failed to update workspace peers:', err.message);
+        }
     }
 }
 
@@ -1285,6 +1386,23 @@ metaWss.on('connection', (ws, req) => {
                         try {
                             await saveWorkspaceMetadata(wsData.id, wsData);
                             console.log('[Sidecar] Workspace saved successfully');
+                            
+                            // --- P2P: Join the Hyperswarm topic for this workspace ---
+                            // This is CRITICAL - without this, the sharer isn't discoverable on DHT
+                            if (p2pInitialized && p2pBridge.isInitialized && wsData.topicHash) {
+                                try {
+                                    await p2pBridge.joinTopic(wsData.topicHash);
+                                    console.log(`[Sidecar] Joined P2P topic for new workspace: ${wsData.topicHash.slice(0, 16)}...`);
+                                    
+                                    // Register for Yjs P2P bridging
+                                    registerWorkspaceTopic(wsData.id, wsData.topicHash);
+                                } catch (e) {
+                                    console.warn('[Sidecar] Failed to join P2P topic for workspace:', e.message);
+                                }
+                            } else if (wsData.topicHash) {
+                                console.log('[Sidecar] P2P not initialized yet, topic will be joined on next startup');
+                            }
+                            
                             metaWss.clients.forEach(client => {
                                 if (client.readyState === WebSocket.OPEN) {
                                     client.send(JSON.stringify({ type: 'workspace-created', workspace: wsData }));
@@ -1308,6 +1426,18 @@ metaWss.on('connection', (ws, req) => {
                             const existing = await metadataDb.get(`workspace:${updateWsId}`);
                             const updated = { ...existing, ...updateWsData, updatedAt: Date.now() };
                             await saveWorkspaceMetadata(updateWsId, updated);
+                            
+                            // --- P2P: Join topic if topicHash was added/changed ---
+                            if (p2pInitialized && p2pBridge.isInitialized && updateWsData.topicHash && updateWsData.topicHash !== existing.topicHash) {
+                                try {
+                                    await p2pBridge.joinTopic(updateWsData.topicHash);
+                                    console.log(`[Sidecar] Joined P2P topic for updated workspace: ${updateWsData.topicHash.slice(0, 16)}...`);
+                                    registerWorkspaceTopic(updateWsId, updateWsData.topicHash);
+                                } catch (e) {
+                                    console.warn('[Sidecar] Failed to join P2P topic on update:', e.message);
+                                }
+                            }
+                            
                             metaWss.clients.forEach(client => {
                                 if (client.readyState === WebSocket.OPEN) {
                                     client.send(JSON.stringify({ type: 'workspace-updated', workspace: updated }));
