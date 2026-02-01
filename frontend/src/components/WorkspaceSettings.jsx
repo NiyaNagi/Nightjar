@@ -474,7 +474,6 @@ export default function WorkspaceSettings({
                     </div>
                   )}
                 </div>
-              </div>
               
               {copiedLink && (
                 <div className="workspace-settings__copied-feedback">

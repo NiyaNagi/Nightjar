@@ -151,14 +151,14 @@ export function WorkspaceProvider({ children }) {
   // Persist workspaces to localStorage in web mode
   useEffect(() => {
     if (!isElectron && workspaces.length > 0) {
-      localStorage.setItem('Nightjar-workspaces', JSON.stringify(workspaces));
+      localStorage.setItem('nahma-workspaces', JSON.stringify(workspaces));
     }
   }, [workspaces, isElectron]);
   
   // Persist current workspace selection
   useEffect(() => {
     if (!isElectron && currentWorkspaceId) {
-      localStorage.setItem('Nightjar-current-workspace', currentWorkspaceId);
+      localStorage.setItem('nahma-current-workspace', currentWorkspaceId);
     }
   }, [currentWorkspaceId, isElectron]);
 
@@ -252,7 +252,7 @@ export function WorkspaceProvider({ children }) {
       secureLog('[WorkspaceContext] Running in web mode (localStorage)');
       
       try {
-        const stored = localStorage.getItem('Nightjar-workspaces');
+        const stored = localStorage.getItem('nahma-workspaces');
         const storedWorkspaces = stored ? JSON.parse(stored) : [];
         setWorkspaces(storedWorkspaces);
         
@@ -282,7 +282,7 @@ export function WorkspaceProvider({ children }) {
           if (anyUpdated) {
             secureLog('[WorkspaceContext] Persisting updated workspaces with generated keys');
             setWorkspaces(updatedWorkspaces);
-            localStorage.setItem('Nightjar-workspaces', JSON.stringify(updatedWorkspaces));
+            localStorage.setItem('nahma-workspaces', JSON.stringify(updatedWorkspaces));
           }
         };
         
@@ -290,7 +290,7 @@ export function WorkspaceProvider({ children }) {
         
         if (storedWorkspaces.length > 0) {
           // Restore last selected workspace
-          const lastWorkspaceId = localStorage.getItem('Nightjar-current-workspace');
+          const lastWorkspaceId = localStorage.getItem('nahma-current-workspace');
           setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
         }
       } catch (e) {
@@ -551,7 +551,7 @@ export function WorkspaceProvider({ children }) {
    * @returns {Promise<Object>} Joined workspace
    */
   const joinWorkspace = useCallback(async (shareData) => {
-    const { entityId, password, encryptionKey, permission, serverUrl, bootstrapPeers } = shareData;
+    const { entityId, password, encryptionKey, permission, serverUrl, bootstrapPeers, topicHash } = shareData;
     
     // DEBUG: Log join attempt details
     secureLog(`[WorkspaceContext] ========== JOIN WORKSPACE ==========`);
@@ -561,6 +561,7 @@ export function WorkspaceProvider({ children }) {
     secureLog(`[WorkspaceContext] permission: ${permission}`);
     secureLog(`[WorkspaceContext] serverUrl: ${serverUrl || '(local)'}`);
     secureLog(`[WorkspaceContext] bootstrapPeers: ${bootstrapPeers?.length || 0} peers`);
+    secureLog(`[WorkspaceContext] topicHash: ${topicHash || '(will derive)'}`);
     secureLog(`[WorkspaceContext] isElectron: ${checkIsElectron()}`);
     secureLog(`[WorkspaceContext] ====================================`);
     
@@ -580,6 +581,11 @@ export function WorkspaceProvider({ children }) {
       if (serverUrl && serverUrl !== existing.serverUrl) {
         updates.serverUrl = serverUrl;
         secureLog(`[WorkspaceContext] Updating serverUrl: ${serverUrl}`);
+      }
+      
+      // Update topicHash if provided
+      if (topicHash && topicHash !== existing.topicHash) {
+        updates.topicHash = topicHash;
       }
       
       // Update bootstrapPeers if provided
@@ -613,11 +619,17 @@ export function WorkspaceProvider({ children }) {
     let workspaceKey;
     let topic;
     
+    // Use provided topicHash if available (from share link)
+    // Otherwise derive from password or use entityId
+    if (topicHash) {
+      topic = topicHash;
+    }
+    
     if (encryptionKey) {
       // Use directly provided encryption key (from key-embedded link)
       workspaceKey = encryptionKey;
       // For key-embedded links, use entityId as topic (no password to derive from)
-      topic = entityId;
+      if (!topic) topic = entityId;
       
       // Store key chain
       storeKeyChain(entityId, {
@@ -629,7 +641,7 @@ export function WorkspaceProvider({ children }) {
     } else if (password) {
       // Derive workspace key from password
       workspaceKey = await deriveWorkspaceKey(password, entityId);
-      topic = await deriveWorkspaceTopicHash(password, entityId);
+      if (!topic) topic = await deriveWorkspaceTopicHash(password, entityId);
       
       // Store key chain
       storeKeyChain(entityId, {
@@ -640,7 +652,7 @@ export function WorkspaceProvider({ children }) {
       });
     } else {
       // No password or key - use entityId as topic, no encryption
-      topic = entityId;
+      if (!topic) topic = entityId;
     }
     
     // Get user identity (prefer context, fallback to IPC)
@@ -663,6 +675,8 @@ export function WorkspaceProvider({ children }) {
       // Store encryption key for persistence (if key-embedded link)
       encryptionKey: encryptionKey && !password ? keyToBase64(encryptionKey) : null,
       topic,
+      // Hyperswarm topic hash for DHT discovery
+      topicHash: topic,
       // Remote sync server URL for cross-platform workspaces
       // If set, Electron will connect to this server instead of local sidecar
       serverUrl: serverUrl || null,
@@ -714,6 +728,46 @@ export function WorkspaceProvider({ children }) {
     return hierarchy[workspace.myPermission] >= hierarchy[requiredPermission];
   }, [workspaces]);
 
+  /**
+   * Get P2P info (our Hyperswarm public key and connected peers)
+   * Used for generating share links with embedded peer info
+   * @returns {Promise<{initialized: boolean, ownPublicKey: string|null, connectedPeers: string[]}>}
+   */
+  const getP2PInfo = useCallback(() => {
+    return new Promise((resolve) => {
+      if (!metaSocket.current || metaSocket.current.readyState !== WebSocket.OPEN) {
+        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [] });
+        return;
+      }
+      
+      // Set up one-time listener for response
+      const handleMessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'p2p-info') {
+            metaSocket.current.removeEventListener('message', handleMessage);
+            resolve({
+              initialized: data.initialized || false,
+              ownPublicKey: data.ownPublicKey || null,
+              connectedPeers: data.connectedPeers || [],
+            });
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      };
+      
+      metaSocket.current.addEventListener('message', handleMessage);
+      metaSocket.current.send(JSON.stringify({ type: 'get-p2p-info' }));
+      
+      // Timeout after 2 seconds
+      setTimeout(() => {
+        metaSocket.current?.removeEventListener('message', handleMessage);
+        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [] });
+      }, 2000);
+    });
+  }, []);
+
   // Context value - memoize to avoid unnecessary re-renders
   // Note: metaSocket.current updates when connected changes, so including connected ensures fresh socket
   const value = useMemo(() => ({
@@ -738,6 +792,7 @@ export function WorkspaceProvider({ children }) {
     getWorkspace,
     hasPermission,
     setCurrentWorkspaceId,
+    getP2PInfo,
     
     // Helpers
     hasWorkspaces: workspaces.length > 0,
@@ -745,7 +800,7 @@ export function WorkspaceProvider({ children }) {
     canEdit: currentWorkspace?.myPermission === 'owner' || currentWorkspace?.myPermission === 'editor',
   }), [workspaces, currentWorkspaceId, currentWorkspace, loading, connected, 
        createWorkspace, updateWorkspace, deleteWorkspace, leaveWorkspace, switchWorkspace, 
-       joinWorkspace, getWorkspace, hasPermission]);
+       joinWorkspace, getWorkspace, hasPermission, getP2PInfo]);
 
   return (
     <WorkspaceContext.Provider value={value}>
