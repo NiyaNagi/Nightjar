@@ -333,8 +333,11 @@ export function parseShareLink(link) {
   let fragment = '';
   let entityType = 'document'; // Default for legacy links
   
+  // Normalize protocol to lowercase for comparison
+  const encodedLower = encoded.toLowerCase();
+  
   // Check for compressed format - cannot parse synchronously
-  if (encoded.startsWith('nightjar://c/')) {
+  if (encodedLower.startsWith('nightjar://c/')) {
     throw new Error('Compressed link detected. Use parseShareLinkAsync() instead.');
   }
   
@@ -345,8 +348,8 @@ export function parseShareLink(link) {
     encoded = encoded.slice(0, hashIndex);
   }
   
-  // Parse entity type from protocol prefix
-  if (encoded.startsWith('nightjar://')) {
+  // Parse entity type from protocol prefix (case-insensitive)
+  if (encodedLower.startsWith('nightjar://')) {
     const afterProtocol = encoded.slice('nightjar://'.length);
     const slashIndex = afterProtocol.indexOf('/');
     
@@ -508,8 +511,8 @@ export function extractShareCode(link) {
  */
 export function expandShareCode(code) {
   if (!code) return '';
-  // Add the nightjar:// prefix if not present
-  if (code.startsWith('nightjar://')) return code;
+  // Add the nightjar:// prefix if not present (case-insensitive check)
+  if (code.toLowerCase().startsWith('nightjar://')) return code;
   return `nightjar://${code}`;
 }
 
@@ -905,8 +908,8 @@ export function parseInviteLink(link) {
     return { token: trimmed };
   }
   
-  // Try legacy nightjar:// format
-  if (trimmed.startsWith('nightjar://')) {
+  // Try legacy nightjar:// format (case-insensitive)
+  if (trimmed.toLowerCase().startsWith('nightjar://')) {
     try {
       const parsed = parseShareLink(trimmed);
       return {
@@ -1086,12 +1089,13 @@ export function isInviteLink(link) {
  * @returns {Promise<string>} Compressed link in format: nightjar://c/{compressedData}
  */
 export async function compressShareLink(link) {
-  if (!link || !link.startsWith('nightjar://')) {
+  if (!link || !link.toLowerCase().startsWith('nightjar://')) {
     return link;
   }
   
-  // Extract everything after nightjar://
-  const content = link.slice('nightjar://'.length);
+  // Extract everything after nightjar:// (case-insensitive slice)
+  const protocolEnd = link.toLowerCase().indexOf('nightjar://') + 'nightjar://'.length;
+  const content = link.slice(protocolEnd);
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
   
@@ -1138,11 +1142,14 @@ export async function compressShareLink(link) {
  * @returns {Promise<string>} Original full link
  */
 export async function decompressShareLink(link) {
-  if (!link || !link.startsWith('nightjar://c/')) {
+  const linkLower = link?.toLowerCase() || '';
+  if (!link || !linkLower.startsWith('nightjar://c/')) {
     return link; // Not compressed, return as-is
   }
   
-  const compressed = link.slice('nightjar://c/'.length);
+  // Find where the compressed data starts (after nightjar://c/)
+  const compressedStart = linkLower.indexOf('nightjar://c/') + 'nightjar://c/'.length;
+  const compressed = link.slice(compressedStart);
   const compressedBytes = base62Decode(compressed);
   
   try {
@@ -1184,7 +1191,7 @@ export async function decompressShareLink(link) {
  * @returns {boolean}
  */
 export function isCompressedLink(link) {
-  return link && link.startsWith('nightjar://c/');
+  return link && link.toLowerCase().startsWith('nightjar://c/');
 }
 
 /**

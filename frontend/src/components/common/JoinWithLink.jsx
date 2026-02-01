@@ -8,10 +8,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './JoinWithLink.css';
 
-// Regex patterns for different link types
+// Regex patterns for different link types (case-insensitive for protocol)
 const LINK_PATTERNS = {
-  workspace: /^Nightjar:\/\/workspace\/([a-zA-Z0-9_-]+)(?:\?.*)?$/,
-  document: /^Nightjar:\/\/doc\/([a-zA-Z0-9_-]+)(?:\?.*)?$/,
+  workspace: /^nightjar:\/\/w(?:orkspace)?\/([a-zA-Z0-9_-]+)/i,
+  document: /^nightjar:\/\/d(?:oc)?\/([a-zA-Z0-9_-]+)/i,
   shortCode: /^[A-Z0-9]{6,12}$/i,
 };
 
@@ -40,8 +40,8 @@ const validateLink = (link) => {
     return { valid: true, type: 'code', id: trimmed.toUpperCase(), error: null };
   }
 
-  // Check if it looks like a partial nightjar:// link
-  if (trimmed.startsWith('nightjar://')) {
+  // Check if it looks like a partial nightjar:// link (case-insensitive)
+  if (trimmed.toLowerCase().startsWith('nightjar://')) {
     return { valid: false, type: null, id: null, error: 'Invalid link format' };
   }
 
