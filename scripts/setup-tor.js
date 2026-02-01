@@ -118,13 +118,16 @@ function startTor() {
 }
 
 // In CI environment, only download Tor, don't start it
-if (process.env.CI) {
-    console.log('CI environment detected. Downloading Tor binary only...');
+// GitHub Actions sets CI=true, GITHUB_ACTIONS=true
+const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true' || process.env.CI === true;
+if (isCI) {
+    console.log('CI environment detected. Downloading Tor binary only (not starting)...');
     if (!fs.existsSync(TOR_EXECUTABLE)) {
         downloadTor();
     } else {
         console.log('Tor executable already exists.');
     }
+    console.log('Skipping Tor startup in CI environment.');
     process.exit(0);
 }
 
