@@ -400,6 +400,22 @@ export function WorkspaceProvider({ children }) {
     };
   }, []);
 
+  // Listen for identity creation to reinitialize P2P
+  // This ensures P2P is ready after user completes onboarding
+  useEffect(() => {
+    const handleIdentityCreated = async () => {
+      secureLog('[WorkspaceContext] Identity created, reinitializing P2P...');
+      if (metaSocket.current?.readyState === WebSocket.OPEN) {
+        metaSocket.current.send(JSON.stringify({ type: 'reinitialize-p2p' }));
+      }
+    };
+    
+    window.addEventListener('identity-created', handleIdentityCreated);
+    return () => {
+      window.removeEventListener('identity-created', handleIdentityCreated);
+    };
+  }, []);
+
   /**
    * Create a new workspace
    * @param {Object} options - Workspace options

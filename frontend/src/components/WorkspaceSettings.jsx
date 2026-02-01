@@ -172,9 +172,14 @@ export default function WorkspaceSettings({
       try {
         const p2pInfo = await getP2PInfo();
         console.log('[WorkspaceSettings] p2pInfo:', p2pInfo);
+        console.log('[WorkspaceSettings] p2pInfo.initialized:', p2pInfo.initialized);
+        console.log('[WorkspaceSettings] p2pInfo.ownPublicKey:', p2pInfo.ownPublicKey?.slice(0, 16) + '...');
+        console.log('[WorkspaceSettings] p2pInfo.directAddress:', p2pInfo.directAddress);
         
-        if (p2pInfo.initialized && p2pInfo.ownPublicKey) {
-          // Include our public key so receivers can connect directly
+        // Include our public key if available (key to P2P discovery)
+        // The sidecar now auto-initializes P2P when get-p2p-info is called
+        if (p2pInfo.ownPublicKey) {
+          // Include our public key so receivers can connect directly via DHT
           hyperswarmPeers = [p2pInfo.ownPublicKey];
           // Also include connected peers for mesh discovery
           if (p2pInfo.connectedPeers && p2pInfo.connectedPeers.length > 0) {
@@ -184,6 +189,8 @@ export default function WorkspaceSettings({
           if (p2pInfo.directAddress?.address) {
             directAddress = p2pInfo.directAddress.address;
           }
+        } else {
+          console.warn('[WorkspaceSettings] No P2P public key available - P2P may not be initialized');
         }
         
         console.log('[WorkspaceSettings] hyperswarmPeers:', hyperswarmPeers);

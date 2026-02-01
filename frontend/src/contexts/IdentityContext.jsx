@@ -83,6 +83,12 @@ export function IdentityProvider({ children }) {
             
             setIdentity(identityData);
             setNeedsOnboarding(false);
+            
+            // Dispatch event to notify other contexts that identity was created
+            // WorkspaceContext listens for this to reinitialize P2P
+            window.dispatchEvent(new CustomEvent('identity-created', { detail: identityData }));
+            secureLog('[Identity] Identity created, dispatched identity-created event');
+            
             return true;
         } catch (e) {
             secureError('[Identity] Failed to create:', e);

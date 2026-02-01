@@ -688,8 +688,12 @@ console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${M
 
 // --- P2P Initialization ---
 // Initialize P2PBridge with identity if available (enables Hyperswarm DHT)
-async function initializeP2P() {
-    if (p2pInitialized) return;
+// force=true will reinitialize even if already initialized (useful after identity creation)
+async function initializeP2P(force = false) {
+    if (p2pInitialized && !force) {
+        console.log('[Sidecar] P2P already initialized, skipping');
+        return { success: true, alreadyInitialized: true };
+    }
     
     try {
         if (hasIdentity()) {
@@ -714,13 +718,18 @@ async function initializeP2P() {
                 
                 // Auto-rejoin saved workspaces
                 await autoRejoinWorkspaces();
+                
+                return { success: true, alreadyInitialized: false };
             }
         } else {
             console.log('[Sidecar] No identity found, P2P will initialize when identity is created');
+            return { success: false, reason: 'no_identity' };
         }
     } catch (err) {
         console.error('[Sidecar] Failed to initialize P2P:', err);
+        return { success: false, reason: err.message };
     }
+    return { success: false, reason: 'unknown' };
 }
 
 // --- Yjs P2P Bridge ---
@@ -1343,11 +1352,17 @@ metaWss.on('connection', (ws, req) => {
                 // --- P2P Info ---
                 case 'get-p2p-info':
                     // Get our Hyperswarm public key, connected peers, and direct address
+                    // If P2P not initialized but identity exists, try to initialize now
                     try {
+                        if (!p2pInitialized) {
+                            console.log('[Sidecar] P2P not initialized, attempting initialization...');
+                            await initializeP2P(true);
+                        }
                         const ownPublicKey = p2pBridge.getOwnPublicKey();
                         const connectedPeers = p2pBridge.getConnectedPeers();
                         // Get direct connection address (public IP:port)
                         const directAddress = await p2pBridge.getDirectAddress();
+                        console.log('[Sidecar] get-p2p-info: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16), 'directAddress=', directAddress?.address);
                         ws.send(JSON.stringify({
                             type: 'p2p-info',
                             initialized: p2pInitialized,
@@ -1356,11 +1371,41 @@ metaWss.on('connection', (ws, req) => {
                             directAddress, // { host, port, publicKey, address }
                         }));
                     } catch (err) {
+                        console.error('[Sidecar] get-p2p-info error:', err);
                         ws.send(JSON.stringify({
                             type: 'p2p-info',
                             initialized: false,
                             ownPublicKey: null,
                             connectedPeers: [],
+                            directAddress: null,
+                            error: err.message,
+                        }));
+                    }
+                    break;
+                
+                case 'reinitialize-p2p':
+                    // Force P2P reinitialization (call after identity is created/changed)
+                    try {
+                        console.log('[Sidecar] Reinitializing P2P...');
+                        const result = await initializeP2P(true);
+                        const ownPublicKey = p2pBridge.getOwnPublicKey();
+                        const directAddress = await p2pBridge.getDirectAddress();
+                        console.log('[Sidecar] P2P reinitialized: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16));
+                        ws.send(JSON.stringify({
+                            type: 'p2p-reinitialized',
+                            success: result.success,
+                            initialized: p2pInitialized,
+                            ownPublicKey,
+                            directAddress,
+                            reason: result.reason,
+                        }));
+                    } catch (err) {
+                        console.error('[Sidecar] P2P reinitialization failed:', err);
+                        ws.send(JSON.stringify({
+                            type: 'p2p-reinitialized',
+                            success: false,
+                            initialized: false,
+                            ownPublicKey: null,
                             directAddress: null,
                             error: err.message,
                         }));
@@ -1389,6 +1434,12 @@ metaWss.on('connection', (ws, req) => {
                             
                             // --- P2P: Join the Hyperswarm topic for this workspace ---
                             // This is CRITICAL - without this, the sharer isn't discoverable on DHT
+                            // Auto-initialize P2P if needed
+                            if (!p2pInitialized && wsData.topicHash) {
+                                console.log('[Sidecar] P2P not initialized, attempting initialization for workspace creation...');
+                                await initializeP2P(true);
+                            }
+                            
                             if (p2pInitialized && p2pBridge.isInitialized && wsData.topicHash) {
                                 try {
                                     await p2pBridge.joinTopic(wsData.topicHash);
@@ -1399,8 +1450,8 @@ metaWss.on('connection', (ws, req) => {
                                 } catch (e) {
                                     console.warn('[Sidecar] Failed to join P2P topic for workspace:', e.message);
                                 }
-                            } else if (wsData.topicHash) {
-                                console.log('[Sidecar] P2P not initialized yet, topic will be joined on next startup');
+                            } else if (wsData.topicHash && !p2pInitialized) {
+                                console.log('[Sidecar] P2P could not be initialized, topic will be joined on next startup');
                             }
                             
                             metaWss.clients.forEach(client => {
@@ -1576,6 +1627,12 @@ metaWss.on('connection', (ws, req) => {
                             
                             // --- P2P Connection ---
                             // Join Hyperswarm topic and connect to bootstrap peers
+                            // Auto-initialize P2P if needed (joiner may not have initialized yet)
+                            if (!p2pInitialized) {
+                                console.log('[Sidecar] P2P not initialized, attempting initialization for join...');
+                                await initializeP2P(true);
+                            }
+                            
                             if (p2pInitialized && p2pBridge.isInitialized) {
                                 const topicHash = joinWsData.topicHash;
                                 const bootstrapPeers = joinWsData.bootstrapPeers;

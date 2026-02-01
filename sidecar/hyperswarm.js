@@ -145,29 +145,40 @@ async function getPublicIPViaHTTP() {
 }
 
 /**
- * Get public IP address with caching
+ * Get public IP address with caching and retries
+ * @param {number} retries - Number of retry attempts (default 2)
  * @returns {Promise<string|null>} Public IP or null
  */
-async function getPublicIP() {
+async function getPublicIP(retries = 2) {
   // Check cache
   if (cachedPublicIP && Date.now() - publicIPTimestamp < PUBLIC_IP_CACHE_TTL) {
     return cachedPublicIP;
   }
   
-  // Try STUN first (more accurate for NAT scenarios)
-  let ip = await getPublicIPViaSTUN();
-  if (!ip) {
-    // Fallback to HTTP API
-    ip = await getPublicIPViaHTTP();
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    // Try STUN first (more accurate for NAT scenarios)
+    let ip = await getPublicIPViaSTUN();
+    if (!ip) {
+      // Fallback to HTTP API
+      ip = await getPublicIPViaHTTP();
+    }
+    
+    if (ip) {
+      cachedPublicIP = ip;
+      publicIPTimestamp = Date.now();
+      console.log('[Hyperswarm] Detected public IP:', ip);
+      return ip;
+    }
+    
+    // Wait before retry
+    if (attempt < retries) {
+      console.log(`[Hyperswarm] Public IP detection failed, retrying (${attempt + 1}/${retries})...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
   
-  if (ip) {
-    cachedPublicIP = ip;
-    publicIPTimestamp = Date.now();
-    console.log('[Hyperswarm] Detected public IP:', ip);
-  }
-  
-  return ip;
+  console.warn('[Hyperswarm] Failed to detect public IP after', retries + 1, 'attempts');
+  return null;
 }
 
 /**
