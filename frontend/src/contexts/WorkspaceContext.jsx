@@ -551,7 +551,7 @@ export function WorkspaceProvider({ children }) {
    * @returns {Promise<Object>} Joined workspace
    */
   const joinWorkspace = useCallback(async (shareData) => {
-    const { entityId, password, encryptionKey, permission, serverUrl, bootstrapPeers, topicHash } = shareData;
+    const { entityId, password, encryptionKey, permission, serverUrl, bootstrapPeers, topicHash, directAddress } = shareData;
     
     // DEBUG: Log join attempt details
     secureLog(`[WorkspaceContext] ========== JOIN WORKSPACE ==========`);
@@ -562,6 +562,7 @@ export function WorkspaceProvider({ children }) {
     secureLog(`[WorkspaceContext] serverUrl: ${serverUrl || '(local)'}`);
     secureLog(`[WorkspaceContext] bootstrapPeers: ${bootstrapPeers?.length || 0} peers`);
     secureLog(`[WorkspaceContext] topicHash: ${topicHash || '(will derive)'}`);
+    secureLog(`[WorkspaceContext] directAddress: ${directAddress || '(none)'}`);
     secureLog(`[WorkspaceContext] isElectron: ${checkIsElectron()}`);
     secureLog(`[WorkspaceContext] ====================================`);
     
@@ -682,6 +683,8 @@ export function WorkspaceProvider({ children }) {
       serverUrl: serverUrl || null,
       // Bootstrap peers for P2P connection via Hyperswarm
       bootstrapPeers: bootstrapPeers || null,
+      // Direct P2P address for connecting without DHT
+      directAddress: directAddress || null,
     };
     
     // Notify sidecar (will queue if socket not ready)
@@ -694,6 +697,8 @@ export function WorkspaceProvider({ children }) {
       userPublicKey: userIdentity.publicKey,
       // If we have bootstrap peers, tell sidecar to connect via Hyperswarm
       bootstrapPeers: bootstrapPeers || null,
+      // Direct P2P address for connecting without DHT
+      directAddress: directAddress || null,
     });
     
     // Add to local state

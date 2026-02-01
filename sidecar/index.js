@@ -1148,15 +1148,18 @@ metaWss.on('connection', (ws, req) => {
                 
                 // --- P2P Info ---
                 case 'get-p2p-info':
-                    // Get our Hyperswarm public key and connected peers
+                    // Get our Hyperswarm public key, connected peers, and direct address
                     try {
                         const ownPublicKey = p2pBridge.getOwnPublicKey();
                         const connectedPeers = p2pBridge.getConnectedPeers();
+                        // Get direct connection address (public IP:port)
+                        const directAddress = await p2pBridge.getDirectAddress();
                         ws.send(JSON.stringify({
                             type: 'p2p-info',
                             initialized: p2pInitialized,
                             ownPublicKey,
                             connectedPeers,
+                            directAddress, // { host, port, publicKey, address }
                         }));
                     } catch (err) {
                         ws.send(JSON.stringify({
@@ -1164,6 +1167,7 @@ metaWss.on('connection', (ws, req) => {
                             initialized: false,
                             ownPublicKey: null,
                             connectedPeers: [],
+                            directAddress: null,
                             error: err.message,
                         }));
                     }
@@ -1316,6 +1320,12 @@ metaWss.on('connection', (ws, req) => {
                                     needsUpdate = true;
                                 }
                                 
+                                // Update directAddress if provided
+                                if (joinWsData.directAddress && joinWsData.directAddress !== existing.directAddress) {
+                                    updates.directAddress = joinWsData.directAddress;
+                                    needsUpdate = true;
+                                }
+                                
                                 // Upgrade permission if new one is higher
                                 if (newLevel > existingLevel) {
                                     updates.myPermission = joinWsData.myPermission;
@@ -1346,6 +1356,12 @@ metaWss.on('connection', (ws, req) => {
                             if (p2pInitialized && p2pBridge.isInitialized) {
                                 const topicHash = joinWsData.topicHash;
                                 const bootstrapPeers = joinWsData.bootstrapPeers;
+                                const peerDirectAddress = joinWsData.directAddress;
+                                
+                                // Log direct address if available (for debugging and potential future direct connections)
+                                if (peerDirectAddress) {
+                                    console.log(`[Sidecar] Peer direct address: ${peerDirectAddress}`);
+                                }
                                 
                                 if (topicHash) {
                                     try {
