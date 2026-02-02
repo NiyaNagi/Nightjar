@@ -13,7 +13,7 @@ export default defineConfig({
     topLevelAwait(),
   ],
   define: {
-    // Polyfill Node.js globals for browser compatibility (needed by Fortune Sheet)
+    // Polyfill Node.js globals for browser compatibility (needed by Fortune Sheet and bip39)
     global: 'globalThis',
   },
   optimizeDeps: {

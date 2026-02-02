@@ -3,6 +3,12 @@
 
 import * as bip39 from 'bip39';
 import nacl from 'tweetnacl';
+import { Buffer } from 'buffer';
+
+// Polyfill Buffer globally for bip39
+if (typeof window !== 'undefined' && !window.Buffer) {
+    window.Buffer = Buffer;
+}
 
 // Base62 alphabet for compact encoding
 const BASE62_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
