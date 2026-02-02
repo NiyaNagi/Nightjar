@@ -48,15 +48,16 @@
     top: 100%;
     right: 0;
     margin-top: 8px;
-    width: 340px;
+    width: 460px;
+    max-width: calc(100vw - 40px);
     background: var(--bg-secondary, #1a1a2e);
     border: 1px solid var(--border-color, #2d2d44);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     z-index: 10001;
-    overflow: hidden;
     max-height: calc(100vh - 80px);
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .profile-header {
@@ -170,23 +171,26 @@
 
 .color-picker,
 .icon-picker {
-    padding: 12px;
-    max-height: 200px;
+    padding: 16px;
+    max-height: 240px;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .preset-colors,
 .preset-icons {
     display: grid;
-    gap: 6px;
+    gap: 8px;
 }
 
 .preset-colors {
-    grid-template-columns: repeat(10, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(28px, max-content));
+    justify-content: start;
 }
 
 .preset-icons {
-    grid-template-columns: repeat(10, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(32px, max-content));
+    justify-content: start;
 }
 
 .color-option {
