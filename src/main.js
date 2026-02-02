@@ -1197,3 +1197,4 @@ app.on('before-quit', async () => {
         await torManager.stop();
     }
 });
+

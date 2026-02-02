@@ -59,6 +59,7 @@ export default function IconColorPicker({
   size = 'medium', // 'small', 'medium', 'large'
   disabled = false,
   showColorPreview = true,
+  compact = false, // For inline display without popover
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('icon'); // 'icon' or 'color'
@@ -110,28 +111,30 @@ export default function IconColorPicker({
 
   return (
     <div 
-      className={`icon-color-picker ${sizeClasses[size]}`} 
+      className={`icon-color-picker ${sizeClasses[size]} ${compact ? 'icon-color-picker--compact' : ''}`} 
       ref={pickerRef}
       onKeyDown={handleKeyDown}
     >
-      <button
-        ref={triggerRef}
-        type="button"
-        className="icon-color-picker__trigger"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        style={{ 
-          backgroundColor: showColorPreview ? color : undefined,
-          borderColor: showColorPreview ? color : undefined,
-        }}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        title="Change icon and color"
-      >
-        <span className="icon-color-picker__icon">{icon}</span>
-      </button>
+      {!compact && (
+        <button
+          ref={triggerRef}
+          type="button"
+          className="icon-color-picker__trigger"
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+          style={{ 
+            backgroundColor: showColorPreview ? color : undefined,
+            borderColor: showColorPreview ? color : undefined,
+          }}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          title="Change icon and color"
+        >
+          <span className="icon-color-picker__icon">{icon}</span>
+        </button>
+      )}
 
-      {isOpen && (
+      {(isOpen || compact) && (
         <div className="icon-color-picker__panel" role="dialog" aria-label="Pick icon and color">
           {/* Tabs */}
           <div className="icon-color-picker__tabs">

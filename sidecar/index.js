@@ -1,3 +1,16 @@
+console.log('[Sidecar] Starting up...');
+
+// Add global error handlers
+process.on('uncaughtException', (error) => {
+    console.error('[Sidecar] Uncaught exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Sidecar] Unhandled rejection at:', promise, 'reason:', reason);
+    process.exit(1);
+});
+
 const WebSocket = require('ws');
 const crypto = require('crypto');
 const { createLibp2pNode } = require('../backend/p2p');
@@ -9,20 +22,42 @@ const TorControl = require('tor-control');
 const EventEmitter = require('events');
 const { P2PBridge } = require('./p2p-bridge');
 const identity = require('./identity');
+const { MeshParticipant } = require('./mesh');
+
+console.log('[Sidecar] Imports completed');
 
 // Initialize P2P Bridge for unified P2P layer
 const p2pBridge = new P2PBridge();
+
+// Initialize Mesh Participant for global relay mesh network
+// Default: enabled, not relay mode (desktop clients only relay through mesh, not act as relays)
+let meshParticipant = null;
+let meshEnabled = process.env.NIGHTJAR_MESH !== 'false'; // Default enabled, can disable via env
 
 // Track if P2P is initialized with identity
 let p2pInitialized = false;
 
 // Dynamically import uint8arrays to handle ES module
 let uint8ArrayFromString = null;
-const uint8arraysReady = (async () => {
-    const uint8arrays = await import('uint8arrays');
-    uint8ArrayFromString = uint8arrays.fromString;
-    return true;
-})();
+let uint8arraysReady = Promise.resolve(false); // Initialize as resolved promise
+
+// Function to load uint8arrays when needed
+async function loadUint8Arrays() {
+    if (uint8ArrayFromString) return true; // Already loaded
+    
+    try {
+        console.log('[Sidecar] Loading uint8arrays module...');
+        const uint8arrays = await import('uint8arrays');
+        uint8ArrayFromString = uint8arrays.fromString;
+        console.log('[Sidecar] uint8arrays module loaded successfully');
+        uint8arraysReady = Promise.resolve(true);
+        return true;
+    } catch (error) {
+        console.error('[Sidecar] Failed to load uint8arrays:', error.message);
+        uint8arraysReady = Promise.resolve(false);
+        return false;
+    }
+}
 
 const path = require('path');
 
@@ -31,6 +66,9 @@ const METADATA_WEBSOCKET_PORT = 8081;
 const TOR_CONTROL_PORT = 9051;
 const P2P_PORT = 4001;
 const PUBSUB_TOPIC = '/nightjarx/1.0.0';
+
+// WebSocket server instances
+let metaWss;
 
 // Storage path - use userData path from command line if provided (Electron packaged app),
 // otherwise fall back to relative path (development mode)
@@ -269,6 +307,21 @@ const dbReady = db.open().then(() => {
 
 console.log(`[Sidecar] Initializing LevelDB at ${DB_PATH}...`);
 
+// Add logging to the db.open() promise
+db.open().then(() => {
+    console.log(`[Sidecar] LevelDB opened successfully at ${DB_PATH}`);
+    return true;
+}).catch(e => {
+    if (e.code === 'LEVEL_DATABASE_ALREADY_OPEN') {
+        console.log(`[Sidecar] LevelDB already open at ${DB_PATH}`);
+        return true;
+    }
+    console.error('[Sidecar] Failed to open LevelDB:', e);
+    throw e;
+});
+
+console.log('[Sidecar] Database setup completed, ready to start servers');
+
 // --- P2P Message Protocol ---
 // P2P messages include document ID for proper routing
 // Format: [1 byte version][32 bytes docId length-prefixed][encrypted data]
@@ -329,6 +382,7 @@ function parseP2PMessage(message) {
 
 // Helper to broadcast status to all connected metadata clients
 function broadcastStatus() {
+    const meshStatus = meshParticipant ? meshParticipant.getStatus() : null;
     const statusMessage = JSON.stringify({
         type: 'status',
         status: connectionStatus,
@@ -336,7 +390,8 @@ function broadcastStatus() {
         torEnabled: torEnabled,
         onionAddress: onionAddress ? `${onionAddress}.onion` : null,
         multiaddr: fullMultiaddr,
-        peerId: p2pNode ? p2pNode.peerId.toString() : null
+        peerId: p2pNode ? p2pNode.peerId.toString() : null,
+        mesh: meshStatus
     });
     metaWss.clients.forEach(ws => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -746,9 +801,41 @@ async function startServers() {
     });
     console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT}`);
 
-    // Server 2: Handles metadata and commands
-    const metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT });
+    // Server 2: Handles metadata and commands  
+    metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT });
+    
+    // Set up metadata server connection handler
+    metaWss.on('connection', (ws, req) => {
+        console.log('[Sidecar] Metadata client connected.');
+        
+        // Immediately send current status
+        ws.send(JSON.stringify({
+            type: 'status',
+            status: connectionStatus,
+            isOnline: isOnline,
+            onionAddress: onionAddress ? `${onionAddress}.onion` : null,
+            multiaddr: fullMultiaddr,
+            peerId: p2pNode ? p2pNode.peerId.toString() : null
+        }));
+
+        ws.on('message', async (message) => {
+            // TODO: Implement full message handler
+            console.log('[Sidecar] Received message:', message.toString());
+        });
+        
+        ws.on('close', () => {
+            console.log('[Sidecar] Metadata client disconnected.');
+        });
+        
+        // Register client with P2P bridge
+        p2pBridge.handleClient(ws);
+    });
+    
     console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT}`);
+    
+    // Load uint8arrays module and initialize document keys after servers are started
+    await loadUint8Arrays();
+    initializeDocumentKeys();
 }
 
 // Start servers
@@ -787,6 +874,9 @@ async function initializeP2P(force = false) {
                 // Set up peer persistence for mesh networking
                 setupPeerPersistence();
                 
+                // Initialize mesh network participation
+                await initializeMesh();
+                
                 // Auto-rejoin saved workspaces
                 await autoRejoinWorkspaces();
                 
@@ -801,6 +891,50 @@ async function initializeP2P(force = false) {
         return { success: false, reason: err.message };
     }
     return { success: false, reason: 'unknown' };
+}
+
+// --- Mesh Network Initialization ---
+// Initialize the global relay mesh for peer discovery and redundancy
+
+async function initializeMesh() {
+    if (!meshEnabled) {
+        console.log('[Mesh] Mesh participation disabled via NIGHTJAR_MESH env');
+        return;
+    }
+    
+    try {
+        // Create mesh participant (desktop clients are NOT relays by default)
+        meshParticipant = new MeshParticipant({
+            enabled: true,
+            relayMode: false, // Desktop clients don't act as public relays
+            announceWorkspaces: true, // Announce our workspaces for peer discovery
+        });
+        
+        // Set up mesh event handlers
+        meshParticipant.on('relay-discovered', (relay) => {
+            console.log(`[Mesh] Discovered relay: ${relay.endpoints?.[0] || relay.nodeId?.slice(0, 16)}`);
+            broadcastStatus(); // Update clients with new relay info
+        });
+        
+        meshParticipant.on('workspace-peers', ({ workspaceId, peers }) => {
+            console.log(`[Mesh] Found ${peers.length} peers for workspace ${workspaceId.slice(0, 16)}...`);
+        });
+        
+        meshParticipant.on('error', (err) => {
+            console.error('[Mesh] Error:', err);
+        });
+        
+        // Start mesh participation
+        await meshParticipant.start();
+        console.log('[Sidecar] Mesh network participation started');
+        
+        // Broadcast updated status including mesh info
+        broadcastStatus();
+        
+    } catch (err) {
+        console.error('[Sidecar] Failed to initialize mesh:', err);
+        // Non-fatal - app continues without mesh
+    }
 }
 
 // --- Yjs P2P Bridge ---
@@ -921,6 +1055,13 @@ function broadcastYjsUpdate(workspaceId, topicHex, update, roomName) {
 // Register a workspace topic for Yjs bridging
 function registerWorkspaceTopic(workspaceId, topicHex) {
     topicToWorkspace.set(topicHex, workspaceId);
+    
+    // Also announce this workspace on the mesh for peer discovery
+    if (meshParticipant && meshParticipant._running) {
+        meshParticipant.joinWorkspace(workspaceId).catch(err => {
+            console.error('[Mesh] Failed to join workspace on mesh:', err);
+        });
+    }
     
     // Set up doc observer to broadcast updates
     const roomName = `workspace-meta:${workspaceId}`;
@@ -1118,7 +1259,8 @@ async function initializeP2PWithRetry() {
 // Start P2P initialization after a short delay to let everything start up
 setTimeout(initializeP2PWithRetry, 1000);
 
-metaWss.on('connection', (ws, req) => {
+// metaWss connection handler moved inside startServers() function
+/*
     console.log('[Sidecar] Metadata client connected.');
     
     // Generate unique client ID for rate limiting per connection
@@ -1351,6 +1493,7 @@ metaWss.on('connection', (ws, req) => {
                     break;
                 
                 case 'get-status':
+                    const meshStatus = meshParticipant ? meshParticipant.getStatus() : null;
                     ws.send(JSON.stringify({
                         type: 'status',
                         status: connectionStatus,
@@ -1358,8 +1501,61 @@ metaWss.on('connection', (ws, req) => {
                         torEnabled: torEnabled,
                         onionAddress: onionAddress ? `${onionAddress}.onion` : null,
                         multiaddr: fullMultiaddr,
-                        peerId: p2pNode ? p2pNode.peerId.toString() : null
+                        peerId: p2pNode ? p2pNode.peerId.toString() : null,
+                        mesh: meshStatus
                     }));
+                    break;
+                
+                case 'get-mesh-status':
+                    // Get detailed mesh network status
+                    if (meshParticipant) {
+                        ws.send(JSON.stringify({
+                            type: 'mesh-status',
+                            ...meshParticipant.getStatus(),
+                            topRelays: meshParticipant.getTopRelays(10)
+                        }));
+                    } else {
+                        ws.send(JSON.stringify({
+                            type: 'mesh-status',
+                            enabled: false,
+                            error: 'Mesh not initialized'
+                        }));
+                    }
+                    break;
+                
+                case 'set-mesh-enabled':
+                    // Enable/disable mesh participation
+                    meshEnabled = !!msg.enabled;
+                    if (meshEnabled && !meshParticipant) {
+                        await initializeMesh();
+                    } else if (!meshEnabled && meshParticipant) {
+                        await meshParticipant.stop();
+                        meshParticipant = null;
+                    }
+                    ws.send(JSON.stringify({
+                        type: 'mesh-enabled-changed',
+                        enabled: meshEnabled
+                    }));
+                    break;
+                
+                case 'query-mesh-peers':
+                    // Query mesh for peers in a workspace
+                    if (meshParticipant && msg.workspaceId) {
+                        try {
+                            const peers = await meshParticipant.queryWorkspacePeers(msg.workspaceId);
+                            ws.send(JSON.stringify({
+                                type: 'mesh-peers-result',
+                                workspaceId: msg.workspaceId,
+                                peers: peers
+                            }));
+                        } catch (err) {
+                            ws.send(JSON.stringify({
+                                type: 'mesh-peers-error',
+                                workspaceId: msg.workspaceId,
+                                error: err.message
+                            }));
+                        }
+                    }
                     break;
                 
                 case 'clear-orphaned-data':
@@ -1995,11 +2191,11 @@ metaWss.on('connection', (ws, req) => {
     // Register client with P2P bridge
     p2pBridge.handleClient(ws);
 });
-console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT}`);
+*/
 
 // Initialize: Load all document keys from metadata on startup (after servers are ready)
 // This is deferred to not block startup - documents will be loaded by the time the client connects
-(async function initializeDocumentKeys() {
+async function initializeDocumentKeys() {
     try {
         await uint8arraysReady;
         console.log('[Sidecar] Loading document list...');
@@ -2008,7 +2204,7 @@ console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${M
     } catch (err) {
         console.error('[Sidecar] Failed to initialize document keys:', err.message);
     }
-})();
+}
 
 
 // --- 4. Main P2P Application Logic ---
@@ -2238,3 +2434,31 @@ docs.on('doc-added', async (doc, docName) => {
 
 // P2P stack is NOT auto-started - use toggle-tor command to enable
 console.log('[Sidecar] Running in OFFLINE mode by default. Use toggle-tor to enable P2P.');
+
+// --- Graceful Shutdown ---
+async function shutdown() {
+    console.log('[Sidecar] Shutting down...');
+    
+    // Stop mesh participant
+    if (meshParticipant) {
+        try {
+            await meshParticipant.stop();
+            console.log('[Sidecar] Mesh participant stopped');
+        } catch (err) {
+            console.error('[Sidecar] Error stopping mesh:', err);
+        }
+    }
+    
+    // Close database
+    try {
+        await db.close();
+        console.log('[Sidecar] Database closed');
+    } catch (err) {
+        console.error('[Sidecar] Error closing database:', err);
+    }
+    
+    process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

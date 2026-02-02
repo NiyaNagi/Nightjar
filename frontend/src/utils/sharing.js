@@ -196,6 +196,9 @@ const MAX_EMBEDDED_PEERS = 5;
 // Maximum Hyperswarm peer public keys to embed
 const MAX_HYPERSWARM_PEERS = 3;
 
+// Maximum mesh relay nodes to embed in share links
+const MAX_MESH_RELAYS = 5;
+
 const CODE_TO_ENTITY = {
   w: 'workspace',
   f: 'folder',
@@ -230,6 +233,7 @@ const LEGACY_LINK_PREFIX = 'nightjar://d/';
  * @param {Uint8Array} options.encryptionKey - Direct encryption key (Option A)
  * @param {Array<string>} options.bootstrapPeers - Array of peer addresses (ip:port or host:port) - legacy WebSocket
  * @param {Array<string>} options.hyperswarmPeers - Array of Hyperswarm public keys (64-char hex)
+ * @param {Array<string>} options.meshRelays - Array of mesh relay WebSocket URLs (wss://...)
  * @param {string} options.topicHash - Full 64-char hex Hyperswarm topic hash
  * @param {string} options.directAddress - Direct connection address (ip:port for P2P)
  * @param {string} options.serverUrl - Sync server URL for fallback
@@ -245,6 +249,7 @@ export function generateShareLink(options) {
     encryptionKey = null,
     bootstrapPeers = [],
     hyperswarmPeers = [], // Hyperswarm peer public keys
+    meshRelays = [], // Mesh relay WebSocket URLs
     topicHash = null, // Full topic hash for DHT discovery
     directAddress = null, // Direct P2P address (ip:port)
     serverUrl = null, // Sync server URL for cross-platform sharing
@@ -319,6 +324,15 @@ export function generateShareLink(options) {
     const hpeersToEmbed = hyperswarmPeers.slice(0, MAX_HYPERSWARM_PEERS);
     // Encode as comma-separated hex keys
     fragmentParts.push('hpeer:' + hpeersToEmbed.join(','));
+  }
+  
+  // Add mesh relay nodes for bootstrap discovery
+  // These are WebSocket URLs that can help find peers via the mesh network
+  if (meshRelays && meshRelays.length > 0) {
+    const relaysToEmbed = meshRelays.slice(0, MAX_MESH_RELAYS);
+    // Encode as comma-separated URLs (URL-encoded)
+    const relaysEncoded = relaysToEmbed.map(r => encodeURIComponent(r)).join(',');
+    fragmentParts.push('nodes:' + relaysEncoded);
   }
   
   // Add sync server URL for cross-platform sharing (fallback only)
@@ -431,6 +445,7 @@ export function parseShareLink(link) {
   let permission = 'editor'; // Default permission
   let bootstrapPeers = [];
   let hyperswarmPeers = []; // Hyperswarm peer public keys
+  let meshRelays = []; // Mesh relay WebSocket URLs
   let directAddress = null; // Direct P2P connection address (ip:port)
   let serverUrl = null; // Remote sync server URL (for Electron joining web workspaces)
   let topic = null; // Hyperswarm topic for P2P discovery
@@ -459,6 +474,9 @@ export function parseShareLink(link) {
     } else if (param.startsWith('hpeer:')) {
       // Hyperswarm peer public keys (comma-separated hex)
       hyperswarmPeers = param.slice(6).split(',').filter(p => p.length === 64);
+    } else if (param.startsWith('nodes:')) {
+      // Mesh relay WebSocket URLs (comma-separated, URL-encoded)
+      meshRelays = param.slice(6).split(',').map(r => decodeURIComponent(r)).filter(Boolean);
     } else if (param.startsWith('srv:')) {
       // Sync server URL (for cross-platform workspace joining)
       serverUrl = decodeURIComponent(param.slice(4));
@@ -488,6 +506,7 @@ export function parseShareLink(link) {
     permission,
     bootstrapPeers, // Legacy WebSocket peers
     hyperswarmPeers, // Hyperswarm peer public keys
+    meshRelays, // Mesh relay WebSocket URLs for bootstrap
     directAddress, // Direct P2P address (ip:port)
     serverUrl, // Sync server URL for remote workspaces
     topic, // Hyperswarm topic for P2P discovery
@@ -1289,6 +1308,88 @@ export function hasSecretFragment() {
   return false;
 }
 
+/**
+ * Fetch top mesh relay nodes for embedding in share links
+ * This queries either the sidecar (Electron) or the server (web) for known relays
+ * 
+ * @param {number} limit - Maximum number of relays to fetch (default: 5)
+ * @returns {Promise<string[]>} Array of WebSocket relay URLs
+ */
+export async function getMeshRelaysForSharing(limit = 5) {
+  const relays = [];
+  
+  try {
+    // First try the sidecar (Electron environment)
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      const ws = new WebSocket('ws://localhost:8081');
+      const meshStatus = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error('Timeout'));
+        }, 2000);
+        
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: 'get-mesh-status' }));
+        };
+        
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'mesh-status') {
+              clearTimeout(timeout);
+              ws.close();
+              resolve(msg);
+            }
+          } catch (e) {
+            // Ignore parse errors
+          }
+        };
+        
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('WebSocket error'));
+        };
+      });
+      
+      if (meshStatus.topRelays && Array.isArray(meshStatus.topRelays)) {
+        for (const relay of meshStatus.topRelays) {
+          if (relay.endpoints && relay.endpoints[0]) {
+            relays.push(relay.endpoints[0]);
+          }
+        }
+      }
+    } else {
+      // Web environment - query the server API
+      const response = await fetch('/api/mesh/relays?limit=' + limit);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.relays && Array.isArray(data.relays)) {
+          for (const relay of data.relays) {
+            if (relay.url) {
+              relays.push(relay.url);
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Mesh not available - return empty array
+    secureWarn('Failed to fetch mesh relays for sharing:', e.message);
+  }
+  
+  return relays.slice(0, limit);
+}
+
+/**
+ * Hardcoded bootstrap relay nodes as fallback
+ * These are used when mesh relays are not available
+ */
+export const BOOTSTRAP_RELAY_NODES = [
+  'wss://relay1.nightjar.io',
+  'wss://relay2.nightjar.io',
+  'wss://relay3.nightjar.io'
+];
+
 // Export constants for use in other modules
 export {
   ENTITY_TYPES,
@@ -1296,4 +1397,5 @@ export {
   PERMISSION_CODES,
   CODE_TO_PERMISSION,
   PROTOCOL_VERSION,
+  MAX_MESH_RELAYS,
 };

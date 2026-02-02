@@ -11,6 +11,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import CreateFolder from './CreateFolder';
+import CreateDocument from './CreateDocument';
 import CreateWorkspace from './CreateWorkspace';
 import WorkspaceSettings from './WorkspaceSettings';
 import { AppSettings, useConfirmDialog, EditPropertiesModal } from './common';
@@ -18,7 +19,8 @@ import { IfPermitted } from './PermissionGuard';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { useFolders } from '../contexts/FolderContext';
-import { ensureContrastWithWhite } from '../utils/colorUtils';
+import { ensureContrastWithWhite, createColorGradient } from '../utils/colorUtils';
+import NightjarMascot from './NightjarMascot';
 import './HierarchicalSidebar.css';
 
 /**
@@ -35,6 +37,7 @@ function TreeItem({
     onToggle,
     onRequestDelete, // Async function that returns true if confirmed
     onRequestRename, // Function to start renaming (id, type, currentName)
+    onRequestEdit, // Function to start editing properties (id, type, item)
     isRenaming, // Whether this item is currently being renamed
     renameValue, // Current rename input value
     onRenameChange, // Handle rename input change
@@ -138,7 +141,7 @@ function TreeItem({
         }
     };
     
-    // Determine background color based on item type
+    // Determine background color/gradient based on item type
     const getBackgroundStyle = () => {
         // System folders use workspace color
         if (item.isSystem && workspaceColor) {
@@ -148,9 +151,23 @@ function TreeItem({
         if (type === 'folder' && item.color) {
             return { background: ensureContrastWithWhite(item.color, 0.3) };
         }
-        // Documents use their own color
-        if (type === 'document' && item.color) {
-            return { background: ensureContrastWithWhite(item.color, 0.3) };
+        // Documents - check for gradient first, then fallback to single color
+        if (type === 'document') {
+            const folderColor = item.folderColor;
+            const docColor = item.color;
+            
+            // Use gradient if both folder and document have colors
+            if (folderColor && docColor) {
+                return { background: createColorGradient(folderColor, docColor, 0.25) };
+            }
+            // Use document color if available
+            else if (docColor) {
+                return { background: ensureContrastWithWhite(docColor, 0.3) };
+            }
+            // Use folder color as fallback
+            else if (folderColor) {
+                return { background: ensureContrastWithWhite(folderColor, 0.3) };
+            }
         }
         return {};
     };
@@ -242,20 +259,35 @@ function TreeItem({
                     </div>
                 )}
                 
-                {/* Delete button */}
-                {onRequestDelete && (
-                    <button 
-                        className="tree-item__delete"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onRequestDelete(item.id, type, item.name);
-                        }}
-                        title={`Delete ${type}`}
-                        aria-label={`Delete ${item.name}`}
-                    >
-                        🗑
-                    </button>
-                )}
+                {/* Action buttons - edit and delete */}
+                <div className="tree-item__actions">
+                    {onRequestEdit && (
+                        <button 
+                            className="tree-item__edit"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRequestEdit(item.id, type, item);
+                            }}
+                            title={`Edit ${type} properties`}
+                            aria-label={`Edit ${item.name} properties`}
+                        >
+                            ⚙️
+                        </button>
+                    )}
+                    {onRequestDelete && (
+                        <button 
+                            className="tree-item__delete"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRequestDelete(item.id, type, item.name);
+                            }}
+                            title={`Delete ${type}`}
+                            aria-label={`Delete ${item.name}`}
+                        >
+                            🗑
+                        </button>
+                    )}
+                </div>
             </div>
             
             {/* Children (folder contents) */}
@@ -270,7 +302,9 @@ function TreeItem({
 function WelcomeState({ onCreateWorkspace, onJoinWorkspace }) {
     return (
         <div className="sidebar-welcome">
-            <div className="sidebar-welcome__icon">🚀</div>
+            <div className="sidebar-welcome__icon">
+                <img src="/assets/nightjar-logo.png" alt="Nightjar" />
+            </div>
             <h3 className="sidebar-welcome__title">Welcome to Nahma</h3>
             <p className="sidebar-welcome__text">
                 Create a workspace to start collaborating on documents securely.
@@ -303,27 +337,9 @@ function EmptyWorkspaceState({ onCreateDocument, onCreateFolder, workspaceName, 
                 <strong>{workspaceName}</strong> is empty
             </p>
             {canCreate ? (
-                <>
-                    <p className="sidebar-empty__hint">
-                        Create your first document or folder to get started
-                    </p>
-                    <div className="sidebar-empty__actions">
-                        <button 
-                            className="sidebar-empty__btn sidebar-empty__btn--primary"
-                            onClick={() => onCreateDocument?.()}
-                            aria-label="Create new document"
-                        >
-                            📄 New Document
-                        </button>
-                        <button 
-                            className="sidebar-empty__btn"
-                            onClick={() => onCreateFolder?.()}
-                            aria-label="Create new folder"
-                        >
-                            📁 New Folder
-                        </button>
-                    </div>
-                </>
+                <p className="sidebar-empty__hint">
+                    Create your first document or folder to get started
+                </p>
             ) : (
                 <p className="sidebar-empty__hint">
                     You have view-only access to this workspace
@@ -388,10 +404,9 @@ const HierarchicalSidebar = ({
     
     // State
     const [expandedFolders, setExpandedFolders] = useState(new Set());
-    const [isCreatingDoc, setIsCreatingDoc] = useState(false);
-    const [newDocName, setNewDocName] = useState('');
-    const [createDocType, setCreateDocType] = useState('text');
+    const [showCreateDocument, setShowCreateDocument] = useState(false);
     const [createInFolderId, setCreateInFolderId] = useState(null);
+    const [createDocumentType, setCreateDocumentType] = useState('text');
     
     // Rename state
     const [renamingItem, setRenamingItem] = useState(null); // { id, type }
@@ -500,6 +515,24 @@ const HierarchicalSidebar = ({
         }
     }, [updateFolder, onUpdateDocument]);
     
+    // Direct edit properties handler (for button, not context menu)
+    const handleRequestEdit = useCallback((id, type, item) => {
+        // Find parent folder for documents to enable gradient preview
+        let parentFolder = null;
+        if (type === 'document' && item.folderId) {
+            parentFolder = folders.find(f => f.id === item.folderId);
+        }
+        
+        setEditPropertiesItem({
+            id,
+            name: item.name,
+            icon: item.icon,
+            color: item.color,
+            type,
+            parentFolder
+        });
+    }, [folders]);
+    
     // Check if we have any workspaces
     const hasWorkspaces = workspaces.length > 0;
     
@@ -543,37 +576,17 @@ const HierarchicalSidebar = ({
     }, []);
     
     // Handle document creation
-    const handleCreateDoc = useCallback(() => {
-        if (!newDocName.trim()) return;
-        
-        if (createDocType === 'kanban' && onCreateKanban) {
-            onCreateKanban(newDocName.trim(), createInFolderId);
-        } else if (createDocType === 'sheet' && onCreateSheet) {
-            onCreateSheet(newDocName.trim(), createInFolderId);
-        } else if (onCreateDocument) {
-            onCreateDocument(newDocName.trim(), createInFolderId);
-        }
-        
-        setNewDocName('');
-        setIsCreatingDoc(false);
-        setCreateDocType('text');
+    const handleCreateDocumentSuccess = useCallback((name, type) => {
+        setShowCreateDocument(false);
         setCreateInFolderId(null);
-    }, [newDocName, createDocType, createInFolderId, onCreateDocument, onCreateSheet, onCreateKanban]);
-    
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') handleCreateDoc();
-        if (e.key === 'Escape') {
-            setIsCreatingDoc(false);
-            setNewDocName('');
-            setCreateDocType('text');
-        }
-    };
+        setCreateDocumentType('text');
+    }, []);
     
     // Start creating document (optionally in a folder)
-    const startCreatingDocument = useCallback((folderId = null) => {
+    const startCreatingDocument = useCallback((folderId = null, docType = 'text') => {
         setCreateInFolderId(folderId);
-        setIsCreatingDoc(true);
-        setCreateDocType('text');
+        setCreateDocumentType(docType);
+        setShowCreateDocument(true);
     }, []);
     
     // Handle item selection
@@ -703,74 +716,38 @@ const HierarchicalSidebar = ({
                     onClick={() => setShowWorkspaceSettings(true)}
                     title="Share Workspace"
                 >
-                    🔗 Share
+                    <span className="action-btn__icon">🔗</span>
+                    <span className="action-btn__label">Share</span>
+                </button>
+                <button 
+                    className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--join"
+                    onClick={handleOpenJoinWorkspace}
+                    title="Join via Link"
+                >
+                    <span className="action-btn__icon">📥</span>
+                    <span className="action-btn__label">Join</span>
                 </button>
                 <IfPermitted action="create" entityType="workspace" entityId={currentWorkspace?.id}>
                     <button 
-                        className="hierarchical-sidebar__action-btn"
+                        className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--doc"
                         onClick={() => startCreatingDocument(null)}
                         title="New Document"
                         aria-label="Create new document"
                     >
-                        📄+
+                        <span className="action-btn__icon">📄+</span>
+                        <span className="action-btn__label">Doc</span>
                     </button>
                     <button 
-                        className="hierarchical-sidebar__action-btn"
+                        className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--folder"
                         onClick={() => setShowCreateFolder(true)}
                         title="New Folder"
                         aria-label="Create new folder"
                     >
-                        📁+
+                        <span className="action-btn__icon">📁+</span>
+                        <span className="action-btn__label">Folder</span>
                     </button>
                 </IfPermitted>
             </div>
-            
-            {/* Document creation inline form */}
-            {isCreatingDoc && (
-                <div className="hierarchical-sidebar__create-form">
-                    <div className="hierarchical-sidebar__type-selector" role="radiogroup" aria-label="Document type">
-                        <button 
-                            className={`type-btn ${createDocType === 'text' ? 'active' : ''}`}
-                            onClick={() => setCreateDocType('text')}
-                            title="Document"
-                            aria-label="Create text document"
-                            aria-pressed={createDocType === 'text'}
-                        >
-                            📄
-                        </button>
-                        <button 
-                            className={`type-btn ${createDocType === 'sheet' ? 'active' : ''}`}
-                            onClick={() => setCreateDocType('sheet')}
-                            title="Spreadsheet"
-                            aria-label="Create spreadsheet"
-                            aria-pressed={createDocType === 'sheet'}
-                        >
-                            📊
-                        </button>
-                        <button 
-                            className={`type-btn ${createDocType === 'kanban' ? 'active' : ''}`}
-                            onClick={() => setCreateDocType('kanban')}
-                            title="Kanban Board"
-                            aria-label="Create kanban board"
-                            aria-pressed={createDocType === 'kanban'}
-                        >
-                            📋
-                        </button>
-                    </div>
-                    <input
-                        type="text"
-                        value={newDocName}
-                        onChange={(e) => setNewDocName(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={createDocType === 'kanban' ? 'Board name...' : createDocType === 'sheet' ? 'Spreadsheet name...' : 'Document name...'}
-                        autoFocus
-                        className="hierarchical-sidebar__create-input"
-                        aria-label="New document name"
-                    />
-                    <button onClick={handleCreateDoc} className="btn-confirm" aria-label="Confirm creation" disabled={!newDocName.trim()}>✓</button>
-                    <button onClick={() => setIsCreatingDoc(false)} className="btn-cancel" aria-label="Cancel creation">✕</button>
-                </div>
-            )}
             
             {/* Tree content - allows dropping docs to root */}
             <div 
@@ -807,6 +784,7 @@ const HierarchicalSidebar = ({
                                     onToggle={toggleFolder}
                                     onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
                                     onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
+                                    onRequestEdit={handleRequestEdit}
                                     isRenaming={isFolderRenaming}
                                     renameValue={isFolderRenaming ? renameValue : ''}
                                     onRenameChange={setRenameValue}
@@ -821,13 +799,14 @@ const HierarchicalSidebar = ({
                                         return (
                                             <TreeItem
                                                 key={doc.id}
-                                                item={doc}
+                                                item={{...doc, folderColor: folder.color}}
                                                 type="document"
                                                 level={1}
                                                 isSelected={doc.id === activeDocId}
                                                 onSelect={handleSelect}
                                                 onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
                                                 onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
+                                                onRequestEdit={handleRequestEdit}
                                                 isRenaming={isDocRenaming}
                                                 renameValue={isDocRenaming ? renameValue : ''}
                                                 onRenameChange={setRenameValue}
@@ -854,6 +833,7 @@ const HierarchicalSidebar = ({
                                     onSelect={handleSelect}
                                     onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
                                     onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
+                                    onRequestEdit={handleRequestEdit}
                                     isRenaming={isDocRenaming}
                                     renameValue={isDocRenaming ? renameValue : ''}
                                     onRenameChange={setRenameValue}
@@ -868,8 +848,9 @@ const HierarchicalSidebar = ({
                 )}
             </div>
             
-            {/* Footer with app settings and collapse */}
+            {/* Footer with mascot, app settings and collapse */}
             <div className="hierarchical-sidebar__footer">
+                <NightjarMascot size="mini" autoRotate={false} fadeTimeout={5000} />
                 <button 
                     className="hierarchical-sidebar__settings-btn"
                     onClick={() => setShowAppSettings(true)}
@@ -973,6 +954,19 @@ const HierarchicalSidebar = ({
                 onClose={() => setEditPropertiesItem(null)}
                 item={editPropertiesItem}
                 onSave={handleSaveProperties}
+                parentFolder={editPropertiesItem?.parentFolder}
+            />
+            
+            {/* Create Document Modal */}
+            <CreateDocument
+                isOpen={showCreateDocument}
+                onClose={() => setShowCreateDocument(false)}
+                parentFolderId={createInFolderId}
+                defaultType={createDocumentType}
+                onSuccess={handleCreateDocumentSuccess}
+                onCreateDocument={onCreateDocument}
+                onCreateSheet={onCreateSheet}
+                onCreateKanban={onCreateKanban}
             />
         </div>
     );

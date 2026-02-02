@@ -1,5 +1,5 @@
 /**
- * Nightjar Unified Server
+ * Nahma Unified Server
  * 
  * A single server that provides:
  * 1. Static file hosting (React app)
@@ -27,6 +27,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { createRequire } from 'module';
+import { MeshParticipant } from './mesh.mjs';
+import { SERVER_MODES } from './mesh-constants.mjs';
 
 // Use createRequire to get the same Yjs instance that y-websocket uses
 // This avoids the "Yjs was already imported" warning which breaks CRDT sync
@@ -42,20 +44,40 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3000;
 const STATIC_PATH = process.env.STATIC_PATH || join(__dirname, '../../frontend/dist');
-const DB_PATH = process.env.DB_PATH || join(__dirname, 'data/Nightjar.db');
+const DB_PATH = process.env.DB_PATH || join(__dirname, 'data/nahma.db');
 const MAX_PEERS_PER_ROOM = parseInt(process.env.MAX_PEERS_PER_ROOM || '100');
 const RATE_LIMIT_WINDOW = 1000;
 const RATE_LIMIT_MAX = 50;
 
+// Server mode: host, relay, or private
+// - host: Full persistence + mesh participation (default)
+// - relay: Signaling only + mesh participation, no persistence
+// - private: Full features, no mesh (for private deployments)
+const SERVER_MODE = process.env.NIGHTJAR_MODE || SERVER_MODES.HOST;
+const PUBLIC_URL = process.env.PUBLIC_URL || null; // e.g., wss://relay1.nightjar.io
+
+// Mesh participation: enabled for host and relay modes, disabled for private
+const MESH_ENABLED = SERVER_MODE !== SERVER_MODES.PRIVATE;
+
 // Persistence toggle: disable to run in pure relay mode
-// Set via Nightjar_DISABLE_PERSISTENCE=1 or --no-persist CLI flag
-const DISABLE_PERSISTENCE = process.env.Nightjar_DISABLE_PERSISTENCE === '1' || 
-                            process.env.Nightjar_DISABLE_PERSISTENCE === 'true' ||
-                            process.argv.includes('--no-persist');
+// Set via NAHMA_DISABLE_PERSISTENCE=1 or --no-persist CLI flag or relay mode
+const DISABLE_PERSISTENCE = process.env.NAHMA_DISABLE_PERSISTENCE === '1' || 
+                            process.env.NAHMA_DISABLE_PERSISTENCE === 'true' ||
+                            process.argv.includes('--no-persist') ||
+                            SERVER_MODE === SERVER_MODES.RELAY;
 
 if (DISABLE_PERSISTENCE) {
   console.log('[Config] Persistence DISABLED - running in pure relay mode');
 }
+
+if (MESH_ENABLED) {
+  console.log(`[Config] Mesh participation ENABLED (mode: ${SERVER_MODE})`);
+} else {
+  console.log('[Config] Mesh participation DISABLED (private mode)');
+}
+
+// Mesh participant instance (initialized after server starts)
+let meshParticipant = null;
 
 // Ensure data directory exists (only if persistence enabled)
 if (!DISABLE_PERSISTENCE) {
@@ -987,7 +1009,40 @@ app.get('/health', (req, res) => {
     status: 'ok',
     rooms: signaling.rooms.size,
     uptime: process.uptime(),
-    persistenceEnabled: !DISABLE_PERSISTENCE
+    persistenceEnabled: !DISABLE_PERSISTENCE,
+    meshEnabled: MESH_ENABLED,
+    serverMode: SERVER_MODE
+  });
+});
+
+// API: Get mesh network status
+app.get('/api/mesh/status', (req, res) => {
+  if (!meshParticipant) {
+    return res.json({ 
+      enabled: false, 
+      reason: MESH_ENABLED ? 'not_started' : 'disabled' 
+    });
+  }
+  
+  res.json({
+    ...meshParticipant.getStatus(),
+    topRelays: meshParticipant.getTopRelays(20)
+  });
+});
+
+// API: Get top relay nodes (for share link embedding)
+app.get('/api/mesh/relays', (req, res) => {
+  if (!meshParticipant) {
+    return res.json({ relays: [] });
+  }
+  
+  const limit = Math.min(parseInt(req.query.limit) || 5, 20);
+  res.json({
+    relays: meshParticipant.getTopRelays(limit).map(r => ({
+      url: r.endpoints[0],
+      persist: r.capabilities?.persist || false,
+      uptime: r.uptime
+    }))
   });
 });
 
@@ -1089,11 +1144,13 @@ app.get('*', (req, res) => {
 });
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   const persistMode = DISABLE_PERSISTENCE ? 'DISABLED (relay only)' : 'ENABLED';
+  const meshMode = MESH_ENABLED ? `ENABLED (${SERVER_MODE})` : 'DISABLED (private)';
+  
   console.log('');
   console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║              Nightjar Unified Server                         ║');
+  console.log('║              Nightjar Unified Server                      ║');
   console.log('╠═══════════════════════════════════════════════════════════╣');
   console.log(`║  HTTP:      http://localhost:${PORT}                         ║`);
   console.log(`║  Y-WS:      ws://localhost:${PORT}/<room>                    ║`);
@@ -1105,6 +1162,7 @@ server.listen(PORT, () => {
   console.log('║  • Persisted:  Server stores encrypted blobs              ║');
   console.log('║                                                           ║');
   console.log(`║  Persistence: ${persistMode.padEnd(35)}    ║`);
+  console.log(`║  Mesh:        ${meshMode.padEnd(35)}    ║`);
   console.log('║                                                           ║');
   console.log('║  Security:                                                ║');
   console.log('║  • Server CANNOT decrypt stored data                      ║');
@@ -1112,11 +1170,56 @@ server.listen(PORT, () => {
   console.log('║  • Workspace keys never leave the browser                 ║');
   console.log('╚═══════════════════════════════════════════════════════════╝');
   console.log('');
+  
+  // Initialize mesh participation if enabled
+  if (MESH_ENABLED) {
+    try {
+      meshParticipant = new MeshParticipant({
+        enabled: true,
+        relayMode: true, // Server always acts as relay for web clients
+        announceWorkspaces: false, // Server doesn't have its own workspaces
+        publicUrl: PUBLIC_URL,
+        persist: !DISABLE_PERSISTENCE,
+        maxPeers: MAX_PEERS_PER_ROOM,
+      });
+      
+      meshParticipant.on('relay-discovered', (relay) => {
+        console.log(`[Mesh] Discovered relay: ${relay.endpoints?.[0] || relay.nodeId?.slice(0, 16)}`);
+      });
+      
+      meshParticipant.on('error', (err) => {
+        console.error('[Mesh] Error:', err);
+      });
+      
+      await meshParticipant.start();
+      console.log('[Server] Mesh network participation started');
+      if (PUBLIC_URL) {
+        console.log(`[Server] Announcing as relay at: ${PUBLIC_URL}`);
+      } else {
+        console.log('[Server] WARNING: No PUBLIC_URL set - not announcing as relay');
+        console.log('[Server] Set PUBLIC_URL=wss://your.domain to join the relay mesh');
+      }
+    } catch (err) {
+      console.error('[Server] Failed to initialize mesh:', err);
+      // Non-fatal - server continues without mesh
+    }
+  }
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('\n[Server] Shutting down...');
+  
+  // Stop mesh participation
+  if (meshParticipant) {
+    try {
+      await meshParticipant.stop();
+      console.log('[Server] Mesh participant stopped');
+    } catch (err) {
+      console.error('[Server] Error stopping mesh:', err);
+    }
+  }
+  
   wssSignaling.clients.forEach(ws => ws.close());
   wssYjs.clients.forEach(ws => ws.close());
   server.close(() => {

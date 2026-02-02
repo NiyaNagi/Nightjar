@@ -14,6 +14,7 @@
   <a href="#download">Download</a> •
   <a href="#security">Security</a> •
   <a href="#architecture">Architecture</a> •
+  <a href="#global-relay-mesh-network">Relay Mesh</a> •
   <a href="#development">Development</a>
 </p>
 
@@ -357,6 +358,140 @@ User types "Hello" in document
 │  Encrypted storage  │    │  To all peers       │
 └─────────────────────┘    └─────────────────────┘
 ```
+
+---
+
+## Global Relay Mesh Network
+
+Nightjar includes a **distributed relay mesh network** that enables high-availability peer discovery without centralized infrastructure. Anyone can run a relay server, and all relays automatically discover each other to form a resilient, globally distributed network—similar to how BitTorrent's DHT works.
+
+### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    NIGHTJAR RELAY MESH                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│    ┌─────────┐       Hyperswarm DHT        ┌─────────┐              │
+│    │ Relay A │◄────────────────────────────►│ Relay B │              │
+│    │ (host)  │                              │ (relay) │              │
+│    └────┬────┘                              └────┬────┘              │
+│         │      Mesh Coordination Topic           │                   │
+│         │◄──────────────────────────────────────►│                   │
+│         │                                        │                   │
+│    ┌────┴────┐                              ┌────┴────┐              │
+│    │ Desktop │ ─ ─ ─ Workspace Topic ─ ─ ─ ─│ Desktop │              │
+│    │ Client  │       (hashed ID)            │ Client  │              │
+│    └─────────┘                              └─────────┘              │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Privacy by Design: What Peers Share
+
+**No personally identifiable information (PII) is ever transmitted through the mesh.** The only data shared between peers is:
+
+| Data Shared | Purpose | Privacy |
+|-------------|---------|---------|
+| **Hashed Workspace Topic** | SHA256(`nightjar-workspace:` + workspaceId) | Cannot reverse to get workspace ID |
+| **Connection Info** | IP:port or WebSocket URL for relay nodes | Required for network connectivity |
+| **Node ID** | Random 32-byte identifier | Not linked to user identity |
+| **Capabilities** | Whether node persists data, max peers | Helps clients choose relays |
+
+**What is NOT shared:**
+- ❌ Usernames or display names
+- ❌ Email addresses or accounts
+- ❌ Document content (always encrypted)
+- ❌ Workspace names or metadata
+- ❌ Recovery phrases or private keys
+- ❌ Original workspace IDs (only hashed topics)
+
+### Server Deployment Modes
+
+Nightjar servers can run in three modes, configurable via the `NIGHTJAR_MODE` environment variable:
+
+| Mode | Mesh Participation | Data Persistence | Use Case |
+|------|-------------------|------------------|----------|
+| **`host`** | ✅ Public mesh | ✅ Encrypted storage | Main server - stores encrypted workspace data |
+| **`relay`** | ✅ Public mesh | ❌ None | Lightweight relay - routes connections only |
+| **`private`** | ❌ Isolated | ✅ Encrypted storage | Private deployment - no public discovery |
+
+#### Host Mode (Default)
+```bash
+# Full server with persistence and mesh participation
+NIGHTJAR_MODE=host PUBLIC_URL=wss://your-server.com node index.js
+```
+- Participates in the global relay mesh
+- Stores encrypted workspace data for offline sync
+- Announces itself as a relay for other clients
+- Best for: Primary workspace servers
+
+#### Relay Mode
+```bash
+# Lightweight relay, no storage
+NIGHTJAR_MODE=relay PUBLIC_URL=wss://relay.your-server.com node index.js
+```
+- Joins the mesh to help route connections
+- Does not store any user data
+- Low resource usage
+- Best for: Community-contributed relay nodes
+
+#### Private Mode
+```bash
+# Isolated server, no mesh
+NIGHTJAR_MODE=private node index.js
+```
+- Full persistence and sync features
+- Does **not** join the public mesh
+- Not discoverable by other peers
+- Best for: Enterprise/private deployments, air-gapped networks
+
+### Desktop Client Mesh Participation
+
+Desktop clients (Electron) participate in the mesh by default to improve peer discovery:
+
+- **Automatic workspace announcement** — When you open a workspace, your client joins that workspace's DHT topic
+- **Relay discovery** — Clients learn about available relays through the mesh
+- **No relay traffic** — Desktop clients don't relay traffic for others (they're not servers)
+- **Opt-out available** — Set `NIGHTJAR_MESH=false` to disable mesh participation
+
+### Share Links with Embedded Relays
+
+When you create a share link, Nightjar can embed known relay nodes to help recipients find peers:
+
+```
+nightjar://w/abc123#p:password&perm:e&nodes:wss%3A%2F%2Frelay1.nightjar.io,wss%3A%2F%2Frelay2.nightjar.io
+```
+
+This allows new users to bootstrap into the mesh even if they haven't discovered any relays yet.
+
+### Running Your Own Relay
+
+Deploy a relay server with Docker:
+
+```bash
+# Using Docker Compose
+PUBLIC_URL=wss://your-domain.com docker-compose --profile relay up -d
+
+# Or with Docker directly
+docker run -d \
+  -e NIGHTJAR_MODE=relay \
+  -e PUBLIC_URL=wss://your-domain.com \
+  -p 3000:3000 \
+  nightjar/server
+```
+
+See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for full deployment options.
+
+### Security Properties
+
+| Property | Mechanism |
+|----------|-----------|
+| **Topic Privacy** | Workspace IDs hashed with SHA256 before DHT announcement |
+| **Anti-Spoofing** | BitTorrent-style IP-bound tokens prevent fake relay announcements |
+| **No Enumeration** | Cannot list workspaces or users from the mesh |
+| **Relay Isolation** | Private mode servers are completely isolated from public mesh |
+| **End-to-End Encryption** | All document content encrypted before relay transit |
 
 ---
 

@@ -1,18 +1,20 @@
 {
   "name": "nightjar-server",
   "version": "1.0.0",
-  "description": "Unified Nightjar server - signaling, persistence, and static hosting",
+  "description": "Unified Nightjar server - signaling, persistence, mesh relay, and static hosting",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "start:relay": "node index.js --no-persist",
+    "start:relay": "NIGHTJAR_MODE=relay node index.js",
+    "start:private": "NIGHTJAR_MODE=private node index.js",
     "dev": "node --watch index.js",
-    "dev:relay": "node --watch index.js --no-persist"
+    "dev:relay": "NIGHTJAR_MODE=relay node --watch index.js"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",
     "express": "^4.18.2",
+    "hyperswarm": "^4.7.15",
     "nanoid": "^5.0.4",
     "ws": "^8.16.0",
     "yjs": "^13.6.10",

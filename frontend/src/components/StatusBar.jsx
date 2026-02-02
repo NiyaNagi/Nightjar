@@ -7,6 +7,7 @@ const StatusBar = ({
     p2pStatus, 
     inviteLink, 
     torEnabled,
+    meshStatus,
     onToggleTor,
     onOpenTorSettings,
     onCopyInvite,
@@ -138,6 +139,22 @@ const StatusBar = ({
                     </div>
                 )}
                 
+                {/* Mesh network status indicator - Electron only */}
+                {isElectron && meshStatus && (
+                    <div 
+                        className={`mesh-status ${meshStatus.running ? 'active' : 'inactive'}`}
+                        title={meshStatus.running 
+                            ? `Mesh: ${meshStatus.connectedPeers || 0} peers, ${meshStatus.knownRelays || 0} relays` 
+                            : 'Mesh network disabled'
+                        }
+                    >
+                        <span className="mesh-icon">🌐</span>
+                        <span className="mesh-label">
+                            {meshStatus.running ? `${meshStatus.knownRelays || 0}` : 'OFF'}
+                        </span>
+                    </div>
+                )}
+                
                 {/* Relay settings button - Electron only */}
                 {isElectron && isFeatureAvailable('relay') && onOpenRelaySettings && (
                     <button 
@@ -145,7 +162,7 @@ const StatusBar = ({
                         onClick={onOpenRelaySettings}
                         title="Configure relay settings"
                     >
-                        <span className="relay-icon">🌐</span>
+                        <span className="relay-icon">📡</span>
                         <span className="relay-label">Relay</span>
                     </button>
                 )}

@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import IconColorPicker from './IconColorPicker';
+import { ensureContrastWithWhite, createColorGradient } from '../../utils/colorUtils';
 import './EditPropertiesModal.css';
 
 export default function EditPropertiesModal({
@@ -13,6 +14,7 @@ export default function EditPropertiesModal({
     onClose,
     item, // { id, name, icon, color, type: 'folder' | 'document' }
     onSave,
+    parentFolder = null, // For gradient previews when editing documents
 }) {
     const [icon, setIcon] = useState(item?.icon || (item?.type === 'folder' ? '📁' : '📄'));
     const [color, setColor] = useState(item?.color || '#6366f1');
@@ -58,35 +60,88 @@ export default function EditPropertiesModal({
                 </div>
                 
                 <div className="edit-properties-modal__body">
-                    <div className="edit-properties-modal__field">
-                        <label className="edit-properties-modal__label">Name</label>
-                        <div className="edit-properties-modal__name">
-                            {item.name}
+                    <div className="edit-properties-modal__content">
+                        <div className="edit-properties-modal__field">
+                            <label className="edit-properties-modal__label">Name</label>
+                            <div className="edit-properties-modal__name">
+                                {item.name}
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div className="edit-properties-modal__field">
-                        <label className="edit-properties-modal__label">Icon & Color</label>
-                        <div className="edit-properties-modal__picker">
-                            <IconColorPicker
-                                icon={icon}
-                                color={color}
-                                onIconChange={setIcon}
-                                onColorChange={setColor}
-                                size="large"
-                                showColorPreview={true}
-                            />
+                        
+                        <div className="edit-properties-modal__field">
+                            <label className="edit-properties-modal__label">Appearance</label>
+                            <div className="edit-properties-modal__picker-compact">
+                                <IconColorPicker
+                                    icon={icon}
+                                    color={color}
+                                    onIconChange={setIcon}
+                                    onColorChange={setColor}
+                                    size="medium"
+                                    showColorPreview={false}
+                                    compact={true}
+                                />
+                            </div>
                         </div>
                     </div>
                     
                     <div className="edit-properties-modal__preview">
-                        <div 
-                            className="edit-properties-modal__preview-item"
-                            style={{ backgroundColor: `${color}20`, borderColor: color }}
-                        >
-                            <span className="edit-properties-modal__preview-icon">{icon}</span>
-                            <span className="edit-properties-modal__preview-name">{item.name}</span>
+                        <div className="edit-properties-modal__preview-header">
+                            <h4 className="edit-properties-modal__preview-title">Preview</h4>
                         </div>
+                        
+                        {/* Sidebar Preview */}
+                        <div className="edit-properties-modal__preview-section">
+                            <label className="edit-properties-modal__preview-label">In Sidebar:</label>
+                            <div className="edit-properties-modal__sidebar-preview">
+                                {item.type === 'document' && parentFolder && (
+                                    <div className="preview-folder-context">
+                                        <div className="preview-tree-item preview-tree-item--folder">
+                                            <span className="preview-tree-toggle">▶</span>
+                                            <span className="preview-tree-icon">{parentFolder.icon || '📁'}</span>
+                                            <span className="preview-tree-name">{parentFolder.name}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div 
+                                    className={`preview-tree-item preview-tree-item--${item.type} ${item.type === 'document' && parentFolder ? 'preview-tree-item--nested' : ''}`}
+                                    style={{
+                                        background: item.type === 'document' && parentFolder?.color && color
+                                            ? createColorGradient(parentFolder.color, color, 0.25)
+                                            : color ? ensureContrastWithWhite(color, 0.3) : undefined,
+                                        paddingLeft: item.type === 'document' && parentFolder ? '32px' : '12px'
+                                    }}
+                                >
+                                    {item.type === 'document' && <span className="preview-tree-spacer"></span>}
+                                    <span className="preview-tree-icon">{icon}</span>
+                                    <span className="preview-tree-name">{item.name}</span>
+                                    <div className="preview-tree-actions">
+                                        <button className="preview-tree-edit" title="Edit properties">⚙️</button>
+                                        <button className="preview-tree-delete" title="Delete">🗑</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Tab Preview */}
+                        {item.type === 'document' && (
+                            <div className="edit-properties-modal__preview-section">
+                                <label className="edit-properties-modal__preview-label">As Tab:</label>
+                                <div className="edit-properties-modal__tab-preview">
+                                    <div 
+                                        className="preview-tab preview-tab--active"
+                                        style={{
+                                            background: parentFolder?.color && color
+                                                ? createColorGradient(parentFolder.color, color, 0.25)
+                                                : color ? ensureContrastWithWhite(color, 0.3) : undefined
+                                        }}
+                                    >
+                                        <span className="preview-tab-name">{item.name}</span>
+                                        <span className="preview-tab-unsaved">●</span>
+                                        <button className="preview-tab-close" title="Close tab">✕</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
                 

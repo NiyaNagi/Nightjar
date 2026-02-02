@@ -1,0 +1,250 @@
+/**
+ * NightjarMascot Styles
+ * 
+ * Uses actual nightjar-logo.png image with speech bubbles
+ */
+
+/* ========== Base Container ========== */
+.nightjar-mascot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Remove all focus outlines */
+.nightjar-mascot:focus,
+.nightjar-mascot:focus-visible {
+    outline: none;
+}
+
+/* ========== Large Mode ========== */
+.nightjar-mascot--large {
+    width: 100%;
+    max-width: 500px;
+}
+
+.nightjar-mascot--large .nightjar-mascot__bird {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+}
+
+/* Large mode: bubble ABOVE bird, arrow pointing DOWN */
+.nightjar-mascot--large .nightjar-mascot__bubble {
+    position: relative;
+    max-width: 320px;
+    min-width: 200px;
+    padding: 16px 24px;
+    margin-bottom: 16px;
+    order: -1; /* Put bubble before bird in flex order */
+}
+
+/* Arrow pointing down (at bottom of bubble) */
+.nightjar-mascot--large .nightjar-mascot__bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 14px solid var(--text-primary, #e4e4e7);
+}
+
+.nightjar-mascot--large .nightjar-mascot__bubble::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 12px solid var(--bg-secondary, #252538);
+    z-index: 1;
+    margin-top: -2px;
+}
+
+/* ========== Mini Mode (32x32) ========== */
+.nightjar-mascot--mini {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.nightjar-mascot--mini .nightjar-mascot__bird {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+/* Mini mode: bubble appears above and to the right, fixed position */
+.nightjar-mascot--mini .nightjar-mascot__bubble {
+    position: fixed;
+    bottom: 60px;
+    left: 16px;
+    max-width: 240px;
+    min-width: 160px;
+    padding: 10px 14px;
+    white-space: normal;
+    z-index: 1000;
+}
+
+/* Arrow pointing down-left toward bird */
+.nightjar-mascot--mini .nightjar-mascot__bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 12px solid var(--text-primary, #e4e4e7);
+}
+
+.nightjar-mascot--mini .nightjar-mascot__bubble::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 22px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 10px solid var(--bg-secondary, #252538);
+    z-index: 1;
+    margin-top: -2px;
+}
+
+/* ========== Speech Bubble ========== */
+.nightjar-mascot__bubble {
+    background: var(--bg-secondary, #252538);
+    border: 2px solid var(--text-primary, #e4e4e7);
+    border-radius: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+    animation: bubbleAppear 0.2s ease-out;
+}
+
+.nightjar-mascot__bubble:hover {
+    background: var(--hover-bg, #2d2d44);
+}
+
+.nightjar-mascot__bubble--fading {
+    opacity: 0;
+    pointer-events: none;
+}
+
+@keyframes bubbleAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Saying text */
+.nightjar-mascot__saying {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--text-primary, #e4e4e7);
+    line-height: 1.4;
+    display: block;
+}
+
+.nightjar-mascot--large .nightjar-mascot__saying {
+    font-size: 1.1rem;
+}
+
+.nightjar-mascot--mini .nightjar-mascot__saying {
+    font-size: 0.85rem;
+}
+
+/* ========== Bird Image ========== */
+.nightjar-mascot__bird {
+    transition: transform 0.15s ease;
+}
+
+.nightjar-mascot:hover .nightjar-mascot__bird {
+    transform: scale(1.02);
+}
+
+/* ========== Paused State ========== */
+.nightjar-mascot--paused .nightjar-mascot__bird {
+    opacity: 0.7;
+}
+
+.nightjar-mascot__paused-indicator {
+    position: absolute;
+    bottom: -28px;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #9ca3af);
+    background: var(--bg-secondary, #252538);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #2d2d44);
+}
+
+/* ========== Light Mode Overrides ========== */
+@media (prefers-color-scheme: light) {
+    .nightjar-mascot__bubble {
+        background: #ffffff;
+        border-color: #1f2937;
+    }
+    
+    .nightjar-mascot__bubble::after {
+        border-top-color: #1f2937 !important;
+    }
+    
+    .nightjar-mascot__bubble::before {
+        border-top-color: #ffffff !important;
+    }
+    
+    .nightjar-mascot__saying {
+        color: #1f2937;
+    }
+}
+
+[data-theme="light"] .nightjar-mascot__bubble {
+    background: #ffffff;
+    border-color: #1f2937;
+}
+
+[data-theme="light"] .nightjar-mascot__bubble:hover {
+    background: #f3f4f6;
+}
+
+[data-theme="light"] .nightjar-mascot__bubble::after {
+    border-top-color: #1f2937 !important;
+}
+
+[data-theme="light"] .nightjar-mascot__bubble::before {
+    border-top-color: #ffffff !important;
+}
+
+[data-theme="light"] .nightjar-mascot__saying {
+    color: #1f2937;
+}
+
+/* ========== Accessibility ========== */
+@media (prefers-reduced-motion: reduce) {
+    .nightjar-mascot,
+    .nightjar-mascot__bird,
+    .nightjar-mascot__bubble {
+        animation: none !important;
+        transition: none !important;
+    }
+}

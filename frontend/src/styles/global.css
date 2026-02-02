@@ -218,8 +218,15 @@ body {
 }
 
 .empty-editor-state .welcome-icon {
-    font-size: 4rem;
+    width: 100px;
+    height: 100px;
     margin-bottom: 8px;
+}
+
+.empty-editor-state .welcome-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .empty-editor-state .hint {

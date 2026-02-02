@@ -1,26 +1,131 @@
+# Nightjar Server Docker Compose Configuration
+# 
+# This file provides configurations for deploying Nightjar servers
+# in different modes. Use profiles to select deployment type.
+#
+# Reference: docs/RELAY_MESH_ARCHITECTURE.md
+
 version: '3.8'
 
 services:
-  Nightjar:
+  # ==========================================================================
+  # HOST MODE (Default)
+  # Full persistence + mesh participation
+  # Use this for your main server that stores encrypted workspace data
+  # ==========================================================================
+  nightjar:
     build:
       context: ../..
       dockerfile: server/unified/Dockerfile
-    container_name: Nightjar
+    container_name: nightjar
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
       # Persist encrypted workspace data
-      - Nightjar-data:/app/server/unified/data
+      - nightjar-data:/app/server/unified/data
     environment:
       - PORT=3000
       - NODE_ENV=production
+      - NIGHTJAR_MODE=host
+      # Set PUBLIC_URL to enable mesh relay announcements
+      # Example: wss://your-domain.com
+      - PUBLIC_URL=${PUBLIC_URL:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    profiles:
+      - host
+      - default
+
+  # ==========================================================================
+  # RELAY MODE
+  # Signaling only + mesh participation, no persistence
+  # Use this for lightweight relay nodes that just route connections
+  # ==========================================================================
+  nightjar-relay:
+    build:
+      context: ../..
+      dockerfile: server/unified/Dockerfile
+    container_name: nightjar-relay
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - NIGHTJAR_MODE=relay
+      # PUBLIC_URL is required for relay mode to be discoverable
+      - PUBLIC_URL=${PUBLIC_URL:-}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Host network recommended for better P2P connectivity
+    # network_mode: host
+    profiles:
+      - relay
+
+  # ==========================================================================
+  # PRIVATE MODE  
+  # Full features, no mesh participation
+  # Use this for private/internal deployments that shouldn't join public mesh
+  # ==========================================================================
+  nightjar-private:
+    build:
+      context: ../..
+      dockerfile: server/unified/Dockerfile
+    container_name: nightjar-private
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - nightjar-private-data:/app/server/unified/data
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - NIGHTJAR_MODE=private
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - private
 
 volumes:
-  Nightjar-data:
+  nightjar-data:
     driver: local
+  nightjar-private-data:
+    driver: local
+
+# ==========================================================================
+# USAGE EXAMPLES
+# ==========================================================================
+#
+# Deploy a host server (persistence + mesh):
+#   PUBLIC_URL=wss://your-domain.com docker-compose --profile host up -d
+#
+# Deploy a relay server (mesh only, no storage):
+#   PUBLIC_URL=wss://relay.your-domain.com docker-compose --profile relay up -d
+#
+# Deploy a private server (full features, isolated):
+#   docker-compose --profile private up -d
+#
+# Default deployment (host mode):
+#   docker-compose up -d
+#
+# ==========================================================================
+# PRODUCTION CHECKLIST
+# ==========================================================================
+#
+# 1. Set PUBLIC_URL to your server's WebSocket URL (wss://...)
+# 2. Configure SSL/TLS termination (nginx, Caddy, or cloud load balancer)
+# 3. Consider using host network mode for better P2P connectivity
+# 4. Mount persistent volume for host/private modes
+# 5. Set up proper logging and monitoring
+#
+# For SSL termination with nginx, see: server/nginx/nginx.conf

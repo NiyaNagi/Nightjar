@@ -68,13 +68,21 @@
   top: 100%;
   left: 0;
   margin-top: 8px;
-  width: 240px;
+  width: 300px;
   background: var(--bg-primary, #ffffff);
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   overflow: hidden;
+}
+
+.icon-color-picker--compact .icon-color-picker__panel {
+  position: static;
+  width: 100%;
+  margin-top: 0;
+  box-shadow: none;
+  border: 1px solid var(--border-color, #e5e7eb);
 }
 
 /* Tabs */
@@ -116,8 +124,14 @@
 /* Content */
 .icon-color-picker__content {
   padding: 12px;
-  max-height: 200px;
+  min-height: 140px;
+  max-height: 180px;
   overflow-y: auto;
+}
+
+.icon-color-picker--compact .icon-color-picker__content {
+  min-height: 120px;
+  max-height: 140px;
 }
 
 /* Icon grid */

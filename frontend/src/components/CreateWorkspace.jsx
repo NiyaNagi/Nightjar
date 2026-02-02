@@ -5,14 +5,15 @@
  * Also handles joining via share link.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { 
   parseShareLink, 
   parseShareLinkAsync,
   parseInviteLink, 
   isInviteLink,
-  isCompressedLink 
+  isCompressedLink,
+  validateSignedInvite
 } from '../utils/sharing';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import './CreateWorkspace.css';
@@ -61,11 +62,51 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [parsedLink, setParsedLink] = useState(null);
+  const [linkValidation, setLinkValidation] = useState(null); // Signature verification result
   const [connectionProgress, setConnectionProgress] = useState(null); // { current, total, status }
+  
+  // Check for pending share link from URL redirect on mount
+  useEffect(() => {
+    const pendingLink = sessionStorage.getItem('pendingShareLink');
+    if (pendingLink && mode === 'join') {
+      sessionStorage.removeItem('pendingShareLink');
+      handleLinkChange(pendingLink);
+    }
+  }, [mode]);
+  
+  // Helper to look up owner handle - placeholder for future implementation
+  // TODO: Could integrate with a contacts/known users store
+  const getOwnerHandle = (publicKey) => {
+    // For now, we don't have a global contacts store
+    // In the future, this could look up known collaborators
+    return null;
+  };
+  
+  // Helper to format expiry time
+  const formatExpiry = (expiryTimestamp) => {
+    if (!expiryTimestamp) return null;
+    const now = Date.now();
+    const diff = expiryTimestamp - now;
+    if (diff <= 0) return 'Expired';
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `in ${days} day${days > 1 ? 's' : ''}`;
+    if (hours > 0) return `in ${hours} hour${hours > 1 ? 's' : ''}`;
+    const minutes = Math.floor(diff / (1000 * 60));
+    return `in ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  };
+  
+  // Helper to truncate public key for display
+  const truncateKey = (key) => {
+    if (!key) return null;
+    if (key.length <= 12) return key;
+    return `${key.slice(0, 6)}...${key.slice(-6)}`;
+  };
   
   // Parse share link as user types
   const handleLinkChange = async (value) => {
     setShareLink(value);
+    setLinkValidation(null);
     setJoinError('');
     setConnectionProgress(null);
     
@@ -142,8 +183,12 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       if (parsed.embeddedPassword) {
         setJoinPassword(parsed.embeddedPassword);
       }
+      // Validate signature for signed links
+      const validation = validateSignedInvite(value);
+      setLinkValidation(validation);
     } catch (err) {
       setParsedLink(null);
+      setLinkValidation(null);
     }
   };
   
@@ -471,34 +516,81 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
                   rows={3}
                   autoFocus
                 />
-                {parsedLink && (
-                  <div className="create-workspace__link-info">
-                    <span className="create-workspace__link-type">
-                      {parsedLink.entityType === 'workspace' ? '📁 Workspace' : 
-                       parsedLink.entityType === 'folder' ? '📂 Folder' : '📄 Document'}
+              </div>
+              
+              {/* Rich consent card for share link */}
+              {parsedLink && (
+                <div className="share-link-consent">
+                  <div className="share-link-consent__header">
+                    <span className="share-link-consent__icon">
+                      {parsedLink.entityType === 'workspace' ? '📁' : 
+                       parsedLink.entityType === 'folder' ? '📂' : '📄'}
                     </span>
-                    {parsedLink.permission && (
-                      <span className="create-workspace__link-perm">
-                        {parsedLink.permission} access
+                    <span className="share-link-consent__title">
+                      {parsedLink.entityType === 'workspace' ? 'Workspace Invitation' : 
+                       parsedLink.entityType === 'folder' ? 'Folder Invitation' : 'Document Invitation'}
+                    </span>
+                  </div>
+                  
+                  <div className="share-link-consent__details">
+                    <div className="share-link-consent__row">
+                      <span className="share-link-consent__label">Permission:</span>
+                      <span className={`share-link-consent__value permission-badge permission-${parsedLink.permission || 'editor'}`}>
+                        {parsedLink.permission === 'owner' ? '👑 Owner' :
+                         parsedLink.permission === 'editor' ? '✏️ Editor' : '👁️ Viewer'}
                       </span>
+                    </div>
+                    
+                    {linkValidation?.ownerPublicKey && (
+                      <div className="share-link-consent__row">
+                        <span className="share-link-consent__label">Shared by:</span>
+                        <span className="share-link-consent__value">
+                          {getOwnerHandle(linkValidation.ownerPublicKey) || truncateKey(linkValidation.ownerPublicKey)}
+                          {getOwnerHandle(linkValidation.ownerPublicKey) && (
+                            <span className="share-link-consent__subtext"> ({truncateKey(linkValidation.ownerPublicKey)})</span>
+                          )}
+                        </span>
+                      </div>
                     )}
-                    {parsedLink.embeddedPassword && (
-                      <span className="create-workspace__link-pass">🔑 Password included</span>
+                    
+                    {linkValidation?.expiry && (
+                      <div className="share-link-consent__row">
+                        <span className="share-link-consent__label">Expires:</span>
+                        <span className="share-link-consent__value">
+                          {formatExpiry(linkValidation.expiry)}
+                        </span>
+                      </div>
                     )}
-                    {parsedLink.encryptionKey && !parsedLink.embeddedPassword && (
-                      <span className="create-workspace__link-pass">🔐 Key included</span>
-                    )}
-                    {parsedLink.isNewStyle && !parsedLink.requiresPassword && (
-                      <span className="create-workspace__link-pass">✓ No password required</span>
-                    )}
-                    {parsedLink.isP2P && parsedLink.hasBootstrapPeers && (
-                      <span className="create-workspace__link-p2p">
-                        🌐 P2P ({parsedLink.bootstrapPeers.length} peer{parsedLink.bootstrapPeers.length !== 1 ? 's' : ''})
-                      </span>
+                    
+                    {parsedLink.isP2P && (
+                      <div className="share-link-consent__row">
+                        <span className="share-link-consent__label">Connection:</span>
+                        <span className="share-link-consent__value">
+                          🌐 Peer-to-peer
+                          {parsedLink.hasBootstrapPeers && ` (${parsedLink.bootstrapPeers?.length || 0} peer${(parsedLink.bootstrapPeers?.length || 0) !== 1 ? 's' : ''})`}
+                        </span>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                  
+                  <div className="share-link-consent__verification">
+                    {linkValidation?.valid && !linkValidation?.legacy ? (
+                      <span className="share-link-consent__verified">✅ Link signature verified</span>
+                    ) : linkValidation?.legacy ? (
+                      <span className="share-link-consent__legacy">⚠️ Legacy link (no signature)</span>
+                    ) : linkValidation?.error ? (
+                      <span className="share-link-consent__invalid">❌ {linkValidation.error}</span>
+                    ) : null}
+                  </div>
+                  
+                  <div className="share-link-consent__note">
+                    <p>📋 Workspace name is encrypted and will be visible after joining.</p>
+                    {!linkValidation?.ownerPublicKey && (
+                      <p>⚠️ If you didn't expect this invitation, click Cancel.</p>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {/* Connection progress for P2P links */}
               {connectionProgress && (

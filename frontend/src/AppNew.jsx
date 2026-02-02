@@ -19,8 +19,10 @@ import SplitPane from './components/SplitPane';
 import UserProfile, { loadUserProfile } from './components/UserProfile';
 import ChangelogPanel from './components/Changelog';
 import CreateWorkspace from './components/CreateWorkspace';
+import CreateDocumentDialog from './components/CreateDocument';
 import KickedModal from './components/KickedModal';
 import OnboardingFlow from './components/Onboarding/OnboardingFlow';
+import NightjarMascot from './components/NightjarMascot';
 import { useAuthorAttribution } from './hooks/useAuthorAttribution';
 import { useChangelogObserver } from './hooks/useChangelogObserver';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
@@ -31,6 +33,8 @@ import { useIdentity } from './contexts/IdentityContext';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron } from './hooks/useEnvironment';
 import { getYjsWebSocketUrl } from './utils/websocket';
+import { parseShareLink, clearUrlFragment } from './utils/sharing';
+import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
 
 import './styles/global.css';
 import './styles/editor.css';
@@ -42,6 +46,7 @@ import './components/UserProfile.css';
 import './components/SplitPane.css';
 import './components/Changelog.css';
 import './components/Comments.css';
+import './components/NightjarMascot.css';
 
 // Get WebSocket URL using centralized utility
 const getWsUrl = getYjsWebSocketUrl;
@@ -49,15 +54,43 @@ const getWsUrl = getYjsWebSocketUrl;
 // --- Helper Functions ---
 function getKeyFromUrl() {
     const fragment = window.location.hash.slice(1);
-    if (fragment) {
-        try {
-            return uint8ArrayFromString(fragment, 'base64url');
-        } catch (e) {
-            console.error('Failed to parse key from URL fragment.', e);
-            return null;
-        }
+    if (!fragment) return null;
+    
+    // SECURITY FIX: Check if this is actually a share link before treating as session key
+    if (isShareLinkFragment(fragment)) {
+        console.log('[Security] URL fragment contains share link, not treating as session key');
+        return null; // Don't use share links as session keys
     }
-    return null;
+    
+    try {
+        return uint8ArrayFromString(fragment, 'base64url');
+    } catch (e) {
+        console.error('Failed to parse key from URL fragment.', e);
+        return null;
+    }
+}
+
+function isShareLinkFragment(fragment) {
+    // Check if fragment looks like a workspace share link
+    // Must be specific to avoid false positives
+    
+    if (!fragment || fragment.length < 20) {
+        return false; // Too short to be a workspace identifier
+    }
+    
+    // Check for known share link patterns:
+    // 1. Contains known fragment parameters like k:, perm:, topic:, sig:, exp:
+    if (/[&]?(k|perm|topic|sig|exp|by|hpeer|srv|addr):/.test(fragment)) {
+        return true;
+    }
+    
+    // 2. Starts with base64-like workspace ID followed by fragment params
+    // e.g., "O4YtGGtX-5Q5ZZIFUgLDoK4tnhQV2W0zjMjy_6oQq4w"
+    if (/^[A-Za-z0-9_-]{20,}(&|$)/.test(fragment) && fragment.includes('&')) {
+        return true;
+    }
+    
+    return false;
 }
 
 function generateDocId() {
@@ -122,7 +155,8 @@ function App() {
         leaveWorkspace,
         joinWorkspace,
         hasWorkspaces,
-        loading: workspacesLoading
+        loading: workspacesLoading,
+        setCurrentWorkspaceId
     } = useWorkspaces();
     
     const {
@@ -142,6 +176,7 @@ function App() {
     const [p2pStatus, setP2pStatus] = useState('offline');
     const [inviteLink, setInviteLink] = useState('');
     const [torEnabled, setTorEnabled] = useState(false);
+    const [meshStatus, setMeshStatus] = useState(null);
     
     // User profile with persistence
     const [userProfile, setUserProfile] = useState(loadUserProfile);
@@ -217,6 +252,8 @@ function App() {
     const [pendingComment, setPendingComment] = useState(null); // Selection to add comment to
     const [showRelaySettings, setShowRelaySettings] = useState(false); // Relay settings modal
     const [showTorSettings, setShowTorSettings] = useState(false); // Tor settings modal
+    const [showCreateDocumentDialog, setShowCreateDocumentDialog] = useState(false); // Create document modal
+    const [createDocumentType, setCreateDocumentType] = useState('text'); // Pre-selected document type
 
     // --- Refs ---
     const metaSocketRef = useRef(null);
@@ -439,12 +476,19 @@ function App() {
                         if (data.type === 'status') {
                             setP2pStatus(data.status);
                             setTorEnabled(data.torEnabled || false);
+                            // Store mesh network status
+                            if (data.mesh) {
+                                setMeshStatus(data.mesh);
+                            }
                             if (data.multiaddr) {
                                 const keyString = uint8ArrayToString(key, 'base64url');
                                 setInviteLink(`${data.multiaddr}#${keyString}`);
                             } else {
                                 setInviteLink('');
                             }
+                        } else if (data.type === 'mesh-status') {
+                            // Detailed mesh status response
+                            setMeshStatus(data);
                         } else if (data.type === 'tor-toggled') {
                             setTorEnabled(data.enabled);
                             setP2pStatus(data.status);
@@ -512,6 +556,37 @@ function App() {
             }
         };
     }, []);
+
+    // --- Share Link Handling ---
+    // Handle workspace share links in URL by redirecting to join dialog with rich consent UI
+    useEffect(() => {
+        // Clear any stale pending share link from previous session first
+        // Only process if there's actually a fragment in the current URL
+        const fragment = window.location.hash.slice(1);
+        if (!fragment) {
+            sessionStorage.removeItem('pendingShareLink');
+            return;
+        }
+        
+        // Check if this looks like a workspace identifier/share link
+        if (isShareLinkFragment(fragment)) {
+            console.log('[ShareLink] Detected share link in URL fragment');
+            
+            // Store the full share link to be picked up by the CreateWorkspaceDialog
+            // The dialog will parse and display rich metadata for user consent
+            const fullLink = window.location.origin + window.location.pathname + '#' + fragment;
+            sessionStorage.setItem('pendingShareLink', fullLink);
+            
+            // Clear the URL fragment immediately for security
+            clearUrlFragment(true);
+            
+            // Open the join workspace dialog
+            setCreateWorkspaceMode('join');
+            setShowCreateWorkspaceDialog(true);
+            
+            showToast('Share link detected - please review the invitation details', 'info');
+        }
+    }, [showToast]);
 
     // --- Document Management ---
     const createDocument = useCallback((name, folderId = null, docType = DOC_TYPES.TEXT, icon = null, color = null) => {
@@ -1022,7 +1097,9 @@ function App() {
                         </div>
                     ) : !hasWorkspaces ? (
                         <div className="empty-editor-state onboarding-welcome">
-                        <div className="welcome-icon">🚀</div>
+                        <div className="welcome-icon">
+                            <img src="/assets/nightjar-logo.png" alt="Nightjar" />
+                        </div>
                         <h2>Welcome to Nahma</h2>
                         <p>Secure P2P Collaboration. Create a workspace or join an existing one.</p>
                         <div className="create-buttons">
@@ -1042,16 +1119,26 @@ function App() {
                     </div>
                     ) : (
                         <div className="empty-editor-state">
+                            <NightjarMascot size="large" autoRotate={true} rotateInterval={5000} />
                             <h2>Ready to collaborate</h2>
                             <p>Create a document or select one from the sidebar to get started.</p>
                             <div className="create-buttons">
-                                <button className="btn-create" onClick={() => createDocument('Untitled', null, DOC_TYPES.TEXT)}>
+                                <button className="btn-create" onClick={() => {
+                                    setCreateDocumentType('text');
+                                    setShowCreateDocumentDialog(true);
+                                }}>
                                     📝 New Document
                                 </button>
-                                <button className="btn-create sheet" onClick={() => createDocument('Spreadsheet', null, DOC_TYPES.SHEET)}>
+                                <button className="btn-create sheet" onClick={() => {
+                                    setCreateDocumentType('sheet');
+                                    setShowCreateDocumentDialog(true);
+                                }}>
                                     📊 New Spreadsheet
                                 </button>
-                                <button className="btn-create kanban" onClick={() => createDocument('Kanban Board', null, DOC_TYPES.KANBAN)}>
+                                <button className="btn-create kanban" onClick={() => {
+                                    setCreateDocumentType('kanban');
+                                    setShowCreateDocumentDialog(true);
+                                }}>
                                     📋 New Kanban Board
                                 </button>
                             </div>
@@ -1078,6 +1165,7 @@ function App() {
                     p2pStatus={p2pStatus}
                     inviteLink={inviteLink}
                     torEnabled={torEnabled}
+                    meshStatus={meshStatus}
                     onToggleTor={toggleTor}
                     onCopyInvite={copyInviteLink}
                     onOpenRelaySettings={() => setShowRelaySettings(true)}
@@ -1185,11 +1273,35 @@ function App() {
                     onClose={() => {
                         setShowCreateWorkspaceDialog(false);
                         setCreateWorkspaceMode('create'); // Reset to default
+                        sessionStorage.removeItem('pendingShareLink'); // Clear any pending share link
                     }}
                     onSuccess={() => {
                         setShowCreateWorkspaceDialog(false);
                         setCreateWorkspaceMode('create'); // Reset to default
+                        sessionStorage.removeItem('pendingShareLink'); // Clear pending share link
                     }}
+                />
+            )}
+
+            {/* Create Document Dialog (from center CTA buttons) */}
+            {showCreateDocumentDialog && (
+                <CreateDocumentDialog
+                    isOpen={showCreateDocumentDialog}
+                    onClose={() => setShowCreateDocumentDialog(false)}
+                    defaultType={createDocumentType}
+                    onCreateDocument={(name, folderId, icon, color) => {
+                        createDocument(name, folderId, DOC_TYPES.TEXT, icon, color);
+                        setShowCreateDocumentDialog(false);
+                    }}
+                    onCreateSheet={(name, folderId, icon, color) => {
+                        createDocument(name || 'Spreadsheet', folderId, DOC_TYPES.SHEET, icon, color);
+                        setShowCreateDocumentDialog(false);
+                    }}
+                    onCreateKanban={(name, folderId, icon, color) => {
+                        createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN, icon, color);
+                        setShowCreateDocumentDialog(false);
+                    }}
+                    onSuccess={() => setShowCreateDocumentDialog(false)}
                 />
             )}
 
