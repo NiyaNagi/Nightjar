@@ -864,6 +864,8 @@ function App() {
                     onCreateKanban={(name, folderId, icon, color) => createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN, icon, color)}
                     onDeleteDocument={deleteDocument}
                     onMoveDocument={handleMoveDocument}
+                    onRenameDocument={renameDocument}
+                    onUpdateDocument={syncUpdateDocument}
                     documentCollaborators={documentCollaborators}
                     
                     // UI props

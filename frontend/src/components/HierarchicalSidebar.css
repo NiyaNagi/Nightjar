@@ -576,3 +576,67 @@
 .hierarchical-sidebar__tree::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary, #a1a1aa);
 }
+
+/* ========== Context Menu ========== */
+.context-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg-secondary, #252525);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  min-width: 180px;
+  animation: contextMenuIn 0.15s ease;
+}
+
+@keyframes contextMenuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: var(--text-primary, #fff);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.context-menu__item:hover {
+  background: var(--bg-hover, #333);
+}
+
+.context-menu__item--danger {
+  color: var(--error-color, #e74c3c);
+}
+
+.context-menu__item--danger:hover {
+  background: var(--error-muted, #e74c3c22);
+}
+
+.context-menu__icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
