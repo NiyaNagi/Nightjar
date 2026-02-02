@@ -28,17 +28,36 @@ async function createCircularIcon(size, outputPath) {
     </svg>`
   );
 
-  // Use 'contain' to fit the entire bird centered in the circle with transparent background
-  await sharp(inputImage)
-    .resize(circleSize, circleSize, { 
+  // Resize the bird to fit within 75% of the circle size, leaving padding around edges
+  const birdSize = Math.round(circleSize * 0.75);
+  
+  // First resize the bird image to fit within the smaller size
+  const resizedBird = await sharp(inputImage)
+    .resize(birdSize, birdSize, { 
       fit: 'contain', 
-      position: 'center',
       background: { r: 0, g: 0, b: 0, alpha: 0 }
     })
-    .composite([{
-      input: circle,
-      blend: 'dest-in'
-    }])
+    .toBuffer();
+  
+  // Create a transparent canvas at full circle size and composite the bird centered
+  await sharp({
+    create: {
+      width: circleSize,
+      height: circleSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    }
+  })
+    .composite([
+      {
+        input: resizedBird,
+        gravity: 'center'
+      },
+      {
+        input: circle,
+        blend: 'dest-in'
+      }
+    ])
     .png()
     .toFile(outputPath);
     
