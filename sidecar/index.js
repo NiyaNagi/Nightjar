@@ -254,25 +254,20 @@ let torEnabled = false; // Whether Tor should be enabled (default OFF)
 // --- 1. Persistence Layer ---
 const db = new Level(DB_PATH, { valueEncoding: 'binary' });
 
-// Initialize/open the database
-(async () => {
-    try {
-        await db.open();
-        console.log(`[Sidecar] LevelDB opened successfully at ${DB_PATH}`);
-    } catch (e) {
-        // Database might already be open, or error opening
-        if (e.code === 'LEVEL_DATABASE_NOT_OPEN') {
-            console.warn('[Sidecar] LevelDB was not open, attempting to open...');
-            await db.open();
-        } else if (e.code !== 'LEVEL_DATABASE_ALREADY_OPEN') {
-            console.error('[Sidecar] Failed to open LevelDB:', e);
-        } else {
-            console.log(`[Sidecar] LevelDB already open at ${DB_PATH}`);
-        }
+// Wait for database to open before proceeding
+const dbReady = db.open().then(() => {
+    console.log(`[Sidecar] LevelDB opened successfully at ${DB_PATH}`);
+    return true;
+}).catch(e => {
+    if (e.code === 'LEVEL_DATABASE_ALREADY_OPEN') {
+        console.log(`[Sidecar] LevelDB already open at ${DB_PATH}`);
+        return true;
     }
-})();
+    console.error('[Sidecar] Failed to open LevelDB:', e);
+    throw e;
+});
 
-console.log(`[Sidecar] Initialized LevelDB at ${DB_PATH}`);
+console.log(`[Sidecar] Initializing LevelDB at ${DB_PATH}...`);
 
 // --- P2P Message Protocol ---
 // P2P messages include document ID for proper routing
@@ -366,6 +361,9 @@ async function persistUpdate(docName, update, origin) {
     }
     
     try {
+        // Wait for database to be ready
+        await dbReady;
+        
         console.log(`[Sidecar] Encrypting update for ${docName}...`);
         const encrypted = encryptUpdate(update, key);
         console.log(`[Sidecar] Encrypted size: ${encrypted?.length}`);
@@ -389,6 +387,10 @@ async function persistUpdate(docName, update, origin) {
 
 async function loadPersistedData(docName, doc, key) {
     console.log(`[Sidecar] Loading persisted data for document: ${docName}`);
+    
+    // Wait for database to be ready
+    await dbReady;
+    
     console.log(`[Sidecar] DB iterator starting...`);
     let count = 0;
     let errors = 0;
@@ -437,15 +439,24 @@ async function loadPersistedData(docName, doc, key) {
 // --- Document Metadata Storage ---
 const METADATA_DB_PATH = path.join(USER_DATA_PATH, 'storage', 'metadata');
 let metadataDb;
+let metadataDbReady;
 try {
     metadataDb = new Level(METADATA_DB_PATH, { valueEncoding: 'json' });
-    console.log(`[Sidecar] Initialized metadata DB at ${METADATA_DB_PATH}`);
+    metadataDbReady = metadataDb.open().then(() => {
+        console.log(`[Sidecar] Metadata DB opened successfully at ${METADATA_DB_PATH}`);
+        return true;
+    }).catch((err) => {
+        console.error('[Sidecar] Failed to open metadata DB:', err.message);
+        throw err;
+    });
 } catch (err) {
     console.error('[Sidecar] Failed to create metadata DB:', err.message);
 }
 
 // Load all document metadata
 async function loadDocumentList() {
+    await metadataDbReady;
+    
     const documents = [];
     console.log('[Sidecar] Loading document list...');
     try {
@@ -482,6 +493,8 @@ async function loadDocumentList() {
 
 // Save document metadata
 async function saveDocumentMetadata(docId, metadata) {
+    await metadataDbReady;
+    
     try {
         // Use 'doc:' prefix to distinguish from workspaces/folders
         await metadataDb.put(`doc:${docId}`, metadata);
@@ -493,6 +506,8 @@ async function saveDocumentMetadata(docId, metadata) {
 
 // Delete document metadata
 async function deleteDocumentMetadata(docId) {
+    await metadataDbReady;
+    
     try {
         // Use 'doc:' prefix to match how we store it
         await metadataDb.del(`doc:${docId}`);
@@ -504,6 +519,8 @@ async function deleteDocumentMetadata(docId) {
 
 // Delete document data (all updates for a document)
 async function deleteDocumentData(docId) {
+    await dbReady;
+    
     try {
         const prefix = `${docId}:`;
         let count = 0;
@@ -534,6 +551,8 @@ async function deleteDocumentData(docId) {
 
 // Load all folders
 async function loadFolderList() {
+    await metadataDbReady;
+    
     const folders = [];
     try {
         for await (const [key, value] of metadataDb.iterator()) {
@@ -549,6 +568,8 @@ async function loadFolderList() {
 
 // Save folder metadata
 async function saveFolderMetadata(folderId, metadata) {
+    await metadataDbReady;
+    
     try {
         await metadataDb.put(`folder:${folderId}`, metadata);
         console.log(`[Sidecar] Saved metadata for folder: ${folderId}`);
@@ -562,6 +583,8 @@ async function saveFolderMetadata(folderId, metadata) {
 
 // Load all workspaces
 async function loadWorkspaceList() {
+    await metadataDbReady;
+    
     const workspaces = [];
     console.log('[Sidecar] Loading workspace list...');
     try {
@@ -581,6 +604,8 @@ async function loadWorkspaceList() {
 
 // Save workspace metadata
 async function saveWorkspaceMetadata(workspaceId, metadata) {
+    await metadataDbReady;
+    
     try {
         const key = `workspace:${workspaceId}`;
         console.log(`[Sidecar] Saving workspace with key: ${key}`);
@@ -598,6 +623,8 @@ async function saveWorkspaceMetadata(workspaceId, metadata) {
 
 // Delete workspace metadata
 async function deleteWorkspaceMetadata(workspaceId) {
+    await metadataDbReady;
+    
     try {
         await metadataDb.del(`workspace:${workspaceId}`);
         console.log(`[Sidecar] Deleted metadata for workspace: ${workspaceId}`);
@@ -614,6 +641,8 @@ const TRASH_PURGE_MS = TRASH_PURGE_DAYS * 24 * 60 * 60 * 1000;
 
 // Load trashed items (folders and documents)
 async function loadTrashList(workspaceId) {
+    await metadataDbReady;
+    
     const trash = {
         folders: [],
         documents: []
@@ -658,6 +687,8 @@ async function loadTrashList(workspaceId) {
 
 // Auto-purge items older than 30 days
 async function purgeExpiredTrash() {
+    await metadataDbReady;
+    
     const now = Date.now();
     const cutoff = now - TRASH_PURGE_MS;
     let purgedCount = 0;
@@ -901,6 +932,8 @@ function setupPeerPersistence() {
 
 // Helper to update a workspace's lastKnownPeers
 async function updateWorkspacePeers(workspaceId, peerPublicKey, isConnected) {
+    await metadataDbReady;
+    
     try {
         const existing = await metadataDb.get(`workspace:${workspaceId}`);
         if (!existing) return;
