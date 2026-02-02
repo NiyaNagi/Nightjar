@@ -286,14 +286,6 @@ class HyperswarmManager extends EventEmitter {
     const seed = b4a.from(identity.secretKey.slice(0, 32), 'hex');
     this.swarm = new Hyperswarm({ seed });
 
-    // Start listening immediately to establish DHT connection and get a port
-    try {
-      await this.swarm.listen();
-      console.log('[Hyperswarm] Started listening on port:', this.swarm.dht?.port || 'unknown');
-    } catch (err) {
-      console.warn('[Hyperswarm] Failed to start listening:', err.message);
-    }
-
     // Handle new connections
     this.swarm.on('connection', (socket, peerInfo) => {
       this._handleConnection(socket, peerInfo);
@@ -301,6 +293,14 @@ class HyperswarmManager extends EventEmitter {
 
     this.isInitialized = true;
     console.log('[Hyperswarm] Initialized with peer ID:', this.swarm.keyPair.publicKey.toString('hex').slice(0, 16) + '...');
+    
+    // Start listening in background (don't block initialization)
+    // This will establish DHT connection and get a port asynchronously
+    this.swarm.listen().then(() => {
+      console.log('[Hyperswarm] Started listening on port:', this.swarm.dht?.port || 'unknown');
+    }).catch(err => {
+      console.warn('[Hyperswarm] Failed to start listening:', err.message);
+    });
   }
 
   /**
