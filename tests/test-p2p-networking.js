@@ -6,7 +6,6 @@
 
 const crypto = require('crypto');
 const nacl = require('tweetnacl');
-const { encode: encodeBase64, decode: decodeBase64 } = require('base64-arraybuffer');
 
 // Import the HyperswarmManager
 const path = require('path');
@@ -43,7 +42,7 @@ async function runTest() {
     
     // Import HyperswarmManager
     console.log('\n📦 Loading Hyperswarm...');
-    const { default: HyperswarmManager } = await import('file://' + hyperswarmPath.replace(/\\/g, '/'));
+    const { HyperswarmManager } = require(hyperswarmPath);
     
     // Create two swarm instances
     console.log('🌐 Initializing Hyperswarm instances...');
@@ -102,21 +101,23 @@ async function runTest() {
     await new Promise(resolve => setTimeout(resolve, 10000));
     
     // Check connected peers
-    const alicePeers = aliceSwarm.getConnectedPeers();
-    const bobPeers = bobSwarm.getConnectedPeers();
+    const alicePeerKeys = aliceSwarm.getConnectedPeerKeys();
+    const bobPeerKeys = bobSwarm.getConnectedPeerKeys();
     
-    console.log(`\n👥 Alice's connected peers: ${alicePeers.length}`);
-    alicePeers.forEach(peer => {
-        console.log(`   - ${peer.identity?.displayName || peer.peerId.slice(0, 16)}`);
+    console.log(`\n👥 Alice's connected peers: ${alicePeerKeys.length}`);
+    alicePeerKeys.forEach(peerKey => {
+        const conn = aliceSwarm.connections.get(peerKey);
+        console.log(`   - ${conn?.identity?.displayName || peerKey.slice(0, 16)}`);
     });
     
-    console.log(`👥 Bob's connected peers: ${bobPeers.length}`);
-    bobPeers.forEach(peer => {
-        console.log(`   - ${peer.identity?.displayName || peer.peerId.slice(0, 16)}`);
+    console.log(`👥 Bob's connected peers: ${bobPeerKeys.length}`);
+    bobPeerKeys.forEach(peerKey => {
+        const conn = bobSwarm.connections.get(peerKey);
+        console.log(`   - ${conn?.identity?.displayName || peerKey.slice(0, 16)}`);
     });
     
     // Test message broadcasting
-    if (alicePeers.length > 0 || bobPeers.length > 0) {
+    if (alicePeerKeys.length > 0 || bobPeerKeys.length > 0) {
         console.log('\n📤 Testing message broadcast...');
         
         const testMessage = { type: 'test', content: 'Hello from Alice!', timestamp: Date.now() };
@@ -149,8 +150,8 @@ async function runTest() {
         
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        const alicePeersAfter = aliceSwarm.getConnectedPeers();
-        const bobPeersAfter = bobSwarm.getConnectedPeers();
+        const alicePeersAfter = aliceSwarm.getConnectedPeerKeys();
+        const bobPeersAfter = bobSwarm.getConnectedPeerKeys();
         
         console.log(`👥 Alice now has ${alicePeersAfter.length} peer(s)`);
         console.log(`👥 Bob now has ${bobPeersAfter.length} peer(s)`);
@@ -163,12 +164,12 @@ async function runTest() {
     }
     
     // Summary
-    console.log('\n========================================');
+    console.log('========================================');
     console.log('  TEST SUMMARY');
     console.log('========================================');
     console.log(`Swarm initialization: ✓`);
     console.log(`Topic joining: ✓`);
-    console.log(`Peer discovery: ${alicePeers.length > 0 || bobPeers.length > 0 ? '✓' : '✗'}`);
+    console.log(`Peer discovery: ${alicePeerKeys.length > 0 || bobPeerKeys.length > 0 ? '✓' : '✗'}`);
     console.log(`Message broadcast: ${bobMessages.length > 0 || aliceMessages.length > 0 ? '✓' : '✗'}`);
     console.log('========================================\n');
     
