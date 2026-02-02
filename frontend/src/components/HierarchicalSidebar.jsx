@@ -13,10 +13,11 @@ import WorkspaceSwitcher from './WorkspaceSwitcher';
 import CreateFolder from './CreateFolder';
 import CreateWorkspace from './CreateWorkspace';
 import WorkspaceSettings from './WorkspaceSettings';
-import { AppSettings, useConfirmDialog } from './common';
+import { AppSettings, useConfirmDialog, EditPropertiesModal } from './common';
 import { IfPermitted } from './PermissionGuard';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
+import { useFolders } from '../contexts/FolderContext';
 import { ensureContrastWithWhite } from '../utils/colorUtils';
 import './HierarchicalSidebar.css';
 
@@ -346,6 +347,7 @@ const HierarchicalSidebar = ({
     onDeleteDocument,
     onRenameDocument,
     onMoveDocument,
+    onUpdateDocument, // For updating document properties (icon, color)
     documentCollaborators = {},
     
     // UI props
@@ -399,6 +401,12 @@ const HierarchicalSidebar = ({
     const [showAppSettings, setShowAppSettings] = useState(false);
     const [createWorkspaceMode, setCreateWorkspaceMode] = useState('create');
     
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState(null);
+    
+    // Edit properties modal state
+    const [editPropertiesItem, setEditPropertiesItem] = useState(null);
+    
     // Confirmation dialog
     const { confirm, ConfirmDialogComponent } = useConfirmDialog();
     
@@ -447,6 +455,47 @@ const HierarchicalSidebar = ({
         setRenamingItem(null);
         setRenameValue('');
     }, []);
+    
+    // Context menu handlers
+    const handleContextMenu = useCallback((e, item, type) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Don't show context menu for system folders
+        if (item.isSystem) return;
+        
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            item,
+            type
+        });
+    }, []);
+    
+    const closeContextMenu = useCallback(() => {
+        setContextMenu(null);
+    }, []);
+    
+    const handleEditProperties = useCallback(() => {
+        if (contextMenu) {
+            setEditPropertiesItem({
+                id: contextMenu.item.id,
+                name: contextMenu.item.name,
+                icon: contextMenu.item.icon,
+                color: contextMenu.item.color,
+                type: contextMenu.type
+            });
+            closeContextMenu();
+        }
+    }, [contextMenu, closeContextMenu]);
+    
+    const handleSaveProperties = useCallback(async ({ id, type, icon, color }) => {
+        if (type === 'folder') {
+            updateFolder(id, { icon, color });
+        } else if (type === 'document' && onUpdateDocument) {
+            await onUpdateDocument(id, { icon, color });
+        }
+    }, [updateFolder, onUpdateDocument]);
     
     // Check if we have any workspaces
     const hasWorkspaces = workspaces.length > 0;
@@ -874,6 +923,54 @@ const HierarchicalSidebar = ({
             
             {/* Confirmation Dialog */}
             {ConfirmDialogComponent}
+            
+            {/* Context Menu */}
+            {contextMenu && (
+                <>
+                    <div className="context-menu-overlay" onClick={closeContextMenu} />
+                    <div
+                        className="context-menu"
+                        style={{ left: contextMenu.x, top: contextMenu.y }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            className="context-menu__item"
+                            onClick={handleEditProperties}
+                        >
+                            <span className="context-menu__icon">🎨</span>
+                            Edit Properties
+                        </button>
+                        <button
+                            className="context-menu__item"
+                            onClick={() => {
+                                handleRequestRename(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
+                                closeContextMenu();
+                            }}
+                        >
+                            <span className="context-menu__icon">✏️</span>
+                            Rename
+                        </button>
+                        <button
+                            className="context-menu__item context-menu__item--danger"
+                            onClick={() => {
+                                handleRequestDelete(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
+                                closeContextMenu();
+                            }}
+                        >
+                            <span className="context-menu__icon">🗑️</span>
+                            Delete
+                        </button>
+                    </div>
+                </>
+            )}
+            
+            {/* Edit Properties Modal */}
+            <EditPropertiesModal
+                isOpen={!!editPropertiesItem}
+                onClose={() => setEditPropertiesItem(null)}
+                item={editPropertiesItem}
+                onSave={handleSaveProperties}
+            />
         </div>
     );
 };
