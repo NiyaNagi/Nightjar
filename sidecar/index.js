@@ -824,10 +824,19 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
             return;
         }
         
-        // Construct the Yjs room name
-        const roomName = `workspace-meta:${workspaceId}`;
+        // Parse the message (new format includes roomName + update)
+        let roomName, updateData;
+        try {
+            const message = JSON.parse(data);
+            roomName = message.roomName;
+            updateData = Buffer.from(message.update, 'base64');
+        } catch (e) {
+            // Fallback to old format (just base64 update for workspace-meta)
+            roomName = `workspace-meta:${workspaceId}`;
+            updateData = typeof data === 'string' ? Buffer.from(data, 'base64') : data;
+        }
         
-        // Get or create the Yjs doc
+        // Get or create the Yjs doc for the specified room
         let doc = docs.get(roomName);
         if (!doc) {
             doc = new Y.Doc();
@@ -835,9 +844,8 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
             console.log(`[Sidecar] Created Yjs doc for room: ${roomName} (from P2P)`);
         }
         
-        // Decode and apply the sync update
-        const updateData = typeof data === 'string' ? Buffer.from(data, 'base64') : data;
-        Y.applyUpdate(doc, updateData);
+        // Apply the update with 'p2p' origin to prevent re-broadcasting
+        Y.applyUpdate(doc, updateData, 'p2p');
         
         console.log(`[Sidecar] Applied P2P sync from peer ${peerId?.slice(0, 8)}... to ${roomName}`);
     } catch (err) {
@@ -846,12 +854,16 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
 }
 
 // Broadcast a Yjs update to all P2P peers for a workspace
-function broadcastYjsUpdate(workspaceId, topicHex, update) {
+function broadcastYjsUpdate(workspaceId, topicHex, update, roomName) {
     if (!p2pInitialized || !p2pBridge.hyperswarm) return;
     
     try {
-        const updateBase64 = Buffer.from(update).toString('base64');
-        p2pBridge.hyperswarm.broadcastSync(topicHex, updateBase64);
+        // Create a message that includes both the update and the room name
+        const message = {
+            roomName: roomName || `workspace-meta:${workspaceId}`,
+            update: Buffer.from(update).toString('base64')
+        };
+        p2pBridge.hyperswarm.broadcastSync(topicHex, JSON.stringify(message));
     } catch (err) {
         console.error('[Sidecar] Failed to broadcast Yjs update:', err);
     }
@@ -2130,6 +2142,28 @@ docs.on('doc-added', async (doc, docName) => {
             const key = getKeyForDocument(docName);
             if (key) {
                 persistUpdate(docName, update, origin);
+                
+                // Also broadcast to P2P if this document belongs to a workspace
+                // Extract document ID from docName (format is "doc:123abc")
+                if (docName.startsWith('doc:')) {
+                    const docId = docName.slice(4);
+                    // Find the workspace this document belongs to
+                    loadDocumentList().then(documents => {
+                        const docMeta = documents.find(d => d.id === docId);
+                        if (docMeta && docMeta.workspaceId) {
+                            // Find the topic for this workspace
+                            for (const [topicHex, wsId] of topicToWorkspace.entries()) {
+                                if (wsId === docMeta.workspaceId) {
+                                    broadcastYjsUpdate(docMeta.workspaceId, topicHex, update, docName);
+                                    console.log(`[Sidecar] Broadcast document ${docId} update to workspace ${wsId} via P2P`);
+                                    break;
+                                }
+                            }
+                        }
+                    }).catch(err => {
+                        console.error(`[Sidecar] Failed to broadcast document update to P2P:`, err);
+                    });
+                }
             } else {
                 // Queue the update for when key is available
                 console.log(`[Sidecar] Queuing update for ${docName} (no key yet)`);
