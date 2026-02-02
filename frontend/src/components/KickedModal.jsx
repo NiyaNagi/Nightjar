@@ -20,20 +20,6 @@ export default function KickedModal({
   
   // Focus trap for accessibility
   useFocusTrap(modalRef, true);
-  
-  // Automatically trigger data cleanup when modal shows
-  useEffect(() => {
-    // Give user time to read the message, then clear
-    const timer = setTimeout(() => {
-      if (onClearData) {
-        onClearData();
-      }
-      // Auto-close after clearing
-      onClose?.();
-    }, 5000); // Clear after 5 seconds
-    
-    return () => clearTimeout(timer);
-  }, [onClearData, onClose]);
 
   // Handle escape key
   useEffect(() => {
@@ -105,16 +91,17 @@ export default function KickedModal({
           <button 
             type="button"
             className="kicked-modal__button kicked-modal__button--primary"
-            onClick={onClose}
+            onClick={() => {
+              if (onClearData) {
+                onClearData();
+              }
+              onClose?.();
+            }}
             autoFocus
           >
             I understand
           </button>
         </div>
-        
-        <p className="kicked-modal__countdown">
-          Local data will be cleared automatically...
-        </p>
       </div>
     </div>
   );
