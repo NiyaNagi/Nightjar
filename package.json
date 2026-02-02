@@ -1,6 +1,6 @@
 {
   "name": "nightjar",
-  "version": "1.0.25",
+  "version": "1.0.26",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
   "author": {
@@ -152,6 +152,7 @@
     "@tiptap/starter-kit": "^2.4.0",
     "b4a": "^1.6.4",
     "bip39": "^3.1.0",
+    "buffer": "^6.0.3",
     "electron-is-dev": "^3.0.1",
     "hash-wasm": "^4.11.0",
     "html5-qrcode": "^2.3.8",
