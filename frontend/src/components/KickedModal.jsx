@@ -23,15 +23,17 @@ export default function KickedModal({
   
   // Automatically trigger data cleanup when modal shows
   useEffect(() => {
-    // Give user time to read the message before clearing
+    // Give user time to read the message, then clear
     const timer = setTimeout(() => {
       if (onClearData) {
         onClearData();
       }
+      // Auto-close after clearing
+      onClose?.();
     }, 5000); // Clear after 5 seconds
     
     return () => clearTimeout(timer);
-  }, [onClearData]);
+  }, [onClearData, onClose]);
 
   // Handle escape key
   useEffect(() => {

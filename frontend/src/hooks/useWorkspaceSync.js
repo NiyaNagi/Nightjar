@@ -59,6 +59,9 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   
   // Initialize Yjs sync when workspace changes
   useEffect(() => {
+    // Always reset kicked state when workspace changes
+    setIsKicked(false);
+    
     if (!workspaceId) {
       setDocuments([]);
       setFolders([]);
@@ -69,7 +72,6 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       setTotalCount(0);
       setMembers({});
       setKicked({});
-      setIsKicked(false);
       return;
     }
     
@@ -377,8 +379,12 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
         }
         
         if (amIKicked) {
-          console.warn(`[WorkspaceSync] Current user has been kicked from workspace`);
-          setIsKicked(true);
+          console.warn(`[WorkspaceSync] Current user has been kicked from workspace ${workspaceId}`);
+          // Only set kicked if we're still connected to this workspace
+          // This prevents loops when switching workspaces
+          if (provider.awareness.getLocalState()?.workspaceId === workspaceId) {
+            setIsKicked(true);
+          }
         }
       } else {
         console.warn(`[WorkspaceSync] syncKicked - no userIdentity.publicKeyBase62 available`);

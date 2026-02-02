@@ -119,6 +119,7 @@ function App() {
         switchWorkspace,
         updateWorkspace,
         deleteWorkspace,
+        leaveWorkspace,
         joinWorkspace,
         hasWorkspaces,
         loading: workspacesLoading
@@ -1182,10 +1183,13 @@ function App() {
             )}
 
             {/* Kicked from Workspace Modal */}
-            {isUserKicked && (
+            {isUserKicked && currentWorkspace && (
                 <KickedModal
-                    workspaceName={currentWorkspace?.name || 'Workspace'}
+                    workspaceName={currentWorkspace.name}
                     onClose={() => {
+                        // Leave the workspace to clear local data
+                        leaveWorkspace(currentWorkspaceId);
+                        
                         // Switch to another workspace or clear selection
                         const otherWorkspace = workspaces.find(w => w.id !== currentWorkspaceId);
                         if (otherWorkspace) {
@@ -1194,6 +1198,10 @@ function App() {
                             // No other workspaces - just clear current
                             switchWorkspace(null);
                         }
+                    }}
+                    onClearData={() => {
+                        // Same as onClose - leave workspace
+                        leaveWorkspace(currentWorkspaceId);
                     }}
                 />
             )}
