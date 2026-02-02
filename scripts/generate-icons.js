@@ -88,6 +88,21 @@ async function generateIcoFile(inputPng, outputIco) {
   }
 }
 
+async function generateIcnsFile(inputPng, outputIcns) {
+  // Use png2icons to generate .icns file for macOS
+  const png2icons = require('png2icons');
+  
+  const input = fs.readFileSync(inputPng);
+  const output = png2icons.createICNS(input, png2icons.HERMITE, 0);
+  
+  if (output) {
+    fs.writeFileSync(outputIcns, output);
+    console.log(`Created ${path.basename(outputIcns)} (macOS icon)`);
+  } else {
+    console.error('Failed to create ICNS file');
+  }
+}
+
 async function generateIcons() {
   console.log('Generating Nightjar icons...\n');
   
@@ -112,6 +127,9 @@ async function generateIcons() {
   
   // Generate Windows .ico file
   await generateIcoFile(path.join(buildDir, 'icon.png'), path.join(buildDir, 'icon.ico'));
+  
+  // Generate macOS .icns file
+  await generateIcnsFile(path.join(buildDir, 'icon.png'), path.join(buildDir, 'icon.icns'));
   
   console.log('\n✓ All icons generated successfully!');
 }
