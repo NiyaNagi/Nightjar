@@ -75,7 +75,11 @@ function WelcomeStep({ hasExistingIdentity, onCreateNew, onRestore }) {
     return (
         <div className="onboarding-step welcome-step">
             <div className="onboarding-logo">
-                <img src="/assets/nightjar-logo.png" alt="Nightjar" style={{ width: '200px', height: '200px' }} />
+                <img 
+                    src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                    alt="Nightjar" 
+                    style={{ width: '200px', height: '200px' }} 
+                />
             </div>
             <h1>Welcome to Nightjar</h1>
             <p className="onboarding-subtitle">

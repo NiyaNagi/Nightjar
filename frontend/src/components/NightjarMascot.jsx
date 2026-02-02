@@ -175,7 +175,7 @@ function NightjarMascot({
             {/* Bird image */}
             <img 
                 className="nightjar-mascot__bird"
-                src="/assets/nightjar-logo.png"
+                src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
                 alt="Nightjar"
                 draggable={false}
             />

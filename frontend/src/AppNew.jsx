@@ -1098,7 +1098,10 @@ function App() {
                     ) : !hasWorkspaces ? (
                         <div className="empty-editor-state onboarding-welcome">
                         <div className="welcome-icon">
-                            <img src="/assets/nightjar-logo.png" alt="Nightjar" />
+                            <img 
+                                src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                                alt="Nightjar" 
+                            />
                         </div>
                         <h2>Welcome to Nahma</h2>
                         <p>Secure P2P Collaboration. Create a workspace or join an existing one.</p>
