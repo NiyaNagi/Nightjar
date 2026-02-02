@@ -24,6 +24,14 @@ function setBasePath(basePath) {
 }
 
 /**
+ * Get the currently configured base path
+ * @returns {string|null} The configured base path or null if not set
+ */
+function getBasePath() {
+    return configuredBasePath;
+}
+
+/**
  * Get the legacy identity directory (HOME-based)
  * Used for migration and fallback on all platforms
  */
@@ -427,6 +435,7 @@ function inferDeviceName() {
 module.exports = {
     // Configuration
     setBasePath,
+    getBasePath,
     migrateIdentityIfNeeded,
     // Core operations
     storeIdentity,

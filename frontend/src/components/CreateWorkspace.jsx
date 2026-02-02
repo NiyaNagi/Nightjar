@@ -18,8 +18,9 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import './CreateWorkspace.css';
 
 const EMOJI_OPTIONS = [
-  // General workspace & organization
-  '📁', '💼', '📚', '🗂️', '📦', '🏢', '🏠', '📋',
+  // Nightjar brand + General workspace & organization
+  '🦅', '📁', '💼', '📚', '🗂️', '📦', '🏢', '🏠',
+  '📋',
   // Creative & design
   '🎨', '🎬', '🎭', '🖼️', '✏️', '🖌️', '🎵', '📸',
   // Technical & development

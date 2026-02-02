@@ -17,6 +17,7 @@ import { AppSettings, useConfirmDialog } from './common';
 import { IfPermitted } from './PermissionGuard';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
+import { ensureContrastWithWhite } from '../utils/colorUtils';
 import './HierarchicalSidebar.css';
 
 /**
@@ -42,6 +43,7 @@ function TreeItem({
     onDocumentDrop, // Callback when a document is dropped on this folder
     children,
     collaborators = [],
+    workspaceColor, // Color of the workspace for system folders
 }) {
     const [isDragOver, setIsDragOver] = useState(false);
     
@@ -135,11 +137,28 @@ function TreeItem({
         }
     };
     
+    // Determine background color based on item type
+    const getBackgroundStyle = () => {
+        // System folders use workspace color
+        if (item.isSystem && workspaceColor) {
+            return { background: ensureContrastWithWhite(workspaceColor, 0.3) };
+        }
+        // Regular folders use their own color
+        if (type === 'folder' && item.color) {
+            return { background: ensureContrastWithWhite(item.color, 0.3) };
+        }
+        // Documents use their own color
+        if (type === 'document' && item.color) {
+            return { background: ensureContrastWithWhite(item.color, 0.3) };
+        }
+        return {};
+    };
+    
     return (
         <div className="tree-item-wrapper">
             <div
                 className={`tree-item tree-item--${type} ${isSelected ? 'tree-item--selected' : ''} ${isDragOver ? 'tree-item--drag-over' : ''} ${isRenaming ? 'tree-item--renaming' : ''}`}
-                style={{ paddingLeft: `${12 + level * 20}px` }}
+                style={{ paddingLeft: `${12 + level * 20}px`, ...getBackgroundStyle() }}
                 onClick={() => !isRenaming && onSelect(item.id, type)}
                 onDoubleClick={handleDoubleClick}
                 onKeyDown={handleKeyDownItem}
@@ -251,7 +270,7 @@ function WelcomeState({ onCreateWorkspace, onJoinWorkspace }) {
     return (
         <div className="sidebar-welcome">
             <div className="sidebar-welcome__icon">🚀</div>
-            <h3 className="sidebar-welcome__title">Welcome to Nightjar</h3>
+            <h3 className="sidebar-welcome__title">Welcome to Nahma</h3>
             <p className="sidebar-welcome__text">
                 Create a workspace to start collaborating on documents securely.
             </p>
@@ -742,6 +761,7 @@ const HierarchicalSidebar = ({
                                     onRenameSubmit={handleRenameSubmit}
                                     onRenameCancel={handleRenameCancel}
                                     onDocumentDrop={canCreateInWorkspace ? handleDocumentDrop : undefined}
+                                    workspaceColor={currentWorkspace?.color}
                                 >
                                     {/* Documents inside this folder */}
                                     {folderDocs.map(doc => {
@@ -762,6 +782,7 @@ const HierarchicalSidebar = ({
                                                 onRenameSubmit={handleRenameSubmit}
                                                 onRenameCancel={handleRenameCancel}
                                                 collaborators={documentCollaborators[doc.id] || []}
+                                                workspaceColor={currentWorkspace?.color}
                                             />
                                         );
                                     })}
@@ -787,6 +808,7 @@ const HierarchicalSidebar = ({
                                     onRenameSubmit={handleRenameSubmit}
                                     onRenameCancel={handleRenameCancel}
                                     collaborators={documentCollaborators[doc.id] || []}
+                                    workspaceColor={currentWorkspace?.color}
                                 />
                             );
                         })}

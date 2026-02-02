@@ -90,7 +90,9 @@ export default function OnboardingFlow({ onComplete }) {
 function WelcomeStep({ onCreateNew, onRestore, onScan, onSkip }) {
     return (
         <div className="onboarding-step welcome-step">
-            <div className="onboarding-logo">✨</div>
+            <div className="onboarding-logo">
+                <img src="/assets/nightjar-logo.png" alt="Nightjar" style={{ width: '100px', height: '100px' }} />
+            </div>
             <h1>Welcome to Nightjar</h1>
             <p className="onboarding-subtitle">
                 Secure, decentralized collaborative writing

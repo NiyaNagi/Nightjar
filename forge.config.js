@@ -1,6 +1,7 @@
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './build/icon', // Will use icon.icns on Mac, icon.ico on Windows
   },
   rebuildConfig: {},
   makers: [

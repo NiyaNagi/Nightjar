@@ -277,9 +277,15 @@ function getLoadingScreenHtml(step = 0, message = '') {
             max-width: 500px;
         }
         .logo {
-            font-size: 4rem;
+            width: 120px;
+            height: 120px;
             margin-bottom: 1rem;
             animation: pulse 2s ease-in-out infinite;
+        }
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
@@ -339,7 +345,9 @@ function getLoadingScreenHtml(step = 0, message = '') {
 </head>
 <body>
     <div class="container">
-        <div class="logo">📝</div>
+        <div class="logo">
+            <img src="file://${path.join(__dirname, '..', 'assets', 'nightjar-logo.png')}" alt="Nightjar" />
+        </div>
         <h1>Nightjar</h1>
         <div class="progress-container">
             <div class="progress-bar" id="progress"></div>
@@ -485,8 +493,17 @@ async function startBackendWithLoadingScreen() {
         
         // For packaged Electron apps, we need to tell Electron to run as Node.js
         // by setting ELECTRON_RUN_AS_NODE environment variable
+        // We also need to set NODE_PATH so the sidecar can find dependencies in app.asar
+        const appAsarPath = app.isPackaged 
+            ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
+            : null;
+        
         const spawnEnv = app.isPackaged 
-            ? { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+            ? { 
+                ...process.env, 
+                ELECTRON_RUN_AS_NODE: '1',
+                NODE_PATH: appAsarPath
+              }
             : process.env;
         
         // Working directory for the sidecar - unpacked folder for packaged app
