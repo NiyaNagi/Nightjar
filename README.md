@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/nightjar-logo.png" alt="Nightjar" width="200" height="200">
+  <img src="assets/nightjar-logo.png" alt="Nightjar" width="300" height="300">
 </p>
 
 <h1 align="center">Nightjar</h1>
