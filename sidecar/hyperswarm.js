@@ -35,6 +35,8 @@ async function getPublicIPViaSTUN() {
       { host: 'stun.cloudflare.com', port: 3478 },
     ];
     
+    console.log('[Hyperswarm] Attempting STUN IP detection...');
+    
     // STUN binding request
     const stunRequest = Buffer.alloc(20);
     stunRequest.writeUInt16BE(0x0001, 0); // Binding Request
@@ -47,9 +49,10 @@ async function getPublicIPViaSTUN() {
       if (!resolved) {
         resolved = true;
         socket.close();
+        console.warn('[Hyperswarm] STUN request timed out');
         resolve(null);
       }
-    }, 3000);
+    }, 5000); // Increased timeout to 5s
     
     socket.on('message', (msg) => {
       if (resolved) return;
@@ -77,6 +80,7 @@ async function getPublicIPViaSTUN() {
               resolved = true;
               clearTimeout(timeout);
               socket.close();
+              console.log('[Hyperswarm] Got IP via STUN:', ip);
               resolve(ip);
               return;
             }
@@ -89,16 +93,22 @@ async function getPublicIPViaSTUN() {
       }
     });
     
-    socket.on('error', () => {
+    socket.on('error', (err) => {
       if (!resolved) {
         resolved = true;
         clearTimeout(timeout);
+        console.warn('[Hyperswarm] STUN socket error:', err.message);
         resolve(null);
       }
     });
     
     // Try first STUN server
-    socket.send(stunRequest, STUN_SERVERS[0].port, STUN_SERVERS[0].host);
+    console.log(`[Hyperswarm] Sending STUN request to ${STUN_SERVERS[0].host}:${STUN_SERVERS[0].port}`);
+    socket.send(stunRequest, STUN_SERVERS[0].port, STUN_SERVERS[0].host, (err) => {
+      if (err) {
+        console.warn('[Hyperswarm] Failed to send STUN request:', err.message);
+      }
+    });
   });
 }
 
@@ -111,19 +121,32 @@ async function getPublicIPViaHTTP() {
     'https://api.ipify.org?format=json',
     'https://api.ip.sb/ip',
     'https://icanhazip.com',
+    'https://ifconfig.me/ip',
+    'https://checkip.amazonaws.com',
+    'https://ipecho.net/plain',
+    'https://myexternalip.com/raw',
   ];
   
   for (const url of services) {
     try {
+      console.log(`[Hyperswarm] Trying IP detection service: ${url}`);
       const response = await new Promise((resolve, reject) => {
         const proto = url.startsWith('https') ? https : http;
-        const req = proto.get(url, { timeout: 3000 }, (res) => {
+        const req = proto.get(url, { 
+          timeout: 5000,
+          headers: {
+            'User-Agent': 'Nightjar/1.0'
+          }
+        }, (res) => {
           let data = '';
           res.on('data', chunk => data += chunk);
           res.on('end', () => resolve({ status: res.statusCode, data: data.trim() }));
         });
         req.on('error', reject);
-        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+        req.on('timeout', () => { 
+          req.destroy(); 
+          reject(new Error('timeout')); 
+        });
       });
       
       if (response.status === 200 && response.data) {
@@ -132,52 +155,71 @@ async function getPublicIPViaHTTP() {
         if (ip.startsWith('{')) {
           try { ip = JSON.parse(ip).ip; } catch (e) {}
         }
+        // Clean up any whitespace/newlines
+        ip = ip.trim();
         // Validate IP format
         if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+          console.log(`[Hyperswarm] Got IP from ${url}: ${ip}`);
           return ip;
+        } else {
+          console.warn(`[Hyperswarm] Invalid IP format from ${url}: ${ip}`);
         }
       }
     } catch (e) {
+      console.warn(`[Hyperswarm] Failed to get IP from ${url}: ${e.message}`);
       continue; // Try next service
     }
   }
+  console.error('[Hyperswarm] All HTTP IP services failed');
   return null;
 }
 
 /**
  * Get public IP address with caching and retries
- * @param {number} retries - Number of retry attempts (default 2)
+ * @param {number} retries - Number of retry attempts (default 3)
  * @returns {Promise<string|null>} Public IP or null
  */
-async function getPublicIP(retries = 2) {
+async function getPublicIP(retries = 3) {
   // Check cache
   if (cachedPublicIP && Date.now() - publicIPTimestamp < PUBLIC_IP_CACHE_TTL) {
+    console.log('[Hyperswarm] Using cached public IP:', cachedPublicIP);
     return cachedPublicIP;
   }
   
+  console.log('[Hyperswarm] ========== PUBLIC IP DETECTION ==========');
+  
   for (let attempt = 0; attempt <= retries; attempt++) {
-    // Try STUN first (more accurate for NAT scenarios)
-    let ip = await getPublicIPViaSTUN();
+    if (attempt > 0) {
+      console.log(`[Hyperswarm] Retry attempt ${attempt}/${retries}...`);
+    }
+    
+    // Try HTTP API first (more reliable on Windows)
+    let ip = await getPublicIPViaHTTP();
+    
     if (!ip) {
-      // Fallback to HTTP API
-      ip = await getPublicIPViaHTTP();
+      // Fallback to STUN
+      console.log('[Hyperswarm] HTTP detection failed, trying STUN...');
+      ip = await getPublicIPViaSTUN();
     }
     
     if (ip) {
       cachedPublicIP = ip;
       publicIPTimestamp = Date.now();
-      console.log('[Hyperswarm] Detected public IP:', ip);
+      console.log('[Hyperswarm] ✓ Successfully detected public IP:', ip);
+      console.log('[Hyperswarm] ==========================================');
       return ip;
     }
     
     // Wait before retry
     if (attempt < retries) {
-      console.log(`[Hyperswarm] Public IP detection failed, retrying (${attempt + 1}/${retries})...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.warn(`[Hyperswarm] Public IP detection failed, waiting before retry...`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Increased wait time
     }
   }
   
-  console.warn('[Hyperswarm] Failed to detect public IP after', retries + 1, 'attempts');
+  console.error('[Hyperswarm] ✗ Failed to detect public IP after', retries + 1, 'attempts');
+  console.error('[Hyperswarm] This may be due to firewall, network configuration, or blocked services');
+  console.log('[Hyperswarm] ==========================================');
   return null;
 }
 
