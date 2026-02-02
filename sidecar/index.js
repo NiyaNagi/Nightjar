@@ -732,17 +732,30 @@ setTimeout(purgeExpiredTrash, 5000);
 
 // --- 3. WebSocket Servers ---
 
-// Server 1: Handles Yjs protocol (using the library's official setup)
-const yjsWss = new WebSocket.Server({ port: YJS_WEBSOCKET_PORT });
-yjsWss.on('connection', (conn, req) => {
-    console.log('[Sidecar] Yjs client connected');
-    setupWSConnection(conn, req);
-});
-console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT}`);
+// Initialize servers after database is ready
+async function startServers() {
+    // Wait for database to be ready before starting servers
+    await dbReady;
+    console.log('[Sidecar] Database ready, starting servers...');
+    
+    // Server 1: Handles Yjs protocol (using the library's official setup)
+    const yjsWss = new WebSocket.Server({ port: YJS_WEBSOCKET_PORT });
+    yjsWss.on('connection', (conn, req) => {
+        console.log('[Sidecar] Yjs client connected');
+        setupWSConnection(conn, req);
+    });
+    console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT}`);
 
-// Server 2: Handles metadata and commands
-const metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT });
-console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT}`);
+    // Server 2: Handles metadata and commands
+    const metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT });
+    console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT}`);
+}
+
+// Start servers
+startServers().catch(err => {
+    console.error('[Sidecar] Failed to start servers:', err);
+    process.exit(1);
+});
 
 // --- P2P Initialization ---
 // Initialize P2PBridge with identity if available (enables Hyperswarm DHT)

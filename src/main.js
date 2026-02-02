@@ -217,21 +217,25 @@ app.on('ready', async () => {
     // Load required modules
     console.log('[Main] Loading modules...');
     try {
+        console.log('[Main] Importing electron-is-dev...');
         const electronIsDev = await import('electron-is-dev');
         isDev = electronIsDev.default;
         console.log('[Main] electron-is-dev loaded, isDev:', isDev);
     } catch (e) {
         console.error('[Main] Failed to import electron-is-dev:', e.message);
+        console.error('[Main] Full error:', e);
         isDev = !app.isPackaged;
         console.log('[Main] Using fallback isDev check:', isDev);
     }
     
     try {
+        console.log('[Main] Importing uint8arrays...');
         const uint8arrays = await import('uint8arrays');
         uint8ArrayFromString = uint8arrays.fromString;
         console.log('[Main] uint8arrays loaded');
     } catch (e) {
         console.error('[Main] Failed to import uint8arrays:', e.message);
+        console.error('[Main] Full error:', e);
         // This is critical, so we'll try to continue without it
     }
     
@@ -247,11 +251,13 @@ app.on('ready', async () => {
     
     // Start sidecar first with loading screen, then create main window
     try {
+        console.log('[Main] Calling startBackendWithLoadingScreen...');
         await startBackendWithLoadingScreen();
         console.log('[Main] Backend startup complete');
         clearTimeout(fallbackTimer);
     } catch (err) {
         console.error('[Main] Backend startup failed:', err);
+        console.error('[Main] Full backend error:', err);
         clearTimeout(fallbackTimer);
         // Create window anyway to show error
         createWindow();
@@ -524,9 +530,23 @@ async function startBackendWithLoadingScreen() {
         // Determine sidecar path and how to run it
         // In development: spawn 'node sidecar/index.js'
         // In packaged app: files are in app.asar.unpacked (due to asarUnpack config)
-        const sidecarPath = app.isPackaged 
-            ? path.join(process.resourcesPath, 'app.asar.unpacked', 'sidecar', 'index.js')
-            : path.join(process.cwd(), 'sidecar', 'index.js');
+        
+        // Platform-specific path resolution
+        let sidecarPath;
+        if (app.isPackaged) {
+            if (process.platform === 'darwin') {
+                // macOS: app.asar.unpacked is in Contents/Resources/
+                sidecarPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'sidecar', 'index.js');
+            } else {
+                // Windows/Linux: standard path
+                sidecarPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'sidecar', 'index.js');
+            }
+        } else {
+            sidecarPath = path.join(process.cwd(), 'sidecar', 'index.js');
+        }
+        
+        console.log(`[Backend] Sidecar path: ${sidecarPath}`);
+        console.log(`[Backend] Sidecar exists: ${require('fs').existsSync(sidecarPath)}`);
         
         // Use Electron's bundled Node.js (same as the main process)
         // For packaged apps, we need to run the sidecar as a fork or use electron.exe
@@ -539,25 +559,50 @@ async function startBackendWithLoadingScreen() {
         // For packaged Electron apps, we need to tell Electron to run as Node.js
         // by setting ELECTRON_RUN_AS_NODE environment variable
         // We also need to set NODE_PATH so the sidecar can find dependencies in app.asar
-        const appAsarPath = app.isPackaged 
-            ? path.join(process.resourcesPath, 'app.asar', 'node_modules')
-            : null;
+        let appAsarPath = null;
+        let spawnEnv;
         
-        const spawnEnv = app.isPackaged 
-            ? { 
+        if (app.isPackaged) {
+            if (process.platform === 'darwin') {
+                // macOS: Contents/Resources/app.asar/node_modules
+                appAsarPath = path.join(process.resourcesPath, 'app.asar', 'node_modules');
+            } else {
+                // Windows/Linux: app.asar/node_modules  
+                appAsarPath = path.join(process.resourcesPath, 'app.asar', 'node_modules');
+            }
+            
+            spawnEnv = { 
                 ...process.env, 
                 ELECTRON_RUN_AS_NODE: '1',
                 NODE_PATH: appAsarPath
-              }
-            : process.env;
+            };
+            
+            console.log(`[Backend] NODE_PATH: ${appAsarPath}`);
+            console.log(`[Backend] NODE_PATH exists: ${require('fs').existsSync(appAsarPath)}`);
+        } else {
+            spawnEnv = process.env;
+        }
         
         // Working directory for the sidecar - unpacked folder for packaged app
-        const sidecarCwd = app.isPackaged 
-            ? path.join(process.resourcesPath, 'app.asar.unpacked')
-            : process.cwd();
+        let sidecarCwd;
+        if (app.isPackaged) {
+            if (process.platform === 'darwin') {
+                // macOS: Contents/Resources/app.asar.unpacked
+                sidecarCwd = path.join(process.resourcesPath, 'app.asar.unpacked');
+            } else {
+                // Windows/Linux: app.asar.unpacked
+                sidecarCwd = path.join(process.resourcesPath, 'app.asar.unpacked');
+            }
+        } else {
+            sidecarCwd = process.cwd();
+        }
         
         console.log(`[Backend] Starting sidecar: ${nodeExecutable} ${nodeArgs.join(' ')}`);
         console.log(`[Backend] Sidecar cwd: ${sidecarCwd}`);
+        console.log(`[Backend] Sidecar cwd exists: ${require('fs').existsSync(sidecarCwd)}`);
+        console.log(`[Backend] Platform: ${process.platform}`);
+        console.log(`[Backend] Packaged: ${app.isPackaged}`);
+        console.log(`[Backend] Resources path: ${process.resourcesPath}`);
         console.log(`[Backend] Sidecar env ELECTRON_RUN_AS_NODE: ${spawnEnv.ELECTRON_RUN_AS_NODE}`);
         
         sidecarProcess = spawn(nodeExecutable, nodeArgs, {
@@ -649,8 +694,56 @@ async function startBackendWithLoadingScreen() {
 
         sidecarProcess.on('error', (err) => {
             console.error('[Backend] Failed to start sidecar:', err);
+            addSidecarLog('error', `Failed to start: ${err.message}`);
+            
+            // Mac-specific fallback: try alternative startup method
+            if (process.platform === 'darwin' && app.isPackaged) {
+                console.log('[Backend] Trying Mac fallback: direct node execution');
+                try {
+                    // Try using direct node path with explicit module resolution
+                    const nodePath = path.join(process.resourcesPath, '..', 'Frameworks', 'Electron Framework.framework', 'Resources', 'node');
+                    if (require('fs').existsSync(nodePath)) {
+                        console.log(`[Backend] Found Electron node at: ${nodePath}`);
+                        const fallbackArgs = [
+                            '--no-deprecation',
+                            sidecarPath,
+                            userDataPath
+                        ];
+                        const fallbackEnv = {
+                            ...process.env,
+                            NODE_PATH: path.join(sidecarCwd, 'node_modules')
+                        };
+                        
+                        console.log('[Backend] Attempting Mac fallback startup...');
+                        sidecarProcess = spawn(nodePath, fallbackArgs, {
+                            stdio: ['ignore', 'pipe', 'pipe'],
+                            cwd: sidecarCwd,
+                            env: fallbackEnv,
+                        });
+                        
+                        // Re-attach event listeners for fallback process
+                        sidecarProcess.stdout.on('data', (data) => {
+                            const output = data.toString();
+                            console.log(`[Sidecar Fallback] ${output}`);
+                            addSidecarLog('info', `[Fallback] ${output}`);
+                        });
+                        
+                        sidecarProcess.stderr.on('data', (data) => {
+                            const output = data.toString();
+                            console.error(`[Sidecar Fallback Error] ${output}`);
+                            addSidecarLog('error', `[Fallback] ${output}`);
+                        });
+                        
+                        return; // Don't reject, let fallback attempt run
+                    }
+                } catch (fallbackErr) {
+                    console.error('[Backend] Mac fallback also failed:', fallbackErr);
+                    addSidecarLog('error', `Mac fallback failed: ${fallbackErr.message}`);
+                }
+            }
+            
             if (loadingWindow && !loadingWindow.isDestroyed()) {
-                loadingWindow.loadURL(`data:text/html,<html><body style="background:#242424;color:white;font-family:sans-serif;padding:2em;text-align:center;"><h1>⚠️ Startup Error</h1><p>${err.message}</p></body></html>`);
+                loadingWindow.loadURL(`data:text/html,<html><body style="background:#242424;color:white;font-family:sans-serif;padding:2em;text-align:center;"><h1>⚠️ Startup Error</h1><p>${err.message}</p><p>Platform: ${process.platform}</p><p>Check console for details</p></body></html>`);
             }
             reject(err);
         });

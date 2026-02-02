@@ -54,10 +54,14 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - Visual project management with drag-and-drop cards
 
 ### 👥 Real-Time Collaboration
-- See collaborators' cursors in real-time
-- Presence indicators showing who's online
-- Comments on text selections or cells
-- Built-in chat with direct messaging
+- **Live cursor tracking** with collaborator names and colors
+- **Presence indicators** showing who's online with last-seen timestamps
+- **Real-time commenting** on text selections, spreadsheet cells, and document sections
+- **Built-in secure chat** with direct messaging and workspace channels
+- **Conflict-free editing** using Yjs CRDT for automatic merge resolution
+- **Permission-based access**: Owner, Editor, Viewer with granular controls
+- **Member management**: Real-time member list, activity tracking, instant kick/ban
+- **Workspace-wide notifications** for joins, edits, and system events
 
 ### 📁 Organization
 - Workspaces to separate projects
@@ -65,10 +69,13 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - Drag-and-drop document management
 
 ### 🔗 Sharing
-- Password-protected invite links
-- QR codes for easy mobile sharing
-- Granular permissions: Owner, Editor, Viewer
-- Time-limited invitations
+- **Cryptographically signed** invite links with Ed25519 signatures
+- **Time-limited invitations** (maximum 24 hours, configurable expiry)
+- **Fragment-based encryption** - keys embedded in URL fragment, never sent to servers
+- **QR codes** for easy mobile sharing
+- **Granular permissions**: Owner, Editor, Viewer
+- **Instant revocation** - kick members and invalidate their access immediately
+- **Workspace deletion** with secure data wiping
 
 ### 🌐 Privacy & Networking
 - Tor hidden service support (Electron)
@@ -95,17 +102,51 @@ Download the latest version for your platform:
 ## Quick Start
 
 1. **Download and install** Nightjar for your platform
-2. **Create your identity** — Choose a display name and avatar
-3. **Save your recovery phrase** — 12 words that can restore your identity anywhere
+2. **Choose your path**:
+   - **New User**: Create fresh identity with 12-word recovery phrase
+   - **Existing User**: Enter your recovery phrase to unlock/restore identity
+3. **Save your recovery phrase** — Required for every session, keep it secure
 4. **Create a workspace** — Your private container for documents
-5. **Invite collaborators** — Share a password-protected link or QR code
+5. **Invite collaborators** — Share cryptographically signed, time-limited links
 6. **Start collaborating** — Edits sync in real-time, encrypted end-to-end
+
+**⚠️ Important**: Nightjar requires your 12-word recovery phrase every time you start the application. This "hard security" model prevents unauthorized access to your identity files.
 
 ---
 
 ## Security
 
 Nightjar is built with security as the foundation, not an afterthought.
+
+### Onboarding Security Model
+
+Nightjar implements a **"hard cutover"** security model that prioritizes data protection over convenience:
+
+**New User Onboarding:**
+1. Generate cryptographically random 12-word BIP39 recovery phrase
+2. Create Ed25519 identity keypair from phrase
+3. Encrypt identity with machine-specific key
+4. Display recovery phrase with secure storage instructions
+
+**Existing User Security Flow:**
+1. **Identity Detection**: System scans for existing identity files
+2. **Recovery Phrase Required**: Never auto-loads — always requires 12-word validation
+3. **Cryptographic Verification**: Phrase mathematically verified against stored identity
+4. **Three Possible Outcomes**:
+   - ✅ **Unlock**: Phrase matches → restore access to existing workspaces
+   - 🔄 **Restore**: Phrase doesn't match → create new identity file (may need re-invites)
+   - 🗑️ **Delete & Create**: Explicitly delete existing data → fresh start
+
+**Why "Hard Security"?**
+- Prevents malware from auto-accessing identity files
+- Stops unauthorized users on shared computers
+- Ensures only recovery phrase holders can access data
+- Forces explicit choice when identity conflicts occur
+
+**Data Protection Warnings:**
+- **Deletion is permanent** — explicit confirmation required
+- **Recovery phrases cannot be retrieved** — must be stored securely
+- **Lost phrases mean lost access** — no account recovery system
 
 ### Cryptographic Primitives
 
@@ -129,13 +170,80 @@ Nightjar is built with security as the foundation, not an afterthought.
 - **No tracking** — No analytics, no telemetry, no phone home
 - **No cloud storage** — Documents exist only on participants' devices
 - **Tor support** — Route all traffic through Tor for anonymity
+- **Hard identity security** — Recovery phrases required for every session
+- **Fragment-based sharing** — Encryption keys never sent to servers
+- **Time-limited access** — All invitations expire automatically
+- **Secure deletion** — Cryptographic key destruction makes data unrecoverable
+- **Local-first architecture** — Works completely offline
+
+### Workspace Permission System
+
+**Permission Levels:**
+
+| Role | Create | Edit | Comment | Invite | Manage Members | Delete Workspace |
+|------|--------|------|---------|--------|----------------|------------------|
+| **Owner** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Editor** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Viewer** | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+
+**Owner Capabilities:**
+- **Full workspace control** - create, edit, delete everything
+- **Member management** - invite, kick, change permissions
+- **Workspace deletion** - permanent removal with secure data wiping
+- **Permission changes** - promote/demote other members
+- **Invite link generation** - create time-limited, signed invitations
+
+**Editor Capabilities:**
+- **Content creation/editing** - full access to documents and folders
+- **Real-time collaboration** - cursors, comments, chat participation
+- **Document management** - create, rename, move, delete documents
+- **Cannot invite others** - prevents unauthorized workspace expansion
+
+**Viewer Capabilities:**
+- **Read-only access** - view all content without editing
+- **Comment participation** - join discussions and leave feedback
+- **Real-time presence** - see others and be seen
+- **Export/download** - save copies for offline viewing
+
+**Security Properties:**
+- **Cryptographic enforcement** - permissions validated with Ed25519 signatures
+- **Real-time updates** - permission changes apply instantly
+- **Audit trail** - all permission changes logged with timestamps
+- **Revocation resilience** - kicked members cannot rejoin without new invitation
 
 ### What Nightjar Does NOT Protect Against
 
-- Malware on your device
-- Collaborators you choose to share with
-- Screenshots or copy/paste by authorized users
-- Metadata visible to network observers (unless using Tor)
+**Device-Level Threats:**
+- **Malware/keyloggers** on your device can steal recovery phrases as you type
+- **Screen recording software** can capture document content
+- **Physical device access** without proper screen locks or disk encryption
+- **Malicious browser extensions** in browser-based deployments
+
+**Social Engineering:**
+- **Recovery phrase theft** through phishing or social manipulation
+- **Malicious invitations** - users choosing to invite attackers
+- **Insider threats** - authorized collaborators acting maliciously
+- **Impersonation attacks** outside the Nightjar system
+
+**Advanced Attacks:**
+- **Nation-state attackers** with unlimited resources and zero-day exploits
+- **Supply chain compromise** of Nightjar itself (mitigated by hard identity security)
+- **Quantum computer attacks** against Ed25519/XSalsa20 (future threat)
+- **Side-channel attacks** on specialized hardware (timing, power analysis)
+
+**Technical Limitations:**
+- **Copy/paste/screenshot** by authorized users
+- **Network metadata analysis** without Tor (who connects when, from where)
+- **Traffic correlation** with sufficient monitoring resources
+- **Endpoint compromise** - if your device is fully compromised, all bets are off
+
+**Nightjar's security model assumes:**
+1. Your device is reasonably secure (updated OS, antivirus, etc.)
+2. You keep your recovery phrase secret and secure
+3. You only invite trustworthy collaborators
+4. You're not targeted by nation-state adversaries with unlimited resources
+
+For maximum security: Use Tor, secure your devices, store recovery phrases offline, and practice good operational security.
 
 ---
 
@@ -313,10 +421,43 @@ Your identity is a cryptographic keypair that you fully control:
    Decrypt data             Share with others
 ```
 
+**Identity Generation & Storage:**
 - **Generation**: Cryptographically random 128-bit entropy → 12-word BIP39 mnemonic
 - **Storage**: Mnemonic encrypted with machine-specific key (XSalsa20-Poly1305)
 - **Backup**: Export encrypted with user password (Argon2id + XSalsa20-Poly1305)
-- **Recovery**: Re-derive full keypair from 12 words on any device
+- **Hard Security Model**: Identity files **never** auto-load - always requires recovery phrase
+
+### Identity Recovery & Protection
+
+Nightjar implements a **hard cutover security model** - when an existing identity is detected, the system requires explicit validation:
+
+**Three Recovery Scenarios:**
+
+1. **🔓 Unlock Existing Identity**
+   - Existing identity file detected on system
+   - Recovery phrase validates against stored identity
+   - Unlocks access to existing workspaces and data
+   - Preserves all workspace memberships and permissions
+
+2. **🔄 Restore Identity from Backup**
+   - Recovery phrase doesn't match local identity
+   - Creates new identity file from recovery phrase
+   - May need re-invitation to existing workspaces
+   - Useful when moving between devices
+
+3. **🗑️ Delete and Create New**
+   - Explicit deletion of existing identity data
+   - **PERMANENT DATA LOSS WARNING** displayed
+   - All local workspaces and documents deleted
+   - Creates fresh identity with new recovery phrase
+   - Cannot be undone
+
+**Security Properties:**
+- **No Auto-Loading**: System never automatically loads identity.json
+- **Recovery Phrase Required**: Every startup requires 12-word validation
+- **Cryptographic Validation**: Recovery phrase mathematically verified against identity
+- **Data Protection**: Prevents unauthorized access to existing identity files
+- **Clear Warning System**: Explicit confirmation required for destructive actions
 
 ### Key Hierarchy
 
@@ -358,22 +499,58 @@ All document content uses **XSalsa20-Poly1305** authenticated encryption:
 
 ### Share Link Security
 
-When you share a workspace, the encryption key is embedded in the URL fragment:
+Nightjar's invite system uses **fragment-based key transmission** with **cryptographic signatures** for enterprise-grade security:
 
 ```
-nightjar://w/abc123#p:azure-dolphin-7-bright&perm:e&exp:1706745600&sig:base64...
-           │        │                        │       │            │
-           │        │                        │       │            └─ Ed25519 signature
-           │        │                        │       └─ Expiration timestamp
-           │        │                        └─ Permission level (e=editor)
-           │        └─ Password (never sent to servers)
+nightjar://w/abc123#key=base64encryptionkey&perm=e&exp=1706745600&sig=ed25519sig
+           │        │                      │      │            │
+           │        │                      │      │            └─ Ed25519 signature
+           │        │                      │      └─ Expiration (max 24hrs)
+           │        │                      └─ Permission (e=editor,v=viewer,o=owner)
+           │        └─ Workspace encryption key (never sent to servers)
            └─ Workspace ID
 ```
 
-- **URL fragment (#)** is never sent to servers in HTTP requests
-- **Ed25519 signature** prevents tampering
-- **Expiration** limits window for compromise
-- **Password format** uses memorable word combinations
+**Security Properties:**
+- **URL Fragment Security**: Key never sent to servers (fragment only exists client-side)
+- **Time Expiry**: Maximum 24-hour window, configurable down to minutes
+- **Cryptographic Integrity**: Ed25519 signatures prevent tampering or replay
+- **Zero-Knowledge Servers**: Relay servers never see encryption keys
+- **Instant Revocation**: Active members can be kicked, invalidating their access
+- **Secure Deletion**: Complete workspace deletion with cryptographic key destruction
+
+**Link Generation Process:**
+1. Generate time-limited invitation with workspace key
+2. Sign invitation parameters with workspace owner's Ed25519 key
+3. Embed key in URL fragment (invisible to servers)
+4. Optionally encode as QR code for mobile sharing
+
+**Validation Process:**
+1. Extract parameters from URL fragment
+2. Verify Ed25519 signature against workspace owner's public key
+3. Check expiration timestamp
+4. Grant access if signature valid and not expired
+
+### Workspace Management & Member Control
+
+**Membership Management:**
+- **Real-time member list** with online status and last activity
+- **Instant member removal** ("kick") with immediate access revocation
+- **Permission management** - change member roles (Owner, Editor, Viewer)
+- **Activity tracking** - see who made changes and when
+
+**Workspace Deletion & Data Wiping:**
+- **Complete workspace deletion** removes all local data
+- **Cryptographic key destruction** makes encrypted data unrecoverable
+- **Secure deletion process** overwrites storage locations
+- **Member notification** when workspace is deleted by owner
+- **Cannot be undone** - explicit confirmation required
+
+**Access Revocation:**
+- **Immediate effect** - kicked members lose access instantly
+- **Background sync termination** - connections closed automatically
+- **Re-invitation required** for kicked members to rejoin
+- **Audit trail** - removal actions logged with timestamps
 
 ### Security Hardening
 
@@ -382,27 +559,51 @@ Built-in protections against common attacks:
 | Attack | Mitigation |
 |--------|------------|
 | **Brute force** | Rate limiting (5 attempts/60s, 5min lockout) |
+| **Identity theft** | Hard cutover model - never auto-load identity files |
+| **Unauthorized access** | Recovery phrase required for every session |
 | **Prototype pollution** | Safe JSON parsing with Object.create(null) |
 | **Path traversal** | Path sanitization and validation |
 | **SSRF** | URL validation blocking localhost/internal IPs |
 | **Replay attacks** | Timestamps in signed messages |
 | **Traffic analysis** | 4KB padding on all encrypted payloads |
 | **Timing attacks** | Constant-time comparison for crypto operations |
+| **Invite tampering** | Ed25519 signatures on all invitation links |
+| **Link hijacking** | Time-limited expiry (max 24 hours) |
+| **Workspace persistence** | Secure deletion with key destruction |
 
 ### Threat Model
 
 **Nightjar protects against:**
-- ✅ Mass surveillance (E2E encryption)
-- ✅ Server compromise (no plaintext on servers)
-- ✅ Network eavesdropping (all traffic encrypted)
-- ✅ Metadata correlation (with Tor enabled)
-- ✅ Credential theft (no passwords to steal)
+- ✅ **Mass surveillance** - End-to-end encryption with fragment-based key distribution
+- ✅ **Server compromise** - Zero-knowledge servers never see plaintext or keys
+- ✅ **Network eavesdropping** - All traffic encrypted, padded to resist traffic analysis
+- ✅ **Metadata correlation** - Optional Tor routing for anonymous collaboration
+- ✅ **Credential theft** - No passwords; cryptographic identity with recovery phrases
+- ✅ **Identity hijacking** - Hard cutover model requires recovery phrase validation
+- ✅ **Unauthorized device access** - Identity files never auto-load
+- ✅ **Invite link interception** - Time-limited, cryptographically signed invitations
+- ✅ **Workspace persistence after removal** - Secure deletion with key destruction
+- ✅ **Member privilege escalation** - Granular permissions with instant revocation
+- ✅ **Replay attacks** - Timestamped, signed messages with expiry validation
 
 **Nightjar does NOT protect against:**
-- ❌ Malware on your device
-- ❌ Malicious collaborators you invited
-- ❌ Screenshots or physical access
-- ❌ Advanced nation-state attackers targeting you specifically
+- ❌ **Malware on your device** - Full system access can steal recovery phrases
+- ❌ **Malicious collaborators** - Invited users can copy/screenshot content
+- ❌ **Physical device access** - Screen locks and disk encryption recommended
+- ❌ **Advanced persistent threats** - Nation-state actors with unlimited resources
+- ❌ **Social engineering** - Users sharing recovery phrases or inviting attackers
+- ❌ **Side-channel attacks** - Timing, power analysis, etc. on dedicated hardware
+- ❌ **Quantum computer attacks** - Ed25519/XSalsa20 vulnerable to sufficiently large quantum computers
+
+**Realistic Attack Scenarios:**
+
+*🎯 Corporate Espionage*: Nightjar's zero-knowledge architecture means even if relay servers are compromised, documents remain encrypted. Time-limited invites prevent long-term unauthorized access.
+
+*🎯 Government Surveillance*: Fragment-based key distribution means invite links can be shared through separate channels. Tor integration provides traffic anonymity.
+
+*🎯 Insider Threats*: Granular permissions and instant member removal prevent privilege abuse. Secure workspace deletion ensures terminated employees lose access.
+
+*🎯 Supply Chain Attack*: Hard identity security prevents automatic access even if Nightjar itself is compromised - recovery phrases still required.
 
 ---
 
