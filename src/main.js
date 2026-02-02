@@ -8,6 +8,10 @@ const identity = require('../sidecar/identity');
 const hyperswarm = require('../sidecar/hyperswarm');
 const Y = require('yjs');
 const awarenessProtocol = require('y-protocols/awareness');
+const packageJson = require('../package.json');
+
+// Make version available to preload script
+global.APP_VERSION = packageJson.version;
 
 // Register nightjar:// as the default protocol handler for this app
 if (process.defaultApp) {
