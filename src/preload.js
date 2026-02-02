@@ -1,9 +1,12 @@
 // src/preload.js
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, app } = require('electron');
 
 // We are exposing a controlled API to the frontend (renderer process)
 // instead of giving it full access to Node.js APIs.
 contextBridge.exposeInMainWorld('electronAPI', {
+    // --- App Info ---
+    appVersion: process.versions.electron ? require('../package.json').version : '1.0.0',
+    
     // --- Frontend to Backend ---
     setKey: (key) => ipcRenderer.send('set-key', key),
     sendYjsUpdate: (update) => ipcRenderer.send('yjs-update', update),
@@ -56,6 +59,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // --- Protocol Link Handling ---
     onProtocolLink: (callback) => ipcRenderer.on('protocol-link', (_e, url) => callback(url)),
+
+    // --- Diagnostics ---
+    getDiagnosticData: () => ipcRenderer.invoke('get-diagnostic-data'),
 
     // Function to remove all listeners, useful for component cleanup
     removeAllListeners: () => {

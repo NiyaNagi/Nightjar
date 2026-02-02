@@ -354,6 +354,21 @@ let sidecarProcess = null;
 let sidecarRestartAttempts = 0;
 const SIDECAR_MAX_RESTART_ATTEMPTS = 3;
 
+// Sidecar log buffer for diagnostics
+let sidecarLogBuffer = [];
+const MAX_SIDECAR_LOGS = 1000;
+
+function addSidecarLog(level, message) {
+    sidecarLogBuffer.push({
+        timestamp: new Date().toISOString(),
+        level: level,
+        message: message
+    });
+    if (sidecarLogBuffer.length > MAX_SIDECAR_LOGS) {
+        sidecarLogBuffer.shift();
+    }
+}
+
 /**
  * Restart sidecar after a crash
  * Limited to SIDECAR_MAX_RESTART_ATTEMPTS to prevent infinite loops
@@ -363,10 +378,12 @@ function restartSidecar(nodeExecutable, nodeArgs, sidecarCwd, spawnEnv) {
     
     if (sidecarRestartAttempts > SIDECAR_MAX_RESTART_ATTEMPTS) {
         console.error(`[Sidecar] Max restart attempts (${SIDECAR_MAX_RESTART_ATTEMPTS}) reached, giving up`);
+        addSidecarLog('error', `Max restart attempts (${SIDECAR_MAX_RESTART_ATTEMPTS}) reached, giving up`);
         return;
     }
     
     console.log(`[Sidecar] Restart attempt ${sidecarRestartAttempts}/${SIDECAR_MAX_RESTART_ATTEMPTS}`);
+    addSidecarLog('info', `Restart attempt ${sidecarRestartAttempts}/${SIDECAR_MAX_RESTART_ATTEMPTS}`);
     
     sidecarProcess = spawn(nodeExecutable, nodeArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -377,6 +394,7 @@ function restartSidecar(nodeExecutable, nodeArgs, sidecarCwd, spawnEnv) {
     sidecarProcess.stdout.on('data', (data) => {
         const output = data.toString();
         console.log(`[Sidecar] ${output}`);
+        addSidecarLog('info', output);
         
         // Reset restart counter on successful startup
         if (output.includes('Metadata WebSocket server listening')) {
@@ -386,15 +404,19 @@ function restartSidecar(nodeExecutable, nodeArgs, sidecarCwd, spawnEnv) {
     });
     
     sidecarProcess.stderr.on('data', (data) => {
-        console.error(`[Sidecar Error] ${data}`);
+        const output = data.toString();
+        console.error(`[Sidecar Error] ${output}`);
+        addSidecarLog('error', output);
     });
     
     sidecarProcess.on('error', (err) => {
         console.error('[Sidecar] Failed to restart:', err);
+        addSidecarLog('error', `Failed to restart: ${err.message}`);
     });
     
     sidecarProcess.on('close', (code) => {
         console.log(`[Sidecar] Restarted process exited with code ${code}`);
+        addSidecarLog('info', `Restarted process exited with code ${code}`);
         if (code !== 0) {
             console.log('[Sidecar] Crashed again, attempting restart...');
             setTimeout(() => {
@@ -510,6 +532,7 @@ async function startBackendWithLoadingScreen() {
         sidecarProcess.stdout.on('data', (data) => {
             const output = data.toString();
             console.log(`[Sidecar] ${output}`);
+            addSidecarLog('info', output);
 
             // Parse sidecar output to update progress
             if (output.includes('Initialized LevelDB')) {
@@ -532,7 +555,9 @@ async function startBackendWithLoadingScreen() {
         });
 
         sidecarProcess.stderr.on('data', (data) => {
-            console.error(`[Sidecar Error] ${data}`);
+            const output = data.toString();
+            console.error(`[Sidecar Error] ${output}`);
+            addSidecarLog('error', output);
         });
 
         sidecarProcess.on('error', (err) => {
@@ -895,6 +920,85 @@ ipcMain.handle('tor:onionAddress', async () => {
         return torManager.onionAddress;
     }
     return null;
+});
+
+// Diagnostic data collection for issue reporting
+ipcMain.handle('get-diagnostic-data', async () => {
+    const os = require('os');
+    const fs = require('fs');
+    
+    const diagnostics = {
+        timestamp: new Date().toISOString(),
+        app: {
+            version: app.getVersion(),
+            name: app.getName(),
+            isPackaged: app.isPackaged,
+            path: app.getAppPath(),
+            userDataPath: app.getPath('userData')
+        },
+        system: {
+            platform: process.platform,
+            arch: process.arch,
+            nodeVersion: process.versions.node,
+            electronVersion: process.versions.electron,
+            chromeVersion: process.versions.chrome,
+            v8Version: process.versions.v8,
+            hostname: os.hostname(),
+            cpus: os.cpus().length,
+            totalMemory: os.totalmem(),
+            freeMemory: os.freemem(),
+            uptime: os.uptime(),
+            networkInterfaces: Object.keys(os.networkInterfaces())
+        },
+        sidecar: {
+            running: !!sidecarProcess,
+            pid: sidecarProcess ? sidecarProcess.pid : null,
+            restartCount: sidecarRestartAttempts,
+            lastError: sidecarProcess ? null : 'Not running'
+        },
+        identity: {
+            basePath: identity.getBasePath(),
+            identityPath: identity.getIdentityPath(),
+            legacyPath: identity.getLegacyIdentityPath(),
+            hasIdentity: fs.existsSync(identity.getIdentityPath())
+        },
+        p2p: {
+            initialized: p2pInitialized,
+            publicIP: null, // Will try to get
+            ownPublicKey: null
+        },
+        tor: {
+            enabled: !!torManager,
+            running: false,
+            bootstrapped: false
+        },
+        sidecarLogs: sidecarLogBuffer || []
+    };
+    
+    // Try to get P2P info
+    try {
+        if (p2pInitialized && hyperswarmInstance) {
+            diagnostics.p2p.ownPublicKey = hyperswarmInstance.getOwnPublicKey();
+            diagnostics.p2p.connectedPeers = hyperswarmInstance.getConnectedPeerKeys().length;
+        }
+        
+        const publicIP = await hyperswarm.getPublicIP();
+        diagnostics.p2p.publicIP = publicIP;
+    } catch (err) {
+        diagnostics.p2p.error = err.message;
+    }
+    
+    // Try to get Tor status
+    try {
+        if (torManager) {
+            const torStatus = await torManager.getStatus();
+            diagnostics.tor = { ...diagnostics.tor, ...torStatus };
+        }
+    } catch (err) {
+        diagnostics.tor.error = err.message;
+    }
+    
+    return diagnostics;
 });
 
 // Cleanup on app quit
