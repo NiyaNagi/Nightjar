@@ -1,11 +1,11 @@
 // src/preload.js
-const { contextBridge, ipcRenderer, app } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 // We are exposing a controlled API to the frontend (renderer process)
 // instead of giving it full access to Node.js APIs.
 contextBridge.exposeInMainWorld('electronAPI', {
     // --- App Info ---
-    appVersion: process.versions.electron ? require('../package.json').version : '1.0.0',
+    appVersion: global.APP_VERSION || '1.0.0',
     
     // --- Frontend to Backend ---
     setKey: (key) => ipcRenderer.send('set-key', key),
