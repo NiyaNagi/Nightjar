@@ -48,7 +48,6 @@ let mainWindow;
 let p2pNode = null;
 let p2pInitialized = false;
 let hyperswarmInstance = null;
-let torManager = null;
 let sessionKey = null;
 const ydocs = new Map();
 const userDataPath = app.getPath('userData');
