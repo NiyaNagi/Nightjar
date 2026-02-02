@@ -1,6 +1,6 @@
 {
   "name": "nightjar",
-  "version": "1.0.32",
+  "version": "1.0.33",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
   "author": {
@@ -20,6 +20,8 @@
     "test:p2p": "node tests/integration/p2p-sync-e2e.test.js",
     "test:p2p:webrtc": "node tests/integration/p2p-sync-e2e.test.js --webrtc",
     "test:p2p:verbose": "node tests/integration/p2p-sync-e2e.test.js --verbose",
+    "test:p2p:network": "node tests/test-p2p-networking.js",
+    "test:ip": "node tests/test-ip-detection.js",
     "build": "vite build",
     "package": "npm run build && electron-builder",
     "package:win": "npm run build && electron-builder --win",
