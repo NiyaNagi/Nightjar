@@ -23,11 +23,60 @@ const { EventEmitter } = require('events');
 const https = require('https');
 const http = require('http');
 const dgram = require('dgram');
+const os = require('os');
 
 // Public IP detection cache
 let cachedPublicIP = null;
 let publicIPTimestamp = 0;
 const PUBLIC_IP_CACHE_TTL = 60000; // 1 minute cache
+
+// Track network interfaces for change detection
+let cachedNetworkInterfaces = null;
+
+/**
+ * Get a hash of current network interfaces for change detection
+ * @returns {string} Hash of network interface addresses
+ */
+function getNetworkInterfaceHash() {
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    if (addrs) {
+      for (const addr of addrs) {
+        if (!addr.internal) {
+          addresses.push(`${name}:${addr.address}`);
+        }
+      }
+    }
+  }
+  return addresses.sort().join(',');
+}
+
+/**
+ * Check if network interfaces have changed and invalidate IP cache if so
+ * @returns {boolean} True if network changed
+ */
+function checkNetworkChange() {
+  const currentHash = getNetworkInterfaceHash();
+  if (cachedNetworkInterfaces !== null && cachedNetworkInterfaces !== currentHash) {
+    console.log('[Hyperswarm] Network interface change detected, invalidating IP cache');
+    cachedPublicIP = null;
+    publicIPTimestamp = 0;
+    cachedNetworkInterfaces = currentHash;
+    return true;
+  }
+  cachedNetworkInterfaces = currentHash;
+  return false;
+}
+
+/**
+ * Clear the public IP cache (call when network changes)
+ */
+function clearIPCache() {
+  console.log('[Hyperswarm] Clearing public IP cache');
+  cachedPublicIP = null;
+  publicIPTimestamp = 0;
+}
 
 /**
  * Get public IP via STUN server
@@ -187,6 +236,9 @@ async function getPublicIPViaHTTP() {
  * @returns {Promise<string|null>} Public IP or null
  */
 async function getPublicIP(retries = 1) {
+  // Check for network changes first - this invalidates cache if interfaces changed
+  checkNetworkChange();
+  
   // Check cache
   if (cachedPublicIP && Date.now() - publicIPTimestamp < PUBLIC_IP_CACHE_TTL) {
     console.log('[Hyperswarm] Using cached public IP:', cachedPublicIP);
@@ -832,5 +884,7 @@ module.exports = {
   getInstance,
   generateTopic,
   generateDocumentId,
-  getPublicIP
+  getPublicIP,
+  clearIPCache,
+  checkNetworkChange
 };

@@ -173,6 +173,20 @@
     animation: pulse 1.5s infinite;
 }
 
+/* IP Address Display */
+.ip-display {
+    font-size: 0.7rem;
+    color: var(--text-secondary, #71717a);
+    opacity: 0.8;
+    font-family: monospace;
+    margin-left: 2px;
+}
+
+.connection-status.connected .ip-display {
+    color: var(--success-color, #22c55e);
+    opacity: 0.7;
+}
+
 /* Peer Counts Display */
 .peer-counts {
     display: flex;

@@ -40,14 +40,34 @@ export function IdentityProvider({ children }) {
             if (window.electronAPI?.identity) {
                 const exists = await window.electronAPI.identity.has();
                 setHasExistingIdentity(exists);
-                setNeedsOnboarding(true); // Always require onboarding for security
+                
+                if (exists) {
+                    // Identity exists - load it automatically
+                    // This fixes the double-onboarding issue on Mac
+                    const stored = await window.electronAPI.identity.load();
+                    if (stored) {
+                        const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
+                        setIdentity(parsed);
+                        setNeedsOnboarding(false);
+                    } else {
+                        setNeedsOnboarding(true);
+                    }
+                } else {
+                    setNeedsOnboarding(true);
+                }
             } else {
                 // Fallback for dev: use encrypted secure storage
                 secureStorage.migrate(LEGACY_KEY, IDENTITY_KEY);
                 
                 const stored = secureStorage.get(IDENTITY_KEY);
                 setHasExistingIdentity(!!stored);
-                setNeedsOnboarding(true); // Always require onboarding for security
+                
+                if (stored) {
+                    setIdentity(stored);
+                    setNeedsOnboarding(false);
+                } else {
+                    setNeedsOnboarding(true);
+                }
             }
         } catch (e) {
             secureError('[Identity] Failed to check:', e);

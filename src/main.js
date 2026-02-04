@@ -58,8 +58,6 @@ let uint8ArrayFromString;
 // --- Global State ---
 let mainWindow;
 let p2pNode = null;
-let p2pInitialized = false;
-let hyperswarmInstance = null;
 let sessionKey = null;
 const ydocs = new Map();
 const userDataPath = app.getPath('userData');
@@ -1169,8 +1167,8 @@ ipcMain.handle('get-diagnostic-data', async () => {
             hasIdentity: fs.existsSync(identity.getIdentityPath())
         },
         p2p: {
-            initialized: p2pInitialized,
-            publicIP: null, // Will try to get
+            initialized: false,
+            publicIP: null,
             ownPublicKey: null
         },
         tor: {
@@ -1181,15 +1179,49 @@ ipcMain.handle('get-diagnostic-data', async () => {
         sidecarLogs: sidecarLogBuffer || []
     };
     
-    // Try to get P2P info
+    // Try to get P2P info from sidecar via WebSocket
+    // This is the accurate source - main process doesn't manage P2P directly
     try {
-        if (p2pInitialized && hyperswarmInstance) {
-            diagnostics.p2p.ownPublicKey = hyperswarmInstance.getOwnPublicKey();
-            diagnostics.p2p.connectedPeers = hyperswarmInstance.getConnectedPeerKeys().length;
-        }
+        const WebSocket = require('ws');
+        const p2pInfoPromise = new Promise((resolve, reject) => {
+            const ws = new WebSocket('ws://localhost:8081');
+            const timeout = setTimeout(() => {
+                ws.close();
+                reject(new Error('Timeout'));
+            }, 2000);
+            
+            ws.on('open', () => {
+                ws.send(JSON.stringify({ type: 'get-p2p-info' }));
+            });
+            
+            ws.on('message', (data) => {
+                try {
+                    const msg = JSON.parse(data.toString());
+                    if (msg.type === 'p2p-info') {
+                        clearTimeout(timeout);
+                        ws.close();
+                        resolve(msg);
+                    }
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            });
+            
+            ws.on('error', (err) => {
+                clearTimeout(timeout);
+                reject(err);
+            });
+        });
         
-        const publicIP = await hyperswarm.getPublicIP();
-        diagnostics.p2p.publicIP = publicIP;
+        const p2pInfo = await p2pInfoPromise;
+        diagnostics.p2p = {
+            initialized: p2pInfo.initialized || false,
+            ownPublicKey: p2pInfo.ownPublicKey || null,
+            publicIP: p2pInfo.publicIP || null,
+            connectedPeers: (p2pInfo.connectedPeers || []).length,
+            directWsUrl: p2pInfo.directWsUrl || null,
+            upnpStatus: p2pInfo.upnpStatus || null
+        };
     } catch (err) {
         diagnostics.p2p.error = err.message;
     }

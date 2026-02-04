@@ -8,6 +8,7 @@ const StatusBar = ({
     inviteLink, 
     torEnabled,
     meshStatus,
+    publicIP,
     onToggleTor,
     onOpenTorSettings,
     onCopyInvite,
@@ -81,7 +82,7 @@ const StatusBar = ({
             if (onlineCount > 0) {
                 return { label: `${onlineCount} peer${onlineCount !== 1 ? 's' : ''} connected`, className: 'connected' };
             }
-            return { label: 'Connected', className: 'connected' };
+            return { label: 'Online', className: 'connected' };
         }
         if (p2pStatus === 'connecting') {
             return { label: 'Connecting...', className: 'connecting' };
@@ -89,7 +90,15 @@ const StatusBar = ({
         return { label: 'Offline', className: 'offline' };
     };
 
+    // Format IP for display (show only for Electron)
+    const getIPDisplay = () => {
+        if (!isElectron || !publicIP) return null;
+        // Truncate long IPs for display
+        return publicIP.length > 15 ? publicIP.substring(0, 12) + '...' : publicIP;
+    };
+
     const connectionStatus = getConnectionStatus();
+    const ipDisplay = getIPDisplay();
     const visibleCollabs = collaborators?.slice(0, maxVisible) || [];
     const hiddenCollabs = collaborators?.slice(maxVisible) || [];
 
@@ -172,9 +181,15 @@ const StatusBar = ({
                     className={`connection-status ${connectionStatus.className}`}
                     data-testid="sync-status"
                     data-synced={p2pStatus === 'connected' ? 'true' : 'false'}
+                    title={publicIP ? `Your IP: ${publicIP}` : 'Connection status'}
                 >
                     <span className="status-dot"></span>
                     <span>{connectionStatus.label}</span>
+                    {ipDisplay && (
+                        <span className="ip-display" title={`Your public IP: ${publicIP}`}>
+                            ({ipDisplay})
+                        </span>
+                    )}
                 </div>
 
                 {/* Peer counts display - only show if there are peers */}

@@ -179,6 +179,7 @@ function App() {
     const [inviteLink, setInviteLink] = useState('');
     const [torEnabled, setTorEnabled] = useState(false);
     const [meshStatus, setMeshStatus] = useState(null);
+    const [publicIP, setPublicIP] = useState(null);
     
     // User profile with persistence
     const [userProfile, setUserProfile] = useState(loadUserProfile);
@@ -489,6 +490,11 @@ function App() {
                             } else {
                                 setInviteLink('');
                             }
+                        } else if (data.type === 'p2p-info') {
+                            // Update public IP when received
+                            if (data.publicIP) {
+                                setPublicIP(data.publicIP);
+                            }
                         } else if (data.type === 'mesh-status') {
                             // Detailed mesh status response
                             setMeshStatus(data);
@@ -497,6 +503,8 @@ function App() {
                             setP2pStatus(data.status);
                         } else if (data.type === 'key-set') {
                             console.log('Session key confirmed by sidecar');
+                            // Request P2P info after key is set to get public IP
+                            metaSocket.send(JSON.stringify({ type: 'get-p2p-info' }));
                         } else if (data.type === 'document-list') {
                             setDocuments(data.documents || []);
                         } else if (data.type === 'document-created') {
@@ -1249,6 +1257,7 @@ function App() {
                     inviteLink={inviteLink}
                     torEnabled={torEnabled}
                     meshStatus={meshStatus}
+                    publicIP={publicIP}
                     onToggleTor={toggleTor}
                     onCopyInvite={copyInviteLink}
                     onOpenRelaySettings={() => setShowRelaySettings(true)}
