@@ -52,6 +52,8 @@ const test = base.extend({
 
   sidecarClient2: async ({ electronSidecar2 }, use) => {
     console.log('[Fixture] Creating sidecarClient2 for', electronSidecar2.metaUrl);
+    // Add a small delay before connecting to ensure the server is fully ready
+    await new Promise(r => setTimeout(r, 2000));
     const client = new SidecarClient(electronSidecar2.metaUrl, 'client2');
     try {
       await client.connect();

@@ -13,8 +13,8 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { createNewEntity } from '../utils/sharing';
-import { deriveWorkspaceKey, storeKeyChain, getStoredKeyChain, deriveWorkspaceTopicHash } from '../utils/keyDerivation';
+import { createNewEntity, generateTopicHash } from '../utils/sharing';
+import { deriveWorkspaceKey, storeKeyChain, getStoredKeyChain } from '../utils/keyDerivation';
 import { secureError, secureLog } from '../utils/secureLogger';
 import { isElectron as checkIsElectron } from '../hooks/useEnvironment';
 import { useIdentity } from './IdentityContext';
@@ -677,8 +677,8 @@ export function WorkspaceProvider({ children }) {
     if (encryptionKey) {
       // Use directly provided encryption key (from key-embedded link)
       workspaceKey = encryptionKey;
-      // For key-embedded links, use entityId as topic (no password to derive from)
-      if (!topic) topic = entityId;
+      // For key-embedded links, derive topic from entityId (matches sidecar formula)
+      if (!topic) topic = generateTopicHash(entityId);
       
       // Store key chain
       storeKeyChain(entityId, {
@@ -690,7 +690,9 @@ export function WorkspaceProvider({ children }) {
     } else if (password) {
       // Derive workspace key from password
       workspaceKey = await deriveWorkspaceKey(password, entityId);
-      if (!topic) topic = await deriveWorkspaceTopicHash(password, entityId);
+      // Topic is NOT derived from password - use the standard workspace topic
+      // This matches sidecar/mesh-constants.js getWorkspaceTopic()
+      if (!topic) topic = generateTopicHash(entityId);
       
       // Store key chain
       storeKeyChain(entityId, {
@@ -700,8 +702,8 @@ export function WorkspaceProvider({ children }) {
         folderKeys: {},
       });
     } else {
-      // No password or key - use entityId as topic, no encryption
-      if (!topic) topic = entityId;
+      // No password or key - derive topic from entityId (matches sidecar formula)
+      if (!topic) topic = generateTopicHash(entityId);
     }
     
     // Get user identity (prefer context, fallback to IPC)
