@@ -14,17 +14,17 @@ const { EventEmitter } = require('events');
 const execAsync = promisify(exec);
 const PROJECT_ROOT = path.resolve(__dirname, '../../..');
 
-// Port configuration matching sidecar/index.js
+// Port configuration - use 9xxx range to avoid conflicts with production app (8080)
 const PORTS = {
   sidecar1: {
-    yjs: 8080,
-    meta: 8081,
-    wss: 8443
+    yjs: 9080,
+    meta: 9081,
+    wss: 9443
   },
   sidecar2: {
-    yjs: 8090,
-    meta: 8091,
-    wss: 8453
+    yjs: 9090,
+    meta: 9091,
+    wss: 9453
   },
   unified1: 3000,
   unified2: 3001

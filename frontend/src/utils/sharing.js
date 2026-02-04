@@ -647,16 +647,28 @@ export function createNewEntity(entityType, options = {}) {
 }
 
 /**
+ * IMPORTANT: This must match sidecar/mesh-constants.js getWorkspaceTopic()
+ * Both use: SHA256('nightjar-workspace:' + workspaceId)
+ * Password is NOT included in topic hash - it only affects encryption.
+ */
+const WORKSPACE_TOPIC_PREFIX = 'nightjar-workspace:';
+
+/**
  * Generate topic hash from entity ID
  * @param {string} entityType - Entity type
  * @param {string} entityId - Entity ID (hex)
- * @param {string} password - Password for the entity
+ * @param {string} password - Password for the entity (ignored for topic generation)
  * @returns {string} Topic hash (hex)
  */
 export function generateTopicFromEntityId(entityType, entityId, password = '') {
-  // Workspaces have their own topic
+  // For workspaces, use the standard prefix that matches sidecar/mesh-constants.js
+  // This ensures all peers join the SAME DHT topic regardless of password
+  if (entityType === 'workspace') {
+    return sha256(WORKSPACE_TOPIC_PREFIX + entityId);
+  }
   // Folders and documents inherit from their workspace's topic
-  const data = `${entityType}:${entityId}:${password}`;
+  // They use a different prefix to avoid collisions
+  const data = `nightjar-${entityType}:${entityId}`;
   return sha256(data);
 }
 
@@ -673,14 +685,15 @@ export function generateTopicFromDocId(documentId, password = '') {
 
 /**
  * Generate topic hash for Hyperswarm DHT discovery
+ * IMPORTANT: Must match sidecar/mesh-constants.js getWorkspaceTopic()
+ * Password is NOT used for topic generation - only for encryption
  * @param {string} workspaceId - Workspace ID (hex)
- * @param {string} password - Optional password for additional security
+ * @param {string} password - Ignored (kept for API compatibility)
  * @returns {string} 64-char hex topic hash
  */
 export function generateTopicHash(workspaceId, password = '') {
-  // Use SHA256 of workspaceId + password for DHT topic
-  const data = password ? `workspace:${workspaceId}:${password}` : `workspace:${workspaceId}`;
-  return sha256(data);
+  // Use the same formula as sidecar/mesh-constants.js
+  return sha256(WORKSPACE_TOPIC_PREFIX + workspaceId);
 }
 
 /**

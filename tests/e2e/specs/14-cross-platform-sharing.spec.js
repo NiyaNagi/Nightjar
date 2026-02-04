@@ -10,6 +10,9 @@
 const { test, expect } = require('../fixtures/test-fixtures.js');
 const crypto = require('crypto');
 
+// Increase timeout for cross-platform tests (sidecars take ~20-25 seconds to start each)
+test.setTimeout(180000); // 3 minutes per test
+
 // Helper to wait for page to be ready
 async function waitForAppReady(page, timeout = 60000) {
   await page.waitForSelector('[data-testid="workspace-sidebar"], [data-testid="onboarding-welcome"], .workspace-switcher, .sidebar, .empty-editor-state.onboarding-welcome, .onboarding-welcome', { 

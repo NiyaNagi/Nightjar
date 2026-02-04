@@ -96,9 +96,12 @@ async function loadUint8Arrays() {
     if (uint8arraysLoaded) return true; // Already loaded
     
     try {
+        console.log('[Sidecar] Loading uint8arrays module via dynamic import...');
+        // uint8arrays is an ESM-only module, must use dynamic import
         const uint8arrays = await import('uint8arrays');
         uint8ArrayFromString = uint8arrays.fromString;
         uint8arraysLoaded = true;
+        console.log('[Sidecar] uint8arrays module loaded successfully');
         return true;
     } catch (error) {
         console.error('[Sidecar] Failed to load uint8arrays:', error.message);
@@ -109,10 +112,10 @@ async function loadUint8Arrays() {
 // Load uint8arrays module in background (don't block startup)
 loadUint8Arrays().then(loaded => {
     if (loaded) {
-        console.log(`[Sidecar] uint8arrays loaded (${Date.now() - startTime}ms)`);
+        console.log(`[Sidecar] uint8arrays loaded in background (${Date.now() - startTime}ms)`);
     } else {
-        console.error('[Sidecar] Critical: uint8arrays failed to load');
-        process.exit(1);
+        console.warn('[Sidecar] Warning: uint8arrays failed to load, some features may not work');
+        // Don't exit - allow sidecar to continue without this module
     }
 });
 
@@ -1637,12 +1640,21 @@ async function startServers() {
     }
     
     // --- Server 1: Plain Yjs WebSocket (ws://) ---
-    yjsWss = new WebSocket.Server({ port: YJS_WEBSOCKET_PORT });
-    yjsWss.on('connection', (conn, req) => {
-        console.log('[Sidecar] Yjs client connected (WS)');
-        setupWSConnection(conn, req);
+    console.log(`[Sidecar] Creating Yjs WebSocket server on port ${YJS_WEBSOCKET_PORT}...`);
+    await new Promise((resolve, reject) => {
+        yjsWss = new WebSocket.Server({ port: YJS_WEBSOCKET_PORT }, () => {
+            console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT} (${Date.now() - startTime}ms)`);
+            resolve();
+        });
+        yjsWss.on('connection', (conn, req) => {
+            console.log('[Sidecar] Yjs client connected (WS)');
+            setupWSConnection(conn, req);
+        });
+        yjsWss.on('error', (err) => {
+            console.error(`[Sidecar] Yjs WebSocket server error:`, err);
+            reject(err);
+        });
     });
-    console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT} (${Date.now() - startTime}ms)`);
     
     // --- Server 2: Secure Yjs WebSocket (wss://) ---
     if (sslCreds) {
@@ -1667,7 +1679,17 @@ async function startServers() {
     }
 
     // Server 2: Handles metadata and commands  
-    metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT });
+    console.log(`[Sidecar] Creating Metadata WebSocket server on port ${METADATA_WEBSOCKET_PORT}...`);
+    const metaServerReady = new Promise((resolve, reject) => {
+        metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT }, () => {
+            console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT} (${Date.now() - startTime}ms)`);
+            resolve();
+        });
+        metaWss.on('error', (err) => {
+            console.error(`[Sidecar] Metadata WebSocket server error:`, err);
+            reject(err);
+        });
+    });
     
     // Set up metadata server connection handler
     metaWss.on('connection', (ws, req) => {
@@ -1738,11 +1760,18 @@ async function startServers() {
         p2pBridge.handleClient(ws);
     });
     
-    console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT} (${Date.now() - startTime}ms)`);
+    // Wait for metadata server to be ready
+    await metaServerReady;
     
-    // Load uint8arrays module and initialize document keys after servers are started
-    await loadUint8Arrays();
-    initializeDocumentKeys();
+    // Load uint8arrays module in background (don't block startup)
+    console.log('[Sidecar] Starting uint8arrays module load in background...');
+    loadUint8Arrays().then(() => {
+        console.log('[Sidecar] uint8arrays loaded, initializing document keys...');
+        initializeDocumentKeys();
+        console.log('[Sidecar] Document keys initialized');
+    }).catch(err => {
+        console.warn('[Sidecar] uint8arrays/document keys init warning:', err.message);
+    });
     
     console.log(`[Sidecar] ========== Startup complete in ${Date.now() - startTime}ms ==========`);
 }
