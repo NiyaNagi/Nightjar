@@ -11,13 +11,26 @@ const test = base.extend({
     const server = await env.startUnifiedServer('unified-1', PORTS.unified1);
     console.log('[Fixture] unified-1 ready at', server.url);
     await use(server);
-    console.log('[Fixture] unified-1 fixture teardown');
-  }, { scope: 'worker' }],
+    console.log('[Fixture] unified-1 fixture teardown - stopping process');
+    try {
+      await server.process.stop();
+      await new Promise(r => setTimeout(r, 1000));
+    } catch (e) {
+      console.log('[Fixture] unified-1 stop error:', e.message);
+    }
+  }, { scope: 'worker', timeout: 120000 }],
 
   unifiedServer2: [async ({}, use) => {
     const server = await env.startUnifiedServer('unified-2', PORTS.unified2);
     await use(server);
-  }, { scope: 'worker' }],
+    console.log('[Fixture] unified-2 fixture teardown - stopping process');
+    try {
+      await server.process.stop();
+      await new Promise(r => setTimeout(r, 1000));
+    } catch (e) {
+      console.log('[Fixture] unified-2 stop error:', e.message);
+    }
+  }, { scope: 'worker', timeout: 120000 }],
 
   electronSidecar1: [async ({}, use) => {
     console.log('[Fixture] Starting sidecar-1 on ports', JSON.stringify(PORTS.sidecar1));
@@ -25,8 +38,15 @@ const test = base.extend({
     const sidecar = await env.startSidecar('sidecar-1', PORTS.sidecar1);
     console.log('[Fixture] sidecar-1 ready after', Date.now() - startTime, 'ms, metaUrl:', sidecar.metaUrl);
     await use(sidecar);
-    console.log('[Fixture] sidecar-1 fixture teardown');
-  }, { scope: 'worker' }],
+    console.log('[Fixture] sidecar-1 fixture teardown - stopping process');
+    try {
+      await sidecar.process.stop();
+      // Give time for locks to release
+      await new Promise(r => setTimeout(r, 2000));
+    } catch (e) {
+      console.log('[Fixture] sidecar-1 stop error:', e.message);
+    }
+  }, { scope: 'worker', timeout: 120000 }],
 
   electronSidecar2: [async ({}, use) => {
     console.log('[Fixture] Starting sidecar-2 on ports', JSON.stringify(PORTS.sidecar2));
@@ -34,8 +54,15 @@ const test = base.extend({
     const sidecar = await env.startSidecar('sidecar-2', PORTS.sidecar2);
     console.log('[Fixture] sidecar-2 ready after', Date.now() - startTime, 'ms, metaUrl:', sidecar.metaUrl);
     await use(sidecar);
-    console.log('[Fixture] sidecar-2 fixture teardown');
-  }, { scope: 'worker' }],
+    console.log('[Fixture] sidecar-2 fixture teardown - stopping process');
+    try {
+      await sidecar.process.stop();
+      // Give time for locks to release
+      await new Promise(r => setTimeout(r, 2000));
+    } catch (e) {
+      console.log('[Fixture] sidecar-2 stop error:', e.message);
+    }
+  }, { scope: 'worker', timeout: 120000 }],
 
   sidecarClient1: async ({ electronSidecar1 }, use) => {
     console.log('[Fixture] Creating sidecarClient1 for', electronSidecar1.metaUrl);

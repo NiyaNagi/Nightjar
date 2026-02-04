@@ -243,10 +243,11 @@ test.describe('Cross-Platform Sharing', () => {
       
       await new Promise(r => setTimeout(r, 3000));
       
-      // Verify documents
+      // Verify documents - filter by workspaceId since sidecar may have docs from previous tests
       const docs = await sidecarClient1.listDocuments(workspaceData.id);
-      testLogs.add('test', 'info', `Documents in workspace: ${docs.documents?.length || 0}`);
-      expect(docs.documents?.length).toBe(3);
+      const workspaceDocs = docs.documents?.filter(d => d.workspaceId === workspaceData.id) || [];
+      testLogs.add('test', 'info', `Documents in workspace: ${workspaceDocs.length}`);
+      expect(workspaceDocs.length).toBe(3);
       
       // Clean up
       await sidecarClient1.deleteWorkspace(workspaceData.id);

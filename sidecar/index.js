@@ -25,6 +25,7 @@ const { Level } = require('level');
 const TorControl = require('tor-control');
 const EventEmitter = require('events');
 const { P2PBridge } = require('./p2p-bridge');
+const { getWorkspaceTopicHex } = require('./mesh-constants');
 console.log(`[Sidecar] Core modules loaded (${Date.now() - startTime}ms)`);
 const identity = require('./identity');
 // OPTIMIZATION: Lazy-load mesh since it creates Hyperswarm at import
@@ -2129,13 +2130,23 @@ async function autoRejoinWorkspaces() {
     try {
         const workspaces = await loadWorkspaceList();
         for (const ws of workspaces) {
-            if (ws.topicHash && p2pBridge.isInitialized) {
+            // Always derive canonical topic hash from workspace ID to ensure consistency
+            if (ws.id && p2pBridge.isInitialized) {
                 try {
-                    await p2pBridge.joinTopic(ws.topicHash);
-                    console.log(`[Sidecar] Auto-rejoined workspace topic: ${ws.topicHash.slice(0, 16)}...`);
+                    const canonicalTopicHash = getWorkspaceTopicHex(ws.id);
+                    
+                    // Log migration if stored hash differs from canonical
+                    if (ws.topicHash && ws.topicHash !== canonicalTopicHash) {
+                        console.log(`[Sidecar] Migrating workspace ${ws.id.slice(0, 8)}... topic hash`);
+                        console.log(`[Sidecar]   Old: ${ws.topicHash.slice(0, 16)}...`);
+                        console.log(`[Sidecar]   New: ${canonicalTopicHash.slice(0, 16)}...`);
+                    }
+                    
+                    await p2pBridge.joinTopic(canonicalTopicHash);
+                    console.log(`[Sidecar] Auto-rejoined workspace topic: ${canonicalTopicHash.slice(0, 16)}...`);
                     
                     // Register for Yjs P2P bridging
-                    registerWorkspaceTopic(ws.id, ws.topicHash);
+                    registerWorkspaceTopic(ws.id, canonicalTopicHash);
                     
                     // Try to connect to last known peers
                     if (ws.lastKnownPeers && Array.isArray(ws.lastKnownPeers)) {
