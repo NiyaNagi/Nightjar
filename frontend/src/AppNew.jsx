@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
+import { IndexeddbPersistence } from 'y-indexeddb';
 import nacl from 'tweetnacl';
 import { fromString as uint8ArrayFromString, toString as uint8ArrayToString } from 'uint8arrays';
 
@@ -22,6 +23,7 @@ import CreateWorkspace from './components/CreateWorkspace';
 import CreateDocumentDialog from './components/CreateDocument';
 import KickedModal from './components/KickedModal';
 import OnboardingFlow from './components/Onboarding/OnboardingFlow';
+import IdentitySelector from './components/IdentitySelector';
 import NightjarMascot from './components/NightjarMascot';
 import { useAuthorAttribution } from './hooks/useAuthorAttribution';
 import { useChangelogObserver } from './hooks/useChangelogObserver';
@@ -254,6 +256,7 @@ function App() {
     const [showTorSettings, setShowTorSettings] = useState(false); // Tor settings modal
     const [showCreateDocumentDialog, setShowCreateDocumentDialog] = useState(false); // Create document modal
     const [createDocumentType, setCreateDocumentType] = useState('text'); // Pre-selected document type
+    const [showIdentitySelector, setShowIdentitySelector] = useState(false); // Identity selector for multiple identities
 
     // --- Refs ---
     const metaSocketRef = useRef(null);
@@ -615,7 +618,17 @@ function App() {
         const wsUrl = getWsUrl(workspaceServerUrl);
         console.log(`[App] Creating document ${docId} with wsUrl: ${wsUrl}`);
         const provider = new WebsocketProvider(wsUrl, docId, ydoc);
-        ydocsRef.current.set(docId, { ydoc, provider, type: docType });
+        
+        // Add local IndexedDB persistence in web mode (offline-first)
+        let indexeddbProvider = null;
+        if (!isElectronMode) {
+            const dbName = `nahma-doc-${docId}`;
+            indexeddbProvider = new IndexeddbPersistence(dbName, ydoc);
+            indexeddbProvider.on('synced', () => {
+                console.log(`[App] Document ${docId.slice(0, 8)}... loaded from IndexedDB`);
+            });
+        }
+        ydocsRef.current.set(docId, { ydoc, provider, indexeddbProvider, type: docType });
 
         // Add to shared document list (syncs to all connected clients)
         // Use Yjs sync for: web mode OR Electron with remote workspace
@@ -669,7 +682,17 @@ function App() {
             const wsUrl = getWsUrl(workspaceServerUrl);
             console.log(`[App] Opening document ${docId} with wsUrl: ${wsUrl}`);
             const provider = new WebsocketProvider(wsUrl, docId, ydoc);
-            ydocsRef.current.set(docId, { ydoc, provider, type: docType });
+            
+            // Add local IndexedDB persistence in web mode (offline-first)
+            let indexeddbProvider = null;
+            if (!isElectronMode) {
+                const dbName = `nahma-doc-${docId}`;
+                indexeddbProvider = new IndexeddbPersistence(dbName, ydoc);
+                indexeddbProvider.on('synced', () => {
+                    console.log(`[App] Document ${docId.slice(0, 8)}... loaded from IndexedDB`);
+                });
+            }
+            ydocsRef.current.set(docId, { ydoc, provider, indexeddbProvider, type: docType });
         }
 
         // Add to tabs
@@ -698,10 +721,14 @@ function App() {
             }
         }
 
-        // Cleanup provider
+        // Cleanup providers
         const docRef = ydocsRef.current.get(docId);
         if (docRef) {
             docRef.provider.disconnect();
+            // Also cleanup IndexedDB provider if exists (web mode)
+            if (docRef.indexeddbProvider) {
+                docRef.indexeddbProvider.destroy();
+            }
             docRef.ydoc.destroy();
             ydocsRef.current.delete(docId);
         }
@@ -922,6 +949,59 @@ function App() {
     }, [activeDoc?.ydoc, activeDoc?.provider, collaborators.length]);
 
     // --- Render ---
+    
+    // Check for multiple identities on startup (Electron only)
+    useEffect(() => {
+        if (!isElectronMode || userIdentity || identityLoading) {
+            return;
+        }
+        
+        // If needsOnboarding but we're in Electron, check for existing identities
+        if (needsOnboarding) {
+            const metadataWs = window.metadataWs;
+            if (metadataWs && metadataWs.readyState === WebSocket.OPEN) {
+                const handleMessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'identity-list') {
+                            // If more than 1 identity exists (active + others), show selector
+                            if (data.identities && data.identities.length > 1) {
+                                setShowIdentitySelector(true);
+                            }
+                            metadataWs.removeEventListener('message', handleMessage);
+                        }
+                    } catch (err) {
+                        console.error('[App] Identity list parse error:', err);
+                    }
+                };
+                
+                metadataWs.addEventListener('message', handleMessage);
+                metadataWs.send(JSON.stringify({ type: 'list-identities' }));
+                
+                // Cleanup after timeout
+                setTimeout(() => {
+                    metadataWs.removeEventListener('message', handleMessage);
+                }, 3000);
+            }
+        }
+    }, [needsOnboarding, userIdentity, identityLoading, isElectronMode]);
+    
+    // Show identity selector if multiple identities exist
+    if (showIdentitySelector && !userIdentity && !identityLoading) {
+        return (
+            <IdentitySelector
+                onSelect={(identity) => {
+                    setShowIdentitySelector(false);
+                    // Reload the app to use the new identity
+                    window.location.reload();
+                }}
+                onCreateNew={() => {
+                    setShowIdentitySelector(false);
+                    // Continue to onboarding
+                }}
+            />
+        );
+    }
     
     // Show onboarding if identity doesn't exist and not loading
     if (needsOnboarding && !userIdentity && !identityLoading) {

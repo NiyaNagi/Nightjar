@@ -455,6 +455,77 @@ function inferDeviceName() {
     return platformNames[platform] || 'Device';
 }
 
+/**
+ * List all identities in the identity directory
+ * Looks for identity-*.json files alongside identity.json
+ * @returns {Array<{filename: string, handle: string, publicKeyBase62: string}>}
+ */
+function listIdentities() {
+    const identities = [];
+    const identityDir = getIdentityDir();
+    
+    try {
+        if (!fs.existsSync(identityDir)) {
+            return [];
+        }
+        
+        const files = fs.readdirSync(identityDir);
+        for (const file of files) {
+            if (file.startsWith('identity') && file.endsWith('.json')) {
+                try {
+                    const filePath = path.join(identityDir, file);
+                    const data = fs.readFileSync(filePath, 'utf-8');
+                    const identity = JSON.parse(data);
+                    
+                    identities.push({
+                        filename: file,
+                        handle: identity.handle || 'Unknown',
+                        publicKeyBase62: identity.publicKeyBase62,
+                        color: identity.color,
+                        icon: identity.icon,
+                        isActive: file === 'identity.json'
+                    });
+                } catch (err) {
+                    console.error(`[Identity] Failed to read ${file}:`, err);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Identity] Failed to list identities:', err);
+    }
+    
+    return identities;
+}
+
+/**
+ * Switch to a different identity by filename
+ * @param {string} filename - The identity file to switch to (e.g., 'identity-backup.json')
+ * @returns {boolean} Success
+ */
+function switchIdentity(filename) {
+    const identityDir = getIdentityDir();
+    const sourcePath = path.join(identityDir, filename);
+    const activePath = getIdentityPath();
+    
+    if (!fs.existsSync(sourcePath)) {
+        throw new Error('Identity file not found');
+    }
+    
+    // Backup current active identity if it exists
+    if (fs.existsSync(activePath)) {
+        const timestamp = Date.now();
+        const backupPath = path.join(identityDir, `identity-${timestamp}.json`);
+        fs.copyFileSync(activePath, backupPath);
+        console.log('[Identity] Backed up current identity to:', backupPath);
+    }
+    
+    // Copy selected identity to active position
+    fs.copyFileSync(sourcePath, activePath);
+    console.log('[Identity] Switched to identity:', filename);
+    
+    return true;
+}
+
 module.exports = {
     // Configuration
     setBasePath,
@@ -469,6 +540,9 @@ module.exports = {
     validateRecoveryPhrase,
     exportIdentity,
     importIdentity,
+    // Identity management
+    listIdentities,
+    switchIdentity,
     // Path helpers
     getIdentityDir,
     getIdentityPath,

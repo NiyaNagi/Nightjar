@@ -73,7 +73,7 @@ export default function OnboardingFlow({ onComplete }) {
 
 function WelcomeStep({ hasExistingIdentity, onCreateNew, onRestore }) {
     return (
-        <div className="onboarding-step welcome-step">
+        <div className="onboarding-step welcome-step" data-testid="onboarding-welcome">
             <div className="onboarding-logo">
                 <img 
                     src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
@@ -96,10 +96,10 @@ function WelcomeStep({ hasExistingIdentity, onCreateNew, onRestore }) {
             </div>
             
             <div className="onboarding-actions">
-                <button className="btn-primary" onClick={onCreateNew}>
+                <button className="btn-primary" onClick={onCreateNew} data-testid="create-identity-btn">
                     Create New Identity
                 </button>
-                <button className="btn-secondary" onClick={onRestore}>
+                <button className="btn-secondary" onClick={onRestore} data-testid="restore-identity-btn">
                     I Have a Recovery Phrase
                 </button>
             </div>
@@ -127,7 +127,7 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
                 identity if you lose access to this device.
             </p>
             
-            <div className="recovery-phrase-grid">
+            <div className="recovery-phrase-grid" data-testid="recovery-phrase">
                 {words.map((word, index) => (
                     <div key={index} className="recovery-word">
                         <span className="word-number">{index + 1}</span>
@@ -136,7 +136,7 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
                 ))}
             </div>
             
-            <button className="btn-copy" onClick={copyToClipboard}>
+            <button className="btn-copy" onClick={copyToClipboard} data-testid="copy-recovery-btn">
                 📋 Copy to Clipboard
             </button>
             
@@ -153,6 +153,7 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
                     type="checkbox" 
                     checked={confirmed}
                     onChange={(e) => setConfirmed(e.target.checked)}
+                    data-testid="understood-checkbox"
                 />
                 <span>I have saved my recovery phrase in a safe place</span>
             </label>
@@ -161,6 +162,7 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
                 className="btn-primary" 
                 onClick={onConfirm}
                 disabled={!confirmed}
+                data-testid="continue-btn"
             >
                 Continue
             </button>

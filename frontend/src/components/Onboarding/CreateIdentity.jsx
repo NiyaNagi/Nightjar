@@ -182,6 +182,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                     placeholder="Enter your name"
                     maxLength={30}
                     autoFocus
+                    data-testid="identity-name-input"
                 />
             </div>
             
@@ -192,6 +193,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                         className="current-avatar"
                         style={{ backgroundColor: selectedColor }}
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        data-testid="emoji-picker-trigger"
                     >
                         {selectedEmoji}
                     </button>
@@ -199,7 +201,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                 </div>
                 
                 {showEmojiPicker && (
-                    <div className="emoji-picker">
+                    <div className="emoji-picker" data-testid="emoji-picker">
                         {EMOJI_OPTIONS.map((emoji) => (
                             <button
                                 key={emoji}
@@ -208,6 +210,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                                     setSelectedEmoji(emoji);
                                     setShowEmojiPicker(false);
                                 }}
+                                data-testid={`emoji-${emoji}`}
                             >
                                 {emoji}
                             </button>
@@ -238,6 +241,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                 className="btn-primary" 
                 onClick={handleCreateClick}
                 disabled={creating}
+                data-testid="confirm-identity-btn"
             >
                 {creating ? 'Creating...' : 'Create Identity'}
             </button>

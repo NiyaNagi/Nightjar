@@ -462,6 +462,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
                   className="create-workspace__input"
                   placeholder="My Workspace"
                   autoFocus
+                  data-testid="workspace-name-input"
                 />
               </div>
               
@@ -500,6 +501,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
                 type="submit" 
                 className="create-workspace__submit"
                 disabled={isCreating}
+                data-testid="confirm-workspace-btn"
               >
                 {isCreating ? 'Creating...' : 'Create Workspace'}
               </button>
@@ -515,6 +517,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
                   placeholder="Paste the share link here..."
                   rows={3}
                   autoFocus
+                  data-testid="share-link-input"
                 />
               </div>
               
@@ -631,13 +634,14 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               )}
               
               {joinError && (
-                <div className="create-workspace__error">{joinError}</div>
+                <div className="create-workspace__error" data-testid="join-error">{joinError}</div>
               )}
               
               <button 
                 type="submit" 
                 className="create-workspace__submit"
                 disabled={isJoining || !parsedLink}
+                data-testid="join-btn"
               >
                 {isJoining ? 'Joining...' : 'Join Workspace'}
               </button>

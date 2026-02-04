@@ -1,9 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
-const { Level } = require('level');
 const { getTorManager } = require('./backend/tor-manager-enhanced');
-const { encryptUpdate, decryptUpdate } = require('./backend/crypto');
 const identity = require('../sidecar/identity');
 const hyperswarm = require('../sidecar/hyperswarm');
 const Y = require('yjs');
@@ -12,6 +11,19 @@ const packageJson = require('../package.json');
 
 // Make version available to preload script
 global.APP_VERSION = packageJson.version;
+
+// Cache the logo as base64 for the loading screen
+let logoBase64 = '';
+try {
+    const logoPath = app.isPackaged 
+        ? path.join(process.resourcesPath, 'app.asar', 'assets', 'nightjar-logo.png')
+        : path.join(__dirname, '..', 'assets', 'nightjar-logo.png');
+    if (fs.existsSync(logoPath)) {
+        logoBase64 = fs.readFileSync(logoPath).toString('base64');
+    }
+} catch (e) {
+    console.warn('[Main] Could not load logo for splash screen:', e.message);
+}
 
 // Register nightjar:// as the default protocol handler for this app
 if (process.defaultApp) {
@@ -51,7 +63,7 @@ let hyperswarmInstance = null;
 let sessionKey = null;
 const ydocs = new Map();
 const userDataPath = app.getPath('userData');
-const db = new Level(path.join(userDataPath, 'storage'), { valueEncoding: 'binary' });
+// NOTE: LevelDB is ONLY opened by the sidecar process to avoid lock conflicts
 
 // Initialize identity storage path to match userData for consistency
 // This ensures identity.json is stored in the same location as other app data
@@ -108,14 +120,10 @@ const DOC_PUBSUB_TOPIC = '/nightjarx/1.0.0/doc';
 const AWARENESS_PUBSUB_TOPIC = '/nightjarx/1.0.0/awareness';
 
 const bindP2PToYDoc = (doc) => {
+    // NOTE: P2P sync is now handled by the sidecar process
+    // This legacy handler is kept for compatibility but does nothing
     doc.on('update', async (update, origin) => {
-        if (origin !== 'p2p' && p2pNode && sessionKey) {
-            const encrypted = encryptUpdate(update, sessionKey);
-            try {
-                await db.put(Date.now(), encrypted);
-                await p2pNode.services.pubsub.publish(DOC_PUBSUB_TOPIC, encrypted);
-            } catch (err) { console.error('Failed to persist/publish doc update:', err); }
-        }
+        // Sidecar handles persistence and P2P publishing
     });
 };
 
@@ -366,10 +374,18 @@ function getLoadingScreenHtml(step = 0, message = '') {
             color: #a5b4fc;
             margin-bottom: 0.5rem;
             min-height: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .message-real {
             font-size: 0.9rem;
             color: rgba(255,255,255,0.5);
+        }
+        .dots {
+            display: inline-block;
+            width: 1.5em;
+            text-align: left;
         }
         .dots::after {
             content: '';
@@ -393,7 +409,7 @@ function getLoadingScreenHtml(step = 0, message = '') {
 <body>
     <div class="container">
         <div class="logo">
-            <img src="file://${path.join(__dirname, '..', 'assets', 'nightjar-logo.png')}" alt="Nightjar" />
+            ${logoBase64 ? `<img src="data:image/png;base64,${logoBase64}" alt="Nightjar" />` : ''}
         </div>
         <h1>Nightjar</h1>
         <div class="progress-container">
@@ -402,7 +418,7 @@ function getLoadingScreenHtml(step = 0, message = '') {
         <div class="message-funny" id="funny">${funny}<span class="dots"></span></div>
         <div class="message-real" id="real">${real}</div>
     </div>
-    <div class="version">v1.0.0</div>
+    <div class="version">v${packageJson.version}</div>
 </body>
 </html>`;
 }
@@ -617,9 +633,11 @@ async function startBackendWithLoadingScreen() {
 
         let wsReady = false;
         let metaWsReady = false;
+        let resolved = false; // Track if we've already resolved
 
         const checkReady = () => {
-            if (wsReady && metaWsReady) {
+            if (wsReady && metaWsReady && !resolved) {
+                resolved = true; // Mark as resolved to prevent duplicate calls
                 updateProgress(7); // Complete
                 setTimeout(() => {
                     console.log('[Main] Backend ready, creating main window...');
@@ -785,15 +803,12 @@ async function startBackend() {
 
 // --- IPC Handlers ---
 ipcMain.on('set-key', async (event, keyPayload) => {
+    // NOTE: Database operations are now handled by the sidecar process
+    // This legacy handler just acknowledges the key and returns current doc state
     console.log('[Backend] Received session key.');
     sessionKey = uint8ArrayFromString(keyPayload, 'base64');
     const doc = getDoc('p2p-editor-room');
-    for await (const [key, value] of db.iterator()) {
-        const decrypted = decryptUpdate(value, sessionKey);
-        if (decrypted) {
-            Y.applyUpdate(doc, decrypted, 'p2p');
-        }
-    }
+    // Sidecar handles persistence - just return current in-memory state
     const fullUpdate = Y.encodeStateAsUpdate(doc);
     event.sender.send('yjs-update', fullUpdate);
 });

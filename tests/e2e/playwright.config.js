@@ -1,59 +1,68 @@
 // @ts-check
-import { defineConfig, devices } from '@playwright/test';
+const { defineConfig, devices } = require('@playwright/test');
 
 /**
- * Playwright configuration for Nightjar E2E and visual testing
+ * Playwright configuration for Nahma E2E and Cross-Platform testing
  * 
  * This config supports:
+ * - Cross-platform testing (Electron sidecar + Web clients)
  * - Screenshot capture on every test
  * - Video recording of test runs
  * - Console/network error capture
- * - HTML reports for AI analysis
+ * - Rich HTML reports for debugging
+ * - Global setup/teardown for process management
  */
-export default defineConfig({
+module.exports = defineConfig({
   testDir: './specs',
   
-  // Run tests sequentially for reliable state
+  // Run tests sequentially for reliable state and process management
   fullyParallel: false,
   
   // Fail the build on CI if you accidentally left test.only in the source code.
   forbidOnly: !!process.env.CI,
   
-  // Retry failed tests once
-  retries: 1,
+  // Retry failed tests (more retries in CI)
+  retries: process.env.CI ? 2 : 1,
   
-  // Number of workers
+  // Single worker for consistent state across cross-platform tests
   workers: 1,
   
-  // Reporter - HTML for visual inspection
+  // Rich reporting
   reporter: [
-    ['html', { outputFolder: '../e2e-report', open: 'never' }],
-    ['json', { outputFile: '../e2e-report/results.json' }],
+    ['html', { outputFolder: './test-results/html-report', open: 'never' }],
+    ['json', { outputFile: './test-results/results.json' }],
     ['list']
   ],
   
+  // Global setup/teardown for process orchestration
+  globalSetup: require.resolve('./fixtures/global-setup.js'),
+  globalTeardown: require.resolve('./fixtures/global-teardown.js'),
+  
   // Shared settings for all projects
   use: {
-    // Base URL for your app
-    baseURL: 'http://localhost:5173',
+    // Base URL - unified server on port 3000
+    baseURL: 'http://localhost:3000',
     
-    // Capture screenshot on failure
+    // Always capture screenshots (helps with debugging)
     screenshot: 'on',
     
-    // Record video of test runs
-    video: 'on-first-retry',
+    // Record video on failure
+    video: 'retain-on-failure',
     
     // Capture trace on failure (includes snapshots, console, network)
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     
     // Viewport size
     viewport: { width: 1280, height: 720 },
     
-    // Collect all console messages
+    // Accept self-signed certs for WSS testing
     ignoreHTTPSErrors: true,
+    
+    // Action timeout
+    actionTimeout: 10000,
   },
 
-  // Configure projects for major browsers
+  // Configure projects - chromium only for faster testing
   projects: [
     {
       name: 'chromium',
@@ -61,20 +70,15 @@ export default defineConfig({
     },
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: {
-    command: 'cd ../.. && npm run dev:react',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
-
-  // Output folder for test artifacts
-  outputDir: './test-results/',
+  // No webServer - we manage processes via orchestrator
+  // Tests will start unified servers and sidecars as needed
   
-  // Timeout settings
-  timeout: 30000,
+  // Output folder for test artifacts
+  outputDir: './test-results/artifacts',
+  
+  // Timeout settings - longer for cross-platform sync
+  timeout: 120000,
   expect: {
-    timeout: 5000,
+    timeout: 15000,
   },
 });

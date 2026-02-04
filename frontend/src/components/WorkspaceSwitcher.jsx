@@ -56,6 +56,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
           <button 
             className="workspace-switcher__action-btn workspace-switcher__action-btn--primary"
             onClick={onCreateWorkspace}
+            data-testid="create-workspace-btn"
           >
             <span className="workspace-switcher__action-icon">+</span>
             Create Workspace
@@ -63,6 +64,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
           <button 
             className="workspace-switcher__action-btn"
             onClick={onJoinWorkspace}
+            data-testid="join-workspace-btn"
           >
             <span className="workspace-switcher__action-icon">🔗</span>
             Join via Link
@@ -80,6 +82,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        data-testid="workspace-selector"
         style={{
           background: currentWorkspace?.color 
             ? `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), ${currentWorkspace.color}`
@@ -140,6 +143,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 }}
                 role="option"
                 aria-selected={workspace.id === currentWorkspace?.id}
+                data-testid={`workspace-option-${workspace.name.replace(/\s+/g, '-')}`}
                 style={{
                   background: workspace.color 
                     ? `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), ${workspace.color}`
@@ -174,6 +178,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 setIsOpen(false);
                 onCreateWorkspace?.();
               }}
+              data-testid="dropdown-create-workspace-btn"
             >
               <span className="workspace-switcher__action-icon">+</span>
               Create New Workspace
@@ -184,6 +189,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 setIsOpen(false);
                 onJoinWorkspace?.();
               }}
+              data-testid="dropdown-join-workspace-btn"
             >
               <span className="workspace-switcher__action-icon">🔗</span>
               Join via Link

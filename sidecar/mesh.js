@@ -7,7 +7,15 @@
  * Reference: docs/RELAY_MESH_ARCHITECTURE.md
  */
 
-const Hyperswarm = require('hyperswarm');
+// OPTIMIZATION: Lazy-load hyperswarm package
+let Hyperswarm = null;
+function ensureHyperswarm() {
+  if (!Hyperswarm) {
+    Hyperswarm = require('hyperswarm');
+  }
+  return Hyperswarm;
+}
+
 const crypto = require('crypto');
 const EventEmitter = require('events');
 
@@ -101,6 +109,9 @@ class MeshParticipant extends EventEmitter {
     console.log(`[Mesh] Node ID: ${this.nodeId.slice(0, 16)}...`);
     console.log(`[Mesh] Relay mode: ${this.relayMode}`);
 
+    // Lazy-load hyperswarm package
+    ensureHyperswarm();
+    
     // Create Hyperswarm instance
     this.swarm = new Hyperswarm();
     
