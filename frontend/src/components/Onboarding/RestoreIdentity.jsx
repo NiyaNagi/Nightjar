@@ -230,7 +230,7 @@ export default function RestoreIdentity({ hasExistingIdentity, onComplete, onBac
     }
     
     return (
-        <div className="onboarding-step restore-step">
+        <div className="onboarding-step restore-step" data-testid="restore-identity">
             <button className="btn-back" onClick={onBack}>← Back</button>
             
             <h2>Restore Your Identity</h2>
@@ -238,7 +238,7 @@ export default function RestoreIdentity({ hasExistingIdentity, onComplete, onBac
                 Enter your 12-word recovery phrase
             </p>
             
-            <div className="recovery-input-grid">
+            <div className="recovery-input-grid" data-testid="recovery-phrase-input">
                 {words.map((word, index) => (
                     <div key={index} className="word-input-wrapper">
                         <span className="word-number">{index + 1}</span>
@@ -251,6 +251,7 @@ export default function RestoreIdentity({ hasExistingIdentity, onComplete, onBac
                             autoCorrect="off"
                             autoCapitalize="off"
                             spellCheck="false"
+                            data-testid={`recovery-word-${index + 1}`}
                         />
                     </div>
                 ))}
@@ -260,9 +261,9 @@ export default function RestoreIdentity({ hasExistingIdentity, onComplete, onBac
                 💡 Tip: You can paste all 12 words at once into the first field
             </p>
             
-            {error && <div className="error-message">{error}</div>}
+            {error && <div className="error-message" data-testid="restore-error">{error}</div>}
             
-            <button className="btn-primary" onClick={handleValidatePhrase}>
+            <button className="btn-primary" onClick={handleValidatePhrase} data-testid="restore-btn">
                 Continue
             </button>
         </div>

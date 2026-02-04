@@ -175,13 +175,14 @@ export default function CreateDocumentDialog({
           {/* Document Type Selection */}
           <div className="create-document-field">
             <label className="create-document-field__label">Document Type</label>
-            <div className="document-type-grid">
+            <div className="document-type-grid" data-testid="doc-type-grid">
               {DOCUMENT_TYPES.map((type) => (
                 <button
                   key={type.type}
                   type="button"
                   className={`document-type-option ${documentType === type.type ? 'selected' : ''}`}
                   onClick={() => setDocumentType(type.type)}
+                  data-testid={`doc-type-${type.type}`}
                 >
                   <div className="document-type-option__icon">{type.icon}</div>
                   <div className="document-type-option__label">{type.label}</div>
@@ -206,6 +207,7 @@ export default function CreateDocumentDialog({
               placeholder={`Enter ${DOCUMENT_TYPES.find(t => t.type === documentType)?.label.toLowerCase() || 'document'} name`}
               autoFocus
               maxLength={100}
+              data-testid="document-name-input"
             />
           </div>
           
@@ -284,6 +286,7 @@ export default function CreateDocumentDialog({
             type="button"
             className="create-document-btn create-document-btn--cancel"
             onClick={onClose}
+            data-testid="cancel-document-btn"
           >
             Cancel
           </button>
@@ -292,6 +295,7 @@ export default function CreateDocumentDialog({
             className="create-document-btn create-document-btn--primary"
             onClick={handleCreate}
             disabled={isCreating || !canCreateDocument || !name.trim()}
+            data-testid="create-document-confirm"
           >
             {isCreating ? 'Creating...' : `Create ${DOCUMENT_TYPES.find(t => t.type === documentType)?.label || 'Document'}`}
           </button>

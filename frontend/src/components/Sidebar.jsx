@@ -151,7 +151,7 @@ const Sidebar = ({
     }
 
     return (
-        <div className="sidebar">
+        <div className="sidebar" data-testid="workspace-sidebar">
             {/* Workspace Switcher at top */}
             <WorkspaceSwitcher
                 workspaces={workspaces}
@@ -224,7 +224,7 @@ const Sidebar = ({
             </div>
 
             {/* Document list for current folder */}
-            <div className="document-list">
+            <div className="document-list" data-testid="document-list">
                 {filteredDocuments.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-state__icon">📝</div>
@@ -262,6 +262,7 @@ const Sidebar = ({
                                     e.dataTransfer.setData('documentId', doc.id);
                                     e.dataTransfer.effectAllowed = 'move';
                                 }}
+                                data-testid={`doc-${doc.id}`}
                             >
                                 <span 
                                     className="doc-icon"

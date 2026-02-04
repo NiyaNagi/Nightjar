@@ -12,7 +12,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useIdentity } from '../contexts/IdentityContext';
-import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash } from '../utils/sharing';
+import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash, BOOTSTRAP_RELAY_NODES } from '../utils/sharing';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { signData, uint8ToBase62 } from '../utils/identity';
 import { isElectron } from '../hooks/useEnvironment';
@@ -65,7 +65,9 @@ export default function WorkspaceSettings({
   const [shareLevel, setShareLevel] = useState('viewer');
   const [expiryMinutes, setExpiryMinutes] = useState(60); // Default 1 hour
   const [customServerUrl, setCustomServerUrl] = useState(workspace?.serverUrl || ''); // For cross-network sharing
-  const [p2pStatus, setP2pStatus] = useState({ initialized: false, ownPublicKey: null }); // P2P status
+  const [p2pStatus, setP2pStatus] = useState({ initialized: false, ownPublicKey: null, publicIP: null }); // P2P status
+  const [relayServerValid, setRelayServerValid] = useState(null); // null = not checked, true/false = validation result
+  const [validatingRelay, setValidatingRelay] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -110,11 +112,89 @@ export default function WorkspaceSettings({
     if (isElectron()) {
       getP2PInfo().then(info => {
         setP2pStatus(info);
+        // Auto-fill relay server URL if not already set
+        // Priority: UPnP public URL (if available), otherwise public bootstrap relay
+        if (!customServerUrl) {
+          if (info.upnpEnabled && (info.directWssUrl || info.directWsUrl)) {
+            // UPnP succeeded - use our public URL
+            const autoUrl = info.directWssUrl || info.directWsUrl;
+            setCustomServerUrl(autoUrl);
+            console.log('[WorkspaceSettings] Auto-populated relay server (UPnP enabled):', autoUrl);
+          } else {
+            // Zero-config: Use public bootstrap relay (like BitTorrent trackers)
+            // This ensures cross-platform sharing works without any configuration
+            const bootstrapRelay = BOOTSTRAP_RELAY_NODES[0];
+            setCustomServerUrl(bootstrapRelay);
+            console.log('[WorkspaceSettings] Zero-config: Using public bootstrap relay:', bootstrapRelay);
+          }
+        }
       }).catch(() => {
-        setP2pStatus({ initialized: false, ownPublicKey: null });
+        setP2pStatus({ initialized: false, ownPublicKey: null, publicIP: null });
       });
     }
-  }, [getP2PInfo]);
+  }, [getP2PInfo, customServerUrl]);
+  
+  // Validate relay server URL
+  const validateRelayServer = async () => {
+    if (!customServerUrl?.trim()) {
+      setRelayServerValid(false);
+      return;
+    }
+    
+    setValidatingRelay(true);
+    try {
+      // Send validation request to sidecar
+      const metadataWs = window.metadataWs;
+      if (metadataWs && metadataWs.readyState === WebSocket.OPEN) {
+        // Wait for response
+        const response = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Validation timeout')), 5000);
+          const handler = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'relay-server-validation') {
+              clearTimeout(timeout);
+              metadataWs.removeEventListener('message', handler);
+              resolve(data);
+            }
+          };
+          metadataWs.addEventListener('message', handler);
+          metadataWs.send(JSON.stringify({
+            type: 'validate-relay-server',
+            payload: { serverUrl: customServerUrl.trim() }
+          }));
+        });
+        
+        setRelayServerValid(response.valid);
+      }
+    } catch (err) {
+      console.error('[WorkspaceSettings] Relay validation error:', err);
+      setRelayServerValid(false);
+    } finally {
+      setValidatingRelay(false);
+    }
+  };
+  
+  // Refresh detected IP/relay - use UPnP if available, fallback to bootstrap relay
+  const refreshDetectedIP = async () => {
+    if (isElectron()) {
+      const info = await getP2PInfo();
+      setP2pStatus(info);
+      
+      if (info.upnpEnabled && (info.directWssUrl || info.directWsUrl)) {
+        // UPnP succeeded - use our public URL
+        const autoUrl = info.directWssUrl || info.directWsUrl;
+        setCustomServerUrl(autoUrl);
+        setRelayServerValid(null);
+        console.log('[WorkspaceSettings] Refreshed: Using UPnP public URL:', autoUrl);
+      } else {
+        // Zero-config fallback: Use public bootstrap relay
+        const bootstrapRelay = BOOTSTRAP_RELAY_NODES[0];
+        setCustomServerUrl(bootstrapRelay);
+        setRelayServerValid(null);
+        console.log('[WorkspaceSettings] Refreshed: Using public bootstrap relay:', bootstrapRelay);
+      }
+    }
+  };
   
   if (!workspace) return null;
   
@@ -156,11 +236,28 @@ export default function WorkspaceSettings({
     }
     
     // For cross-network sharing, include the server URL
-    // Priority: 1. User-entered customServerUrl, 2. Workspace's stored serverUrl, 3. Web mode uses window.location.origin
-    // In Electron, if no serverUrl is set, users need to run the unified server publicly
+    // ZERO-CONFIG APPROACH: Use public bootstrap relays when no specific server is configured
+    // This works like BitTorrent - peers connect through public relay servers that bridge the mesh
+    // Priority: 1. User-entered customServerUrl, 2. Workspace's stored serverUrl,
+    //           3. UPnP public URL (if available), 4. Public bootstrap relay (zero-config)
     let serverUrl = customServerUrl?.trim() || workspace.serverUrl;
-    if (!serverUrl && !isElectron()) {
-      serverUrl = window.location.origin;
+    if (!serverUrl) {
+      if (isElectron()) {
+        // Check if UPnP succeeded and we have a public URL
+        if (p2pStatus.upnpEnabled && (p2pStatus.directWssUrl || p2pStatus.directWsUrl)) {
+          serverUrl = p2pStatus.directWssUrl || p2pStatus.directWsUrl;
+          console.log('[WorkspaceSettings] Using UPnP public URL:', serverUrl);
+        } else {
+          // Zero-config fallback: Use public bootstrap relay
+          // Web clients will connect to the relay, which bridges to the mesh network
+          // The Electron app syncs to the same relay via Hyperswarm mesh
+          const bootstrapRelay = BOOTSTRAP_RELAY_NODES[0]; // Primary relay
+          console.log('[WorkspaceSettings] Zero-config: Using public bootstrap relay:', bootstrapRelay);
+          serverUrl = bootstrapRelay;
+        }
+      } else {
+        serverUrl = window.location.origin;
+      }
     }
     
     // Get P2P info for true serverless sharing (Electron only)
@@ -220,6 +317,8 @@ export default function WorkspaceSettings({
           hyperswarmPeers,
           topicHash,
           directAddress,
+          // Include serverUrl for cross-platform sharing (web app can't use P2P)
+          serverUrl,
         });
         
         return compress ? await compressShareLink(signedInvite.link) : signedInvite.link;
@@ -286,9 +385,13 @@ export default function WorkspaceSettings({
   // Legacy copy handler (for backwards compat)
   const handleCopyShareLink = () => handleCopyFormat('link');
   
-  // Delete workspace (owners only)
+  // Delete workspace (owners OR only member)
   const handleDelete = async () => {
-    if (!isOwner) return;
+    // Allow deletion if owner OR if you're the only member
+    const totalMembers = Object.keys(members || {}).length || collaborators.length || 1;
+    const isOnlyMemberLocal = totalMembers <= 1;
+    
+    if (!isOwner && !isOnlyMemberLocal) return;
     
     await deleteWorkspace(workspace.id);
     onClose?.();
@@ -451,24 +554,30 @@ export default function WorkspaceSettings({
               {/* P2P Status - show direct address when available */}
               {isElectron() && (
                 <div className="workspace-settings__server-url">
-                  {p2pStatus.initialized ? (
+                  {p2pStatus.initialized && p2pStatus.ownPublicKey ? (
                     <>
                       <div className="workspace-settings__p2p-status workspace-settings__p2p-status--connected">
                         <span className="workspace-settings__p2p-icon">🟢</span>
-                        <span>
-                          P2P Ready
-                          {p2pStatus.directAddress?.address && (
-                            <span className="workspace-settings__p2p-address"> ({p2pStatus.directAddress.address})</span>
-                          )}
-                        </span>
+                        <span>P2P Active</span>
                       </div>
-                      {p2pStatus.directAddress?.address ? (
-                        <div className="workspace-settings__p2p-info">
-                          Share links include your public address for direct P2P connections. No relay server needed.
-                        </div>
+                      {p2pStatus.publicIP ? (
+                        <>
+                          <div className="workspace-settings__p2p-info">
+                            Public IP: {p2pStatus.publicIP}
+                          </div>
+                          {p2pStatus.upnpEnabled ? (
+                            <div className="workspace-settings__p2p-info">
+                              ✓ Auto port-forward active. Cross-platform sharing enabled.
+                            </div>
+                          ) : (
+                            <div className="workspace-settings__p2p-info workspace-settings__p2p-info--warning">
+                              ⚠️ Auto port-forward unavailable. Manually forward ports {p2pStatus.wsPort || 8080} (WS) and {p2pStatus.wssPort || 8443} (WSS) for sharing.
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <div className="workspace-settings__p2p-info workspace-settings__p2p-info--warning">
-                          Could not detect public IP. Links will use DHT discovery. Add a relay server URL below if peers can't connect.
+                          DHT only (no public IP detected). Add relay server URL below for cross-platform sharing.
                         </div>
                       )}
                     </>
@@ -481,16 +590,49 @@ export default function WorkspaceSettings({
                       <label className="workspace-settings__server-label">
                         <span className="workspace-settings__server-title">🌐 Relay Server URL</span>
                         <span className="workspace-settings__server-desc">
-                          Enter your server URL for sharing (e.g., http://192.168.1.x:3000)
+                          Enter your server URL for sharing
                         </span>
                       </label>
-                      <input
-                        type="text"
-                        value={customServerUrl}
-                        onChange={(e) => setCustomServerUrl(e.target.value)}
-                        placeholder="http://192.168.1.x:3000"
-                        className="workspace-settings__input workspace-settings__input--server"
-                      />
+                      <div className="workspace-settings__server-input-group">
+                        <input
+                          type="text"
+                          value={customServerUrl}
+                          onChange={(e) => {
+                            setCustomServerUrl(e.target.value);
+                            setRelayServerValid(null); // Reset validation when URL changes
+                          }}
+                          placeholder="http://192.168.1.x"
+                          className="workspace-settings__input workspace-settings__input--server"
+                        />
+                        <button
+                          type="button"
+                          onClick={validateRelayServer}
+                          disabled={validatingRelay || !customServerUrl?.trim()}
+                          className="workspace-settings__validate-btn"
+                        >
+                          {validatingRelay ? '⏳' : '✓ Validate'}
+                        </button>
+                        {p2pStatus.publicIP && (
+                          <button
+                            type="button"
+                            onClick={refreshDetectedIP}
+                            className="workspace-settings__refresh-btn"
+                            title="Use detected public IP"
+                          >
+                            🔄 Use My IP
+                          </button>
+                        )}
+                      </div>
+                      {relayServerValid === false && (
+                        <div className="workspace-settings__server-warning">
+                          ⚠️ Server unreachable. Share links may not work. <button type="button" onClick={refreshDetectedIP} className="workspace-settings__inline-btn">Use detected IP instead?</button>
+                        </div>
+                      )}
+                      {relayServerValid === true && (
+                        <div className="workspace-settings__server-success">
+                          ✓ Server validated and ready
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -689,8 +831,8 @@ export default function WorkspaceSettings({
           <h3 className="workspace-settings__section-title">Danger Zone</h3>
           
           <div className="workspace-settings__danger-buttons">
-            {/* Delete Workspace - owners only */}
-            {isOwner && (
+            {/* Delete Workspace - owners OR only member */}
+            {(isOwner || isOnlyMember) && (
               !showDeleteConfirm ? (
                 <button 
                   className="workspace-settings__delete-btn"
@@ -805,14 +947,9 @@ export default function WorkspaceSettings({
             )}
             
             {/* Show message when leave is disabled */}
-            {isOnlyMember && !isOwner && (
+            {isOnlyMember && (
               <p className="workspace-settings__disabled-note">
-                You are the only member. You cannot leave this workspace.
-              </p>
-            )}
-            {isOwner && isOnlyMember && (
-              <p className="workspace-settings__disabled-note">
-                You are the only member. Use "Delete Workspace" to remove it.
+                You are the only member. Use "Delete Workspace" above to remove it.
               </p>
             )}
           </div>

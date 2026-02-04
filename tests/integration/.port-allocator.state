@@ -1,3 +1,10 @@
 {
-  "allocations": []
+  "allocations": [
+    {
+      "metaPort": 18000,
+      "yjsPort": 18001,
+      "pid": 79460,
+      "timestamp": 1770165486288
+    }
+  ]
 }

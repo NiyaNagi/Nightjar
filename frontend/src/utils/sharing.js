@@ -1009,6 +1009,7 @@ export function parseInviteLink(link) {
  * @param {Array<string>} options.hyperswarmPeers - Hyperswarm peer public keys for P2P
  * @param {string} options.topicHash - DHT topic hash for P2P discovery
  * @param {string} options.directAddress - Direct P2P address (ip:port)
+ * @param {string} options.serverUrl - Sync server URL for cross-platform sharing
  * @returns {Object} { link, expiry, signature }
  */
 export function generateSignedInviteLink(options) {
@@ -1022,6 +1023,7 @@ export function generateSignedInviteLink(options) {
     hyperswarmPeers = [],
     topicHash = null,
     directAddress = null,
+    serverUrl = null,
   } = options;
   
   if (!workspaceId || !encryptionKey || !ownerPrivateKey) {
@@ -1041,7 +1043,7 @@ export function generateSignedInviteLink(options) {
   const signatureBase62 = uint8ToBase62(signature);
   
   // Build the base share link
-  // Build the base share link with P2P info
+  // Build the base share link with P2P info and serverUrl for cross-platform
   const baseLink = generateShareLink({
     entityType: 'workspace',
     entityId: workspaceId,
@@ -1051,6 +1053,7 @@ export function generateSignedInviteLink(options) {
     hyperswarmPeers,
     topicHash,
     directAddress,
+    serverUrl,
   });
   
   // Parse existing fragment and add new fields
@@ -1383,8 +1386,38 @@ export async function getMeshRelaysForSharing(limit = 5) {
 /**
  * Hardcoded bootstrap relay nodes as fallback
  * These are used when mesh relays are not available
+ * 
+ * In development mode, use the local unified server instead
  */
-export const BOOTSTRAP_RELAY_NODES = [
+function getBootstrapRelayNodes() {
+  // Check if we're in development mode
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const port = window.location.port;
+    
+    // Development mode detection:
+    // - localhost or 127.0.0.1
+    // - Vite dev server (port 5173, 5174, etc) OR unified server (port 3000)
+    // - file:// protocol (Electron production with local files)
+    const isDevelopment = (host === 'localhost' || host === '127.0.0.1') && 
+                          !window.location.protocol.startsWith('file:');
+    
+    if (isDevelopment) {
+      // Development mode: always use the unified server at localhost:3000
+      // This is where the y-websocket server runs locally
+      return ['ws://localhost:3000'];
+    }
+  }
+  // Production: use public relay servers
+  return [
+    'wss://relay1.nightjar.io',
+    'wss://relay2.nightjar.io',
+    'wss://relay3.nightjar.io'
+  ];
+}
+
+// Export as a getter to allow dynamic detection
+export const BOOTSTRAP_RELAY_NODES = typeof window !== 'undefined' ? getBootstrapRelayNodes() : [
   'wss://relay1.nightjar.io',
   'wss://relay2.nightjar.io',
   'wss://relay3.nightjar.io'

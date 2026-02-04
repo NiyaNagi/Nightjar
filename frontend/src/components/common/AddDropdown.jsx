@@ -165,6 +165,7 @@ export default function AddDropdown({
         disabled={disabled}
         aria-expanded={isOpen}
         aria-haspopup="menu"
+        data-testid="new-document-btn"
       >
         <span className="add-dropdown__trigger-icon">+</span>
         <span className="add-dropdown__trigger-label">Add</span>

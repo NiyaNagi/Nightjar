@@ -168,7 +168,11 @@ const StatusBar = ({
                 )}
                 
                 {/* Connection status - shown on all platforms */}
-                <div className={`connection-status ${connectionStatus.className}`}>
+                <div 
+                    className={`connection-status ${connectionStatus.className}`}
+                    data-testid="sync-status"
+                    data-synced={p2pStatus === 'connected' ? 'true' : 'false'}
+                >
                     <span className="status-dot"></span>
                     <span>{connectionStatus.label}</span>
                 </div>
@@ -189,7 +193,7 @@ const StatusBar = ({
                 )}
                 
                 {collaborators && collaborators.length > 0 && (
-                    <div className="collaborators" ref={containerRef}>
+                    <div className="collaborators" ref={containerRef} data-testid="collaborator-list">
                         {visibleCollabs.map((collab, idx) => (
                             <div 
                                 key={idx}
@@ -198,6 +202,7 @@ const StatusBar = ({
                                 onMouseEnter={() => setExpandedChip(idx)}
                                 onMouseLeave={() => setExpandedChip(null)}
                                 onClick={(e) => handleCollaboratorClick(collab, e)}
+                                data-testid={`collaborator-${collab.name?.replace(/\s+/g, '-') || idx}`}
                                 title={`${collab.name}${collab.contextInfo ? ` (${collab.contextInfo})` : ''} - Click for options`}
                             >
                                 <span className="avatar-icon">

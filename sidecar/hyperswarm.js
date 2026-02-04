@@ -7,7 +7,15 @@
  * Direct P2P: Also supports direct IP:port connections via getDirectAddress()
  */
 
-const Hyperswarm = require('hyperswarm');
+// OPTIMIZATION: Lazy-load hyperswarm package (it's ~40s to load!)
+let Hyperswarm = null;
+function ensureHyperswarmPackage() {
+  if (!Hyperswarm) {
+    Hyperswarm = require('hyperswarm');
+  }
+  return Hyperswarm;
+}
+
 const b4a = require('b4a');
 const crypto = require('crypto');
 const nacl = require('tweetnacl');
@@ -52,7 +60,7 @@ async function getPublicIPViaSTUN() {
         console.warn('[Hyperswarm] STUN request timed out');
         resolve(null);
       }
-    }, 5000); // Increased timeout to 5s
+    }, 2000); // Reduced from 5s to 2s for faster startup
     
     socket.on('message', (msg) => {
       if (resolved) return;
@@ -114,17 +122,15 @@ async function getPublicIPViaSTUN() {
 
 /**
  * Get public IP via HTTP API (fallback)
+ * OPTIMIZATION: Reduced timeout from 5s to 2s and limited to 3 fastest services
  * @returns {Promise<string|null>} Public IP or null
  */
 async function getPublicIPViaHTTP() {
+  // Use only the fastest/most reliable services
   const services = [
     'https://api.ipify.org?format=json',
-    'https://api.ip.sb/ip',
     'https://icanhazip.com',
-    'https://ifconfig.me/ip',
     'https://checkip.amazonaws.com',
-    'https://ipecho.net/plain',
-    'https://myexternalip.com/raw',
   ];
   
   for (const url of services) {
@@ -133,7 +139,7 @@ async function getPublicIPViaHTTP() {
       const response = await new Promise((resolve, reject) => {
         const proto = url.startsWith('https') ? https : http;
         const req = proto.get(url, { 
-          timeout: 5000,
+          timeout: 2000, // Reduced from 5s to 2s
           headers: {
             'User-Agent': 'Nightjar/1.0'
           }
@@ -176,10 +182,11 @@ async function getPublicIPViaHTTP() {
 
 /**
  * Get public IP address with caching and retries
- * @param {number} retries - Number of retry attempts (default 3)
+ * OPTIMIZATION: Reduced retries from 3 to 1 for faster startup
+ * @param {number} retries - Number of retry attempts (default 1)
  * @returns {Promise<string|null>} Public IP or null
  */
-async function getPublicIP(retries = 3) {
+async function getPublicIP(retries = 1) {
   // Check cache
   if (cachedPublicIP && Date.now() - publicIPTimestamp < PUBLIC_IP_CACHE_TTL) {
     console.log('[Hyperswarm] Using cached public IP:', cachedPublicIP);
@@ -281,6 +288,9 @@ class HyperswarmManager extends EventEmitter {
     }
 
     this.identity = identity;
+    
+    // Lazy-load hyperswarm package
+    ensureHyperswarmPackage();
     
     // Create Hyperswarm instance with keypair for persistent peer ID
     const seed = b4a.from(identity.secretKey.slice(0, 32), 'hex');

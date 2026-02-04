@@ -1,4 +1,5 @@
 console.log('[Sidecar] Starting up...');
+const startTime = Date.now();
 
 // Add global error handlers
 process.on('uncaughtException', (error) => {
@@ -11,9 +12,12 @@ process.on('unhandledRejection', (reason, promise) => {
     process.exit(1);
 });
 
+console.log(`[Sidecar] Loading modules... (${Date.now() - startTime}ms)`);
 const WebSocket = require('ws');
 const crypto = require('crypto');
-const { createLibp2pNode } = require('../backend/p2p');
+// OPTIMIZATION: Lazy-load libp2p since it's slow and rarely needed at startup
+// const { createLibp2pNode } = require('../backend/p2p');
+let createLibp2pNode = null;
 const Y = require('yjs');
 const { setupWSConnection, docs } = require('y-websocket/bin/utils');
 const { encryptUpdate, decryptUpdate, isValidKey } = require('../backend/crypto');
@@ -21,10 +25,53 @@ const { Level } = require('level');
 const TorControl = require('tor-control');
 const EventEmitter = require('events');
 const { P2PBridge } = require('./p2p-bridge');
+console.log(`[Sidecar] Core modules loaded (${Date.now() - startTime}ms)`);
 const identity = require('./identity');
-const { MeshParticipant } = require('./mesh');
+// OPTIMIZATION: Lazy-load mesh since it creates Hyperswarm at import
+let MeshParticipant = null;
+const { ensureSSLCert, getCertInfo } = require('./ssl-cert');
+// OPTIMIZATION: Lazy-load UPnP - it probes the network at require time
+let upnpMapper = null;
+function getUPnPMapper() {
+  if (!upnpMapper) {
+    upnpMapper = require('./upnp-mapper');
+  }
+  return upnpMapper;
+}
+const { relayBridge } = require('./relay-bridge');
+const https = require('https');
 
-console.log('[Sidecar] Imports completed');
+console.log(`[Sidecar] All imports completed (${Date.now() - startTime}ms)`);
+
+// Lazy-load heavy modules in background
+let libp2pLoading = null;
+let meshLoading = null;
+
+async function ensureLibp2p() {
+  if (createLibp2pNode) return createLibp2pNode;
+  if (libp2pLoading) return libp2pLoading;
+  libp2pLoading = (async () => {
+    console.log(`[Sidecar] Lazy-loading libp2p... (${Date.now() - startTime}ms)`);
+    const module = require('../backend/p2p');
+    createLibp2pNode = module.createLibp2pNode;
+    console.log(`[Sidecar] libp2p loaded (${Date.now() - startTime}ms)`);
+    return createLibp2pNode;
+  })();
+  return libp2pLoading;
+}
+
+async function ensureMesh() {
+  if (MeshParticipant) return MeshParticipant;
+  if (meshLoading) return meshLoading;
+  meshLoading = (async () => {
+    console.log(`[Sidecar] Lazy-loading mesh... (${Date.now() - startTime}ms)`);
+    const module = require('./mesh');
+    MeshParticipant = module.MeshParticipant;
+    console.log(`[Sidecar] Mesh loaded (${Date.now() - startTime}ms)`);
+    return MeshParticipant;
+  })();
+  return meshLoading;
+}
 
 // Initialize P2P Bridge for unified P2P layer
 const p2pBridge = new P2PBridge();
@@ -34,41 +81,63 @@ const p2pBridge = new P2PBridge();
 let meshParticipant = null;
 let meshEnabled = process.env.NIGHTJAR_MESH !== 'false'; // Default enabled, can disable via env
 
+// Enable relay bridge for cross-platform sharing (connects local docs to public relay)
+let relayBridgeEnabled = process.env.NIGHTJAR_RELAY_BRIDGE !== 'false'; // Default enabled
+
 // Track if P2P is initialized with identity
 let p2pInitialized = false;
 
 // Dynamically import uint8arrays to handle ES module
 let uint8ArrayFromString = null;
-let uint8arraysReady = Promise.resolve(false); // Initialize as resolved promise
+let uint8arraysLoaded = false;
 
-// Function to load uint8arrays when needed
+// Function to load uint8arrays once at startup
 async function loadUint8Arrays() {
-    if (uint8ArrayFromString) return true; // Already loaded
+    if (uint8arraysLoaded) return true; // Already loaded
     
     try {
-        console.log('[Sidecar] Loading uint8arrays module...');
         const uint8arrays = await import('uint8arrays');
         uint8ArrayFromString = uint8arrays.fromString;
-        console.log('[Sidecar] uint8arrays module loaded successfully');
-        uint8arraysReady = Promise.resolve(true);
+        uint8arraysLoaded = true;
         return true;
     } catch (error) {
         console.error('[Sidecar] Failed to load uint8arrays:', error.message);
-        uint8arraysReady = Promise.resolve(false);
         return false;
     }
 }
 
+// Load uint8arrays module in background (don't block startup)
+loadUint8Arrays().then(loaded => {
+    if (loaded) {
+        console.log(`[Sidecar] uint8arrays loaded (${Date.now() - startTime}ms)`);
+    } else {
+        console.error('[Sidecar] Critical: uint8arrays failed to load');
+        process.exit(1);
+    }
+});
+
 const path = require('path');
 
-const YJS_WEBSOCKET_PORT = 8080;
-const METADATA_WEBSOCKET_PORT = 8081;
-const TOR_CONTROL_PORT = 9051;
-const P2P_PORT = 4001;
+// Port configuration - supports environment variables for testing
+const YJS_WEBSOCKET_PORT = parseInt(process.env.YJS_WEBSOCKET_PORT, 10) || 8080;
+const YJS_WEBSOCKET_SECURE_PORT = parseInt(process.env.YJS_WEBSOCKET_SECURE_PORT, 10) || 8443; // WSS port for HTTPS support
+const METADATA_WEBSOCKET_PORT = parseInt(process.env.METADATA_WEBSOCKET_PORT, 10) || 8081;
+const TOR_CONTROL_PORT = parseInt(process.env.TOR_CONTROL_PORT, 10) || 9051;
+const P2P_PORT = parseInt(process.env.P2P_PORT, 10) || 4001;
 const PUBSUB_TOPIC = '/nightjarx/1.0.0';
 
 // WebSocket server instances
 let metaWss;
+let yjsWss = null;       // Plain WebSocket server
+let yjsWssSecure = null; // Secure WebSocket server (WSS)
+
+// UPnP port mapping status
+let upnpStatus = {
+  enabled: false,
+  wsPortMapped: false,
+  wssPortMapped: false,
+  externalIP: null
+};
 
 // Storage path - use userData path from command line if provided (Electron packaged app),
 // otherwise fall back to relative path (development mode)
@@ -530,7 +599,9 @@ async function loadDocumentList() {
             if (metadata.encryptionKey) {
                 try {
                     // Ensure uint8arrays is loaded before using
-                    await uint8arraysReady;
+                    if (!uint8arraysLoaded) {
+                        await loadUint8Arrays();
+                    }
                     const keyBytes = uint8ArrayFromString(metadata.encryptionKey, 'base64');
                     documentKeys.set(docId, keyBytes);
                     console.log(`[Sidecar] Loaded encryption key for document: ${docId}`);
@@ -640,20 +711,53 @@ async function saveFolderMetadata(folderId, metadata) {
 async function loadWorkspaceList() {
     await metadataDbReady;
     
+    // Get current identity's public key to filter workspaces
+    const currentIdentity = identity.loadIdentity();
+    const currentPublicKey = currentIdentity?.publicKeyBase62;
+    
     const workspaces = [];
     console.log('[Sidecar] Loading workspace list...');
+    console.log('[Sidecar] Current identity public key:', currentPublicKey);
     try {
         for await (const [key, value] of metadataDb.iterator()) {
             console.log(`[Sidecar] DB key: ${key}`);
             if (key.startsWith('workspace:')) {
-                console.log(`[Sidecar] Found workspace: ${value?.name || value?.id}`);
-                workspaces.push(value);
+                console.log(`[Sidecar] Found workspace: ${value?.name || value?.id}, ownerPublicKey: ${value?.ownerPublicKey}`);
+                
+                // Only include workspaces owned by current identity
+                // If no ownerPublicKey (legacy), include it for backward compatibility
+                if (!value?.ownerPublicKey || value.ownerPublicKey === currentPublicKey) {
+                    workspaces.push(value);
+                    
+                    // Preload encryption key for workspace-meta document if available
+                    // This ensures cross-platform shared workspaces can decrypt their data
+                    if (value.encryptionKey) {
+                        try {
+                            // Ensure uint8arrays is loaded before using
+                            if (!uint8arraysLoaded) {
+                                await loadUint8Arrays();
+                            }
+                            const keyBytes = uint8ArrayFromString(value.encryptionKey, 'base64');
+                            const workspaceMetaDocName = `workspace-meta:${value.id}`;
+                            documentKeys.set(workspaceMetaDocName, keyBytes);
+                            console.log(`[Sidecar] Loaded encryption key for workspace-meta: ${value.id}`);
+                            
+                            // Also load key for workspace-folders room
+                            const workspaceFoldersDocName = `workspace-folders:${value.id}`;
+                            documentKeys.set(workspaceFoldersDocName, keyBytes);
+                        } catch (e) {
+                            console.error(`[Sidecar] Failed to load key for workspace ${value.id}:`, e.message);
+                        }
+                    }
+                } else {
+                    console.log(`[Sidecar] Skipping workspace owned by different identity: ${value.ownerPublicKey}`);
+                }
             }
         }
     } catch (err) {
         console.error('[Sidecar] Error loading workspaces:', err);
     }
-    console.log(`[Sidecar] Loaded ${workspaces.length} workspaces`);
+    console.log(`[Sidecar] Loaded ${workspaces.length} workspaces for current identity`);
     return workspaces;
 }
 
@@ -785,42 +889,767 @@ setInterval(purgeExpiredTrash, 60 * 60 * 1000);
 // Also run on startup after a delay
 setTimeout(purgeExpiredTrash, 5000);
 
+// --- Relay Server Validation ---
+/**
+ * Validate that a relay server URL is running and accessible
+ * @param {string} serverUrl - The URL to validate (e.g., "http://123.45.67.89")
+ * @returns {Promise<boolean>} True if server is valid and reachable
+ */
+async function validateRelayServer(serverUrl) {
+    try {
+        // Parse the URL to extract host
+        const url = new URL(serverUrl);
+        
+        // Simple HTTP check - try to connect to the server
+        // In a real implementation, you'd want to check for specific Hyperswarm/DHT responses
+        const fetch = (await import('node-fetch')).default;
+        const response = await fetch(serverUrl, {
+            method: 'HEAD',
+            timeout: 5000,
+        });
+        
+        // Consider 200-299 or 404 (no route) as "server exists"
+        // 404 is ok because we're just checking if the server is running
+        return response.status < 500;
+    } catch (err) {
+        console.error('[Sidecar] Relay server validation failed:', err.message);
+        return false;
+    }
+}
+
+// --- Metadata Message Handler ---
+// Centralized handler for all metadata WebSocket messages
+async function handleMetadataMessage(ws, parsed) {
+    // uint8arrays is loaded at startup, no need to check here
+    if (!uint8ArrayFromString) {
+        throw new Error('uint8arrays module not loaded at startup');
+    }
+    
+    const { type, payload, document, docId, metadata, docName, workspace, folder, workspaceId, folderId, updates } = parsed;
+    
+    switch (type) {
+        case 'set-key':
+            if (payload) {
+                const key = uint8ArrayFromString(payload, 'base64');
+                
+                // Validate key length
+                if (!isValidKey(key)) {
+                    ws.send(JSON.stringify({ type: 'error', code: 'INVALID_KEY', message: 'Invalid encryption key' }));
+                    return;
+                }
+                
+                // Sanitize docName if provided
+                const sanitizedDocName = docName ? sanitizeId(docName) : null;
+                
+                if (sanitizedDocName) {
+                    // Per-document key
+                    console.log(`[Sidecar] Received encryption key for document: ${sanitizedDocName}`);
+                    documentKeys.set(sanitizedDocName, key);
+                    
+                    // If this document is already loaded, reload its data with the correct key
+                    if (docs.has(sanitizedDocName)) {
+                        const doc = docs.get(sanitizedDocName);
+                        await loadPersistedData(sanitizedDocName, doc, key);
+                    }
+                    
+                    // Flush any pending updates for this document
+                    if (pendingUpdates.has(sanitizedDocName)) {
+                        const updates = pendingUpdates.get(sanitizedDocName);
+                        console.log(`[Sidecar] Flushing ${updates.length} pending updates for ${sanitizedDocName}`);
+                        for (const { update, origin } of updates) {
+                            await persistUpdate(sanitizedDocName, update, origin);
+                        }
+                        pendingUpdates.set(sanitizedDocName, []);
+                    }
+                } else {
+                    // Legacy: global session key (for backward compatibility)
+                    console.log('[Sidecar] Received global session key. Loading all documents...');
+                    sessionKey = key;
+                    
+                    // When the key is set, load data for all existing documents
+                    for (const [name, doc] of docs.entries()) {
+                        // Only use session key if no per-doc key exists
+                        if (!documentKeys.has(name)) {
+                            await loadPersistedData(name, doc, sessionKey);
+                        }
+                    }
+                    console.log('[Sidecar] Finished applying persisted data to all docs.');
+                    
+                    // Flush any pending updates that were queued before the key was available
+                    for (const [name, updates] of pendingUpdates.entries()) {
+                        if (!documentKeys.has(name)) {
+                            console.log(`[Sidecar] Flushing ${updates.length} pending updates for ${name}`);
+                            for (const { update, origin } of updates) {
+                                await persistUpdate(name, update, origin);
+                            }
+                            pendingUpdates.set(name, []);
+                        }
+                    }
+                }
+                
+                // Confirm key was set
+                ws.send(JSON.stringify({ type: 'key-set', success: true, docName: sanitizedDocName || docName }));
+            }
+            break;
+        
+        case 'list-documents':
+            const documents = await loadDocumentList();
+            ws.send(JSON.stringify({ type: 'document-list', documents }));
+            break;
+        
+        case 'toggle-tor':
+            const enable = payload?.enable ?? !torEnabled;
+            console.log(`[Sidecar] Toggle Tor: ${enable ? 'enabling' : 'disabling'}`);
+            
+            if (enable && !torEnabled) {
+                torEnabled = true;
+                // P2P is now always on, tor just affects how we connect
+            } else if (!enable && torEnabled) {
+                torEnabled = false;
+            }
+            
+            // Send confirmation
+            ws.send(JSON.stringify({ 
+                type: 'tor-toggled', 
+                enabled: torEnabled,
+                status: connectionStatus
+            }));
+            break;
+        
+        case 'get-status':
+            const statusMesh = meshParticipant ? meshParticipant.getStatus() : null;
+            ws.send(JSON.stringify({
+                type: 'status',
+                status: connectionStatus,
+                isOnline: isOnline,
+                torEnabled: torEnabled,
+                onionAddress: onionAddress ? `${onionAddress}.onion` : null,
+                multiaddr: fullMultiaddr,
+                peerId: p2pNode ? p2pNode.peerId.toString() : null,
+                mesh: statusMesh
+            }));
+            break;
+        
+        case 'reinitialize-p2p':
+            // Force P2P reinitialization (call after identity is created/changed)
+            try {
+                console.log('[Sidecar] Reinitializing P2P...');
+                const result = await initializeP2P(true);
+                const ownPublicKey = p2pBridge.getOwnPublicKey();
+                const directAddress = await p2pBridge.getDirectAddress();
+                console.log('[Sidecar] P2P reinitialized: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16));
+                ws.send(JSON.stringify({
+                    type: 'p2p-reinitialized',
+                    success: result.success,
+                    initialized: p2pInitialized,
+                    ownPublicKey,
+                    directAddress,
+                    reason: result.reason,
+                }));
+            } catch (err) {
+                console.error('[Sidecar] P2P reinitialization failed:', err);
+                ws.send(JSON.stringify({
+                    type: 'p2p-reinitialized',
+                    success: false,
+                    initialized: false,
+                    ownPublicKey: null,
+                    directAddress: null,
+                    error: err.message,
+                }));
+            }
+            break;
+        
+        // --- Workspace Management ---
+        case 'list-workspaces':
+            try {
+                const workspaces = await loadWorkspaceList();
+                ws.send(JSON.stringify({ type: 'workspace-list', workspaces }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to list workspaces:', err);
+                ws.send(JSON.stringify({ type: 'workspace-list', workspaces: [], error: err.message }));
+            }
+            break;
+        
+        case 'create-workspace':
+            // Accept workspace from either direct property or payload.workspace
+            const wsData = workspace || parsed.payload?.workspace;
+            console.log('[Sidecar] create-workspace received:', wsData?.id, wsData?.name);
+            if (wsData) {
+                try {
+                    await saveWorkspaceMetadata(wsData.id, wsData);
+                    console.log('[Sidecar] Workspace saved successfully');
+                    
+                    // Register encryption key for workspace-meta documents
+                    if (wsData.encryptionKey) {
+                        try {
+                            if (!uint8arraysLoaded) await loadUint8Arrays();
+                            const keyBytes = uint8ArrayFromString(wsData.encryptionKey, 'base64');
+                            documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes);
+                            documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes);
+                            console.log(`[Sidecar] Registered encryption key for created workspace-meta: ${wsData.id}`);
+                        } catch (e) {
+                            console.error(`[Sidecar] Failed to register key for workspace ${wsData.id}:`, e.message);
+                        }
+                    }
+                    
+                    // Auto-initialize P2P if needed and join topic
+                    if (!p2pInitialized && wsData.topicHash) {
+                        console.log('[Sidecar] P2P not initialized, attempting initialization for workspace creation...');
+                        await initializeP2P(true);
+                    }
+                    
+                    // Join the workspace topic for P2P discovery
+                    if (p2pInitialized && wsData.topicHash) {
+                        try {
+                            console.log('[Sidecar] Joining Hyperswarm topic for new workspace:', wsData.topicHash?.slice(0, 16));
+                            await p2pBridge.joinTopic(wsData.topicHash);
+                            console.log('[Sidecar] Successfully joined workspace topic');
+                        } catch (joinErr) {
+                            console.error('[Sidecar] Failed to join workspace topic:', joinErr);
+                        }
+                    }
+                    
+                    ws.send(JSON.stringify({ type: 'workspace-created', workspace: wsData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to create workspace:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'update-workspace':
+            const updateWsData = workspace || parsed.payload?.workspace;
+            if (updateWsData) {
+                try {
+                    await saveWorkspaceMetadata(updateWsData.id, updateWsData);
+                    ws.send(JSON.stringify({ type: 'workspace-updated', workspace: updateWsData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to update workspace:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'delete-workspace':
+            const deleteWsId = workspaceId || parsed.payload?.workspaceId;
+            if (deleteWsId) {
+                try {
+                    await deleteWorkspaceMetadata(deleteWsId);
+                    ws.send(JSON.stringify({ type: 'workspace-deleted', workspaceId: deleteWsId }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to delete workspace:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'join-workspace':
+            // Join an existing workspace (from share link)
+            const joinWsData = workspace || parsed.payload?.workspace;
+            if (joinWsData) {
+                try {
+                    // Save or update workspace metadata
+                    await saveWorkspaceMetadata(joinWsData.id, joinWsData);
+                    
+                    // Register encryption key immediately for workspace-meta documents
+                    // This ensures we can decrypt data synced from other platforms
+                    if (joinWsData.encryptionKey) {
+                        try {
+                            if (!uint8arraysLoaded) {
+                                await loadUint8Arrays();
+                            }
+                            const keyBytes = uint8ArrayFromString(joinWsData.encryptionKey, 'base64');
+                            const workspaceMetaDocName = `workspace-meta:${joinWsData.id}`;
+                            documentKeys.set(workspaceMetaDocName, keyBytes);
+                            console.log(`[Sidecar] Registered encryption key for joined workspace-meta: ${joinWsData.id}`);
+                            
+                            // Also register for workspace-folders room
+                            const workspaceFoldersDocName = `workspace-folders:${joinWsData.id}`;
+                            documentKeys.set(workspaceFoldersDocName, keyBytes);
+                        } catch (e) {
+                            console.error(`[Sidecar] Failed to register key for joined workspace ${joinWsData.id}:`, e.message);
+                        }
+                    }
+                    
+                    // Join the topic
+                    if (p2pInitialized && joinWsData.topicHash) {
+                        await p2pBridge.joinTopic(joinWsData.topicHash);
+                    }
+                    
+                    ws.send(JSON.stringify({ type: 'workspace-joined', workspace: joinWsData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to join workspace:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        // --- Folder Management ---
+        case 'create-folder':
+            const folderData = folder || parsed.payload?.folder;
+            if (folderData) {
+                try {
+                    await saveFolderMetadata(folderData.id, folderData);
+                    ws.send(JSON.stringify({ type: 'folder-created', folder: folderData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to create folder:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'update-folder':
+            const updateFolderData = folder || parsed.payload?.folder;
+            if (updateFolderData) {
+                try {
+                    await saveFolderMetadata(updateFolderData.id, updateFolderData);
+                    ws.send(JSON.stringify({ type: 'folder-updated', folder: updateFolderData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to update folder:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'delete-folder':
+            const deleteFolderId = folderId || parsed.payload?.folderId;
+            if (deleteFolderId) {
+                try {
+                    await deleteFolderMetadata(deleteFolderId);
+                    ws.send(JSON.stringify({ type: 'folder-deleted', folderId: deleteFolderId }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to delete folder:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'list-folders':
+            try {
+                const folders = await loadFolderList();
+                ws.send(JSON.stringify({ type: 'folder-list', folders }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to list folders:', err);
+                ws.send(JSON.stringify({ type: 'folder-list', folders: [], error: err.message }));
+            }
+            break;
+        
+        // --- Trash Management ---
+        case 'list-trash':
+            try {
+                const trashItems = await loadTrashList();
+                ws.send(JSON.stringify({ type: 'trash-list', trash: trashItems }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to list trash:', err);
+                ws.send(JSON.stringify({ type: 'trash-list', trash: [], error: err.message }));
+            }
+            break;
+        
+        // --- Document Management ---
+        case 'create-document':
+            const docData = document || parsed.payload?.document;
+            if (docData) {
+                try {
+                    await saveDocumentMetadata(docData.id, docData);
+                    ws.send(JSON.stringify({ type: 'document-created', document: docData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to create document:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'update-document':
+            const updateDocData = document || parsed.payload?.document;
+            if (updateDocData) {
+                try {
+                    await saveDocumentMetadata(updateDocData.id, updateDocData);
+                    ws.send(JSON.stringify({ type: 'document-updated', document: updateDocData }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to update document:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'delete-document':
+            const deleteDocId = docId || parsed.payload?.docId;
+            if (deleteDocId) {
+                try {
+                    await deleteDocumentMetadata(deleteDocId);
+                    ws.send(JSON.stringify({ type: 'document-deleted', docId: deleteDocId }));
+                } catch (err) {
+                    console.error('[Sidecar] Failed to delete document:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        // --- P2P Messages (forward to P2P bridge) ---
+        case 'p2p-identity':
+        case 'p2p-join-topic':
+        case 'p2p-leave-topic':
+        case 'p2p-send':
+        case 'p2p-broadcast':
+        case 'mdns-advertise':
+        case 'mdns-discover':
+        case 'mdns-stop':
+            await p2pBridge.handleMessage(ws, parsed);
+            break;
+        
+        // --- P2P Info ---
+        case 'get-p2p-info':
+            // Get our Hyperswarm public key, connected peers, and direct address
+            // If P2P not initialized but identity exists, try to initialize now
+            try {
+                if (!p2pInitialized) {
+                    console.log('[Sidecar] P2P not initialized, attempting initialization...');
+                    await initializeP2P(true);
+                }
+                const ownPublicKey = p2pBridge.getOwnPublicKey();
+                const connectedPeers = p2pBridge.getConnectedPeers();
+                // Get direct connection address (public IP:port)
+                const directAddress = await p2pBridge.getDirectAddress();
+                const publicIP = await p2pBridge.getPublicIP();
+                
+                // Build WebSocket URLs for cross-platform sharing
+                // IMPORTANT: Only set public URLs if UPnP successfully mapped the ports
+                // Otherwise, the URLs won't be accessible from outside
+                let directWsUrl = null;
+                let directWssUrl = null;
+                
+                if (publicIP && upnpStatus.wsPortMapped) {
+                    directWsUrl = `ws://${publicIP}:${YJS_WEBSOCKET_PORT}`;
+                }
+                if (publicIP && upnpStatus.wssPortMapped) {
+                    directWssUrl = `wss://${publicIP}:${YJS_WEBSOCKET_SECURE_PORT}`;
+                }
+                
+                console.log('[Sidecar] get-p2p-info: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16), 'publicIP=', publicIP);
+                
+                ws.send(JSON.stringify({
+                    type: 'p2p-info',
+                    initialized: p2pInitialized,
+                    ownPublicKey,
+                    connectedPeers,
+                    directAddress,     // Hyperswarm { host, port, publicKey, address }
+                    publicIP,
+                    // WebSocket server info for cross-platform sharing
+                    wsPort: YJS_WEBSOCKET_PORT,
+                    wssPort: YJS_WEBSOCKET_SECURE_PORT,
+                    directWsUrl,       // ws://publicIP:8080
+                    directWssUrl,      // wss://publicIP:8443
+                    upnpEnabled: upnpStatus.enabled,
+                    upnpStatus: {
+                        wsPortMapped: upnpStatus.wsPortMapped,
+                        wssPortMapped: upnpStatus.wssPortMapped,
+                        externalIP: upnpStatus.externalIP
+                    }
+                }));
+            } catch (err) {
+                console.error('[Sidecar] get-p2p-info error:', err);
+                ws.send(JSON.stringify({
+                    type: 'p2p-info',
+                    initialized: false,
+                    ownPublicKey: null,
+                    connectedPeers: [],
+                    directAddress: null,
+                    publicIP: null,
+                    wsPort: YJS_WEBSOCKET_PORT,
+                    wssPort: YJS_WEBSOCKET_SECURE_PORT,
+                    directWsUrl: null,
+                    directWssUrl: null,
+                    upnpEnabled: false,
+                    upnpStatus: null,
+                    error: err.message,
+                }));
+            }
+            break;
+        
+        case 'reinitialize-p2p':
+            // Force P2P reinitialization (call after identity is created/changed)
+            try {
+                console.log('[Sidecar] Reinitializing P2P...');
+                const result = await initializeP2P(true);
+                const ownPublicKey = p2pBridge.getOwnPublicKey();
+                const directAddress = await p2pBridge.getDirectAddress();
+                const publicIP = await p2pBridge.getPublicIP();
+                console.log('[Sidecar] P2P reinitialized: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16));
+                ws.send(JSON.stringify({
+                    type: 'p2p-reinitialized',
+                    success: result.success,
+                    initialized: p2pInitialized,
+                    ownPublicKey,
+                    directAddress,
+                    publicIP,
+                    reason: result.reason,
+                }));
+            } catch (err) {
+                console.error('[Sidecar] P2P reinitialization failed:', err);
+                ws.send(JSON.stringify({
+                    type: 'p2p-reinitialized',
+                    success: false,
+                    initialized: false,
+                    ownPublicKey: null,
+                    directAddress: null,
+                    publicIP: null,
+                    error: err.message,
+                }));
+            }
+            break;
+        
+        case 'validate-relay-server':
+            // Validate that a relay server URL is running Hyperswarm/DHT
+            try {
+                const { serverUrl } = parsed.payload || {};
+                if (!serverUrl) {
+                    ws.send(JSON.stringify({
+                        type: 'relay-server-validation',
+                        valid: false,
+                        error: 'No server URL provided'
+                    }));
+                    return;
+                }
+                
+                // Simple validation: try to connect and check for Hyperswarm response
+                // This is a basic check - in production you'd want more robust validation
+                const isValid = await validateRelayServer(serverUrl);
+                ws.send(JSON.stringify({
+                    type: 'relay-server-validation',
+                    valid: isValid,
+                    serverUrl
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Relay server validation error:', err);
+                ws.send(JSON.stringify({
+                    type: 'relay-server-validation',
+                    valid: false,
+                    error: err.message
+                }));
+            }
+            break;
+        
+        // --- Identity Management ---
+        case 'list-identities':
+            try {
+                const identities = identity.listIdentities();
+                ws.send(JSON.stringify({
+                    type: 'identity-list',
+                    identities
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to list identities:', err);
+                ws.send(JSON.stringify({
+                    type: 'identity-list',
+                    identities: [],
+                    error: err.message
+                }));
+            }
+            break;
+        
+        case 'switch-identity':
+            try {
+                const { filename } = parsed.payload || {};
+                if (!filename) {
+                    ws.send(JSON.stringify({
+                        type: 'identity-switched',
+                        success: false,
+                        error: 'No filename provided'
+                    }));
+                    return;
+                }
+                
+                identity.switchIdentity(filename);
+                
+                // Reinitialize P2P with new identity
+                await initializeP2P(true);
+                
+                ws.send(JSON.stringify({
+                    type: 'identity-switched',
+                    success: true,
+                    identity: identity.loadIdentity()
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to switch identity:', err);
+                ws.send(JSON.stringify({
+                    type: 'identity-switched',
+                    success: false,
+                    error: err.message
+                }));
+            }
+            break;
+        
+        default:
+            // Unknown message type - log but don't error
+            console.log(`[Sidecar] Unknown message type: ${type}`);
+    }
+}
+
 // --- 3. WebSocket Servers ---
 
 // Initialize servers after database is ready
 async function startServers() {
     // Wait for database to be ready before starting servers
     await dbReady;
-    console.log('[Sidecar] Database ready, starting servers...');
+    console.log(`[Sidecar] Database ready, starting servers... (${Date.now() - startTime}ms)`);
     
-    // Server 1: Handles Yjs protocol (using the library's official setup)
-    const yjsWss = new WebSocket.Server({ port: YJS_WEBSOCKET_PORT });
+    // --- UPnP Port Mapping (run AFTER servers start, truly non-blocking) ---
+    // Use setImmediate to defer to after the current event loop tick
+    setImmediate(() => {
+        console.log('[Sidecar] Starting UPnP discovery in background...');
+        
+        // Run UPnP in background with 3-second timeout
+        Promise.race([
+            (async () => {
+                // Lazy-load UPnP mapper
+                const { mapPort, getExternalIP } = getUPnPMapper();
+                
+                try {
+                    const externalIP = await getExternalIP();
+                    if (externalIP) {
+                        upnpStatus.externalIP = externalIP;
+                        console.log(`[UPnP] Detected external IP: ${externalIP}`);
+                    }
+                } catch (err) {
+                    console.warn('[UPnP] Could not detect external IP:', err.message);
+                }
+                
+                const wsMapping = await mapPort(YJS_WEBSOCKET_PORT, 'Nightjar Yjs WebSocket');
+                if (wsMapping.success) {
+                    upnpStatus.enabled = true;
+                    upnpStatus.wsPortMapped = true;
+                }
+                
+                const wssMapping = await mapPort(YJS_WEBSOCKET_SECURE_PORT, 'Nightjar Yjs Secure WebSocket');
+                if (wssMapping.success) {
+                    upnpStatus.enabled = true;
+                    upnpStatus.wssPortMapped = true;
+                }
+                
+                if (upnpStatus.enabled) {
+                    console.log('[Sidecar] ✓ UPnP auto-configuration successful');
+                } else {
+                    console.log('[Sidecar] ⚠ UPnP unavailable - manual port forwarding may be required');
+                }
+            })(),
+            new Promise(resolve => setTimeout(() => {
+                console.log('[UPnP] Timeout after 3s, continuing...');
+                resolve();
+            }, 3000))
+        ]).catch(err => {
+            console.warn('[UPnP] Error during discovery:', err.message);
+        }).then(() => {
+            // UPnP result doesn't block startup - just log completion
+            console.log('[UPnP] Discovery phase complete (background)');
+        });
+    });
+    
+    // Continue with server startup immediately
+    console.log(`[Sidecar] Continuing startup (UPnP runs in background)... (${Date.now() - startTime}ms)`);
+    
+    // --- SSL Certificate (for WSS support) ---
+    const certDir = path.join(USER_DATA_PATH, 'identity');
+    let sslCreds = null;
+    try {
+        sslCreds = ensureSSLCert(certDir);
+        console.log(`[Sidecar] SSL certificate ready for WSS (${Date.now() - startTime}ms)`);
+    } catch (err) {
+        console.error('[Sidecar] Failed to setup SSL certificate:', err);
+        console.warn('[Sidecar] WSS (secure WebSocket) will not be available');
+    }
+    
+    // --- Server 1: Plain Yjs WebSocket (ws://) ---
+    yjsWss = new WebSocket.Server({ port: YJS_WEBSOCKET_PORT });
     yjsWss.on('connection', (conn, req) => {
-        console.log('[Sidecar] Yjs client connected');
+        console.log('[Sidecar] Yjs client connected (WS)');
         setupWSConnection(conn, req);
     });
-    console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT}`);
+    console.log(`[Sidecar] Yjs WebSocket server listening on ws://localhost:${YJS_WEBSOCKET_PORT} (${Date.now() - startTime}ms)`);
+    
+    // --- Server 2: Secure Yjs WebSocket (wss://) ---
+    if (sslCreds) {
+        try {
+            const httpsServer = https.createServer({
+                cert: sslCreds.cert,
+                key: sslCreds.key
+            });
+            
+            yjsWssSecure = new WebSocket.Server({ server: httpsServer });
+            yjsWssSecure.on('connection', (conn, req) => {
+                console.log('[Sidecar] Yjs client connected (WSS)');
+                setupWSConnection(conn, req);
+            });
+            
+            httpsServer.listen(YJS_WEBSOCKET_SECURE_PORT, () => {
+                console.log(`[Sidecar] Yjs Secure WebSocket server listening on wss://localhost:${YJS_WEBSOCKET_SECURE_PORT} (${Date.now() - startTime}ms)`);
+            });
+        } catch (err) {
+            console.error('[Sidecar] Failed to start WSS server:', err);
+        }
+    }
 
     // Server 2: Handles metadata and commands  
     metaWss = new WebSocket.Server({ port: METADATA_WEBSOCKET_PORT });
     
     // Set up metadata server connection handler
     metaWss.on('connection', (ws, req) => {
-        console.log('[Sidecar] Metadata client connected.');
+        // Generate unique client ID for rate limiting per connection
+        const clientId = `${req.socket.remoteAddress || 'unknown'}:${req.socket.remotePort || crypto.randomBytes(4).toString('hex')}`;
         
         // Immediately send current status
+        const meshStatus = meshParticipant ? meshParticipant.getStatus() : null;
         ws.send(JSON.stringify({
             type: 'status',
             status: connectionStatus,
             isOnline: isOnline,
+            torEnabled: torEnabled,
             onionAddress: onionAddress ? `${onionAddress}.onion` : null,
             multiaddr: fullMultiaddr,
-            peerId: p2pNode ? p2pNode.peerId.toString() : null
+            peerId: p2pNode ? p2pNode.peerId.toString() : null,
+            mesh: meshStatus
         }));
 
         ws.on('message', async (message) => {
-            // TODO: Implement full message handler
-            console.log('[Sidecar] Received message:', message.toString());
+            // Apply rate limiting
+            const rateLimit = rateLimiter.check(clientId);
+            if (!rateLimit.allowed) {
+                ws.send(JSON.stringify({ 
+                    type: 'error', 
+                    code: 'RATE_LIMITED',
+                    message: `Too many requests. Retry after ${rateLimit.retryAfter} seconds.`,
+                    retryAfter: rateLimit.retryAfter
+                }));
+                console.warn(`[Sidecar] Rate limited client: ${clientId.slice(0, 8)}`);
+                return;
+            }
+            
+            try {
+                // Ensure uint8arrays module is loaded
+                if (!uint8arraysLoaded) {
+                    await loadUint8Arrays();
+                }
+                
+                // Use safe JSON parsing with prototype pollution protection
+                const parsed = safeJsonParse(message.toString());
+                if (!parsed) {
+                    ws.send(JSON.stringify({ type: 'error', code: 'INVALID_MESSAGE', message: 'Invalid message format' }));
+                    return;
+                }
+                
+                const { type, payload, document, docId, metadata, docName, workspace, folder, workspaceId, folderId, updates } = parsed;
+                
+                // Validate message type
+                if (typeof type !== 'string' || type.length === 0 || type.length > 64) {
+                    ws.send(JSON.stringify({ type: 'error', code: 'INVALID_TYPE', message: 'Invalid message type' }));
+                    return;
+                }
+                
+                // Handle message through the centralized handler
+                await handleMetadataMessage(ws, parsed);
+                
+            } catch (e) {
+                console.error('[Sidecar] Failed to handle metadata message:', e);
+            }
         });
         
         ws.on('close', () => {
@@ -831,11 +1660,13 @@ async function startServers() {
         p2pBridge.handleClient(ws);
     });
     
-    console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT}`);
+    console.log(`[Sidecar] Metadata WebSocket server listening on ws://localhost:${METADATA_WEBSOCKET_PORT} (${Date.now() - startTime}ms)`);
     
     // Load uint8arrays module and initialize document keys after servers are started
     await loadUint8Arrays();
     initializeDocumentKeys();
+    
+    console.log(`[Sidecar] ========== Startup complete in ${Date.now() - startTime}ms ==========`);
 }
 
 // Start servers
@@ -874,11 +1705,15 @@ async function initializeP2P(force = false) {
                 // Set up peer persistence for mesh networking
                 setupPeerPersistence();
                 
-                // Initialize mesh network participation
-                await initializeMesh();
+                // Initialize mesh network participation IN BACKGROUND (don't block)
+                initializeMesh().catch(err => {
+                    console.warn('[Sidecar] Background mesh init failed:', err.message);
+                });
                 
-                // Auto-rejoin saved workspaces
-                await autoRejoinWorkspaces();
+                // Auto-rejoin saved workspaces IN BACKGROUND (don't block)
+                autoRejoinWorkspaces().catch(err => {
+                    console.warn('[Sidecar] Background workspace rejoin failed:', err.message);
+                });
                 
                 return { success: true, alreadyInitialized: false };
             }
@@ -903,6 +1738,9 @@ async function initializeMesh() {
     }
     
     try {
+        // Lazy-load mesh module
+        await ensureMesh();
+        
         // Create mesh participant (desktop clients are NOT relays by default)
         meshParticipant = new MeshParticipant({
             enabled: true,
@@ -1216,8 +2054,9 @@ async function autoRejoinWorkspaces() {
 
 // P2P initialization with retry loop
 // Retries initialization until identity is available or max attempts reached
-const P2P_INIT_MAX_ATTEMPTS = 20;
-const P2P_INIT_RETRY_INTERVAL_MS = 3000;
+// Reduced from 20 to 3 for faster test execution
+const P2P_INIT_MAX_ATTEMPTS = process.env.P2P_INIT_MAX_ATTEMPTS ? parseInt(process.env.P2P_INIT_MAX_ATTEMPTS) : 3;
+const P2P_INIT_RETRY_INTERVAL_MS = process.env.P2P_INIT_RETRY_INTERVAL_MS ? parseInt(process.env.P2P_INIT_RETRY_INTERVAL_MS) : 3000;
 let p2pInitAttempts = 0;
 
 async function initializeP2PWithRetry() {
@@ -1293,7 +2132,9 @@ setTimeout(initializeP2PWithRetry, 1000);
         
         try {
             // Ensure uint8arrays module is loaded
-            await uint8arraysReady;
+            if (!uint8arraysLoaded) {
+                await loadUint8Arrays();
+            }
             
             // Use safe JSON parsing with prototype pollution protection
             const parsed = safeJsonParse(message.toString());
@@ -1708,69 +2549,6 @@ setTimeout(initializeP2PWithRetry, 1000);
                     }
                     break;
                 
-                // --- P2P Info ---
-                case 'get-p2p-info':
-                    // Get our Hyperswarm public key, connected peers, and direct address
-                    // If P2P not initialized but identity exists, try to initialize now
-                    try {
-                        if (!p2pInitialized) {
-                            console.log('[Sidecar] P2P not initialized, attempting initialization...');
-                            await initializeP2P(true);
-                        }
-                        const ownPublicKey = p2pBridge.getOwnPublicKey();
-                        const connectedPeers = p2pBridge.getConnectedPeers();
-                        // Get direct connection address (public IP:port)
-                        const directAddress = await p2pBridge.getDirectAddress();
-                        console.log('[Sidecar] get-p2p-info: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16), 'directAddress=', directAddress?.address);
-                        ws.send(JSON.stringify({
-                            type: 'p2p-info',
-                            initialized: p2pInitialized,
-                            ownPublicKey,
-                            connectedPeers,
-                            directAddress, // { host, port, publicKey, address }
-                        }));
-                    } catch (err) {
-                        console.error('[Sidecar] get-p2p-info error:', err);
-                        ws.send(JSON.stringify({
-                            type: 'p2p-info',
-                            initialized: false,
-                            ownPublicKey: null,
-                            connectedPeers: [],
-                            directAddress: null,
-                            error: err.message,
-                        }));
-                    }
-                    break;
-                
-                case 'reinitialize-p2p':
-                    // Force P2P reinitialization (call after identity is created/changed)
-                    try {
-                        console.log('[Sidecar] Reinitializing P2P...');
-                        const result = await initializeP2P(true);
-                        const ownPublicKey = p2pBridge.getOwnPublicKey();
-                        const directAddress = await p2pBridge.getDirectAddress();
-                        console.log('[Sidecar] P2P reinitialized: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16));
-                        ws.send(JSON.stringify({
-                            type: 'p2p-reinitialized',
-                            success: result.success,
-                            initialized: p2pInitialized,
-                            ownPublicKey,
-                            directAddress,
-                            reason: result.reason,
-                        }));
-                    } catch (err) {
-                        console.error('[Sidecar] P2P reinitialization failed:', err);
-                        ws.send(JSON.stringify({
-                            type: 'p2p-reinitialized',
-                            success: false,
-                            initialized: false,
-                            ownPublicKey: null,
-                            directAddress: null,
-                            error: err.message,
-                        }));
-                    }
-                    break;
-                
                 // --- Workspace Management ---
                 case 'list-workspaces':
                     try {
@@ -1788,6 +2566,13 @@ setTimeout(initializeP2PWithRetry, 1000);
                     console.log('[Sidecar] create-workspace received:', wsData?.id, wsData?.name);
                     if (wsData) {
                         try {
+                            // Add current identity's public key as owner
+                            const currentIdentity = identity.loadIdentity();
+                            if (currentIdentity?.publicKeyBase62) {
+                                wsData.ownerPublicKey = currentIdentity.publicKeyBase62;
+                                console.log('[Sidecar] Associating workspace with identity:', currentIdentity.publicKeyBase62);
+                            }
+                            
                             await saveWorkspaceMetadata(wsData.id, wsData);
                             console.log('[Sidecar] Workspace saved successfully');
                             
@@ -1811,6 +2596,19 @@ setTimeout(initializeP2PWithRetry, 1000);
                                 }
                             } else if (wsData.topicHash && !p2pInitialized) {
                                 console.log('[Sidecar] P2P could not be initialized, topic will be joined on next startup');
+                            }
+                            
+                            // Register encryption key for workspace-meta documents
+                            if (wsData.encryptionKey) {
+                                try {
+                                    if (!uint8arraysLoaded) await loadUint8Arrays();
+                                    const keyBytes = uint8ArrayFromString(wsData.encryptionKey, 'base64');
+                                    documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes);
+                                    documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes);
+                                    console.log(`[Sidecar] Registered encryption key for created workspace-meta: ${wsData.id}`);
+                                } catch (e) {
+                                    console.error(`[Sidecar] Failed to register key for workspace ${wsData.id}:`, e.message);
+                                }
                             }
                             
                             metaWss.clients.forEach(client => {
@@ -1967,8 +2765,35 @@ setTimeout(initializeP2PWithRetry, 1000);
                                 
                                 if (needsUpdate) {
                                     await saveWorkspaceMetadata(joinWsData.id, updates);
+                                    
+                                    // Register encryption key for workspace-meta documents
+                                    const keyToRegister = updates.encryptionKey || existing.encryptionKey;
+                                    if (keyToRegister) {
+                                        try {
+                                            if (!uint8arraysLoaded) await loadUint8Arrays();
+                                            const keyBytes = uint8ArrayFromString(keyToRegister, 'base64');
+                                            documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
+                                            documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
+                                            console.log(`[Sidecar] Registered encryption key for workspace-meta: ${joinWsData.id}`);
+                                        } catch (e) {
+                                            console.error(`[Sidecar] Failed to register key for workspace ${joinWsData.id}:`, e.message);
+                                        }
+                                    }
+                                    
                                     ws.send(JSON.stringify({ type: 'workspace-joined', workspace: updates, upgraded: true }));
                                 } else {
+                                    // Even if no update needed, register existing key
+                                    if (existing.encryptionKey) {
+                                        try {
+                                            if (!uint8arraysLoaded) await loadUint8Arrays();
+                                            const keyBytes = uint8ArrayFromString(existing.encryptionKey, 'base64');
+                                            documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
+                                            documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
+                                            console.log(`[Sidecar] Registered encryption key for existing workspace-meta: ${joinWsData.id}`);
+                                        } catch (e) {
+                                            console.error(`[Sidecar] Failed to register key for workspace ${joinWsData.id}:`, e.message);
+                                        }
+                                    }
                                     ws.send(JSON.stringify({ type: 'workspace-joined', workspace: existing, upgraded: false }));
                                 }
                             } else {
@@ -1981,6 +2806,20 @@ setTimeout(initializeP2PWithRetry, 1000);
                                     }));
                                 }
                                 await saveWorkspaceMetadata(joinWsData.id, wsToSave);
+                                
+                                // Register encryption key for new workspace
+                                if (wsToSave.encryptionKey) {
+                                    try {
+                                        if (!uint8arraysLoaded) await loadUint8Arrays();
+                                        const keyBytes = uint8ArrayFromString(wsToSave.encryptionKey, 'base64');
+                                        documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
+                                        documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
+                                        console.log(`[Sidecar] Registered encryption key for new workspace-meta: ${joinWsData.id}`);
+                                    } catch (e) {
+                                        console.error(`[Sidecar] Failed to register key for workspace ${joinWsData.id}:`, e.message);
+                                    }
+                                }
+                                
                                 ws.send(JSON.stringify({ type: 'workspace-joined', workspace: wsToSave, upgraded: false }));
                             }
                             
@@ -2197,7 +3036,9 @@ setTimeout(initializeP2PWithRetry, 1000);
 // This is deferred to not block startup - documents will be loaded by the time the client connects
 async function initializeDocumentKeys() {
     try {
-        await uint8arraysReady;
+        if (!uint8arraysLoaded) {
+            await loadUint8Arrays();
+        }
         console.log('[Sidecar] Loading document list...');
         const documents = await loadDocumentList();
         console.log(`[Sidecar] Startup: Loaded ${documents.length} documents, ${documentKeys.size} encryption keys`);
@@ -2427,6 +3268,16 @@ docs.on('doc-added', async (doc, docName) => {
         } else {
             console.log(`[Sidecar] No session key yet for new document: ${docName}`);
         }
+        
+        // Connect workspace-meta docs to public relay for zero-config cross-platform sharing
+        // This ensures web clients can sync via the relay even if UPnP fails
+        if (relayBridgeEnabled && docName.startsWith('workspace-meta:')) {
+            console.log(`[Sidecar] Connecting ${docName} to public relay for cross-platform sharing...`);
+            relayBridge.connect(docName, doc).catch(err => {
+                console.warn(`[Sidecar] Failed to connect ${docName} to relay:`, err.message);
+                // Non-fatal - P2P mesh will still work
+            });
+        }
     } catch (err) {
         console.error(`[Sidecar] Error in doc-added handler for ${docName}:`, err);
     }
@@ -2438,6 +3289,24 @@ console.log('[Sidecar] Running in OFFLINE mode by default. Use toggle-tor to ena
 // --- Graceful Shutdown ---
 async function shutdown() {
     console.log('[Sidecar] Shutting down...');
+    
+    // Disconnect relay bridge
+    if (relayBridgeEnabled) {
+        console.log('[Sidecar] Disconnecting relay bridge...');
+        relayBridge.disconnectAll();
+    }
+    
+    // Unmap UPnP ports (only if upnpMapper was loaded)
+    if (upnpStatus.wsPortMapped || upnpStatus.wssPortMapped) {
+        console.log('[Sidecar] Unmapping UPnP ports...');
+        const { unmapPort } = getUPnPMapper();
+        if (upnpStatus.wsPortMapped) {
+            await unmapPort(YJS_WEBSOCKET_PORT);
+        }
+        if (upnpStatus.wssPortMapped) {
+            await unmapPort(YJS_WEBSOCKET_SECURE_PORT);
+        }
+    }
     
     // Stop mesh participant
     if (meshParticipant) {

@@ -618,12 +618,6 @@
     font-family: 'SF Mono', 'Fira Code', monospace;
     color: #fbbf24;
 }
-    color: #fca5a5;
-    padding: 12px 16px;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    text-align: center;
-}
 
 /* Responsive */
 @media (max-width: 500px) {

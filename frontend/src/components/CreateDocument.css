@@ -61,18 +61,6 @@
     outline: 2px solid var(--accent-color, #3b82f6);
     outline-offset: 1px;
 }
-    font-size: 1.5rem;
-    color: var(--text-secondary);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 6px;
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
 
 .create-document-modal__close:hover {
     background: var(--hover-color);
@@ -104,27 +92,33 @@
     letter-spacing: 0.05em;
 }
 
-.create-document-input,
-.create-document-select {
+.create-document-field__input,
+.create-document-field__select {
     width: 100%;
-    padding: 10px 12px;
+    padding: 12px 16px;
     border: 1px solid var(--border-color, #d1d5db);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--bg-primary, #ffffff);
     color: var(--text-primary, #1f2937);
-    font-size: 14px;
+    font-size: 15px;
+    font-family: inherit;
     transition: all 0.15s;
+    line-height: 1.5;
 }
 
-.create-document-input:focus,
-.create-document-select:focus {
+.create-document-field__input:focus,
+.create-document-field__select:focus {
     outline: none;
     border-color: var(--accent-color, #3b82f6);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.create-document-input::placeholder {
+.create-document-field__input::placeholder {
     color: var(--text-secondary, #9ca3af);
+}
+
+.create-document-field__select {
+    cursor: pointer;
 }
 
 /* Document Type Selection */
@@ -167,24 +161,14 @@
 .document-type-option__label {
     font-size: 14px;
     font-weight: 600;
-    color: inherit;
+    color: var(--text-primary, #1f2937);
     margin-bottom: 4px;
 }
 
 .document-type-option__description {
     font-size: 12px;
     color: var(--text-secondary, #6b7280);
-    line-height: 1.3;
-}
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: var(--text-primary);
-}
-
-.document-type-option__description {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    line-height: 1.3;
+    line-height: 1.4;
 }
 
 /* Icon Grid */
@@ -312,10 +296,89 @@
 
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
+    .create-document-overlay {
+        background: rgba(0, 0, 0, 0.75);
+    }
+
+    .create-document-modal__title {
+        color: var(--text-primary, #f9fafb);
+    }
+
+    .create-document-modal__close {
+        color: var(--text-secondary, #d1d5db);
+    }
+
+    .create-document-modal__close:hover {
+        color: var(--text-primary, #f9fafb);
+    }
+
+    .create-document-field__label {
+        color: var(--text-primary, #f3f4f6);
+    }
+
+    .create-document-field__input,
+    .create-document-field__select {
+        background: var(--bg-secondary, #1f2937);
+        color: var(--text-primary, #f9fafb);
+        border-color: var(--border-color, #374151);
+    }
+
+    .create-document-field__input::placeholder {
+        color: var(--text-secondary, #9ca3af);
+    }
+
+    .document-type-option {
+        background: var(--bg-secondary, #1f2937);
+        border-color: var(--border-color, #374151);
+    }
+
+    .document-type-option:hover {
+        background: var(--bg-hover, #374151);
+    }
+
+    .document-type-option.selected {
+        background: rgba(59, 130, 246, 0.15);
+    }
+
+    .document-type-option__label {
+        color: var(--text-primary, #f9fafb);
+    }
+
+    .document-type-option__description {
+        color: var(--text-secondary, #d1d5db);
+    }
+
+    .icon-option {
+        background: var(--bg-secondary, #1f2937);
+        border-color: var(--border-color, #374151);
+    }
+
+    .icon-option:hover {
+        background: var(--bg-hover, #374151);
+    }
+
+    .color-option {
+        color: var(--text-secondary, #d1d5db);
+    }
+
+    .color-option.selected {
+        border-color: var(--text-primary, #f9fafb);
+    }
+
+    .create-document-btn--cancel {
+        color: var(--text-secondary, #d1d5db);
+        border-color: var(--border-color, #374151);
+    }
+
+    .create-document-btn--cancel:hover {
+        color: var(--text-primary, #f9fafb);
+        background: var(--hover-color, #374151);
+    }
+
     .create-document-error {
         background: rgba(220, 38, 38, 0.1);
         border-color: rgba(220, 38, 38, 0.3);
-        color: #f87171;
+        color: #fca5a5;
     }
 }
 

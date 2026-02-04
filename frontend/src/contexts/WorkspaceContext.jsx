@@ -513,13 +513,22 @@ export function WorkspaceProvider({ children }) {
   }, [sendMessage]);
 
   /**
-   * Delete a workspace (owner only)
+   * Delete a workspace (owner OR only member)
    * @param {string} workspaceId - Workspace ID
    */
   const deleteWorkspace = useCallback(async (workspaceId) => {
     const workspace = workspaces.find(w => w.id === workspaceId);
-    if (!workspace || workspace.myPermission !== 'owner') {
-      throw new Error('Only owners can delete a workspace');
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+    
+    // Allow deletion if owner OR if you're the only member
+    const isOwner = workspace.myPermission === 'owner';
+    const memberCount = workspace.members?.length || workspace.collaborators?.length || 1;
+    const isOnlyMember = memberCount <= 1;
+    
+    if (!isOwner && !isOnlyMember) {
+      throw new Error('Only owners or the last remaining member can delete a workspace');
     }
     
     sendMessage({ type: 'delete-workspace', workspaceId });
@@ -795,6 +804,13 @@ export function WorkspaceProvider({ children }) {
               ownPublicKey: data.ownPublicKey || null,
               connectedPeers: data.connectedPeers || [],
               directAddress: data.directAddress || null,
+              publicIP: data.publicIP || null,
+              wsPort: data.wsPort || null,
+              wssPort: data.wssPort || null,
+              directWsUrl: data.directWsUrl || null,
+              directWssUrl: data.directWssUrl || null,
+              upnpEnabled: data.upnpEnabled || false,
+              upnpStatus: data.upnpStatus || null,
             });
           }
         } catch (e) {
@@ -808,7 +824,19 @@ export function WorkspaceProvider({ children }) {
       // Timeout after 2 seconds
       setTimeout(() => {
         metaSocket.current?.removeEventListener('message', handleMessage);
-        resolve({ initialized: false, ownPublicKey: null, connectedPeers: [], directAddress: null });
+        resolve({ 
+          initialized: false, 
+          ownPublicKey: null, 
+          connectedPeers: [], 
+          directAddress: null,
+          publicIP: null,
+          wsPort: null,
+          wssPort: null,
+          directWsUrl: null,
+          directWssUrl: null,
+          upnpEnabled: false,
+          upnpStatus: null
+        });
       }, 2000);
     });
   }, []);

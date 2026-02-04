@@ -8,7 +8,17 @@
  * - Mesh peer sharing (peers share their peer lists)
  */
 
-const { HyperswarmManager, generateTopic } = require('./hyperswarm');
+// OPTIMIZATION: Lazy-load hyperswarm to speed up startup
+let HyperswarmManager = null;
+let generateTopic = null;
+
+async function ensureHyperswarm() {
+  if (HyperswarmManager) return;
+  const module = require('./hyperswarm');
+  HyperswarmManager = module.HyperswarmManager;
+  generateTopic = module.generateTopic;
+}
+
 const EventEmitter = require('events');
 
 class P2PBridge extends EventEmitter {
@@ -48,6 +58,9 @@ class P2PBridge extends EventEmitter {
     if (this.isInitialized) return;
 
     try {
+      // Lazy-load hyperswarm module
+      await ensureHyperswarm();
+      
       this.hyperswarm = new HyperswarmManager();
       await this.hyperswarm.initialize(identity);
       this._setupHyperswarmEvents();
@@ -533,6 +546,15 @@ class P2PBridge extends EventEmitter {
   getConnectedPeers() {
     if (!this.hyperswarm) return [];
     return this.hyperswarm.getConnectedPeerKeys();
+  }
+
+  /**
+   * Get public IP address (cached if available)
+   * @returns {Promise<string|null>} Public IP or null
+   */
+  async getPublicIP() {
+    const { getPublicIP } = require('./hyperswarm.js');
+    return await getPublicIP();
   }
 
   /**
