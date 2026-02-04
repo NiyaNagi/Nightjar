@@ -64,7 +64,11 @@ export default function WorkspaceSettings({
   const [color, setColor] = useState(workspace?.color || '#6366f1');
   const [shareLevel, setShareLevel] = useState('viewer');
   const [expiryMinutes, setExpiryMinutes] = useState(60); // Default 1 hour
-  const [customServerUrl, setCustomServerUrl] = useState(workspace?.serverUrl || ''); // For cross-network sharing
+  const [customRelayUrl, setCustomRelayUrl] = useState('');
+  const [relayValidation, setRelayValidation] = useState(null);
+  const [isValidatingRelay, setIsValidatingRelay] = useState(false);
+  const [validationDebounceTimer, setValidationDebounceTimer] = useState(null);
+  const [customServerUrl, setCustomServerUrl] = useState(workspace?.serverUrl || ''); // Legacy - for compatibility
   const [p2pStatus, setP2pStatus] = useState({ initialized: false, ownPublicKey: null, publicIP: null }); // P2P status
   const [relayServerValid, setRelayServerValid] = useState(null); // null = not checked, true/false = validation result
   const [validatingRelay, setValidatingRelay] = useState(false);
@@ -79,6 +83,20 @@ export default function WorkspaceSettings({
   const [memberSearch, setMemberSearch] = useState(''); // Search filter for collaborators
   const shareMenuRef = useRef(null);
   const modalRef = useRef(null);
+  
+  // Auto-detect relay from current server
+  const autoDetectedRelay = React.useMemo(() => {
+    if (BOOTSTRAP_RELAY_NODES.length > 0) {
+      return BOOTSTRAP_RELAY_NODES[0];
+    }
+    if (typeof window !== 'undefined' && window.location.origin) {
+      const origin = window.location.origin;
+      return origin.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+    }
+    return '';
+  }, []);
+  
+  const effectiveRelayUrl = customRelayUrl || autoDetectedRelay;
   
   // Focus trap for modal accessibility
   useFocusTrap(modalRef, true, { onEscape: onClose });
@@ -107,94 +125,94 @@ export default function WorkspaceSettings({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
   
+  // Load saved custom relay from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('nightjar_customRelayServer');
+    if (saved) {
+      setCustomRelayUrl(saved);
+    }
+  }, []);
+  
+  // Relay validation function
+  const validateRelayUrl = useCallback(async (url) => {
+    if (!url || (!url.startsWith('ws://') && !url.startsWith('wss://'))) {
+      return { valid: false, error: 'URL must start with ws:// or wss://' };
+    }
+    
+    setIsValidatingRelay(true);
+    const startTime = Date.now();
+    
+    try {
+      const ws = new WebSocket(url);
+      
+      return await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          ws.close();
+          resolve({ valid: false, error: 'Connection timeout (5s)' });
+        }, 5000);
+        
+        ws.onopen = () => {
+          clearTimeout(timeout);
+          const latency = Date.now() - startTime;
+          ws.close();
+          resolve({ valid: true, latency });
+        };
+        
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          resolve({ valid: false, error: 'Connection failed' });
+        };
+      });
+    } catch (error) {
+      return { valid: false, error: error.message };
+    } finally {
+      setIsValidatingRelay(false);
+    }
+  }, []);
+  
+  // Handle relay URL input changes with debouncing
+  const handleRelayUrlChange = useCallback((value) => {
+    setCustomRelayUrl(value);
+    
+    // Clear previous validation
+    setRelayValidation(null);
+    
+    // Clear previous debounce timer
+    if (validationDebounceTimer) {
+      clearTimeout(validationDebounceTimer);
+    }
+    
+    // If empty, clear custom relay and use auto-detected
+    if (!value || value.trim() === '') {
+      setCustomRelayUrl('');
+      localStorage.removeItem('nightjar_customRelayServer');
+      setRelayValidation(null);
+      return;
+    }
+    
+    // Debounce validation by 500ms
+    const timer = setTimeout(async () => {
+      const result = await validateRelayUrl(value);
+      setRelayValidation(result);
+      
+      if (result.valid) {
+        localStorage.setItem('nightjar_customRelayServer', value);
+      }
+    }, 500);
+    
+    setValidationDebounceTimer(timer);
+  }, [validateRelayUrl, validationDebounceTimer]);
+  
   // Fetch P2P status on mount (Electron only)
   useEffect(() => {
     if (isElectron()) {
       getP2PInfo().then(info => {
         setP2pStatus(info);
-        // Auto-fill relay server URL if not already set
-        // Priority: UPnP public URL (if available), otherwise public bootstrap relay
-        if (!customServerUrl) {
-          if (info.upnpEnabled && (info.directWssUrl || info.directWsUrl)) {
-            // UPnP succeeded - use our public URL
-            const autoUrl = info.directWssUrl || info.directWsUrl;
-            setCustomServerUrl(autoUrl);
-            console.log('[WorkspaceSettings] Auto-populated relay server (UPnP enabled):', autoUrl);
-          } else {
-            // Zero-config: Use public bootstrap relay (like BitTorrent trackers)
-            // This ensures cross-platform sharing works without any configuration
-            const bootstrapRelay = BOOTSTRAP_RELAY_NODES[0];
-            setCustomServerUrl(bootstrapRelay);
-            console.log('[WorkspaceSettings] Zero-config: Using public bootstrap relay:', bootstrapRelay);
-          }
-        }
       }).catch(() => {
         setP2pStatus({ initialized: false, ownPublicKey: null, publicIP: null });
       });
     }
-  }, [getP2PInfo, customServerUrl]);
-  
-  // Validate relay server URL
-  const validateRelayServer = async () => {
-    if (!customServerUrl?.trim()) {
-      setRelayServerValid(false);
-      return;
-    }
-    
-    setValidatingRelay(true);
-    try {
-      // Send validation request to sidecar
-      const metadataWs = window.metadataWs;
-      if (metadataWs && metadataWs.readyState === WebSocket.OPEN) {
-        // Wait for response
-        const response = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Validation timeout')), 5000);
-          const handler = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'relay-server-validation') {
-              clearTimeout(timeout);
-              metadataWs.removeEventListener('message', handler);
-              resolve(data);
-            }
-          };
-          metadataWs.addEventListener('message', handler);
-          metadataWs.send(JSON.stringify({
-            type: 'validate-relay-server',
-            payload: { serverUrl: customServerUrl.trim() }
-          }));
-        });
-        
-        setRelayServerValid(response.valid);
-      }
-    } catch (err) {
-      console.error('[WorkspaceSettings] Relay validation error:', err);
-      setRelayServerValid(false);
-    } finally {
-      setValidatingRelay(false);
-    }
-  };
-  
-  // Refresh detected IP/relay - use UPnP if available, fallback to bootstrap relay
-  const refreshDetectedIP = async () => {
-    if (isElectron()) {
-      const info = await getP2PInfo();
-      setP2pStatus(info);
-      
-      if (info.upnpEnabled && (info.directWssUrl || info.directWsUrl)) {
-        // UPnP succeeded - use our public URL
-        const autoUrl = info.directWssUrl || info.directWsUrl;
-        setCustomServerUrl(autoUrl);
-        setRelayServerValid(null);
-        console.log('[WorkspaceSettings] Refreshed: Using UPnP public URL:', autoUrl);
-      } else {
-        // Zero-config fallback: Use public bootstrap relay
-        const bootstrapRelay = BOOTSTRAP_RELAY_NODES[0];
-        setCustomServerUrl(bootstrapRelay);
-        setRelayServerValid(null);
-        console.log('[WorkspaceSettings] Refreshed: Using public bootstrap relay:', bootstrapRelay);
-      }
-    }
-  };
+  }, [getP2PInfo]);
   
   if (!workspace) return null;
   
@@ -223,40 +241,21 @@ export default function WorkspaceSettings({
     const keyChain = getStoredKeyChain(workspace.id);
     const encryptionKey = keyChain?.workspaceKey || null;
     
-    // DEBUG: Log share link generation details
-    console.log('[WorkspaceSettings] ===== SHARE LINK GENERATION =====');
-    console.log('[WorkspaceSettings] workspaceId:', workspace.id);
-    console.log('[WorkspaceSettings] hasKeyChain:', !!keyChain);
-    console.log('[WorkspaceSettings] hasEncryptionKey:', !!encryptionKey);
-    console.log('[WorkspaceSettings] isOwner:', isOwner);
-    console.log('[WorkspaceSettings] hasUserIdentity:', !!userIdentity?.privateKey);
-    
     if (!encryptionKey) {
-      console.warn('[WorkspaceSettings] No encryption key found for workspace, link may require password');
+      console.warn('[WorkspaceSettings] No encryption key found for workspace');
     }
     
-    // For cross-network sharing, include the server URL
-    // ZERO-CONFIG APPROACH: Use public bootstrap relays when no specific server is configured
-    // This works like BitTorrent - peers connect through public relay servers that bridge the mesh
-    // Priority: 1. User-entered customServerUrl, 2. Workspace's stored serverUrl,
-    //           3. UPnP public URL (if available), 4. Public bootstrap relay (zero-config)
-    let serverUrl = customServerUrl?.trim() || workspace.serverUrl;
-    if (!serverUrl) {
-      if (isElectron()) {
-        // Check if UPnP succeeded and we have a public URL
-        if (p2pStatus.upnpEnabled && (p2pStatus.directWssUrl || p2pStatus.directWsUrl)) {
-          serverUrl = p2pStatus.directWssUrl || p2pStatus.directWsUrl;
-          console.log('[WorkspaceSettings] Using UPnP public URL:', serverUrl);
-        } else {
-          // Zero-config fallback: Use public bootstrap relay
-          // Web clients will connect to the relay, which bridges to the mesh network
-          // The Electron app syncs to the same relay via Hyperswarm mesh
-          const bootstrapRelay = BOOTSTRAP_RELAY_NODES[0]; // Primary relay
-          console.log('[WorkspaceSettings] Zero-config: Using public bootstrap relay:', bootstrapRelay);
-          serverUrl = bootstrapRelay;
-        }
-      } else {
-        serverUrl = window.location.origin;
+    // Determine server URL for relay
+    let serverUrl = null;
+    
+    if (!isElectron()) {
+      // Browser: Use custom relay if valid, otherwise fall back to auto-detected
+      if (customRelayUrl && relayValidation?.valid) {
+        serverUrl = customRelayUrl;
+        console.log('[WorkspaceSettings] Using custom relay server:', serverUrl);
+      } else if (autoDetectedRelay) {
+        serverUrl = autoDetectedRelay;
+        console.log('[WorkspaceSettings] Using auto-detected relay server:', serverUrl);
       }
     }
     
@@ -268,40 +267,24 @@ export default function WorkspaceSettings({
     if (isElectron()) {
       try {
         const p2pInfo = await getP2PInfo();
-        console.log('[WorkspaceSettings] p2pInfo:', p2pInfo);
-        console.log('[WorkspaceSettings] p2pInfo.initialized:', p2pInfo.initialized);
-        console.log('[WorkspaceSettings] p2pInfo.ownPublicKey:', p2pInfo.ownPublicKey?.slice(0, 16) + '...');
-        console.log('[WorkspaceSettings] p2pInfo.directAddress:', p2pInfo.directAddress);
         
-        // Include our public key if available (key to P2P discovery)
-        // The sidecar now auto-initializes P2P when get-p2p-info is called
+        // Include our public key if available
         if (p2pInfo.ownPublicKey) {
-          // Include our public key so receivers can connect directly via DHT
           hyperswarmPeers = [p2pInfo.ownPublicKey];
-          // Also include connected peers for mesh discovery
           if (p2pInfo.connectedPeers && p2pInfo.connectedPeers.length > 0) {
             hyperswarmPeers = [...hyperswarmPeers, ...p2pInfo.connectedPeers.slice(0, 2)];
           }
-          // Include direct address (public IP:port) for true P2P without DHT
           if (p2pInfo.directAddress?.address) {
             directAddress = p2pInfo.directAddress.address;
           }
-        } else {
-          console.warn('[WorkspaceSettings] No P2P public key available - P2P may not be initialized');
         }
-        
-        console.log('[WorkspaceSettings] hyperswarmPeers:', hyperswarmPeers);
-        console.log('[WorkspaceSettings] directAddress:', directAddress);
       } catch (e) {
         console.warn('[WorkspaceSettings] Failed to get P2P info:', e);
       }
       
       // Generate topic hash for DHT discovery
       topicHash = generateTopicHash(workspace.id, keyChain?.password || '');
-      console.log('[WorkspaceSettings] topicHash:', topicHash);
     }
-    
-    console.log('[WorkspaceSettings] ================================');
     
     // If we have owner identity, use signed invite with expiry
     if (isOwner && userIdentity?.privateKey && encryptionKey) {
@@ -352,7 +335,7 @@ export default function WorkspaceSettings({
     }
     
     return link;
-  }, [workspace.id, shareLevel, expiryMinutes, customServerUrl, isOwner, userIdentity, getP2PInfo]);
+  }, [workspace.id, shareLevel, expiryMinutes, customRelayUrl, relayValidation, autoDetectedRelay, isOwner, userIdentity, getP2PInfo]);
 
   // Copy different share formats
   const handleCopyFormat = async (format) => {
@@ -551,7 +534,53 @@ export default function WorkspaceSettings({
                 )}
               </div>
               
-              {/* P2P Status - show direct address when available */}
+              {/* Relay Server Configuration */}
+              {!isElectron() && (
+                <div className="workspace-settings__relay-config">
+                  <label className="workspace-settings__label">
+                    Relay Server
+                    <span className="workspace-settings__help-text">
+                      Auto-detected from current server. Override for cross-network sharing.
+                    </span>
+                  </label>
+                  <div className="workspace-settings__relay-input-group">
+                    <input
+                      type="text"
+                      className="workspace-settings__input"
+                      value={customRelayUrl}
+                      onChange={(e) => handleRelayUrlChange(e.target.value)}
+                      placeholder={autoDetectedRelay || 'ws://your-server.com'}
+                    />
+                    {isValidatingRelay && (
+                      <span className="workspace-settings__relay-status validating">
+                        ⟳ Validating...
+                      </span>
+                    )}
+                    {relayValidation?.valid && (
+                      <span className="workspace-settings__relay-status valid">
+                        ✓ Connected ({relayValidation.latency}ms)
+                      </span>
+                    )}
+                    {relayValidation && !relayValidation.valid && (
+                      <span className="workspace-settings__relay-status invalid">
+                        ✗ {relayValidation.error}
+                      </span>
+                    )}
+                  </div>
+                  {!customRelayUrl && autoDetectedRelay && (
+                    <div className="workspace-settings__relay-auto">
+                      Using auto-detected: {autoDetectedRelay}
+                    </div>
+                  )}
+                  {effectiveRelayUrl && (
+                    <div className="workspace-settings__relay-preview">
+                      <small>Share link will include relay: {effectiveRelayUrl}</small>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* P2P Status - show direct address when available (Electron only) */}
               {isElectron() && (
                 <div className="workspace-settings__server-url">
                   {p2pStatus.initialized && p2pStatus.ownPublicKey ? (
@@ -643,6 +672,7 @@ export default function WorkspaceSettings({
                     className={`workspace-settings__copy-btn ${copiedLink ? 'workspace-settings__copy-btn--copied' : ''}`}
                     onClick={() => handleCopyFormat('link')}
                     type="button"
+                    data-testid="copy-share-link-btn"
                   >
                     {copiedLink ? '✓ Copied!' : '📋 Copy Link'}
                   </button>
@@ -652,6 +682,7 @@ export default function WorkspaceSettings({
                     aria-label="More share options"
                     aria-expanded={showShareMenu}
                     type="button"
+                    data-testid="share-options-dropdown"
                   >
                     ▾
                   </button>

@@ -1073,3 +1073,87 @@
 .workspace-settings__inline-btn:hover {
   opacity: 0.8;
 }
+
+/* Relay Configuration */
+.workspace-settings__relay-config {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.workspace-settings__relay-config .workspace-settings__label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+}
+
+.workspace-settings__help-text {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.4;
+}
+
+.workspace-settings__relay-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.workspace-settings__relay-input-group input {
+  flex: 1;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.workspace-settings__relay-status {
+  position: absolute;
+  right: 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.workspace-settings__relay-status.validating {
+  color: var(--text-secondary, #6b7280);
+}
+
+.workspace-settings__relay-status.valid {
+  color: #059669;
+  font-weight: 500;
+}
+
+.workspace-settings__relay-status.invalid {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.workspace-settings__relay-auto {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-style: italic;
+}
+
+.workspace-settings__relay-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.workspace-settings__relay-preview small {
+  font-size: 12px;
+  color: #4f46e5;
+  line-height: 1.4;
+}

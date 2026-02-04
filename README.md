@@ -115,6 +115,32 @@ Download the latest version for your platform:
 
 ---
 
+## 🌐 Relay & P2P Architecture
+
+Nightjar uses a **zero-config hybrid P2P architecture** that combines multiple networking strategies:
+
+- **Electron clients:** Direct P2P via Hyperswarm DHT (no relay needed)
+- **Browser clients:** Auto-detect relay from hosting server origin
+- **Cross-platform:** Electron users can host relays via UPnP for browser peers
+
+**No central server required** — workspaces are fully peer-to-peer with optional relays for browser clients.
+
+### How It Works
+
+1. **Browser-to-Browser:** Uses WebSocket relay (auto-detected from `window.location.origin`)
+2. **Electron-to-Electron:** Direct P2P via Hyperswarm DHT (truly decentralized)
+3. **Browser-to-Electron:** Electron embeds relay server, bridges to Hyperswarm mesh
+
+### Custom Relay Configuration
+
+For cross-network scenarios or private deployments, you can specify a custom relay server in Workspace Settings. The built-in validator tests connectivity and latency before use.
+
+📖 **Learn more:**
+- [Relay Architecture](docs/RELAY_ARCHITECTURE.md) - How P2P discovery works
+- [Deploy Custom Relay](docs/RELAY_DEPLOYMENT.md) - Host your own relay server (Fly.io, Railway, Render, or self-hosted)
+
+---
+
 ## Security
 
 Nightjar is built with security as the foundation, not an afterthought.

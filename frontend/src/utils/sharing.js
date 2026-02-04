@@ -1384,43 +1384,68 @@ export async function getMeshRelaysForSharing(limit = 5) {
 }
 
 /**
- * Hardcoded bootstrap relay nodes as fallback
- * These are used when mesh relays are not available
+ * Convert HTTP/HTTPS URL to WebSocket URL
+ * @param {string} url - HTTP(S) URL
+ * @returns {string} WebSocket URL
+ */
+function convertHttpToWs(url) {
+  return url.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+}
+
+/**
+ * Auto-detect relay server from browser context
  * 
- * In development mode, use the local unified server instead
+ * Strategy:
+ * - Browser clients: Use current server origin as relay (auto-detected)
+ * - Electron clients: Use Hyperswarm DHT (no relay needed)
+ * - Development: Use localhost:3000 unified server
+ * 
+ * This enables zero-config sharing:
+ * - Web users share via their hosting server
+ * - Electron users share via Hyperswarm DHT + embedded relay (UPnP)
  */
 function getBootstrapRelayNodes() {
-  // Check if we're in development mode
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    const port = window.location.port;
-    
-    // Development mode detection:
-    // - localhost or 127.0.0.1
-    // - Vite dev server (port 5173, 5174, etc) OR unified server (port 3000)
-    // - file:// protocol (Electron production with local files)
-    const isDevelopment = (host === 'localhost' || host === '127.0.0.1') && 
-                          !window.location.protocol.startsWith('file:');
-    
-    if (isDevelopment) {
-      // Development mode: always use the unified server at localhost:3000
-      // This is where the y-websocket server runs locally
-      return ['ws://localhost:3000'];
-    }
+  if (typeof window === 'undefined') {
+    return []; // Server-side, no relay needed
   }
-  // Production: use public relay servers
-  return [
-    'wss://relay1.nightjar.io',
-    'wss://relay2.nightjar.io',
-    'wss://relay3.nightjar.io'
-  ];
+  
+  const protocol = window.location.protocol;
+  const host = window.location.hostname;
+  
+  // Electron production (file:// protocol) - use Hyperswarm DHT, no relay
+  if (protocol === 'file:') {
+    return [];
+  }
+  
+  // Development mode - use local unified server
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return ['ws://localhost:3000'];
+  }
+  
+  // Browser production - auto-detect relay from current server
+  if (protocol === 'http:' || protocol === 'https:') {
+    const origin = window.location.origin;
+    return [convertHttpToWs(origin)];
+  }
+  
+  return [];
 }
 
 // Export as a getter to allow dynamic detection
-export const BOOTSTRAP_RELAY_NODES = typeof window !== 'undefined' ? getBootstrapRelayNodes() : [
-  'wss://relay1.nightjar.io',
-  'wss://relay2.nightjar.io',
-  'wss://relay3.nightjar.io'
+export const BOOTSTRAP_RELAY_NODES = typeof window !== 'undefined' ? getBootstrapRelayNodes() : [];
+
+// Public STUN/TURN servers for WebRTC NAT traversal
+// These are real, working servers provided by Google, Cloudflare, and Open Relay Project
+export const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  // Free TURN relay from Open Relay Project (for when STUN isn't enough)
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  }
 ];
 
 // Export constants for use in other modules

@@ -242,6 +242,7 @@ export function DocumentPicker({
             onShareDocument(doc.id, doc.name);
           }}
           title="Share document"
+          data-testid={`share-doc-${doc.id}`}
         >
           📤
         </button>

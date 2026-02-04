@@ -143,14 +143,14 @@ export function EntityShareDialog({
   if (!isOpen) return null;
   
   return (
-    <div className="share-dialog-overlay" onClick={onClose}>
-      <div className="share-dialog entity-share-dialog" onClick={e => e.stopPropagation()}>
+    <div className="share-dialog-overlay" onClick={onClose} data-testid="share-dialog-overlay">
+      <div className="share-dialog entity-share-dialog" onClick={e => e.stopPropagation()} data-testid="share-dialog">
         <div className="share-dialog__header">
           <div className="share-dialog__title">
             <span className="share-dialog__icon">{entityInfo?.icon}</span>
             Share {entityInfo?.label}
           </div>
-          <button className="share-dialog__close" onClick={onClose}>×</button>
+          <button className="share-dialog__close" onClick={onClose} data-testid="share-dialog-close">×</button>
         </div>
         
         <div className="share-dialog__content">
@@ -163,7 +163,7 @@ export function EntityShareDialog({
           {/* Permission selector */}
           <div className="entity-share__section">
             <label className="entity-share__label">Access Level</label>
-            <div className="entity-share__permissions">
+            <div className="entity-share__permissions" data-testid="permission-selector">
               {permissionOptions.map(option => (
                 <button
                   key={option.value}
@@ -171,6 +171,7 @@ export function EntityShareDialog({
                     selectedPermission === option.value ? 'entity-share__perm-btn--selected' : ''
                   }`}
                   onClick={() => setSelectedPermission(option.value)}
+                  data-testid={`permission-${option.value}`}
                 >
                   <span className="entity-share__perm-icon">{option.icon}</span>
                   <span className="entity-share__perm-label">{option.label}</span>
@@ -210,7 +211,7 @@ export function EntityShareDialog({
           <div className="entity-share__section">
             <label className="entity-share__label">Share Link</label>
             <div className="entity-share__link-box">
-              <code className="entity-share__link">{shareLink || 'Generating...'}</code>
+              <code className="entity-share__link" data-testid="share-link-text">{shareLink || 'Generating...'}</code>
             </div>
           </div>
           
@@ -227,6 +228,7 @@ export function EntityShareDialog({
               className="entity-share__btn entity-share__btn--secondary"
               onClick={handleCopyWithMessage}
               disabled={!shareLink}
+              data-testid="copy-with-message-btn"
             >
               📝 Copy with Message
             </button>
@@ -234,6 +236,7 @@ export function EntityShareDialog({
               className="entity-share__btn entity-share__btn--primary"
               onClick={handleCopy}
               disabled={!shareLink}
+              data-testid="copy-link-btn"
             >
               {copied ? '✓ Copied!' : '📋 Copy Link'}
             </button>

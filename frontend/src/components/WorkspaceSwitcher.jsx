@@ -121,6 +121,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
           }}
           title="Workspace Settings"
           aria-label="Open workspace settings"
+          data-testid="workspace-settings-btn"
         >
           ⚙️
         </button>
