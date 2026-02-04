@@ -602,7 +602,9 @@ async function loadDocumentList() {
                     if (!uint8arraysLoaded) {
                         await loadUint8Arrays();
                     }
-                    const keyBytes = uint8ArrayFromString(metadata.encryptionKey, 'base64');
+                    // Convert base64url to standard base64
+                    const base64Key = metadata.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                    const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                     documentKeys.set(docId, keyBytes);
                     console.log(`[Sidecar] Loaded encryption key for document: ${docId}`);
                 } catch (e) {
@@ -737,7 +739,9 @@ async function loadWorkspaceList() {
                             if (!uint8arraysLoaded) {
                                 await loadUint8Arrays();
                             }
-                            const keyBytes = uint8ArrayFromString(value.encryptionKey, 'base64');
+                            // Convert base64url to standard base64
+                            const base64Key = value.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                             const workspaceMetaDocName = `workspace-meta:${value.id}`;
                             documentKeys.set(workspaceMetaDocName, keyBytes);
                             console.log(`[Sidecar] Loaded encryption key for workspace-meta: ${value.id}`);
@@ -1083,7 +1087,9 @@ async function handleMetadataMessage(ws, parsed) {
                     if (wsData.encryptionKey) {
                         try {
                             if (!uint8arraysLoaded) await loadUint8Arrays();
-                            const keyBytes = uint8ArrayFromString(wsData.encryptionKey, 'base64');
+                            // Convert base64url to standard base64
+                            const base64Key = wsData.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                             documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes);
                             documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes);
                             console.log(`[Sidecar] Registered encryption key for created workspace-meta: ${wsData.id}`);
@@ -1158,7 +1164,11 @@ async function handleMetadataMessage(ws, parsed) {
                             if (!uint8arraysLoaded) {
                                 await loadUint8Arrays();
                             }
-                            const keyBytes = uint8ArrayFromString(joinWsData.encryptionKey, 'base64');
+                            // Convert base64url to standard base64 (frontend stores keys as base64url)
+                            const base64Key = joinWsData.encryptionKey
+                                .replace(/-/g, '+')
+                                .replace(/_/g, '/');
+                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                             const workspaceMetaDocName = `workspace-meta:${joinWsData.id}`;
                             documentKeys.set(workspaceMetaDocName, keyBytes);
                             console.log(`[Sidecar] Registered encryption key for joined workspace-meta: ${joinWsData.id}`);
@@ -2602,7 +2612,9 @@ setTimeout(initializeP2PWithRetry, 1000);
                             if (wsData.encryptionKey) {
                                 try {
                                     if (!uint8arraysLoaded) await loadUint8Arrays();
-                                    const keyBytes = uint8ArrayFromString(wsData.encryptionKey, 'base64');
+                                    // Convert base64url to standard base64
+                                    const base64Key = wsData.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                                    const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                                     documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes);
                                     documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes);
                                     console.log(`[Sidecar] Registered encryption key for created workspace-meta: ${wsData.id}`);
@@ -2771,7 +2783,9 @@ setTimeout(initializeP2PWithRetry, 1000);
                                     if (keyToRegister) {
                                         try {
                                             if (!uint8arraysLoaded) await loadUint8Arrays();
-                                            const keyBytes = uint8ArrayFromString(keyToRegister, 'base64');
+                                            // Convert base64url to standard base64
+                                            const base64Key = keyToRegister.replace(/-/g, '+').replace(/_/g, '/');
+                                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                                             documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
                                             documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
                                             console.log(`[Sidecar] Registered encryption key for workspace-meta: ${joinWsData.id}`);
@@ -2786,7 +2800,9 @@ setTimeout(initializeP2PWithRetry, 1000);
                                     if (existing.encryptionKey) {
                                         try {
                                             if (!uint8arraysLoaded) await loadUint8Arrays();
-                                            const keyBytes = uint8ArrayFromString(existing.encryptionKey, 'base64');
+                                            // Convert base64url to standard base64
+                                            const base64Key = existing.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                                             documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
                                             documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
                                             console.log(`[Sidecar] Registered encryption key for existing workspace-meta: ${joinWsData.id}`);
@@ -2811,7 +2827,9 @@ setTimeout(initializeP2PWithRetry, 1000);
                                 if (wsToSave.encryptionKey) {
                                     try {
                                         if (!uint8arraysLoaded) await loadUint8Arrays();
-                                        const keyBytes = uint8ArrayFromString(wsToSave.encryptionKey, 'base64');
+                                        // Convert base64url to standard base64
+                                        const base64Key = wsToSave.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                                        const keyBytes = uint8ArrayFromString(base64Key, 'base64');
                                         documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
                                         documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
                                         console.log(`[Sidecar] Registered encryption key for new workspace-meta: ${joinWsData.id}`);
