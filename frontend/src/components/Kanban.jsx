@@ -151,7 +151,10 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
 
     // Drag and drop for cards
     const handleDragStart = (e, card, fromColumnId) => {
+        // Stop propagation to prevent column from also being dragged
+        e.stopPropagation();
         setDraggedCard({ card, fromColumnId });
+        setDraggedColumn(null); // Clear any column drag state
         e.dataTransfer.effectAllowed = 'move';
     };
 
@@ -202,8 +205,18 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
 
     // Drag and drop for columns
     const handleColumnDragStart = (e, column) => {
+        // Only set column drag if not already dragging a card
+        if (draggedCard) {
+            e.preventDefault();
+            return;
+        }
         setDraggedColumn(column);
+        setDraggedCard(null); // Clear any card drag state
         e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleColumnDragEnd = () => {
+        setDraggedColumn(null);
     };
 
     const handleColumnDrop = (e, targetColumnId) => {
@@ -258,6 +271,7 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                         style={{ '--column-color': column.color }}
                         draggable={!readOnly}
                         onDragStart={(e) => !readOnly && handleColumnDragStart(e, column)}
+                        onDragEnd={!readOnly ? handleColumnDragEnd : undefined}
                         onDragOver={!readOnly ? handleDragOver : undefined}
                         onDrop={!readOnly ? (e) => {
                             if (draggedColumn) {
