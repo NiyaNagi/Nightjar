@@ -103,7 +103,7 @@ export default function CreateFolderDialog({
       >
         <div className="create-folder__header">
           <h2 id="create-folder-title" className="create-folder__title">Create Folder</h2>
-          <button className="create-folder__close" onClick={handleClose} aria-label="Close dialog">×</button>
+          <button type="button" className="create-folder__close" onClick={handleClose} aria-label="Close dialog">×</button>
         </div>
         
         <form onSubmit={handleSubmit} className="create-folder__form">

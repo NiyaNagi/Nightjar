@@ -74,11 +74,13 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
                     <div key={group.name} className="tool-group">
                         {group.tools.map((tool, toolIndex) => (
                             <button
+                                type="button"
                                 key={`${group.name}-${toolIndex}`}
                                 onClick={tool.action}
                                 disabled={tool.disabled}
                                 className={`tool-btn ${tool.active ? 'active' : ''} ${tool.className || ''}`}
                                 title={tool.title}
+                                aria-label={tool.title}
                             >
                                 {tool.label}
                             </button>
@@ -88,9 +90,11 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
                 ))}
             </div>
             <button 
+                type="button"
                 className="toolbar-collapse-btn"
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 title={isCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
+                aria-label={isCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
             >
                 {isCollapsed ? '▼' : '▲'}
             </button>

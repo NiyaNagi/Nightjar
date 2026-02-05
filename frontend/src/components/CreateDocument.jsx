@@ -163,6 +163,7 @@ export default function CreateDocumentDialog({
         <header className="create-document-modal__header">
           <h2 className="create-document-modal__title">Create New Document</h2>
           <button 
+            type="button"
             className="create-document-modal__close" 
             onClick={onClose}
             aria-label="Close dialog"

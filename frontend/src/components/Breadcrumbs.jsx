@@ -217,6 +217,7 @@ export default function Breadcrumbs({
                 {index > 0 && <span className="breadcrumb-separator">/</span>}
                 {item.accessible && !item.current ? (
                   <button
+                    type="button"
                     className="breadcrumb-link"
                     onClick={() => onNavigate?.(item.type, item.id)}
                     title={item.name}

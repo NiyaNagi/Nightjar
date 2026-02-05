@@ -94,7 +94,7 @@
     min-width: 160px;
     padding: 10px 14px;
     white-space: normal;
-    z-index: 1000;
+    z-index: var(--z-modal);
 }
 
 /* Arrow pointing down-left toward bird */

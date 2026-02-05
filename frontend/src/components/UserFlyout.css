@@ -4,7 +4,7 @@
 
 .user-flyout {
     position: fixed;
-    z-index: 1100;
+    z-index: var(--z-popover);
     background: var(--bg-secondary, #16161e);
     border: 1px solid var(--border-color, #2d2d44);
     border-radius: 12px;

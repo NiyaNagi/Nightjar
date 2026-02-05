@@ -399,6 +399,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           </h2>
           <div className="create-workspace__tabs" role="tablist">
             <button
+              type="button"
               className={`create-workspace__tab ${activeTab === 'create' ? 'create-workspace__tab--active' : ''}`}
               onClick={() => setActiveTab('create')}
               role="tab"
@@ -407,6 +408,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               Create New
             </button>
             <button
+              type="button"
               className={`create-workspace__tab ${activeTab === 'join' ? 'create-workspace__tab--active' : ''}`}
               onClick={() => setActiveTab('join')}
               role="tab"
@@ -415,7 +417,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               Join via Link
             </button>
           </div>
-          <button className="create-workspace__close" onClick={onClose} aria-label="Close dialog">×</button>
+          <button type="button" className="create-workspace__close" onClick={onClose} aria-label="Close dialog">×</button>
         </div>
         
         <div className="create-workspace__content">

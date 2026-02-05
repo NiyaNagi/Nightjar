@@ -315,6 +315,7 @@ const Comments = ({
                         className="comment-input"
                     />
                     <button 
+                        type="button"
                         className="btn-add-comment"
                         onClick={addComment}
                         disabled={!newComment.trim()}
@@ -418,6 +419,7 @@ const Comments = ({
                         ) : (
                             <div className="comment-actions">
                                 <button 
+                                    type="button"
                                     className="btn-reply-action"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -428,6 +430,7 @@ const Comments = ({
                                     Reply
                                 </button>
                                 <button 
+                                    type="button"
                                     className="btn-resolve"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -439,6 +442,7 @@ const Comments = ({
                                 </button>
                                 {comment.author === username && (
                                     <button 
+                                        type="button"
                                         className="btn-delete-comment"
                                         onClick={(e) => {
                                             e.stopPropagation();

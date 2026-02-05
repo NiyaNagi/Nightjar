@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000; /* Higher than other modals */
+  z-index: var(--z-modal); /* High priority modal */
   padding: 20px;
   animation: fadeIn 0.2s ease-out;
 }

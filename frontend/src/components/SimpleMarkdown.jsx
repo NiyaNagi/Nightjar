@@ -29,8 +29,16 @@ const SimpleMarkdown = ({ text, className = '' }) => {
             { regex: /~~(.+?)~~/, render: (m) => <del key={`${keyPrefix}-s-${idx++}`}>{m[1]}</del> },
             // Inline code `code`
             { regex: /`(.+?)`/, render: (m) => <code key={`${keyPrefix}-c-${idx++}`}>{m[1]}</code> },
-            // Links [text](url)
-            { regex: /\[(.+?)\]\((.+?)\)/, render: (m) => <a href={m[2]} target="_blank" rel="noopener noreferrer" key={`${keyPrefix}-a-${idx++}`}>{m[1]}</a> },
+            // Links [text](url) - with XSS protection
+            { regex: /\[(.+?)\]\((.+?)\)/, render: (m) => {
+                const url = m[2];
+                // Only allow safe URL protocols
+                const isSafeUrl = /^(https?:\/\/|\/|#|mailto:)/i.test(url);
+                if (!isSafeUrl) {
+                    return <span key={`${keyPrefix}-a-${idx++}`}>{m[1]}</span>;
+                }
+                return <a href={url} target="_blank" rel="noopener noreferrer" key={`${keyPrefix}-a-${idx++}`}>{m[1]}</a>;
+            }},
         ];
 
         while (remaining) {

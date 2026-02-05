@@ -233,6 +233,7 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                 {!readOnly && (
                     <div className="kanban-actions">
                         <button 
+                            type="button"
                             className="btn-add-column"
                             onClick={() => setShowNewColumn(true)}
                             disabled={isLoading}
@@ -374,6 +375,7 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                         {!readOnly && (
                         <div className="column-footer">
                             <button 
+                                type="button"
                                 className="btn-add-card"
                                 onClick={() => addCard(column.id, 'bottom')}
                             >
@@ -402,8 +404,8 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                                 }}
                             />
                             <div className="new-column-actions">
-                                <button onClick={addColumn}>Add</button>
-                                <button onClick={() => {
+                                <button type="button" onClick={addColumn}>Add</button>
+                                <button type="button" onClick={() => {
                                     setShowNewColumn(false);
                                     setNewColumnName('');
                                 }}>Cancel</button>

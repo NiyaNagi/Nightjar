@@ -43,6 +43,7 @@ const TabBar = ({
                         <span className="tab-name">{tab.name}</span>
                         {tab.hasUnsavedChanges && <span className="unsaved-indicator">●</span>}
                         <button 
+                            type="button"
                             className="tab-close" 
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -60,6 +61,7 @@ const TabBar = ({
             
             <div className="tab-bar-actions">
                 <button 
+                    type="button"
                     className={`tab-bar-btn ${showComments ? 'active' : ''}`}
                     onClick={onShowComments}
                     title={showComments ? 'Hide comments' : 'Show comments'}
@@ -70,6 +72,7 @@ const TabBar = ({
                 </button>
                 
                 <button 
+                    type="button"
                     className="tab-bar-btn" 
                     onClick={onShowChangelog}
                     title="View changelog"
@@ -79,6 +82,7 @@ const TabBar = ({
                 </button>
                 
                 <button 
+                    type="button"
                     className="tab-bar-btn"
                     onClick={onToggleFullscreen}
                     title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}

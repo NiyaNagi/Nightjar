@@ -7,7 +7,7 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
-    z-index: 10000; /* High z-index to stay above spreadsheet elements */
+    z-index: var(--z-popover); /* Above modals but below tooltips */
     border: 1px solid var(--border-color);
     min-width: 280px;
     min-height: 300px;
@@ -55,7 +55,7 @@
     align-items: center;
     gap: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    z-index: 10000; /* High z-index to stay above spreadsheet elements */
+    z-index: var(--z-popover); /* Above modals but below tooltips */
     font-size: 0.875rem;
     font-weight: 500;
     transition: transform 0.2s, box-shadow 0.2s;

@@ -195,6 +195,7 @@ function TreeItem({
                 {/* Expand/collapse toggle for folders */}
                 {type === 'folder' && (
                     <button
+                        type="button"
                         className={`tree-item__toggle ${hasChildren ? '' : 'tree-item__toggle--hidden'}`}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -263,6 +264,7 @@ function TreeItem({
                 <div className="tree-item__actions">
                     {onRequestEdit && (
                         <button 
+                            type="button"
                             className="tree-item__edit"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -276,6 +278,7 @@ function TreeItem({
                     )}
                     {onRequestDelete && (
                         <button 
+                            type="button"
                             className="tree-item__delete"
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -311,12 +314,14 @@ function WelcomeState({ onCreateWorkspace, onJoinWorkspace }) {
             </p>
             <div className="sidebar-welcome__actions">
                 <button 
+                    type="button"
                     className="sidebar-welcome__btn sidebar-welcome__btn--primary"
                     onClick={onCreateWorkspace}
                 >
                     <span>+</span> Create Workspace
                 </button>
                 <button 
+                    type="button"
                     className="sidebar-welcome__btn"
                     onClick={onJoinWorkspace}
                 >
@@ -634,6 +639,7 @@ const HierarchicalSidebar = ({
         return (
             <div className="hierarchical-sidebar hierarchical-sidebar--collapsed">
                 <button 
+                    type="button"
                     className="hierarchical-sidebar__expand-btn" 
                     onClick={onToggleCollapse}
                     title="Expand sidebar"
@@ -654,6 +660,7 @@ const HierarchicalSidebar = ({
                 </div>
                 <div className="hierarchical-sidebar__footer">
                     <button 
+                        type="button"
                         className="hierarchical-sidebar__collapse-btn"
                         onClick={onToggleCollapse}
                         title="Collapse sidebar"
@@ -676,6 +683,7 @@ const HierarchicalSidebar = ({
                 
                 <div className="hierarchical-sidebar__footer">
                     <button 
+                        type="button"
                         className="hierarchical-sidebar__collapse-btn"
                         onClick={onToggleCollapse}
                         title="Collapse sidebar"
@@ -687,10 +695,9 @@ const HierarchicalSidebar = ({
                 {/* Create workspace dialog */}
                 {showCreateWorkspace && (
                     <CreateWorkspace
-                        initialTab={createWorkspaceMode}
-                        onSubmit={handleCreateWorkspaceSubmit}
-                        onJoin={handleJoinWorkspaceSubmit}
+                        mode={createWorkspaceMode}
                         onClose={() => setShowCreateWorkspace(false)}
+                        onSuccess={() => setShowCreateWorkspace(false)}
                     />
                 )}
             </div>
@@ -712,6 +719,7 @@ const HierarchicalSidebar = ({
             {/* Action bar */}
             <div className="hierarchical-sidebar__actions">
                 <button 
+                    type="button"
                     className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--share"
                     onClick={() => setShowWorkspaceSettings(true)}
                     title="Share Workspace"
@@ -720,6 +728,7 @@ const HierarchicalSidebar = ({
                     <span className="action-btn__label">Share</span>
                 </button>
                 <button 
+                    type="button"
                     className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--join"
                     onClick={handleOpenJoinWorkspace}
                     title="Join via Link"
@@ -729,6 +738,7 @@ const HierarchicalSidebar = ({
                 </button>
                 <IfPermitted action="create" entityType="workspace" entityId={currentWorkspace?.id}>
                     <button 
+                        type="button"
                         className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--doc"
                         onClick={() => startCreatingDocument(null)}
                         title="New Document"
@@ -738,6 +748,7 @@ const HierarchicalSidebar = ({
                         <span className="action-btn__label">Doc</span>
                     </button>
                     <button 
+                        type="button"
                         className="hierarchical-sidebar__action-btn hierarchical-sidebar__action-btn--folder"
                         onClick={() => setShowCreateFolder(true)}
                         title="New Folder"
@@ -852,6 +863,7 @@ const HierarchicalSidebar = ({
             <div className="hierarchical-sidebar__footer">
                 <NightjarMascot size="mini" autoRotate={false} fadeTimeout={5000} />
                 <button 
+                    type="button"
                     className="hierarchical-sidebar__settings-btn"
                     onClick={() => setShowAppSettings(true)}
                     title="App Settings"
@@ -860,6 +872,7 @@ const HierarchicalSidebar = ({
                     ⚙️
                 </button>
                 <button 
+                    type="button"
                     className="hierarchical-sidebar__collapse-btn"
                     onClick={onToggleCollapse}
                     title="Collapse sidebar"
@@ -918,6 +931,7 @@ const HierarchicalSidebar = ({
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
+                            type="button"
                             className="context-menu__item"
                             onClick={handleEditProperties}
                         >
@@ -925,6 +939,7 @@ const HierarchicalSidebar = ({
                             Edit Properties
                         </button>
                         <button
+                            type="button"
                             className="context-menu__item"
                             onClick={() => {
                                 handleRequestRename(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
@@ -935,6 +950,7 @@ const HierarchicalSidebar = ({
                             Rename
                         </button>
                         <button
+                            type="button"
                             className="context-menu__item context-menu__item--danger"
                             onClick={() => {
                                 handleRequestDelete(contextMenu.item.id, contextMenu.type, contextMenu.item.name);

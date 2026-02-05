@@ -41,6 +41,7 @@ export default function AccessDenied({
         <div className="access-denied__actions">
           {onGoBack && (
             <button 
+              type="button"
               className="access-denied__btn access-denied__btn--primary"
               onClick={onGoBack}
             >
@@ -49,6 +50,7 @@ export default function AccessDenied({
           )}
           {onRequestAccess && (
             <button 
+              type="button"
               className="access-denied__btn access-denied__btn--secondary"
               onClick={onRequestAccess}
             >

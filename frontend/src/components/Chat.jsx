@@ -531,6 +531,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         {provider?.awareness?.getStates()?.size || 1} online
                     </span>
                     <button 
+                        type="button"
                         className="btn-minimize"
                         onClick={() => setMinimized(true)}
                         title="Minimize chat"
@@ -560,6 +561,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         <span className="tab-name">{tab.name}</span>
                         {tab.id !== 'general' && (
                             <button 
+                                type="button"
                                 className="tab-close"
                                 onClick={(e) => closeTab(tab.id, e)}
                                 aria-label={`Close ${tab.name} chat`}
@@ -570,6 +572,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     </div>
                 ))}
                 <button 
+                    type="button"
                     className="chat-tab add-tab"
                     onClick={() => setShowUserSearch(true)}
                     title="Start new chat"
@@ -585,6 +588,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     <div className="user-search-header">
                         <h4>Start a Chat</h4>
                         <button 
+                            type="button"
                             className="close-search"
                             onClick={() => {
                                 setShowUserSearch(false);
@@ -694,6 +698,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     className="chat-input"
                 />
                 <button 
+                    type="button"
                     className="btn-send"
                     onClick={sendMessage}
                     disabled={!inputValue.trim()}

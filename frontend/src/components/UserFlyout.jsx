@@ -57,6 +57,7 @@ const UserFlyout = ({ user, position, onClose, onStartChat, onViewProfile, onFol
             
             <div className="user-flyout__actions">
                 <button 
+                    type="button"
                     className="user-flyout__action"
                     onClick={() => {
                         onStartChat?.(user);
@@ -68,6 +69,7 @@ const UserFlyout = ({ user, position, onClose, onStartChat, onViewProfile, onFol
                 </button>
                 
                 <button 
+                    type="button"
                     className="user-flyout__action"
                     onClick={() => {
                         onFollow?.(user);
@@ -79,6 +81,7 @@ const UserFlyout = ({ user, position, onClose, onStartChat, onViewProfile, onFol
                 </button>
                 
                 <button 
+                    type="button"
                     className="user-flyout__action"
                     onClick={() => {
                         onViewProfile?.(user);

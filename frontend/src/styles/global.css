@@ -42,6 +42,18 @@
     --code-bg: rgba(255, 255, 255, 0.1);
     
     --cursor-colors: #ff6b6b, #4ecdc4, #ffe66d, #95e1d3, #f38181, #aa96da;
+    
+    /* Z-index scale for consistent stacking */
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-toolbar: 400;
+    --z-overlay: 500;
+    --z-modal-backdrop: 900;
+    --z-modal: 1000;
+    --z-popover: 1100;
+    --z-tooltip: 1200;
+    --z-toast: 1300;
 }
 
 /* Light theme */
@@ -340,7 +352,7 @@ body {
     color: var(--text-primary);
     font-size: 0.9rem;
     cursor: pointer;
-    z-index: 1000;
+    z-index: var(--z-modal);
     opacity: 0.3;
     transition: opacity 0.2s ease, background 0.2s ease;
 }
@@ -387,7 +399,7 @@ body {
     border-radius: 8px;
     color: var(--text-primary);
     font-size: 0.9rem;
-    z-index: 10000;
+    z-index: var(--z-toast);
     animation: slideIn 0.2s ease-out;
     display: flex;
     align-items: center;

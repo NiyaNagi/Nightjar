@@ -97,6 +97,7 @@ export default function CollaboratorList({
           ))}
           {hasMore && (
             <button 
+              type="button"
               className="collaborator-list__avatar collaborator-list__avatar--more"
               onClick={() => setExpanded(true)}
             >
@@ -151,6 +152,7 @@ export default function CollaboratorList({
       
       {hasMore && (
         <button 
+          type="button"
           className="collaborator-list__show-more"
           onClick={() => setExpanded(true)}
         >
@@ -160,6 +162,7 @@ export default function CollaboratorList({
       
       {expanded && maxDisplay > 0 && (
         <button 
+          type="button"
           className="collaborator-list__show-less"
           onClick={() => setExpanded(false)}
         >

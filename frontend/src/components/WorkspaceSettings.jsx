@@ -214,6 +214,15 @@ export default function WorkspaceSettings({
     }
   }, [getP2PInfo]);
   
+  // Use detected public IP for relay server
+  const refreshDetectedIP = useCallback(() => {
+    if (p2pStatus.publicIP) {
+      const ipUrl = `http://${p2pStatus.publicIP}`;
+      setCustomServerUrl(ipUrl);
+      setRelayServerValid(null); // Reset validation
+    }
+  }, [p2pStatus.publicIP]);
+  
   if (!workspace) return null;
   
   const myPermission = workspace.myPermission || 'viewer';

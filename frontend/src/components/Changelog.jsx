@@ -217,6 +217,24 @@ const ChangelogPanel = ({
     const [diff, setDiff] = useState([]);
     const [showConfirmRollback, setShowConfirmRollback] = useState(false);
 
+    // Handle escape key to close
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                if (showConfirmRollback) {
+                    setShowConfirmRollback(false);
+                } else {
+                    onClose();
+                }
+            }
+        };
+        
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose, showConfirmRollback]);
+
     // Load changelog when opening or when docId changes
     useEffect(() => {
         if (docId) {
@@ -282,10 +300,10 @@ const ChangelogPanel = ({
     return (
         <>
             <div className="changelog-backdrop" onClick={onClose} />
-            <div className="changelog-panel">
+            <div className="changelog-panel" role="dialog" aria-modal="true" aria-label="Document changelog">
                 <div className="changelog-header">
                     <h3>📜 Changelog</h3>
-                    <button className="close-btn" onClick={onClose} title="Close">×</button>
+                    <button type="button" className="close-btn" onClick={onClose} title="Close" aria-label="Close changelog">×</button>
                 </div>
 
             <div className="changelog-content">
@@ -329,6 +347,7 @@ const ChangelogPanel = ({
                             <span>Changes from {formatTime(selectedEntry.timestamp)}</span>
                             {onRollback && (
                                 <button 
+                                    type="button"
                                     className="rollback-btn"
                                     onClick={() => setShowConfirmRollback(true)}
                                 >
@@ -363,13 +382,13 @@ const ChangelogPanel = ({
 
             {showConfirmRollback && (
                 <div className="rollback-confirm">
-                    <div className="confirm-dialog">
+                    <div className="confirm-dialog" role="alertdialog" aria-modal="true">
                         <h4>Confirm Rollback</h4>
                         <p>This will replace the current document with the version from {formatTime(selectedEntry?.timestamp)}.</p>
                         <p className="warning">⚠️ This action cannot be undone.</p>
                         <div className="confirm-actions">
-                            <button onClick={() => setShowConfirmRollback(false)}>Cancel</button>
-                            <button className="confirm-btn" onClick={handleRollback}>
+                            <button type="button" onClick={() => setShowConfirmRollback(false)}>Cancel</button>
+                            <button type="button" className="confirm-btn" onClick={handleRollback}>
                                 Rollback
                             </button>
                         </div>

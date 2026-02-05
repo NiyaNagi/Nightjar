@@ -159,17 +159,25 @@ function NightjarMascot({
         };
     }, []);
     
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick();
+        }
+    }, [handleClick]);
+    
     const currentSaying = sayings[currentIndex] || 'Squawk!';
     
     return (
         <div 
             className={`nightjar-mascot nightjar-mascot--${size} ${isPaused ? 'nightjar-mascot--paused' : ''}`}
             onClick={handleClick}
+            onKeyDown={handleKeyDown}
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             role="button"
-            tabIndex={-1}
+            tabIndex={0}
             aria-label="Nightjar mascot. Click for a new saying."
         >
             {/* Bird image */}

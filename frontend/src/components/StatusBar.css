@@ -91,7 +91,7 @@
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     min-width: 200px;
-    z-index: 1000;
+    z-index: var(--z-popover);
     overflow: hidden;
 }
 
@@ -331,7 +331,7 @@
     border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     min-width: 180px;
-    z-index: 1000;
+    z-index: var(--z-popover);
     overflow: hidden;
 }
 

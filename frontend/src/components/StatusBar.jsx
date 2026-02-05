@@ -124,9 +124,11 @@ const StatusBar = ({
                 {isElectron && isFeatureAvailable('tor') && (
                     <div className="tor-control" ref={torMenuRef}>
                         <button 
+                            type="button"
                             className={`tor-toggle ${torEnabled ? 'enabled' : 'disabled'} ${p2pStatus}`}
                             onClick={handleTorClick}
                             title="Tor P2P options"
+                            aria-label="Tor P2P options"
                         >
                             <span className="tor-icon">🧅</span>
                             <span className="tor-label">{torEnabled ? 'ON' : 'OFF'}</span>
@@ -134,12 +136,12 @@ const StatusBar = ({
                         
                         {/* Tor popup menu */}
                         {showTorMenu && (
-                            <div className="tor-menu">
-                                <button className="tor-menu-item" onClick={handleTorToggle}>
+                            <div className="tor-menu" role="menu">
+                                <button type="button" className="tor-menu-item" onClick={handleTorToggle} role="menuitem">
                                     <span className="menu-icon">{torEnabled ? '⏹️' : '▶️'}</span>
                                     <span>{torEnabled ? 'Disconnect from Tor' : 'Connect to Tor'}</span>
                                 </button>
-                                <button className="tor-menu-item" onClick={handleTorSettingsClick}>
+                                <button type="button" className="tor-menu-item" onClick={handleTorSettingsClick} role="menuitem">
                                     <span className="menu-icon">⚙️</span>
                                     <span>Tor Settings...</span>
                                 </button>
@@ -167,9 +169,11 @@ const StatusBar = ({
                 {/* Relay settings button - Electron only */}
                 {isElectron && isFeatureAvailable('relay') && onOpenRelaySettings && (
                     <button 
+                        type="button"
                         className="relay-settings-btn"
                         onClick={onOpenRelaySettings}
                         title="Configure relay settings"
+                        aria-label="Configure relay settings"
                     >
                         <span className="relay-icon">📡</span>
                         <span className="relay-label">Relay</span>

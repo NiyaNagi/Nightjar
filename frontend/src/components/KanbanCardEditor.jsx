@@ -72,16 +72,19 @@ const KanbanCardEditor = ({ card, onUpdate, onDelete, onClose, onAddComment }) =
                         setColor(e.target.value);
                         onUpdate({ title, description, color: e.target.value });
                     }}
+                    aria-label="Card color"
                 />
                 <button 
+                    type="button"
                     className="btn-comment"
                     onClick={handleAddComment}
                     title="Add comment to this card"
                 >
                     💬
                 </button>
-                <button onClick={onClose}>Done</button>
+                <button type="button" onClick={onClose}>Done</button>
                 <button 
+                    type="button"
                     className="btn-delete"
                     onClick={onDelete}
                 >
