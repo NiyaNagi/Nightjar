@@ -115,6 +115,13 @@
 .btn-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    pointer-events: auto;
+}
+
+/* Ensure recovery step buttons are above other elements */
+.recovery-step .btn-primary {
+    position: relative;
+    z-index: 10;
 }
 
 .btn-secondary {
@@ -454,12 +461,20 @@
     gap: 10px;
     color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
+    position: relative;
+    z-index: 5;
+    user-select: none;
 }
 
 .confirm-checkbox input[type="checkbox"] {
     width: 18px;
     height: 18px;
     accent-color: #3b82f6;
+    cursor: pointer;
+}
+
+.confirm-checkbox span {
+    cursor: pointer;
 }
 
 /* Recovery input grid */

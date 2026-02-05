@@ -1030,21 +1030,54 @@ function App() {
 
     // --- Render ---
     
-    // Check for multiple identities on startup
+    // Track if startup check has been performed to avoid duplicate runs
+    const startupCheckDone = useRef(false);
+    
+    // Check for multiple identities on startup - runs once after identity loading completes
     useEffect(() => {
-        // Check for migration need first
+        // Don't run until IdentityContext has finished loading
+        if (identityLoading) return;
+        
+        // Only run startup check once
+        if (startupCheckDone.current) return;
+        startupCheckDone.current = true;
+        
+        console.log('[App] Startup identity check');
+        
+        // Check for migration need first (legacy identity without PIN system)
         if (identityManager.needsMigration()) {
+            console.log('[App] Migration needed for legacy identity');
             handleNeedsMigration();
             return;
         }
         
-        // Check if we have identities in the new system
+        // Check if we have identities in the new PIN-protected system
         const identities = identityManager.listIdentities();
-        if (identities.length > 0 && !identityManager.isSessionValid()) {
-            // Have identities but no valid session - show selector
-            setShowIdentitySelector(true);
+        console.log('[App] Found', identities.length, 'identities in new system');
+        
+        if (identities.length > 0) {
+            // Have identities in new system - check session
+            if (!identityManager.isSessionValid()) {
+                // No valid session - show identity selector for PIN entry
+                console.log('[App] No valid session, showing identity selector');
+                setShowIdentitySelector(true);
+            } else {
+                console.log('[App] Valid session exists');
+            }
+        } else if (userIdentity) {
+            // Have legacy identity but not in new system - trigger migration
+            console.log('[App] Legacy identity exists but not in new system, triggering migration');
+            const legacy = {
+                ...userIdentity,
+                handle: userIdentity.handle || userProfile.name || 'User',
+                icon: userIdentity.icon || userProfile.icon || '😊',
+                color: userIdentity.color || userProfile.color || '#6366f1'
+            };
+            setLegacyIdentity(legacy);
+            setNeedsMigration(true);
         }
-    }, [handleNeedsMigration]);
+        // If no identities at all, IdentityContext will handle showing onboarding via needsOnboarding
+    }, [identityLoading, handleNeedsMigration, userIdentity, userProfile]);
     
     // Show lock screen if app is locked
     if (isLocked && !showIdentitySelector) {

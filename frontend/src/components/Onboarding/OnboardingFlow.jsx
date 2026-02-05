@@ -188,8 +188,15 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
             </label>
             
             <button 
+                type="button"
                 className="btn-primary" 
-                onClick={onConfirm}
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (confirmed) {
+                        onConfirm();
+                    }
+                }}
                 disabled={!confirmed}
                 data-testid="continue-btn"
             >
