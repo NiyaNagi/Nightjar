@@ -155,3 +155,27 @@
     font-size: 0.85rem;
     margin-bottom: 0.5rem;
 }
+
+/* Word wrap setting - applied via data attribute on html */
+[data-word-wrap="off"] .tiptap,
+[data-word-wrap="off"] .ProseMirror {
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+[data-word-wrap="on"] .tiptap,
+[data-word-wrap="on"] .ProseMirror {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Spell check setting - applied via data attribute on html */
+[data-spell-check="off"] .tiptap,
+[data-spell-check="off"] .ProseMirror {
+    -webkit-spellcheck: false;
+}
+
+[data-spell-check="on"] .tiptap,
+[data-spell-check="on"] .ProseMirror {
+    -webkit-spellcheck: true;
+}

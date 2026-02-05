@@ -136,9 +136,13 @@ export function TorSettings({ isOpen, onClose }) {
     }
   };
   
+  const [relaySaved, setRelaySaved] = useState(false);
+  
   const handleSaveRelaySettings = () => {
     localStorage.setItem('Nightjar_relay_url', relayUrl);
     localStorage.setItem('Nightjar_use_relay', useRelay.toString());
+    setRelaySaved(true);
+    setTimeout(() => setRelaySaved(false), 2000);
   };
   
   const copyOnionAddress = () => {
@@ -311,7 +315,9 @@ export function TorSettings({ isOpen, onClose }) {
                   value={relayUrl}
                   onChange={e => setRelayUrl(e.target.value)}
                 />
-                <button onClick={handleSaveRelaySettings}>Save</button>
+                <button type="button" onClick={handleSaveRelaySettings}>
+                  {relaySaved ? '✓ Saved!' : 'Save'}
+                </button>
               </div>
             )}
             

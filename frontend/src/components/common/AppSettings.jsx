@@ -89,6 +89,12 @@ const applyEditorSettings = (settings) => {
     '--editor-font-family', 
     fontFamilyMap[settings.fontFamily] || fontFamilyMap['system']
   );
+  
+  // Apply word wrap setting
+  document.documentElement.setAttribute('data-word-wrap', settings.wordWrap ? 'on' : 'off');
+  
+  // Apply spell check setting
+  document.documentElement.setAttribute('data-spell-check', settings.spellCheck ? 'on' : 'off');
 };
 
 // Apply all settings on initial page load

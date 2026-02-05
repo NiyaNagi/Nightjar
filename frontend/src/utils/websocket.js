@@ -66,6 +66,23 @@ export function getYjsWebSocketUrl(serverUrl = null) {
         return url;
     }
     
+    // Check for mobile relay preference (non-Electron mode)
+    if (!isElectronMode) {
+        try {
+            const useRelay = localStorage.getItem('Nightjar_use_relay') === 'true';
+            const relayUrl = localStorage.getItem('Nightjar_relay_url');
+            if (useRelay && relayUrl) {
+                const wsUrl = relayUrl
+                    .replace(/^https:/, 'wss:')
+                    .replace(/^http:/, 'ws:');
+                console.log(`[WebSocket] getYjsWebSocketUrl() => ${wsUrl} (mobile relay)`);
+                return wsUrl;
+            }
+        } catch (e) {
+            // Ignore localStorage errors
+        }
+    }
+    
     if (isElectronMode) {
         url = `ws://localhost:${SIDECAR_YJS_PORT}`;
     } else {

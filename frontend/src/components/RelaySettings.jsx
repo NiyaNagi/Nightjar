@@ -418,9 +418,9 @@ export default function RelaySettings({ isOpen, onClose }) {
           <button 
             className="save-btn" 
             onClick={handleSaveSettings}
-            disabled={isSaving || settings.enabled}
+            disabled={isSaving}
           >
-            {isSaving ? 'Saving...' : 'Save Settings'}
+            {isSaving ? 'Saving...' : settings.enabled ? 'Save & Restart Relay' : 'Save Settings'}
           </button>
         </div>
       </div>

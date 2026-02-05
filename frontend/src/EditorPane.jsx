@@ -31,6 +31,17 @@ const EditorPane = ({
 }) => {
     // Load editor settings
     const editorSettings = useMemo(() => loadSettings(), []);
+    
+    // Load user preferences for cursor visibility
+    const userPrefs = useMemo(() => {
+        try {
+            const saved = localStorage.getItem('nahma_preferences');
+            return saved ? JSON.parse(saved) : { showCursor: true, showSelection: true };
+        } catch {
+            return { showCursor: true, showSelection: true };
+        }
+    }, []);
+    
     const fileInputRef = useRef(null);
     
     // Memoize the UndoManager
@@ -114,9 +125,11 @@ const EditorPane = ({
                 name: userHandle,
                 color: userColor,
                 lastActive: Date.now(),
+                showCursor: userPrefs.showCursor !== false, // Share cursor visibility preference
+                showSelection: userPrefs.showSelection !== false,
             });
         }
-    }, [userHandle, provider, userColor, editor]);
+    }, [userHandle, provider, userColor, editor, userPrefs.showCursor, userPrefs.showSelection]);
 
     // Periodic awareness heartbeat to keep lastActive fresh
     useEffect(() => {
