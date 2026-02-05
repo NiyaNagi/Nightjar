@@ -1,106 +1,130 @@
 /**
  * IdentitySelector Component
  * 
- * Displays when multiple identities exist on the device
- * Allows user to select an existing identity or create a new one
+ * Multi-identity selection with PIN unlock.
+ * Shows all identities on device, allows PIN unlock or create new.
  */
 
-import React, { useState, useEffect } from 'react';
-import { isElectron } from '../hooks/useEnvironment';
+import React, { useState, useEffect, useCallback } from 'react';
+import identityManager from '../utils/identityManager';
+import PinInput from './PinInput';
 import './IdentitySelector.css';
 
-export default function IdentitySelector({ onSelect, onCreateNew }) {
+// Views
+const VIEWS = {
+  LIST: 'list',
+  UNLOCK: 'unlock',
+  DELETE_CONFIRM: 'delete_confirm'
+};
+
+export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigration }) {
   const [identities, setIdentities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [view, setView] = useState(VIEWS.LIST);
   const [selectedIdentity, setSelectedIdentity] = useState(null);
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(null);
+  const [unlocking, setUnlocking] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
+  // Load identities on mount
   useEffect(() => {
-    if (!isElectron()) {
-      setLoading(false);
-      return;
-    }
+    loadIdentities();
+  }, []);
 
-    // Request identity list from sidecar
-    const metadataWs = window.metadataWs;
-    if (!metadataWs || metadataWs.readyState !== WebSocket.OPEN) {
-      setError('Connection to sidecar not ready');
-      setLoading(false);
-      return;
-    }
-
-    const handleMessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'identity-list') {
-          setIdentities(data.identities || []);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('[IdentitySelector] Message parse error:', err);
-      }
-    };
-
-    metadataWs.addEventListener('message', handleMessage);
-
-    // Request identity list
-    metadataWs.send(JSON.stringify({
-      type: 'list-identities'
-    }));
-
-    // Cleanup timeout
-    const timeout = setTimeout(() => {
-      if (loading) {
-        setError('Timeout loading identities');
-        setLoading(false);
-      }
-    }, 5000);
-
-    return () => {
-      metadataWs.removeEventListener('message', handleMessage);
-      clearTimeout(timeout);
-    };
-  }, [loading]);
-
-  const handleSelectIdentity = async (identity) => {
-    if (!identity.filename) return;
-
+  const loadIdentities = useCallback(() => {
+    setLoading(true);
     try {
-      const metadataWs = window.metadataWs;
-      if (!metadataWs || metadataWs.readyState !== WebSocket.OPEN) {
-        throw new Error('Connection to sidecar not ready');
+      // Check for migration need
+      if (identityManager.needsMigration()) {
+        onNeedsMigration?.();
+        setLoading(false);
+        return;
       }
 
-      // Wait for switch confirmation
-      const response = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Switch timeout')), 5000);
-        
-        const handler = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.type === 'identity-switched') {
-            clearTimeout(timeout);
-            metadataWs.removeEventListener('message', handler);
-            resolve(data);
-          }
-        };
-
-        metadataWs.addEventListener('message', handler);
-        
-        metadataWs.send(JSON.stringify({
-          type: 'switch-identity',
-          payload: { filename: identity.filename }
-        }));
-      });
-
-      if (response.success) {
-        onSelect?.(response.identity);
-      } else {
-        setError(response.error || 'Failed to switch identity');
+      const list = identityManager.listIdentities();
+      setIdentities(list);
+      
+      // Check for valid session
+      if (identityManager.isSessionValid()) {
+        const unlocked = identityManager.getUnlockedIdentity();
+        if (unlocked) {
+          onSelect?.(unlocked.identityData, unlocked.metadata);
+          return;
+        }
       }
     } catch (err) {
-      console.error('[IdentitySelector] Switch error:', err);
+      console.error('[IdentitySelector] Error loading identities:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [onSelect, onNeedsMigration]);
+
+  const handleSelectForUnlock = (identity) => {
+    setSelectedIdentity(identity);
+    setPin('');
+    setError(null);
+    setView(VIEWS.UNLOCK);
+  };
+
+  const handleUnlock = async (pinValue) => {
+    if (!selectedIdentity || pinValue.length !== 6) return;
+
+    setUnlocking(true);
+    setError(null);
+
+    try {
+      const result = await identityManager.unlockIdentity(selectedIdentity.id, pinValue);
+      onSelect?.(result.identityData, result.metadata);
+    } catch (err) {
+      console.error('[IdentitySelector] Unlock failed:', err);
+      setError(err.message);
+      setPin('');
+      
+      // Reload identities in case one was deleted due to too many attempts
+      if (err.message.includes('deleted')) {
+        loadIdentities();
+        setView(VIEWS.LIST);
+      }
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  const handleDeleteClick = (identity, e) => {
+    e.stopPropagation();
+    setSelectedIdentity(identity);
+    setDeleteConfirmName('');
+    setError(null);
+    setView(VIEWS.DELETE_CONFIRM);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedIdentity) return;
+    
+    if (deleteConfirmName !== selectedIdentity.handle) {
+      setError(`Type "${selectedIdentity.handle}" to confirm deletion`);
+      return;
+    }
+
+    try {
+      await identityManager.deleteIdentity(selectedIdentity.id);
+      loadIdentities();
+      setView(VIEWS.LIST);
+    } catch (err) {
       setError(err.message);
     }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString(undefined, { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
   if (loading) {
@@ -114,65 +138,182 @@ export default function IdentitySelector({ onSelect, onCreateNew }) {
     );
   }
 
-  if (error) {
+  // No identities - should go to onboarding
+  if (identities.length === 0) {
+    onCreateNew?.();
+    return null;
+  }
+
+  // Unlock view
+  if (view === VIEWS.UNLOCK && selectedIdentity) {
+    const remaining = identityManager.getRemainingAttempts(selectedIdentity.id);
+    
     return (
       <div className="identity-selector">
-        <div className="identity-selector__error">
-          <p>⚠️ {error}</p>
-          <button onClick={() => window.location.reload()}>Reload</button>
+        <div className="identity-selector__content identity-selector__unlock">
+          <button 
+            className="identity-selector__back" 
+            onClick={() => setView(VIEWS.LIST)}
+            type="button"
+          >
+            ← Back
+          </button>
+          
+          <div className="identity-selector__unlock-identity">
+            <div 
+              className="identity-selector__unlock-icon" 
+              style={{ backgroundColor: selectedIdentity.color + '20', color: selectedIdentity.color }}
+            >
+              {selectedIdentity.icon || '👤'}
+            </div>
+            <h2>{selectedIdentity.handle}</h2>
+          </div>
+          
+          <PinInput
+            value={pin}
+            onChange={setPin}
+            onComplete={handleUnlock}
+            disabled={unlocking}
+            error={error}
+            label="Enter your 6-digit PIN"
+            autoFocus
+          />
+          
+          <div className="identity-selector__attempts">
+            {remaining} attempts remaining
+          </div>
+          
+          {unlocking && (
+            <div className="identity-selector__unlocking">
+              <div className="identity-selector__spinner" />
+              Unlocking...
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  // Filter out the currently active identity
-  const inactiveIdentities = identities.filter(id => !id.isActive);
-
-  // If only one identity exists (the active one), skip selector
-  if (inactiveIdentities.length === 0) {
-    return null;
+  // Delete confirmation view
+  if (view === VIEWS.DELETE_CONFIRM && selectedIdentity) {
+    return (
+      <div className="identity-selector">
+        <div className="identity-selector__content identity-selector__delete-confirm">
+          <button 
+            className="identity-selector__back" 
+            onClick={() => setView(VIEWS.LIST)}
+            type="button"
+          >
+            ← Back
+          </button>
+          
+          <div className="identity-selector__delete-warning">
+            <span className="identity-selector__delete-icon">⚠️</span>
+            <h2>Delete Identity</h2>
+            <p>
+              This will permanently delete the identity <strong>{selectedIdentity.handle}</strong> 
+              and all associated data. This action cannot be undone.
+            </p>
+          </div>
+          
+          <div className="identity-selector__delete-confirm-input">
+            <label>Type <strong>{selectedIdentity.handle}</strong> to confirm:</label>
+            <input
+              type="text"
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder={selectedIdentity.handle}
+              autoFocus
+            />
+          </div>
+          
+          {error && <div className="identity-selector__error-message">{error}</div>}
+          
+          <div className="identity-selector__delete-actions">
+            <button 
+              className="identity-selector__btn identity-selector__btn--secondary"
+              onClick={() => setView(VIEWS.LIST)}
+              type="button"
+            >
+              Cancel
+            </button>
+            <button 
+              className="identity-selector__btn identity-selector__btn--danger"
+              onClick={handleConfirmDelete}
+              disabled={deleteConfirmName !== selectedIdentity.handle}
+              type="button"
+            >
+              Delete Identity
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
+  // List view
   return (
     <div className="identity-selector">
       <div className="identity-selector__content">
         <div className="identity-selector__header">
-          <h1>🔐 Select Identity</h1>
-          <p>Multiple identities found on this device. Which one would you like to use?</p>
+          <div className="identity-selector__logo">🔐</div>
+          <h1>Welcome Back</h1>
+          <p>Select an identity to continue</p>
         </div>
 
         <div className="identity-selector__list">
-          {inactiveIdentities.map((identity) => (
-            <button
-              key={identity.filename}
-              className={`identity-selector__item ${selectedIdentity === identity.filename ? 'identity-selector__item--selected' : ''}`}
-              onClick={() => {
-                setSelectedIdentity(identity.filename);
-                handleSelectIdentity(identity);
-              }}
+          {identities.map((identity) => (
+            <div
+              key={identity.id}
+              className="identity-selector__item"
+              onClick={() => handleSelectForUnlock(identity)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSelectForUnlock(identity)}
+              role="button"
+              tabIndex={0}
             >
-              <div className="identity-selector__item-icon" style={{ color: identity.color }}>
+              <div 
+                className="identity-selector__item-icon" 
+                style={{ backgroundColor: identity.color + '20', color: identity.color }}
+              >
                 {identity.icon || '👤'}
               </div>
               <div className="identity-selector__item-info">
                 <div className="identity-selector__item-name">{identity.handle}</div>
-                <div className="identity-selector__item-key">{identity.publicKeyBase62?.slice(0, 20)}...</div>
+                <div className="identity-selector__item-meta">
+                  <span>Created {formatDate(identity.createdAt)}</span>
+                  {identity.docCount > 0 && (
+                    <span> • {identity.docCount} document{identity.docCount !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
               </div>
-            </button>
+              <button
+                className="identity-selector__item-delete"
+                onClick={(e) => handleDeleteClick(identity, e)}
+                title="Delete identity"
+                type="button"
+              >
+                🗑️
+              </button>
+            </div>
           ))}
+        </div>
+
+        <div className="identity-selector__divider">
+          <span>or</span>
         </div>
 
         <div className="identity-selector__actions">
           <button
             className="identity-selector__btn identity-selector__btn--primary"
             onClick={onCreateNew}
+            type="button"
           >
             ➕ Create New Identity
           </button>
         </div>
 
         <div className="identity-selector__note">
-          Creating a new identity will keep your existing identities. You can switch between them later.
+          Each identity has its own separate data and documents.
         </div>
       </div>
     </div>

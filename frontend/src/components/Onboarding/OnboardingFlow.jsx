@@ -1,24 +1,33 @@
 // frontend/src/components/Onboarding/OnboardingFlow.jsx
 // Main onboarding flow component - handles first-time setup
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CreateIdentity from './CreateIdentity';
 import RestoreIdentity from './RestoreIdentity';
 import { generateIdentity } from '../../utils/identity';
 import { useIdentity } from '../../contexts/IdentityContext';
+import identityManager from '../../utils/identityManager';
 import './Onboarding.css';
 
 const STEPS = {
     WELCOME: 'welcome',
     CREATE: 'create',
     RESTORE: 'restore',
-    SHOW_RECOVERY: 'show_recovery'
+    SHOW_RECOVERY: 'show_recovery',
+    MIGRATION: 'migration'
 };
 
-export default function OnboardingFlow({ onComplete }) {
-    const [step, setStep] = useState(STEPS.WELCOME);
+export default function OnboardingFlow({ onComplete, isMigration = false, legacyIdentity = null }) {
+    const [step, setStep] = useState(isMigration ? STEPS.MIGRATION : STEPS.WELCOME);
     const [createdIdentity, setCreatedIdentity] = useState(null);
     const { hasExistingIdentity } = useIdentity();
+    
+    // If migration mode, pre-populate with legacy data
+    useEffect(() => {
+        if (isMigration && legacyIdentity) {
+            setCreatedIdentity(legacyIdentity);
+        }
+    }, [isMigration, legacyIdentity]);
     
     const handleIdentityCreated = (identity) => {
         setCreatedIdentity(identity);
@@ -31,6 +40,11 @@ export default function OnboardingFlow({ onComplete }) {
     
     const handleRestoreComplete = (identity, hadLocalData) => {
         onComplete(identity, hadLocalData);
+    };
+    
+    const handleMigrationComplete = (identity) => {
+        // Migration skips recovery phrase display since user already has it
+        onComplete(identity);
     };
     
     return (
@@ -64,6 +78,16 @@ export default function OnboardingFlow({ onComplete }) {
                     <ShowRecoveryStep 
                         mnemonic={createdIdentity.mnemonic}
                         onConfirm={handleRecoveryConfirmed}
+                    />
+                )}
+                
+                {step === STEPS.MIGRATION && legacyIdentity && (
+                    <CreateIdentity 
+                        hasExistingIdentity={false}
+                        onComplete={handleMigrationComplete}
+                        onBack={() => {}} // Can't go back during migration
+                        isMigration={true}
+                        migrationMessage="Your existing identity and data will be secured with a PIN. This is a one-time setup."
                     />
                 )}
             </div>

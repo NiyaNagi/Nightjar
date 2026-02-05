@@ -434,6 +434,40 @@ export default function AppSettings({ isOpen, onClose }) {
             {/* Privacy Tab */}
             {activeTab === 'privacy' && (
               <div className="app-settings__section">
+                <h3 className="app-settings__section-title">Auto-Lock</h3>
+                
+                <div className="app-settings__group">
+                  <label className="app-settings__label" htmlFor="lockTimeout">
+                    Lock Timeout
+                    <span className="app-settings__hint">Automatically lock after inactivity</span>
+                  </label>
+                  <select
+                    id="lockTimeout"
+                    className="app-settings__select"
+                    value={settings.lockTimeout || 15}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      updateSetting('lockTimeout', value);
+                      // Also update the identity manager
+                      import('../../utils/identityManager').then(m => {
+                        m.setLockTimeout(value);
+                      });
+                    }}
+                  >
+                    <option value={5}>5 minutes</option>
+                    <option value={10}>10 minutes</option>
+                    <option value={15}>15 minutes (default)</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={60}>1 hour</option>
+                    <option value={120}>2 hours</option>
+                    <option value={480}>8 hours</option>
+                  </select>
+                </div>
+                
+                <div className="app-settings__divider" />
+                
+                <h3 className="app-settings__section-title">Encryption</h3>
+                
                 <div className="app-settings__info-box">
                   <span className="app-settings__info-icon">🔐</span>
                   <div>
@@ -455,6 +489,14 @@ export default function AppSettings({ isOpen, onClose }) {
                   <div>
                     <strong>Anonymous Collaboration</strong>
                     <p>Share documents using links. No accounts or personal information required.</p>
+                  </div>
+                </div>
+                
+                <div className="app-settings__info-box app-settings__info-box--warning">
+                  <span className="app-settings__info-icon">⚠️</span>
+                  <div>
+                    <strong>PIN Protection</strong>
+                    <p>Your identity is protected by a 6-digit PIN. After 10 incorrect attempts within an hour, your identity will be permanently deleted.</p>
                   </div>
                 </div>
               </div>

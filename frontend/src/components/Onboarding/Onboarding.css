@@ -638,3 +638,124 @@
         grid-template-columns: repeat(6, 1fr);
     }
 }
+
+/* PIN Step Styles */
+.pin-step {
+    text-align: center;
+}
+
+.pin-step-header {
+    margin-bottom: 32px;
+}
+
+.pin-step-header .pin-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.pin-step-header h2 {
+    margin-bottom: 12px;
+}
+
+.pin-step-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.pin-step-content .pin-input-container {
+    width: 100%;
+}
+
+.pin-step-content .pin-input-label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.pin-step-content .pin-input-digit {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.pin-step-content .pin-input-digit:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+.pin-step-content .pin-input-digit.filled {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: #6366f1;
+}
+
+.pin-step-content .pin-input-error-message {
+    color: #fca5a5;
+}
+
+.pin-security-note {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: rgba(251, 146, 60, 0.1);
+    border: 1px solid rgba(251, 146, 60, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: left;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    max-width: 360px;
+}
+
+.pin-security-note .warning-icon {
+    font-size: 20px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.pin-security-note strong {
+    color: #fbbf24;
+}
+
+.creating-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+.creating-indicator .spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Migration notice */
+.migration-notice {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: left;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.5;
+}
+
+.migration-notice .info-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}

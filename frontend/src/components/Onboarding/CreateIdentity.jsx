@@ -1,8 +1,9 @@
 // frontend/src/components/Onboarding/CreateIdentity.jsx
-// Component for creating a new identity
+// Component for creating a new identity with PIN protection
 
 import React, { useState, useEffect } from 'react';
 import { generateIdentity, EMOJI_OPTIONS, generateRandomColor } from '../../utils/identity';
+import PinInput from '../PinInput';
 
 const COLOR_PRESETS = [
     '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
@@ -10,7 +11,14 @@ const COLOR_PRESETS = [
     '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'
 ];
 
-export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack }) {
+const STEPS = {
+    PROFILE: 'profile',
+    PIN_CREATE: 'pin_create',
+    PIN_CONFIRM: 'pin_confirm'
+};
+
+export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack, isMigration = false, migrationMessage = null }) {
+    const [step, setStep] = useState(STEPS.PROFILE);
     const [handle, setHandle] = useState('');
     const [selectedEmoji, setSelectedEmoji] = useState('');
     const [selectedColor, setSelectedColor] = useState('');
@@ -20,6 +28,11 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
     const [showDeleteWarning, setShowDeleteWarning] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState('');
     
+    // PIN state
+    const [pin, setPin] = useState('');
+    const [pinConfirm, setPinConfirm] = useState('');
+    const [pinError, setPinError] = useState(null);
+    
     // Initialize with random values
     useEffect(() => {
         const randomEmoji = EMOJI_OPTIONS[Math.floor(Math.random() * EMOJI_OPTIONS.length)];
@@ -28,31 +41,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
         setSelectedColor(randomColor);
     }, []);
     
-    const handleCreateClick = () => {
-        if (hasExistingIdentity) {
-            setShowDeleteWarning(true);
-        } else {
-            handleCreate();
-        }
-    };
-    
-    const handleConfirmDelete = async () => {
-        if (deleteConfirmation !== 'DELETE') {
-            setError('Please type DELETE to confirm');
-            return;
-        }
-        
-        // Delete existing identity
-        if (window.electronAPI?.identity) {
-            await window.electronAPI.identity.delete();
-        }
-        
-        // Proceed with creation
-        setShowDeleteWarning(false);
-        handleCreate();
-    };
-    
-    const handleCreate = async () => {
+    const handleProfileNext = () => {
         if (!handle.trim()) {
             setError('Please enter a display name');
             return;
@@ -68,8 +57,56 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
             return;
         }
         
-        setCreating(true);
+        // Check if existing identity and not migration mode
+        if (hasExistingIdentity && !isMigration) {
+            setShowDeleteWarning(true);
+        } else {
+            setError(null);
+            setStep(STEPS.PIN_CREATE);
+        }
+    };
+    
+    const handleConfirmDelete = async () => {
+        if (deleteConfirmation !== 'DELETE') {
+            setError('Please type DELETE to confirm');
+            return;
+        }
+        
+        // Delete existing identity
+        if (window.electronAPI?.identity) {
+            await window.electronAPI.identity.delete();
+        }
+        
+        // Proceed to PIN creation
+        setShowDeleteWarning(false);
         setError(null);
+        setStep(STEPS.PIN_CREATE);
+    };
+    
+    const handlePinCreated = (pinValue) => {
+        if (pinValue.length !== 6) {
+            setPinError('PIN must be 6 digits');
+            return;
+        }
+        setPin(pinValue);
+        setPinError(null);
+        setStep(STEPS.PIN_CONFIRM);
+    };
+    
+    const handlePinConfirmed = (confirmValue) => {
+        if (confirmValue !== pin) {
+            setPinError('PINs do not match');
+            setPinConfirm('');
+            return;
+        }
+        
+        // PINs match - create the identity
+        handleCreate(confirmValue);
+    };
+    
+    const handleCreate = async (confirmedPin) => {
+        setCreating(true);
+        setPinError(null);
         
         try {
             // Generate new identity
@@ -77,6 +114,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
             identity.handle = handle.trim();
             identity.icon = selectedEmoji;
             identity.color = selectedColor;
+            identity.pin = confirmedPin; // Pass PIN for storage
             
             // Also set user profile to match
             const profileData = {
@@ -89,7 +127,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
             onComplete(identity);
         } catch (e) {
             console.error('Failed to create identity:', e);
-            setError('Failed to create identity: ' + e.message);
+            setPinError('Failed to create identity: ' + e.message);
             setCreating(false);
         }
     };
@@ -136,6 +174,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                                 setDeleteConfirmation('');
                                 setError(null);
                             }}
+                            type="button"
                         >
                             Cancel
                         </button>
@@ -143,6 +182,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                             className="btn-danger" 
                             onClick={handleConfirmDelete}
                             disabled={deleteConfirmation !== 'DELETE'}
+                            type="button"
                         >
                             Delete and Create New
                         </button>
@@ -152,20 +192,118 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
         );
     }
     
+    // PIN Creation step
+    if (step === STEPS.PIN_CREATE) {
+        return (
+            <div className="onboarding-step create-step pin-step">
+                <button className="btn-back" onClick={() => setStep(STEPS.PROFILE)} type="button">← Back</button>
+                
+                <div className="pin-step-header">
+                    <div className="pin-icon">🔐</div>
+                    <h2>Create a PIN</h2>
+                    <p className="onboarding-subtitle">
+                        Choose a 6-digit PIN to protect your identity. 
+                        You'll need this PIN each time you open the app.
+                    </p>
+                </div>
+                
+                <div className="pin-step-content">
+                    <PinInput
+                        value={pin}
+                        onChange={(val) => {
+                            setPin(val);
+                            setPinError(null);
+                        }}
+                        onComplete={handlePinCreated}
+                        error={pinError}
+                        label="Create your PIN"
+                        autoFocus
+                    />
+                    
+                    <div className="pin-security-note">
+                        <span className="warning-icon">⚠️</span>
+                        <div>
+                            <strong>Security Warning:</strong> After 10 incorrect PIN attempts within an hour, 
+                            your identity will be permanently deleted for security.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    
+    // PIN Confirmation step
+    if (step === STEPS.PIN_CONFIRM) {
+        return (
+            <div className="onboarding-step create-step pin-step">
+                <button className="btn-back" onClick={() => {
+                    setStep(STEPS.PIN_CREATE);
+                    setPin('');
+                    setPinConfirm('');
+                    setPinError(null);
+                }} type="button">← Back</button>
+                
+                <div className="pin-step-header">
+                    <div className="pin-icon">🔐</div>
+                    <h2>Confirm Your PIN</h2>
+                    <p className="onboarding-subtitle">
+                        Enter your PIN again to confirm
+                    </p>
+                </div>
+                
+                <div className="pin-step-content">
+                    <PinInput
+                        value={pinConfirm}
+                        onChange={(val) => {
+                            setPinConfirm(val);
+                            setPinError(null);
+                        }}
+                        onComplete={handlePinConfirmed}
+                        disabled={creating}
+                        error={pinError}
+                        label="Confirm your PIN"
+                        autoFocus
+                    />
+                    
+                    {creating && (
+                        <div className="creating-indicator">
+                            <div className="spinner" />
+                            Creating your identity...
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+    
+    // Profile step (default)
     return (
         <div className="onboarding-step create-step">
-            <button className="btn-back" onClick={onBack}>← Back</button>
+            <button className="btn-back" onClick={onBack} type="button">← Back</button>
             
-            <h2>Create Your Identity</h2>
+            <h2>{isMigration ? 'Secure Your Identity' : 'Create Your Identity'}</h2>
             <p className="onboarding-subtitle">
-                Choose how you want to appear to collaborators
+                {isMigration 
+                    ? 'Set up a PIN to protect your existing data'
+                    : 'Choose how you want to appear to collaborators'
+                }
             </p>
+            
+            {migrationMessage && (
+                <div className="migration-notice">
+                    <span className="info-icon">ℹ️</span>
+                    <div>{migrationMessage}</div>
+                </div>
+            )}
             
             <div className="profile-preview" style={{ borderColor: selectedColor }}>
                 <div 
                     className="avatar-large" 
                     style={{ backgroundColor: selectedColor }}
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    onKeyDown={(e) => e.key === 'Enter' && setShowEmojiPicker(!showEmojiPicker)}
+                    role="button"
+                    tabIndex={0}
                 >
                     {selectedEmoji}
                 </div>
@@ -194,6 +332,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                         style={{ backgroundColor: selectedColor }}
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                         data-testid="emoji-picker-trigger"
+                        type="button"
                     >
                         {selectedEmoji}
                     </button>
@@ -211,6 +350,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                                     setShowEmojiPicker(false);
                                 }}
                                 data-testid={`emoji-${emoji}`}
+                                type="button"
                             >
                                 {emoji}
                             </button>
@@ -228,6 +368,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
                             className={`color-option ${color === selectedColor ? 'selected' : ''}`}
                             style={{ backgroundColor: color }}
                             onClick={() => setSelectedColor(color)}
+                            type="button"
                         />
                     ))}
                 </div>
@@ -239,11 +380,12 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
             
             <button 
                 className="btn-primary" 
-                onClick={handleCreateClick}
+                onClick={handleProfileNext}
                 disabled={creating}
                 data-testid="confirm-identity-btn"
+                type="button"
             >
-                {creating ? 'Creating...' : 'Create Identity'}
+                Next: Set Up PIN →
             </button>
         </div>
     );

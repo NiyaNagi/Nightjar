@@ -24,7 +24,10 @@ import CreateDocumentDialog from './components/CreateDocument';
 import KickedModal from './components/KickedModal';
 import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import IdentitySelector from './components/IdentitySelector';
+import LockScreen from './components/LockScreen';
 import NightjarMascot from './components/NightjarMascot';
+import { useAutoLock } from './hooks/useAutoLock';
+import identityManager from './utils/identityManager';
 import { useAuthorAttribution } from './hooks/useAuthorAttribution';
 import { useChangelogObserver } from './hooks/useChangelogObserver';
 import { useWorkspaceSync } from './hooks/useWorkspaceSync';
@@ -258,6 +261,11 @@ function App() {
     const [showCreateDocumentDialog, setShowCreateDocumentDialog] = useState(false); // Create document modal
     const [createDocumentType, setCreateDocumentType] = useState('text'); // Pre-selected document type
     const [showIdentitySelector, setShowIdentitySelector] = useState(false); // Identity selector for multiple identities
+    const [needsMigration, setNeedsMigration] = useState(false); // Migration needed for legacy identity
+    const [legacyIdentity, setLegacyIdentity] = useState(null); // Legacy identity data for migration
+
+    // --- Auto-Lock Hook ---
+    const { isLocked, setIsLocked, unlock: unlockApp } = useAutoLock();
 
     // --- Refs ---
     const metaSocketRef = useRef(null);
@@ -272,32 +280,96 @@ function App() {
     const handleOnboardingComplete = useCallback(async (identity, hadLocalData = false) => {
         try {
             console.log('[App] Creating identity from onboarding:', identity.handle);
-            const success = await createIdentity(identity);
-            if (success) {
-                console.log('[App] Identity created successfully');
+            
+            // Use the new identity manager to create identity with PIN
+            if (identity.pin) {
+                // New multi-identity system with PIN
+                const result = await identityManager.createIdentity(identity, identity.pin);
+                console.log('[App] Identity created with PIN:', result.id);
                 
-                if (hadLocalData) {
-                    showToast(`Welcome back, ${identity.handle}! 🔓`, 'success');
-                } else {
-                    showToast(`Welcome, ${identity.handle}! 👋`, 'success');
+                // Also create legacy identity for backward compatibility
+                const success = await createIdentity(identity);
+                
+                if (success) {
+                    if (hadLocalData || needsMigration) {
+                        showToast(`Welcome back, ${identity.handle}! 🔓`, 'success');
+                    } else {
+                        showToast(`Welcome, ${identity.handle}! 👋`, 'success');
+                    }
+                    
+                    setUserProfile({
+                        name: identity.handle,
+                        icon: identity.icon || '😊',
+                        color: identity.color || '#6366f1',
+                    });
+                    
+                    setNeedsMigration(false);
+                    setLegacyIdentity(null);
                 }
-                
-                // Update user profile state with the onboarding selections
-                setUserProfile({
-                    name: identity.handle,
-                    icon: identity.icon || '😊',
-                    color: identity.color || '#6366f1',
-                });
-                // Identity context will reload automatically
             } else {
-                console.error('[App] Failed to create identity');
-                showToast('Failed to create identity. Please try again.', 'error');
+                // Legacy flow (shouldn't happen with new UI)
+                const success = await createIdentity(identity);
+                if (success) {
+                    console.log('[App] Identity created successfully');
+                    
+                    if (hadLocalData) {
+                        showToast(`Welcome back, ${identity.handle}! 🔓`, 'success');
+                    } else {
+                        showToast(`Welcome, ${identity.handle}! 👋`, 'success');
+                    }
+                    
+                    setUserProfile({
+                        name: identity.handle,
+                        icon: identity.icon || '😊',
+                        color: identity.color || '#6366f1',
+                    });
+                } else {
+                    console.error('[App] Failed to create identity');
+                    showToast('Failed to create identity. Please try again.', 'error');
+                }
             }
         } catch (error) {
             console.error('[App] Error during identity creation:', error);
             showToast('Error creating identity: ' + error.message, 'error');
         }
-    }, [createIdentity, showToast]);
+    }, [createIdentity, showToast, needsMigration]);
+
+    // --- Lock Screen Handlers ---
+    const handleLockScreenUnlock = useCallback((identityData, metadata) => {
+        console.log('[App] Unlocked identity:', metadata?.handle);
+        unlockApp();
+        showToast(`Welcome back, ${metadata?.handle || 'User'}! 🔓`, 'success');
+    }, [unlockApp, showToast]);
+    
+    const handleSwitchIdentity = useCallback(() => {
+        setIsLocked(false);
+        setShowIdentitySelector(true);
+    }, [setIsLocked]);
+    
+    const handleIdentitySelected = useCallback((identityData, metadata) => {
+        console.log('[App] Identity selected:', metadata?.handle);
+        setShowIdentitySelector(false);
+        
+        // Update user profile with selected identity
+        if (identityData) {
+            setUserProfile({
+                name: identityData.handle || metadata?.handle || 'Anonymous',
+                icon: identityData.icon || metadata?.icon || '😊',
+                color: identityData.color || metadata?.color || '#6366f1',
+            });
+        }
+        
+        showToast(`Signed in as ${metadata?.handle || 'User'}`, 'success');
+    }, [showToast]);
+    
+    const handleNeedsMigration = useCallback(() => {
+        // Legacy identity detected, need to migrate
+        const legacy = identityManager.getLegacyIdentity();
+        if (legacy) {
+            setLegacyIdentity(legacy);
+            setNeedsMigration(true);
+        }
+    }, []);
 
     // --- Kick Member Handler with Toast Feedback ---
     const handleKickMember = useCallback((publicKey, memberName = 'member') => {
@@ -958,55 +1030,53 @@ function App() {
 
     // --- Render ---
     
-    // Check for multiple identities on startup (Electron only)
+    // Check for multiple identities on startup
     useEffect(() => {
-        if (!isElectronMode || userIdentity || identityLoading) {
+        // Check for migration need first
+        if (identityManager.needsMigration()) {
+            handleNeedsMigration();
             return;
         }
         
-        // If needsOnboarding but we're in Electron, check for existing identities
-        if (needsOnboarding) {
-            const metadataWs = window.metadataWs;
-            if (metadataWs && metadataWs.readyState === WebSocket.OPEN) {
-                const handleMessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        if (data.type === 'identity-list') {
-                            // If more than 1 identity exists (active + others), show selector
-                            if (data.identities && data.identities.length > 1) {
-                                setShowIdentitySelector(true);
-                            }
-                            metadataWs.removeEventListener('message', handleMessage);
-                        }
-                    } catch (err) {
-                        console.error('[App] Identity list parse error:', err);
-                    }
-                };
-                
-                metadataWs.addEventListener('message', handleMessage);
-                metadataWs.send(JSON.stringify({ type: 'list-identities' }));
-                
-                // Cleanup after timeout
-                setTimeout(() => {
-                    metadataWs.removeEventListener('message', handleMessage);
-                }, 3000);
-            }
+        // Check if we have identities in the new system
+        const identities = identityManager.listIdentities();
+        if (identities.length > 0 && !identityManager.isSessionValid()) {
+            // Have identities but no valid session - show selector
+            setShowIdentitySelector(true);
         }
-    }, [needsOnboarding, userIdentity, identityLoading, isElectronMode]);
+    }, [handleNeedsMigration]);
     
-    // Show identity selector if multiple identities exist
-    if (showIdentitySelector && !userIdentity && !identityLoading) {
+    // Show lock screen if app is locked
+    if (isLocked && !showIdentitySelector) {
+        return (
+            <LockScreen
+                onUnlock={handleLockScreenUnlock}
+                onSwitchIdentity={handleSwitchIdentity}
+            />
+        );
+    }
+    
+    // Show identity selector
+    if (showIdentitySelector) {
         return (
             <IdentitySelector
-                onSelect={(identity) => {
-                    setShowIdentitySelector(false);
-                    // Reload the app to use the new identity
-                    window.location.reload();
-                }}
+                onSelect={handleIdentitySelected}
                 onCreateNew={() => {
                     setShowIdentitySelector(false);
                     // Continue to onboarding
                 }}
+                onNeedsMigration={handleNeedsMigration}
+            />
+        );
+    }
+    
+    // Show migration flow if needed
+    if (needsMigration && legacyIdentity) {
+        return (
+            <OnboardingFlow 
+                onComplete={handleOnboardingComplete}
+                isMigration={true}
+                legacyIdentity={legacyIdentity}
             />
         );
     }

@@ -1,0 +1,176 @@
+/* LockScreen Styles */
+
+.lock-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    z-index: var(--z-modal);
+}
+
+.lock-screen__content {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 48px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.lock-screen__header {
+    margin-bottom: 32px;
+}
+
+.lock-screen__lock-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+}
+
+.lock-screen__header h1 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+}
+
+.lock-screen__header p {
+    margin: 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.lock-screen__identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.lock-screen__identity-icon {
+    font-size: 36px;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.lock-screen__identity-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+}
+
+.lock-screen__pin-area {
+    margin-bottom: 32px;
+}
+
+.lock-screen__pin-area .pin-input-container {
+    margin-bottom: 16px;
+}
+
+.lock-screen__pin-area .pin-input-label {
+    display: none;
+}
+
+.lock-screen__pin-area .pin-input-digit {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.lock-screen__pin-area .pin-input-digit:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+}
+
+.lock-screen__pin-area .pin-input-digit.filled {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: #6366f1;
+}
+
+.lock-screen__pin-area .pin-input-error-message {
+    color: #fca5a5;
+}
+
+.lock-screen__attempts {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 8px;
+}
+
+.lock-screen__unlocking {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+}
+
+.lock-screen__spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.lock-screen__switch-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.lock-screen__switch-btn:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+    .lock-screen__content {
+        padding: 32px 24px;
+    }
+    
+    .lock-screen__pin-area .pin-input-digit {
+        width: 40px;
+        height: 48px;
+        font-size: 20px;
+    }
+}
