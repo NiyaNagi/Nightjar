@@ -621,6 +621,32 @@ async function startBackendWithLoadingScreen() {
         console.log(`[Backend] Resources path: ${process.resourcesPath}`);
         console.log(`[Backend] Sidecar env ELECTRON_RUN_AS_NODE: ${spawnEnv.ELECTRON_RUN_AS_NODE}`);
         
+        // On macOS packaged apps, check for additional paths
+        if (process.platform === 'darwin' && app.isPackaged) {
+            const fs = require('fs');
+            const unpackedNodeModules = path.join(sidecarCwd, 'node_modules');
+            console.log(`[Backend] Mac: unpacked node_modules exists: ${fs.existsSync(unpackedNodeModules)}`);
+            
+            // List first few items in sidecar folder for debugging
+            const sidecarFolder = path.join(sidecarCwd, 'sidecar');
+            if (fs.existsSync(sidecarFolder)) {
+                try {
+                    const sidecarFiles = fs.readdirSync(sidecarFolder).slice(0, 10);
+                    console.log(`[Backend] Mac: sidecar folder contents: ${sidecarFiles.join(', ')}`);
+                } catch (e) {
+                    console.error(`[Backend] Mac: Failed to list sidecar folder: ${e.message}`);
+                }
+            } else {
+                console.error(`[Backend] Mac: sidecar folder NOT FOUND at ${sidecarFolder}`);
+            }
+            
+            // Check for level native module (common issue on Mac)
+            const levelPath = path.join(unpackedNodeModules, 'level');
+            const classicLevelPath = path.join(unpackedNodeModules, 'classic-level');
+            console.log(`[Backend] Mac: level module exists: ${fs.existsSync(levelPath)}`);
+            console.log(`[Backend] Mac: classic-level module exists: ${fs.existsSync(classicLevelPath)}`);
+        }
+        
         sidecarProcess = spawn(nodeExecutable, nodeArgs, {
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: sidecarCwd,
@@ -768,6 +794,15 @@ async function startBackendWithLoadingScreen() {
 
         sidecarProcess.on('close', (code) => {
             console.log(`[Sidecar] Process exited with code ${code}`);
+            addSidecarLog('info', `Process exited with code ${code}`);
+            
+            // On macOS, code 1 often means module loading failed
+            if (code !== 0 && process.platform === 'darwin' && app.isPackaged) {
+                console.error('[Sidecar] Mac: Process crashed on startup - this usually means native module issues');
+                console.error('[Sidecar] Mac: Check that classic-level was rebuilt for the correct Electron version');
+                addSidecarLog('error', 'Mac startup crash - likely native module issue');
+            }
+            
             if (code !== 0 && !wsReady) {
                 reject(new Error(`Sidecar exited with code ${code}`));
             }
