@@ -30,12 +30,18 @@ export default function OnboardingFlow({ onComplete, isMigration = false, legacy
     }, [isMigration, legacyIdentity]);
     
     const handleIdentityCreated = (identity) => {
+        console.log('[OnboardingFlow] Identity created:', identity.handle, 'has PIN:', !!identity.pin);
         setCreatedIdentity(identity);
         setStep(STEPS.SHOW_RECOVERY);
     };
     
     const handleRecoveryConfirmed = () => {
-        onComplete(createdIdentity);
+        console.log('[OnboardingFlow] Recovery confirmed, calling onComplete with:', createdIdentity?.handle);
+        if (createdIdentity) {
+            onComplete(createdIdentity);
+        } else {
+            console.error('[OnboardingFlow] No createdIdentity available!');
+        }
     };
     
     const handleRestoreComplete = (identity, hadLocalData) => {
@@ -148,6 +154,14 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
         }
     };
     
+    const handleContinue = () => {
+        console.log('[ShowRecoveryStep] Continue clicked, confirmed:', confirmed);
+        if (confirmed && onConfirm) {
+            console.log('[ShowRecoveryStep] Calling onConfirm');
+            onConfirm();
+        }
+    };
+    
     return (
         <div className="onboarding-step recovery-step">
             <h2>🔐 Save Your Recovery Phrase</h2>
@@ -165,7 +179,7 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
                 ))}
             </div>
             
-            <button className="btn-copy" onClick={copyToClipboard} data-testid="copy-recovery-btn">
+            <button className="btn-copy" onClick={copyToClipboard} type="button" data-testid="copy-recovery-btn">
                 {copyStatus === 'success' ? '✓ Copied!' : copyStatus === 'error' ? '✗ Copy failed - please copy manually' : '📋 Copy to Clipboard'}
             </button>
             
@@ -181,7 +195,10 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
                 <input 
                     type="checkbox" 
                     checked={confirmed}
-                    onChange={(e) => setConfirmed(e.target.checked)}
+                    onChange={(e) => {
+                        console.log('[ShowRecoveryStep] Checkbox changed:', e.target.checked);
+                        setConfirmed(e.target.checked);
+                    }}
                     data-testid="understood-checkbox"
                 />
                 <span>I have saved my recovery phrase in a safe place</span>
@@ -189,16 +206,11 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
             
             <button 
                 type="button"
-                className="btn-primary" 
-                onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (confirmed) {
-                        onConfirm();
-                    }
-                }}
+                className={`btn-primary ${confirmed ? '' : 'btn-disabled'}`}
+                onClick={handleContinue}
                 disabled={!confirmed}
                 data-testid="continue-btn"
+                aria-disabled={!confirmed}
             >
                 Continue
             </button>
