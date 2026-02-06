@@ -501,17 +501,26 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     // Only expand if it wasn't a drag
                     if (!hasDragged) setMinimized(false);
                 }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setMinimized(false);
+                    }
+                }}
                 style={chatState.position.x !== null ? {
                     left: chatState.position.x,
                     top: chatState.position.y,
                     right: 'auto',
                     bottom: 'auto'
                 } : {}}
+                role="button"
+                tabIndex={0}
+                aria-label={`Expand chat${unreadCount > 0 ? `, ${unreadCount} unread messages` : ''}`}
             >
-                <span className="chat-icon">💬</span>
+                <span className="chat-icon" aria-hidden="true">💬</span>
                 <span>Chat</span>
                 {unreadCount > 0 && (
-                    <span className="unread-badge">{unreadCount}</span>
+                    <span className="unread-badge" aria-label={`${unreadCount} unread`}>{unreadCount}</span>
                 )}
             </div>
         );
@@ -543,12 +552,21 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             </div>
 
             {/* Chat Tabs */}
-            <div className="chat-tabs">
+            <div className="chat-tabs" role="tablist" aria-label="Chat channels">
                 {chatTabs.map(tab => (
                     <div 
                         key={tab.id}
                         className={`chat-tab ${activeTab === tab.id ? 'active' : ''}`}
                         onClick={() => setActiveTab(tab.id)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setActiveTab(tab.id);
+                            }
+                        }}
+                        role="tab"
+                        aria-selected={activeTab === tab.id}
+                        tabIndex={activeTab === tab.id ? 0 : -1}
                     >
                         {tab.type === 'dm' && (
                             <span 
@@ -584,9 +602,9 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
 
             {/* User Search Modal */}
             {showUserSearch && (
-                <div className="user-search-panel">
+                <div className="user-search-panel" role="dialog" aria-labelledby="user-search-title">
                     <div className="user-search-header">
-                        <h4>Start a Chat</h4>
+                        <h4 id="user-search-title">Start a Chat</h4>
                         <button 
                             type="button"
                             className="close-search"
@@ -606,8 +624,9 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         value={userSearchQuery}
                         onChange={(e) => setUserSearchQuery(e.target.value)}
                         autoFocus
+                        aria-label="Search for users to chat with"
                     />
-                    <div className="user-search-results">
+                    <div className="user-search-results" role="listbox" aria-label="Available users">
                         {filteredUsers.length === 0 ? (
                             <div className="no-users">
                                 {onlineUsers.length === 0 
@@ -620,10 +639,20 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                     key={user.clientId}
                                     className="user-search-item"
                                     onClick={() => startDirectMessage(user)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            startDirectMessage(user);
+                                        }
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Start chat with ${user.name}`}
                                 >
                                     <span 
                                         className="user-avatar"
                                         style={{ backgroundColor: user.color }}
+                                        aria-hidden="true"
                                     >
                                         {user.icon || user.name?.charAt(0).toUpperCase()}
                                     </span>

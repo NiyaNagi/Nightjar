@@ -26,6 +26,45 @@ export function usePeerManager(config = {}) {
 
   // Initialize PeerManager
   useEffect(() => {
+    let isMounted = true;
+
+    const updateStats = () => {
+      if (peerManagerRef.current && isMounted) {
+        setStats(peerManagerRef.current.getStats());
+        setConnectedPeers(peerManagerRef.current.getConnectedPeerCount());
+      }
+    };
+
+    // Named event handlers for proper cleanup
+    const handleInitialized = () => {
+      if (isMounted) {
+        setIsInitialized(true);
+        updateStats();
+      }
+    };
+
+    const handlePeerConnected = () => {
+      if (isMounted && peerManagerRef.current) {
+        setConnectedPeers(peerManagerRef.current.getConnectedPeerCount());
+        updateStats();
+      }
+    };
+
+    const handlePeerDisconnected = () => {
+      if (isMounted && peerManagerRef.current) {
+        setConnectedPeers(peerManagerRef.current.getConnectedPeerCount());
+        updateStats();
+      }
+    };
+
+    const handleWorkspaceJoined = () => {
+      if (isMounted) updateStats();
+    };
+
+    const handleWorkspaceLeft = () => {
+      if (isMounted) updateStats();
+    };
+
     const initPeerManager = async () => {
       try {
         const pm = getPeerManager(configRef.current);
@@ -34,51 +73,37 @@ export function usePeerManager(config = {}) {
         // Initialize if identity is provided
         if (configRef.current.identity) {
           await pm.initialize(configRef.current.identity);
-          setIsInitialized(true);
+          if (isMounted) setIsInitialized(true);
         }
 
         // Setup event listeners
-        pm.on('initialized', () => {
-          setIsInitialized(true);
-          updateStats();
-        });
-
-        pm.on('peer-connected', () => {
-          setConnectedPeers(pm.getConnectedPeerCount());
-          updateStats();
-        });
-
-        pm.on('peer-disconnected', () => {
-          setConnectedPeers(pm.getConnectedPeerCount());
-          updateStats();
-        });
-
-        pm.on('workspace-joined', () => {
-          updateStats();
-        });
-
-        pm.on('workspace-left', () => {
-          updateStats();
-        });
+        pm.on('initialized', handleInitialized);
+        pm.on('peer-connected', handlePeerConnected);
+        pm.on('peer-disconnected', handlePeerDisconnected);
+        pm.on('workspace-joined', handleWorkspaceJoined);
+        pm.on('workspace-left', handleWorkspaceLeft);
 
         // Initial stats
         updateStats();
       } catch (err) {
         console.error('[usePeerManager] Initialization error:', err);
-        setError(err);
-      }
-    };
-
-    const updateStats = () => {
-      if (peerManagerRef.current) {
-        setStats(peerManagerRef.current.getStats());
-        setConnectedPeers(peerManagerRef.current.getConnectedPeerCount());
+        if (isMounted) setError(err);
       }
     };
 
     initPeerManager();
 
     return () => {
+      isMounted = false;
+      // Remove event listeners on cleanup
+      const pm = peerManagerRef.current;
+      if (pm) {
+        pm.removeListener('initialized', handleInitialized);
+        pm.removeListener('peer-connected', handlePeerConnected);
+        pm.removeListener('peer-disconnected', handlePeerDisconnected);
+        pm.removeListener('workspace-joined', handleWorkspaceJoined);
+        pm.removeListener('workspace-left', handleWorkspaceLeft);
+      }
       // Don't destroy on unmount - PeerManager is a singleton
       // It will be destroyed when the app closes
     };

@@ -49,10 +49,20 @@ class RelayServer {
   handleConnection(ws, clientId) {
     console.log(`[Relay] Client connected: ${clientId}`);
     
+    // Authentication timeout - close connection if no identity received within 30 seconds
+    const authTimeout = setTimeout(() => {
+      const client = this.clients.get(clientId);
+      if (client && !client.identity) {
+        console.warn(`[Relay] Client ${clientId} failed to authenticate within timeout, closing`);
+        ws.close(4001, 'Authentication timeout');
+      }
+    }, 30000);
+    
     this.clients.set(clientId, {
       ws,
       identity: null,
-      topics: new Set()
+      topics: new Set(),
+      authTimeout
     });
     
     ws.on('message', (data) => {
@@ -66,6 +76,8 @@ class RelayServer {
     
     ws.on('error', (err) => {
       console.error(`[Relay] Client error ${clientId}:`, err.message);
+      // Ensure cleanup happens on error
+      this.handleDisconnect(clientId);
     });
   }
   
@@ -78,6 +90,11 @@ class RelayServer {
       
       switch (message.type) {
         case 'identity':
+          // Clear auth timeout on successful identity
+          if (client.authTimeout) {
+            clearTimeout(client.authTimeout);
+            client.authTimeout = null;
+          }
           client.identity = {
             publicKey: message.publicKey,
             displayName: message.displayName,
@@ -239,6 +256,12 @@ class RelayServer {
   handleDisconnect(clientId) {
     const client = this.clients.get(clientId);
     if (!client) return;
+    
+    // Clear auth timeout if pending
+    if (client.authTimeout) {
+      clearTimeout(client.authTimeout);
+      client.authTimeout = null;
+    }
     
     // Leave all topics
     for (const topic of client.topics) {

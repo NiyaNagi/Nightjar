@@ -32,6 +32,17 @@ export default defineConfig({
       include: [/node_modules/],
     },
     target: 'esnext',
+    rollupOptions: {
+      // Externalize Capacitor plugins - they're only available on mobile and are dynamically imported
+      external: [
+        '@capacitor/app',
+        '@capacitor/clipboard',
+        '@capacitor/share',
+        '@capacitor/haptics',
+        '@capacitor/device',
+        '@capacitor/splash-screen',
+      ],
+    },
   },
   server: {
     port: 5174,

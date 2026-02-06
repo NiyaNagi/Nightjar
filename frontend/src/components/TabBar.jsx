@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import './TabBar.css';
 import UserProfile from './UserProfile';
 import { createColorGradient } from '../utils/colorUtils';
@@ -36,20 +36,28 @@ const TabBar = ({
         }
     }, [tabs, onSelectTab]);
 
+    // Pre-compute color map for all tabs to avoid repeated lookups in render loop
+    const colorMap = useMemo(() => {
+        const map = new Map();
+        tabs.forEach(tab => {
+            const doc = documents.find(d => d.id === tab.id);
+            const folder = doc?.folderId ? folders.find(f => f.id === doc.folderId) : null;
+            const folderColor = folder?.color;
+            const docColor = doc?.color;
+            const backgroundStyle = folderColor || docColor
+                ? { background: createColorGradient(folderColor, docColor, 0.25) }
+                : {};
+            map.set(tab.id, backgroundStyle);
+        });
+        return map;
+    }, [tabs, documents, folders]);
+
     return (
         <div className="tab-bar">
             <div className="tabs-container" role="tablist" aria-label="Document tabs">
                 {tabs.map((tab, tabIndex) => {
-                    // Look up document and folder for color gradient
-                    const doc = documents.find(d => d.id === tab.id);
-                    const folder = doc?.folderId ? folders.find(f => f.id === doc.folderId) : null;
-                    const folderColor = folder?.color;
-                    const docColor = doc?.color;
-                    
-                    // Apply gradient if we have colors
-                    const backgroundStyle = folderColor || docColor
-                        ? { background: createColorGradient(folderColor, docColor, 0.25) }
-                        : {};
+                    // Use pre-computed color from memoized map
+                    const backgroundStyle = colorMap.get(tab.id) || {};
                     
                     const isSelected = tab.id === activeTabId;
                     return (

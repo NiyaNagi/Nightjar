@@ -5,6 +5,15 @@ export function useAutoSave(content, onSave, delay = 1000) {
     const timeoutRef = useRef(null);
     const lastSavedRef = useRef(content);
     const isSavingRef = useRef(false);
+    const isMountedRef = useRef(true);
+
+    // Track mount state
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     const save = useCallback(async () => {
         if (isSavingRef.current) return;
@@ -13,11 +22,15 @@ export function useAutoSave(content, onSave, delay = 1000) {
         isSavingRef.current = true;
         try {
             await onSave(content);
-            lastSavedRef.current = content;
+            if (isMountedRef.current) {
+                lastSavedRef.current = content;
+            }
         } catch (error) {
             console.error('Auto-save failed:', error);
         } finally {
-            isSavingRef.current = false;
+            if (isMountedRef.current) {
+                isSavingRef.current = false;
+            }
         }
     }, [content, onSave]);
 

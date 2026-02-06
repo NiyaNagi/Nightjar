@@ -310,6 +310,7 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                                     type="text"
                                     defaultValue={column.name}
                                     autoFocus
+                                    aria-label="Edit column name"
                                     onBlur={(e) => updateColumnName(column.id, e.target.value)}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -400,6 +401,7 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                                                             setEditingCard(card.id);
                                                         }}
                                                         title="Edit card"
+                                                        aria-label={`Edit ${card.title} card`}
                                                     >
                                                         ✏️
                                                     </button>
@@ -440,13 +442,14 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
 
                 {!readOnly && showNewColumn && (
                     <div className="kanban-column new-column">
-                        <div className="new-column-form">
+                        <div className="new-column-form" role="form" aria-label="Add new column form">
                             <input
                                 type="text"
                                 value={newColumnName}
                                 onChange={(e) => setNewColumnName(e.target.value)}
                                 placeholder="Column name..."
                                 autoFocus
+                                aria-label="New column name"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') addColumn();
                                     if (e.key === 'Escape') {
@@ -456,11 +459,11 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                                 }}
                             />
                             <div className="new-column-actions">
-                                <button type="button" onClick={addColumn}>Add</button>
+                                <button type="button" onClick={addColumn} aria-label="Add column">Add</button>
                                 <button type="button" onClick={() => {
                                     setShowNewColumn(false);
                                     setNewColumnName('');
-                                }}>Cancel</button>
+                                }} aria-label="Cancel adding column">Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -471,4 +474,4 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
     );
 };
 
-export default Kanban;
+export default React.memo(Kanban);

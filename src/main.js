@@ -110,6 +110,11 @@ function safeFocusWindow() {
     }
 }
 
+// Helper to validate IPC sender is from mainWindow
+function validateSender(event) {
+    return event.sender === mainWindow?.webContents;
+}
+
 // Central awareness object for the backend
 const awareness = new awarenessProtocol.Awareness(new Y.Doc());
 
@@ -183,7 +188,7 @@ function createWindow() {
     
     loadWithRetry();
 
-    if (isDev) {
+    if (isDev && !app.isPackaged) {
         mainWindow.webContents.openDevTools();
     }
 }
@@ -860,6 +865,10 @@ async function startBackend() {
 
 // --- IPC Handlers ---
 ipcMain.on('set-key', async (event, keyPayload) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        return;
+    }
     // NOTE: Database operations are now handled by the sidecar process
     // This legacy handler just acknowledges the key and returns current doc state
     console.log('[Backend] Received session key.');
@@ -893,7 +902,11 @@ awareness.on('update', (changes, origin) => {
 });
 
 // --- Identity IPC Handlers ---
-ipcMain.handle('identity:load', async () => {
+ipcMain.handle('identity:load', async (event) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         const stored = identity.loadIdentity();
         if (stored) {
@@ -918,6 +931,10 @@ ipcMain.handle('identity:load', async () => {
 });
 
 ipcMain.handle('identity:store', async (event, identityData) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         // Convert hex back to Uint8Arrays if needed
         const toStore = {
@@ -944,6 +961,10 @@ ipcMain.handle('identity:store', async (event, identityData) => {
 });
 
 ipcMain.handle('identity:update', async (event, updates) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         identity.updateIdentity(updates);
         return true;
@@ -953,7 +974,11 @@ ipcMain.handle('identity:update', async (event, updates) => {
     }
 });
 
-ipcMain.handle('identity:delete', async () => {
+ipcMain.handle('identity:delete', async (event) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         identity.deleteIdentity();
         return true;
@@ -963,11 +988,19 @@ ipcMain.handle('identity:delete', async () => {
     }
 });
 
-ipcMain.handle('identity:has', async () => {
+ipcMain.handle('identity:has', async (event) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     return identity.hasIdentity();
 });
 
 ipcMain.handle('identity:validate', async (event, mnemonic) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         return identity.validateRecoveryPhrase(mnemonic);
     } catch (err) {
@@ -977,6 +1010,10 @@ ipcMain.handle('identity:validate', async (event, mnemonic) => {
 });
 
 ipcMain.handle('identity:export', async (event, password) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         return identity.exportIdentity(password);
     } catch (err) {
@@ -986,6 +1023,10 @@ ipcMain.handle('identity:export', async (event, password) => {
 });
 
 ipcMain.handle('identity:import', async (event, data, password) => {
+    if (!validateSender(event)) {
+        console.warn('[Security] Rejected IPC from unknown sender');
+        throw new Error('Unauthorized IPC sender');
+    }
     try {
         const restored = identity.importIdentity(data, password);
         return {

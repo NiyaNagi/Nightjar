@@ -36,6 +36,21 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
         }
     }, [metaSocket]);
 
+    // Cleanup all Yjs providers on unmount
+    useEffect(() => {
+        return () => {
+            ydocsRef.current.forEach((docRef, docId) => {
+                try {
+                    docRef.provider.disconnect();
+                    docRef.ydoc.destroy();
+                } catch (e) {
+                    console.error(`[useDocumentManager] Error cleaning up doc ${docId}:`, e);
+                }
+            });
+            ydocsRef.current.clear();
+        };
+    }, []);
+
     // Handle messages from sidecar
     useEffect(() => {
         if (!metaSocket) return;

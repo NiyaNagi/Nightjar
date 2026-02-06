@@ -59,3 +59,9 @@ Thumbs.db
 
 # Optional eslint cache
 .eslintcache
+
+# SSL certificates and private keys (NEVER commit private keys!)
+*.pem
+sidecar/identity/*.pem
+server/**/*.pem
+!server/nginx/*.example.pem

@@ -284,6 +284,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Sync documents from Yjs to React state
     const syncDocuments = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const docs = yDocuments.toArray();
       console.log(`[WorkspaceSync] syncDocuments called, count: ${docs.length}`);
       setDocuments(docs);
@@ -291,6 +292,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Sync folders from Yjs to React state
     const syncFolders = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const flds = yFolders.toArray();
       console.log(`[WorkspaceSync] syncFolders called, count: ${flds.length}`);
       setFolders(flds);
@@ -298,6 +300,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Sync workspace info from Yjs to React state
     const syncInfo = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const info = {
         name: yInfo.get('name'),
         icon: yInfo.get('icon'),
@@ -349,6 +352,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Sync workspace-level collaborators from Yjs
     const syncCollaborators = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const collabs = yCollaborators.toArray();
       setCollaborators(collabs);
       setTotalCount(collabs.length);
@@ -356,6 +360,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Sync members map (keyed by publicKey for deduplication)
     const syncMembers = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const membersObj = {};
       yMembers.forEach((value, key) => {
         membersObj[key] = value;
@@ -366,6 +371,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Sync kicked map and check if current user is kicked
     const syncKicked = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const kickedObj = {};
       const kickedKeys = [];
       yKicked.forEach((value, key) => {
@@ -407,6 +413,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     // Track online users via awareness
     // Uses publicKey for deduplication to prevent duplicates when users reconnect
     const syncOnlineFromAwareness = () => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       const states = provider.awareness.getStates();
       let online = 0;
       const myClientId = provider.awareness.clientID;
@@ -477,9 +484,11 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     syncOnlineFromAwareness();
     
     // Connection status
-    provider.on('status', ({ status }) => {
+    const handleStatusChange = ({ status }) => {
+      if (cleanedUp) return; // Prevent state updates after cleanup
       setConnected(status === 'connected');
-    });
+    };
+    provider.on('status', handleStatusChange);
     
     // Cleanup on workspace change
     return () => {
@@ -488,6 +497,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       if (keySocket && keySocket.readyState === WebSocket.OPEN) {
         keySocket.close();
       }
+      // Remove status handler
+      provider.off('status', handleStatusChange);
       yDocuments.unobserve(syncDocuments);
       yFolders.unobserve(syncFolders);
       yInfo.unobserve(syncInfo);

@@ -53,8 +53,10 @@ export default function IdentitySettings({ onClose }) {
     };
     
     const generateTransferQR = async () => {
-        // Generate random 4-digit PIN
-        const pin = String(Math.floor(1000 + Math.random() * 9000));
+        // Generate cryptographically secure random 4-digit PIN
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        const pin = String(1000 + (array[0] % 9000));
         setQrPin(pin);
         
         try {

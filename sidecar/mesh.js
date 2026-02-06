@@ -201,8 +201,18 @@ class MeshParticipant extends EventEmitter {
       const lines = buffer.toString().split('\n');
       buffer = Buffer.from(lines.pop() || ''); // Keep incomplete line
       
+      // Maximum size for a single parsed JSON message (1MB)
+      const MAX_MESSAGE_SIZE = 1024 * 1024;
+      
       for (const line of lines) {
         if (!line.trim()) continue;
+        
+        // Reject oversized individual messages
+        if (line.length > MAX_MESSAGE_SIZE) {
+          console.error(`[Mesh] Rejecting oversized message (${line.length} bytes) from ${remoteKey.slice(0, 16)}...`);
+          continue;
+        }
+        
         try {
           const msg = JSON.parse(line);
           this._handleMessage(msg, conn, info);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import FolderTree from './FolderTree';
 import CreateFolder from './CreateFolder';
@@ -124,7 +124,7 @@ const Sidebar = ({
 
     // Filter documents for current folder
     console.log('[Sidebar] Received documents:', documents?.length, documents);
-    const filteredDocuments = documents.filter(doc => {
+    const filteredDocuments = useMemo(() => documents.filter(doc => {
         if (activeFolderId === 'all' || !activeFolderId) return true;
         if (activeFolderId === 'recent') {
             // Show docs edited in last 7 days
@@ -138,7 +138,7 @@ const Sidebar = ({
             return doc.deletedAt;
         }
         return doc.folderId === activeFolderId;
-    });
+    }), [documents, activeFolderId]);
 
     if (isCollapsed) {
         return (
@@ -379,4 +379,4 @@ const Sidebar = ({
     );
 };
 
-export default Sidebar;
+export default React.memo(Sidebar);

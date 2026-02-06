@@ -404,7 +404,7 @@ const Comments = ({
 
                         {/* Reply Input */}
                         {replyingTo === comment.id ? (
-                            <div className="reply-input-row">
+                            <div className="reply-input-row" role="form" aria-label="Reply to comment form">
                                 <input
                                     type="text"
                                     value={replyText}
@@ -412,12 +412,14 @@ const Comments = ({
                                     onKeyDown={(e) => handleKeyDown(e, 'reply', comment.id)}
                                     placeholder="Write a reply..."
                                     className="reply-input"
+                                    aria-label="Write a reply"
                                     autoFocus
                                 />
                                 <button 
                                     className="btn-reply"
                                     onClick={() => addReply(comment.id)}
                                     disabled={!replyText.trim()}
+                                    aria-label="Submit reply"
                                 >
                                     Reply
                                 </button>

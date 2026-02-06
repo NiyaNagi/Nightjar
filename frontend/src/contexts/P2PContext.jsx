@@ -96,6 +96,27 @@ export function P2PProvider({ children, config = {} }) {
       return;
     }
 
+    let isMounted = true;
+    
+    // Event handlers that check mounted state before setState
+    const handlePeerConnected = () => {
+      if (isMounted && peerManagerRef.current) {
+        setConnectedPeers(peerManagerRef.current.getConnectedPeerCount());
+      }
+    };
+
+    const handlePeerDisconnected = () => {
+      if (isMounted && peerManagerRef.current) {
+        setConnectedPeers(peerManagerRef.current.getConnectedPeerCount());
+      }
+    };
+
+    const handleInitialized = () => {
+      if (isMounted) {
+        setIsInitialized(true);
+      }
+    };
+
     const initP2P = async () => {
       try {
         const pm = getPeerManager({
@@ -104,22 +125,16 @@ export function P2PProvider({ children, config = {} }) {
         peerManagerRef.current = pm;
 
         // Setup event listeners
-        pm.on('peer-connected', () => {
-          setConnectedPeers(pm.getConnectedPeerCount());
-        });
-
-        pm.on('peer-disconnected', () => {
-          setConnectedPeers(pm.getConnectedPeerCount());
-        });
-
-        pm.on('initialized', () => {
-          setIsInitialized(true);
-        });
+        pm.on('peer-connected', handlePeerConnected);
+        pm.on('peer-disconnected', handlePeerDisconnected);
+        pm.on('initialized', handleInitialized);
 
         // Check if already initialized
         if (pm.isInitialized) {
-          setIsInitialized(true);
-          setConnectedPeers(pm.getConnectedPeerCount());
+          if (isMounted) {
+            setIsInitialized(true);
+            setConnectedPeers(pm.getConnectedPeerCount());
+          }
         }
 
         console.log('[P2PProvider] PeerManager ready');
@@ -131,7 +146,14 @@ export function P2PProvider({ children, config = {} }) {
     initP2P();
 
     return () => {
-      // Don't destroy PeerManager on unmount - it's a singleton
+      isMounted = false;
+      // Remove event listeners to prevent setState after unmount and memory leaks
+      // Don't destroy PeerManager itself - it's a singleton
+      if (peerManagerRef.current) {
+        peerManagerRef.current.off('peer-connected', handlePeerConnected);
+        peerManagerRef.current.off('peer-disconnected', handlePeerDisconnected);
+        peerManagerRef.current.off('initialized', handleInitialized);
+      }
     };
   }, [isEnabled]);
 

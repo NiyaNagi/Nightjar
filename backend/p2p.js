@@ -3,31 +3,43 @@
 
 const { SocksProxyAgent } = require('socks-proxy-agent');
 
-// Dynamically import libp2p, @libp2p/tcp, @libp2p/mplex, @libp2p/gossipsub, and @chainsafe/libp2p-noise to handle ES modules
-let tcp, noise, mplex, gossipsub;
-(async () => {
-    const libp2p = await import('libp2p');
-    createLibp2p = libp2p.createLibp2p;
-    
-    const tcpModule = await import('@libp2p/tcp');
-    tcp = tcpModule.tcp;
-    
-    const noiseModule = await import('@chainsafe/libp2p-noise');
-    noise = noiseModule.noise;
-    
-    const mplexModule = await import('@libp2p/mplex');
-    mplex = mplexModule.mplex;
-    
-    const gossipsubModule = await import('@libp2p/gossipsub');
-    gossipsub = gossipsubModule.gossipsub;
-})();
+// Module loading state - ensures imports are complete before use
+let createLibp2p, tcp, noise, mplex, gossipsub;
+let modulesLoaded = false;
+let modulesLoadPromise = null;
 
-// Dynamically import libp2p to handle ES module
-let createLibp2p;
-(async () => {
-    const libp2p = await import('libp2p');
-    createLibp2p = libp2p.createLibp2p;
-})();
+/**
+ * Dynamically load all ES modules required for libp2p
+ * Uses a singleton promise to ensure modules are only loaded once
+ * @returns {Promise<void>}
+ */
+async function ensureModulesLoaded() {
+    if (modulesLoaded) return;
+    
+    if (!modulesLoadPromise) {
+        modulesLoadPromise = (async () => {
+            const libp2p = await import('libp2p');
+            createLibp2p = libp2p.createLibp2p;
+            
+            const tcpModule = await import('@libp2p/tcp');
+            tcp = tcpModule.tcp;
+            
+            const noiseModule = await import('@chainsafe/libp2p-noise');
+            noise = noiseModule.noise;
+            
+            const mplexModule = await import('@libp2p/mplex');
+            mplex = mplexModule.mplex;
+            
+            const gossipsubModule = await import('@libp2p/gossipsub');
+            gossipsub = gossipsubModule.gossipsub;
+            
+            modulesLoaded = true;
+            console.log('[p2p] ES modules loaded successfully');
+        })();
+    }
+    
+    await modulesLoadPromise;
+}
 
 // The design doc specifies using a SOCKS5 proxy for all TCP traffic to route it through Tor.
 // Note: 'socks5h' ensures DNS resolution happens over the proxy, which is crucial for .onion addresses.
@@ -39,6 +51,9 @@ const torAgent = new SocksProxyAgent('socks5h://127.0.0.1:9050');
  * @returns {Promise<import('libp2p').Libp2p>} A promise that resolves to the created Libp2p node.
  */
 async function createLibp2pNode(onionAddress) {
+    // Ensure all ES modules are loaded before proceeding
+    await ensureModulesLoaded();
+    
     console.log('[p2p] Creating Libp2p node...');
 
     // The address for libp2p to listen on. The onion service forwards public port 80 to this local port.

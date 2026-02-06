@@ -725,3 +725,102 @@ This audit identifies gaps in test coverage for the Nightjar application. The co
 2. **P2P Service Testing:** Mock Hyperswarm/WebRTC for transport tests
 3. **Sidecar Testing:** Test via IPC mocking for Electron APIs
 4. **E2E Coverage:** Expand Playwright tests for permission flows
+
+---
+
+## Cycle 6: P2P/Mesh Core Testing (February 2026)
+
+### Critical Files Identified Without Tests
+
+| File | Lines | Priority | Status |
+|------|-------|----------|--------|
+| `sidecar/mesh.js` | 656 | 🔴 Critical | ✅ Now tested |
+| `sidecar/p2p-bridge.js` | 602 | 🔴 Critical | ✅ Now tested |
+| `sidecar/relay-bridge.js` | 426 | 🔴 Critical | ✅ Now tested |
+| `sidecar/hyperswarm.js` | 1077 | 🔴 Critical | ⚠️ Partial (integration) |
+| `frontend/src/services/p2p/PeerManager.js` | 486 | 🔴 Critical | ✅ Now tested |
+| `frontend/src/services/p2p/BootstrapManager.js` | 451 | 🔴 Critical | ⚠️ Via PeerManager mock |
+| `frontend/src/services/p2p/AwarenessManager.js` | 283 | 🔴 Critical | ⚠️ Via PeerManager mock |
+| `frontend/src/contexts/P2PContext.jsx` | 183 | 🔴 Critical | ✅ Now tested |
+
+### Important Files Still Missing Tests
+
+| File | Lines | Priority | Reason |
+|------|-------|----------|--------|
+| `frontend/src/hooks/usePeerManager.js` | 258 | 🟡 Important | React hook, needs renderHook |
+| `frontend/src/utils/websocket.js` | 130 | 🟡 Important | Covered by P2PContext tests |
+| `frontend/src/utils/diagnostics.js` | 195 | 🟡 Important | Console capture utilities |
+| `frontend/src/utils/mobile-p2p.js` | ~200 | 🟡 Important | Mobile-specific P2P |
+| `frontend/src/components/Share/*.jsx` | Multiple | 🟡 Important | UI components |
+| `frontend/src/components/Presence/*.jsx` | Multiple | 🟡 Important | Real-time presence |
+
+### Nice-to-Have Files Without Tests
+
+| File | Priority | Reason |
+|------|----------|--------|
+| `frontend/src/components/Onboarding/*.jsx` | 🟢 Nice | Setup flow UIs |
+| `frontend/src/components/Settings/*.jsx` | 🟢 Nice | Settings panels |
+| `frontend/src/utils/colorUtils.js` | 🟢 Nice | Color manipulation |
+| `frontend/src/utils/qrcode.js` | 🟢 Nice | QR code generation |
+
+### New Tests Written (Cycle 6)
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `tests/mesh.test.js` | 42 | mesh-constants, MeshParticipant, message handling |
+| `tests/p2p-bridge.test.js` | 31 | P2PBridge client handling, topics, broadcast |
+| `tests/relay-bridge.test.js` | 24 | RelayBridge backoff, connections, retries |
+| `tests/peer-manager.test.js` | 38 | PeerManager initialization, workspaces, transports |
+| `tests/p2p-context.test.js` | 22 | P2PContext, useP2P hook, WebSocket factory |
+
+**Total new tests: 157**
+
+### Key Test Patterns Established
+
+1. **Sidecar Testing (Node.js environment)**
+   ```javascript
+   /**
+    * @jest-environment node
+    */
+   jest.mock('../sidecar/hyperswarm', () => { /* ... */ });
+   ```
+
+2. **Transport Mocking**
+   ```javascript
+   jest.mock('../frontend/src/services/p2p/transports/WebSocketTransport', () => ({
+     WebSocketTransport: jest.fn().mockImplementation(() => ({
+       initialize: jest.fn().mockResolvedValue(),
+       // ... all methods
+     })),
+   }));
+   ```
+
+3. **Mock WebSocket for Node.js**
+   ```javascript
+   function createMockWebSocket() {
+     const ws = new EventEmitter();
+     ws.readyState = 1;
+     ws.sent = [];
+     ws.send = function(data) { this.sent.push(data); };
+     return ws;
+   }
+   ```
+
+### Test Quality Verification
+
+Existing tests were audited for actual test quality:
+
+| File | Quality | Notes |
+|------|---------|-------|
+| `hooks.test.js` | ✅ Good | Tests actual logic, not just coverage |
+| `components.test.js` | ✅ Good | Tests UI logic patterns |
+| `contexts.test.js` | ✅ Good | Tests state management |
+| `sidecar.test.js` | ✅ Excellent | Tests crypto, validation, security |
+| `p2p-services.test.js` | ✅ Excellent | Tests protocol serialization |
+
+### Remaining Gaps for Cycle 7
+
+1. **React Hooks with renderHook**: `usePeerManager`, `useAutoLock`, `useChangelogObserver`
+2. **Complex Components**: `Toolbar.jsx`, `HierarchicalSidebar.jsx`
+3. **Mobile P2P**: Full mobile-p2p.js test suite
+4. **Sidecar Hyperswarm**: Full hyperswarm.js unit tests (currently integration only)
