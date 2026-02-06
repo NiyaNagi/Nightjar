@@ -85,6 +85,10 @@
   margin-bottom: 24px;
   max-height: 400px;
   overflow-y: auto;
+  /* Add padding to prevent hover effects from being clipped */
+  padding: 4px;
+  margin: -4px;
+  margin-bottom: 24px;
 }
 
 .identity-selector__item {
