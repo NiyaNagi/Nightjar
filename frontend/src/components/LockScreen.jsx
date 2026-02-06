@@ -22,9 +22,19 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
         if (activeId) {
             const identities = identityManager.listIdentities();
             const active = identities.find(i => i.id === activeId);
-            setIdentity(active);
+            if (active) {
+                setIdentity(active);
+            } else {
+                // Active identity not found, switch to identity selector
+                console.warn('[LockScreen] Active identity not found, switching to identity selector');
+                onSwitchIdentity?.();
+            }
+        } else {
+            // No active identity, need to select one
+            console.warn('[LockScreen] No active identity, switching to identity selector');
+            onSwitchIdentity?.();
         }
-    }, []);
+    }, [onSwitchIdentity]);
     
     const handleUnlock = async (pinValue) => {
         if (!identity || pinValue.length !== 6) return;
