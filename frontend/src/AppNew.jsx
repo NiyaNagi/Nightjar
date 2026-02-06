@@ -261,6 +261,7 @@ function App() {
     const [showCreateDocumentDialog, setShowCreateDocumentDialog] = useState(false); // Create document modal
     const [createDocumentType, setCreateDocumentType] = useState('text'); // Pre-selected document type
     const [showIdentitySelector, setShowIdentitySelector] = useState(false); // Identity selector for multiple identities
+    const [showCreateNewIdentity, setShowCreateNewIdentity] = useState(false); // Show onboarding to create new identity
     const [needsMigration, setNeedsMigration] = useState(false); // Migration needed for legacy identity
     const [legacyIdentity, setLegacyIdentity] = useState(null); // Legacy identity data for migration
     const [startupComplete, setStartupComplete] = useState(false); // Track if startup identity check is complete
@@ -346,6 +347,16 @@ function App() {
     const handleLockScreenUnlock = useCallback((identityData, metadata) => {
         console.log('[App] Unlocked identity:', metadata?.handle);
         unlockApp();
+        
+        // Update user profile with unlocked identity data
+        if (identityData || metadata) {
+            setUserProfile({
+                name: identityData?.handle || metadata?.handle || 'Anonymous',
+                icon: identityData?.icon || metadata?.icon || '😊',
+                color: identityData?.color || metadata?.color || '#6366f1',
+            });
+        }
+        
         showToast(`Welcome back, ${metadata?.handle || 'User'}! 🔓`, 'success');
     }, [unlockApp, showToast]);
     
@@ -372,12 +383,20 @@ function App() {
     
     const handleNeedsMigration = useCallback(() => {
         // Legacy identity detected, need to migrate
-        const legacy = identityManager.getLegacyIdentity();
+        // Try identityManager first (localStorage), then fall back to userIdentity (IdentityContext/Electron)
+        const legacy = identityManager.getLegacyIdentity() || userIdentity;
         if (legacy) {
-            setLegacyIdentity(legacy);
+            // Ensure we have the required fields
+            const legacyData = {
+                ...legacy,
+                handle: legacy.handle || userProfile?.name || 'User',
+                icon: legacy.icon || userProfile?.icon || '😊',
+                color: legacy.color || userProfile?.color || '#6366f1'
+            };
+            setLegacyIdentity(legacyData);
             setNeedsMigration(true);
         }
-    }, []);
+    }, [userIdentity, userProfile]);
 
     // --- Kick Member Handler with Toast Feedback ---
     const handleKickMember = useCallback((publicKey, memberName = 'member') => {
@@ -1089,6 +1108,23 @@ function App() {
         setStartupComplete(true);
     }, [identityLoading, handleNeedsMigration, userIdentity, userProfile]);
     
+    // Show loading screen while checking identity status
+    if (identityLoading || !startupComplete) {
+        return (
+            <div className="app-loading">
+                <div className="app-loading__content">
+                    <img 
+                        src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                        alt="Nightjar" 
+                        className="app-loading__logo"
+                        style={{ width: '120px', height: '120px' }} 
+                    />
+                    <div className="app-loading__spinner" />
+                </div>
+            </div>
+        );
+    }
+    
     // Show identity selector first (takes priority over lock screen to avoid double unlock)
     // This handles both: locked session + multiple identities
     if (showIdentitySelector) {
@@ -1097,7 +1133,7 @@ function App() {
                 onSelect={handleIdentitySelected}
                 onCreateNew={() => {
                     setShowIdentitySelector(false);
-                    // Continue to onboarding
+                    setShowCreateNewIdentity(true);
                 }}
                 onNeedsMigration={handleNeedsMigration}
             />
@@ -1122,6 +1158,18 @@ function App() {
                 onComplete={handleOnboardingComplete}
                 isMigration={true}
                 legacyIdentity={legacyIdentity}
+            />
+        );
+    }
+    
+    // Show onboarding for creating a new identity (from IdentitySelector)
+    if (showCreateNewIdentity) {
+        return (
+            <OnboardingFlow 
+                onComplete={(identity, hadLocalData) => {
+                    setShowCreateNewIdentity(false);
+                    handleOnboardingComplete(identity, hadLocalData);
+                }} 
             />
         );
     }
