@@ -18,6 +18,20 @@ import { deriveWorkspaceKey, storeKeyChain, getStoredKeyChain } from '../utils/k
 import { secureError, secureLog } from '../utils/secureLogger';
 import { isElectron as checkIsElectron } from '../hooks/useEnvironment';
 import { useIdentity } from './IdentityContext';
+import identityManager from '../utils/identityManager';
+
+/**
+ * Get identity-scoped storage key for web mode
+ * Ensures workspaces are isolated between different identities
+ */
+function getIdentityScopedStorageKey(baseKey) {
+  const activeId = identityManager.getActiveIdentityId();
+  if (activeId) {
+    return `${baseKey}_${activeId}`;
+  }
+  // Fallback to unscoped key (legacy or no identity yet)
+  return baseKey;
+}
 
 /**
  * Helper: Convert bytes to base64url string for localStorage persistence
@@ -148,17 +162,19 @@ export function WorkspaceProvider({ children }) {
   // Use ref to always have latest message handler
   const handleSidecarMessageRef = useRef(null);
   
-  // Persist workspaces to localStorage in web mode
+  // Persist workspaces to localStorage in web mode (identity-scoped)
   useEffect(() => {
     if (!isElectron && workspaces.length > 0) {
-      localStorage.setItem('nahma-workspaces', JSON.stringify(workspaces));
+      const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
+      localStorage.setItem(storageKey, JSON.stringify(workspaces));
     }
   }, [workspaces, isElectron]);
   
-  // Persist current workspace selection
+  // Persist current workspace selection (identity-scoped)
   useEffect(() => {
     if (!isElectron && currentWorkspaceId) {
-      localStorage.setItem('nahma-current-workspace', currentWorkspaceId);
+      const storageKey = getIdentityScopedStorageKey('nahma-current-workspace');
+      localStorage.setItem(storageKey, currentWorkspaceId);
     }
   }, [currentWorkspaceId, isElectron]);
 
@@ -269,11 +285,22 @@ export function WorkspaceProvider({ children }) {
     const isElectronMode = checkIsElectron();
     
     if (!isElectronMode) {
-      // Web mode: use localStorage for persistence
+      // Web mode: use localStorage for persistence (identity-scoped)
       secureLog('[WorkspaceContext] Running in web mode (localStorage)');
       
+      // Check if identity is available for scoped storage
+      const activeIdentityId = identityManager.getActiveIdentityId();
+      if (!activeIdentityId && identityManager.listIdentities().length > 0) {
+        // Have identities but none active - wait for identity selection
+        secureLog('[WorkspaceContext] Waiting for identity selection before loading workspaces');
+        setLoading(false);
+        return;
+      }
+      
       try {
-        const stored = localStorage.getItem('nahma-workspaces');
+        // Use identity-scoped storage key
+        const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
+        const stored = localStorage.getItem(storageKey);
         const storedWorkspaces = stored ? JSON.parse(stored) : [];
         setWorkspaces(storedWorkspaces);
         
@@ -299,19 +326,21 @@ export function WorkspaceProvider({ children }) {
             }
           }
           
-          // Persist updated workspaces if any legacy keys were generated
+          // Persist updated workspaces if any legacy keys were generated (identity-scoped)
           if (anyUpdated) {
             secureLog('[WorkspaceContext] Persisting updated workspaces with generated keys');
             setWorkspaces(updatedWorkspaces);
-            localStorage.setItem('nahma-workspaces', JSON.stringify(updatedWorkspaces));
+            const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
+            localStorage.setItem(storageKey, JSON.stringify(updatedWorkspaces));
           }
         };
         
         restoreAllKeychains();
         
         if (storedWorkspaces.length > 0) {
-          // Restore last selected workspace
-          const lastWorkspaceId = localStorage.getItem('nahma-current-workspace');
+          // Restore last selected workspace (identity-scoped)
+          const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
+          const lastWorkspaceId = localStorage.getItem(currentWsKey);
           setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
         }
       } catch (e) {
@@ -333,13 +362,15 @@ export function WorkspaceProvider({ children }) {
       // If sidecar has been determined unavailable, fall back to web mode
       if (sidecarUnavailable) {
         secureLog('[WorkspaceContext] Sidecar unavailable, falling back to web mode');
-        // Load from localStorage as fallback
+        // Load from localStorage as fallback (identity-scoped)
         try {
-          const stored = localStorage.getItem('nahma-workspaces');
+          const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
+          const stored = localStorage.getItem(storageKey);
           const storedWorkspaces = stored ? JSON.parse(stored) : [];
           setWorkspaces(storedWorkspaces);
           if (storedWorkspaces.length > 0) {
-            const lastWorkspaceId = localStorage.getItem('nahma-current-workspace');
+            const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
+            const lastWorkspaceId = localStorage.getItem(currentWsKey);
             setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
           }
         } catch (e) {

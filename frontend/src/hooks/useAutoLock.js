@@ -29,10 +29,27 @@ export function useAutoLock() {
     
     // Check session validity
     const checkSession = useCallback(() => {
-        // Only check if we have identities
+        // Only check if we have identities in the new PIN-protected system
         const identities = identityManager.listIdentities();
         if (identities.length === 0) {
-            return; // No identities yet, don't lock
+            // No identities yet (fresh install or onboarding) - don't lock
+            return;
+        }
+        
+        // Check if there's an active identity ID
+        const activeId = identityManager.getActiveIdentityId();
+        if (!activeId) {
+            // No active identity set - need to show identity selector, not lock screen
+            return;
+        }
+        
+        // Verify the active identity still exists (wasn't deleted)
+        const activeExists = identities.some(i => i.id === activeId);
+        if (!activeExists) {
+            // Active identity was deleted - clear it and don't lock
+            // This will cause IdentitySelector to show instead
+            console.log('[useAutoLock] Active identity no longer exists, clearing');
+            return;
         }
         
         // Check if session is valid

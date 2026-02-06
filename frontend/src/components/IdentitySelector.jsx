@@ -51,6 +51,11 @@ export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigrati
         if (unlocked) {
           onSelect?.(unlocked.identityData, unlocked.metadata);
           return;
+        } else {
+          // Session exists but failed to decrypt - clear the stale session
+          // This can happen if identity data was corrupted or deleted
+          console.warn('[IdentitySelector] Valid session but failed to decrypt, clearing session');
+          identityManager.clearSession();
         }
       }
     } catch (err) {

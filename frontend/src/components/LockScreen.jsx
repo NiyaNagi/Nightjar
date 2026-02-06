@@ -19,14 +19,24 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
     useEffect(() => {
         // Get the active identity metadata
         const activeId = identityManager.getActiveIdentityId();
+        const identities = identityManager.listIdentities();
+        
+        // If no identities exist at all, this shouldn't be showing - switch to onboarding
+        if (identities.length === 0) {
+            console.warn('[LockScreen] No identities exist, should show onboarding instead');
+            onSwitchIdentity?.();
+            return;
+        }
+        
         if (activeId) {
-            const identities = identityManager.listIdentities();
             const active = identities.find(i => i.id === activeId);
             if (active) {
                 setIdentity(active);
             } else {
-                // Active identity not found, switch to identity selector
-                console.warn('[LockScreen] Active identity not found, switching to identity selector');
+                // Active identity not found (was deleted), clear and switch to identity selector
+                console.warn('[LockScreen] Active identity not found, clearing and switching to identity selector');
+                // Clear the stale active identity reference
+                identityManager.clearSession();
                 onSwitchIdentity?.();
             }
         } else {

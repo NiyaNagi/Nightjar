@@ -1090,7 +1090,24 @@ function App() {
                 console.log('[App] No valid session, showing identity selector');
                 setShowIdentitySelector(true);
             } else {
-                console.log('[App] Valid session exists');
+                // Session is valid - try to get the unlocked identity
+                const unlocked = identityManager.getUnlockedIdentity();
+                if (unlocked) {
+                    console.log('[App] Valid session with unlocked identity:', unlocked.metadata?.handle);
+                    // Update user profile from unlocked identity
+                    if (unlocked.identityData) {
+                        setUserProfile({
+                            name: unlocked.identityData.handle || 'Anonymous',
+                            icon: unlocked.identityData.icon || '😊',
+                            color: unlocked.identityData.color || '#6366f1',
+                        });
+                    }
+                } else {
+                    // Session valid but failed to decrypt - session may be stale
+                    console.warn('[App] Valid session but no unlocked identity, clearing session');
+                    identityManager.clearSession();
+                    setShowIdentitySelector(true);
+                }
             }
         } else if (userIdentity) {
             // Have legacy identity but not in new system - trigger migration
@@ -1356,7 +1373,7 @@ function App() {
                                 alt="Nightjar" 
                             />
                         </div>
-                        <h2>Welcome to Nahma</h2>
+                        <h2>Welcome to Nightjar</h2>
                         <p>Secure P2P Collaboration. Create a workspace or join an existing one.</p>
                         <div className="create-buttons">
                             <button className="btn-create primary" onClick={() => {

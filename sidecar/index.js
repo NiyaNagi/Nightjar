@@ -721,6 +721,12 @@ async function loadWorkspaceList() {
     const currentIdentity = identity.loadIdentity();
     const currentPublicKey = currentIdentity?.publicKeyBase62;
     
+    // SECURITY: If no identity is loaded, return empty list to prevent data exposure
+    if (!currentIdentity || !currentPublicKey) {
+        console.log('[Sidecar] No identity loaded - returning empty workspace list for security');
+        return [];
+    }
+    
     const workspaces = [];
     console.log('[Sidecar] Loading workspace list...');
     console.log('[Sidecar] Current identity public key:', currentPublicKey);
