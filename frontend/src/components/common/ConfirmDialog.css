@@ -125,10 +125,10 @@
 }
 
 [data-theme="light"] .confirm-dialog__btn--cancel {
-    background: rgba(0, 0, 0, 0.05);
-    color: #1a1a1a;
+    background: #374151;
+    color: #ffffff;
 }
 
 [data-theme="light"] .confirm-dialog__btn--cancel:hover {
-    background: rgba(0, 0, 0, 0.1);
+    background: #4b5563;
 }
