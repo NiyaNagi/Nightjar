@@ -142,6 +142,14 @@ const getDoc = (roomName) => {
 
 // --- Main Application Lifecycle ---
 function createWindow() {
+    // Prevent duplicate window creation
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log('[Main] Window already exists, focusing instead of creating');
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+        return;
+    }
+    
     mainWindow = new BrowserWindow({
         width: 1600,
         height: 1000,

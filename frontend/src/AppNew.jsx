@@ -369,6 +369,9 @@ function App() {
         console.log('[App] Identity selected:', metadata?.handle);
         setShowIdentitySelector(false);
         
+        // Clear locked state since identity is now selected/unlocked
+        setIsLocked(false);
+        
         // Update user profile with selected identity
         if (identityData) {
             setUserProfile({
@@ -379,7 +382,7 @@ function App() {
         }
         
         showToast(`Signed in as ${metadata?.handle || 'User'}`, 'success');
-    }, [showToast]);
+    }, [showToast, setIsLocked]);
     
     const handleNeedsMigration = useCallback(() => {
         // Legacy identity detected, need to migrate
