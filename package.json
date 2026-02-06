@@ -62,7 +62,12 @@
     "test:e2e:debug": "cross-env PWDEBUG=1 node tests/e2e/run-e2e.js",
     "test:e2e:ui": "npx playwright test --config tests/e2e/playwright.config.js --ui",
     "test:e2e:report": "npx playwright show-report playwright-report",
-    "test:e2e:cross-platform": "node tests/e2e/run-e2e.js -- tests/e2e/specs/04-cross-platform.spec.js"
+    "test:e2e:cross-platform": "node tests/e2e/run-e2e.js -- tests/e2e/specs/04-cross-platform.spec.js",
+    "version:sync": "node scripts/sync-version.js",
+    "version:bump:patch": "node scripts/sync-version.js --bump patch",
+    "version:bump:minor": "node scripts/sync-version.js --bump minor",
+    "version:bump:major": "node scripts/sync-version.js --bump major",
+    "prerelease": "node scripts/sync-version.js --from-git"
   },
   "build": {
     "appId": "com.nightjarx.Nightjar",

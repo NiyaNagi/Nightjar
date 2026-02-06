@@ -97,7 +97,25 @@ npm run build            # Build frontend
 npm run package:win      # Package Windows installer
 npm run package:mac      # Package macOS DMG
 npm run package:linux    # Package Linux AppImage
+
+# Version Management
+npm run version:bump:patch   # 1.3.1 → 1.3.2
+npm run version:bump:minor   # 1.3.1 → 1.4.0  
+npm run version:bump:major   # 1.3.1 → 2.0.0
+npm run version:sync -- --tag v1.3.2  # Sync from specific tag
 ```
+
+## Version Management
+
+**Single source of truth**: `package.json` version field
+
+The version is automatically read by:
+- `src/main.js` → `global.APP_VERSION`
+- `src/preload.js` → `electronAPI.appVersion`
+- `sidecar/mesh-constants.js` → `getAppVersion()`
+- `electron-builder` → installer filename
+
+**GitHub Actions**: When pushing a version tag (e.g., `v1.3.2`), the CI workflow automatically syncs the version to package.json before building.
 
 ## Security Model
 
