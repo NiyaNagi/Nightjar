@@ -34,11 +34,38 @@ const DEFAULT_LOCK_TIMEOUT_MINUTES = 15;
 const PIN_LENGTH = 6;
 
 /**
+ * Convert base64 to base64url (browser-compatible)
+ */
+function base64ToBase64Url(base64) {
+    return base64
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+/**
+ * Convert base64url to base64 (browser-compatible)
+ */
+function base64UrlToBase64(base64url) {
+    let base64 = base64url
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+    // Add padding if needed
+    const padding = base64.length % 4;
+    if (padding) {
+        base64 += '='.repeat(4 - padding);
+    }
+    return base64;
+}
+
+/**
  * Generate a random identity ID (8 bytes as base64url)
  */
 function generateIdentityId() {
     const bytes = nacl.randomBytes(8);
-    return Buffer.from(bytes).toString('base64url');
+    // Use base64 and convert to base64url for browser compatibility
+    const base64 = Buffer.from(bytes).toString('base64');
+    return base64ToBase64Url(base64);
 }
 
 /**
