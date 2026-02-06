@@ -1,6 +1,6 @@
 {
   "name": "nightjar",
-  "version": "1.2.18",
+  "version": "1.3.1",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
   "author": {
@@ -81,6 +81,18 @@
       "backend/**/*",
       "tor/**/*",
       "package.json"
+    ],
+    "asarUnpack": [
+      "sidecar/**/*",
+      "backend/**/*",
+      "node_modules/level/**/*",
+      "node_modules/classic-level/**/*",
+      "node_modules/leveldown/**/*",
+      "node_modules/sodium-native/**/*",
+      "node_modules/hyperswarm/**/*",
+      "node_modules/hypercore-crypto/**/*",
+      "node_modules/sodium-universal/**/*",
+      "node_modules/**/*.node"
     ],
     "extraResources": [
       {

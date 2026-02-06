@@ -653,6 +653,26 @@ async function startBackendWithLoadingScreen() {
             try {
                 const resourcesContents = fs.readdirSync(process.resourcesPath);
                 console.log(`[Backend] Win: resources contents: ${resourcesContents.join(', ')}`);
+                
+                // Check if app.asar.unpacked exists
+                const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked');
+                if (fs.existsSync(unpackedPath)) {
+                    const unpackedContents = fs.readdirSync(unpackedPath);
+                    console.log(`[Backend] Win: app.asar.unpacked contents: ${unpackedContents.join(', ')}`);
+                    
+                    // Check if sidecar folder exists inside unpacked
+                    const sidecarFolder = path.join(unpackedPath, 'sidecar');
+                    if (fs.existsSync(sidecarFolder)) {
+                        const sidecarFiles = fs.readdirSync(sidecarFolder).slice(0, 10);
+                        console.log(`[Backend] Win: sidecar folder contents: ${sidecarFiles.join(', ')}`);
+                    } else {
+                        console.error(`[Backend] Win: sidecar folder NOT FOUND at ${sidecarFolder}`);
+                        console.error(`[Backend] Win: This means asarUnpack config is missing or incorrect`);
+                    }
+                } else {
+                    console.error(`[Backend] Win: app.asar.unpacked NOT FOUND at ${unpackedPath}`);
+                    console.error(`[Backend] Win: Files are still inside ASAR - need to rebuild with asarUnpack config`);
+                }
             } catch (e) {
                 console.error(`[Backend] Win: Failed to list resources: ${e.message}`);
             }
