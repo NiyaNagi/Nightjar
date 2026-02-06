@@ -24,51 +24,50 @@
 .nightjar-mascot--large {
     width: 100%;
     max-width: 500px;
+    /* Fixed height container to prevent layout shift */
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end; /* Anchor content to bottom */
 }
 
 .nightjar-mascot--large .nightjar-mascot__bird {
     width: 200px;
     height: 200px;
     object-fit: contain;
+    flex-shrink: 0; /* Bird never shrinks */
 }
 
-/* Large mode: bubble ABOVE bird, arrow pointing DOWN */
+/* Large mode: bubble ABOVE bird with curved tail pointing to beak */
 .nightjar-mascot--large .nightjar-mascot__bubble {
     position: relative;
     max-width: 320px;
     min-width: 200px;
     padding: 16px 24px;
-    margin-bottom: 16px;
+    margin-bottom: 24px; /* Space for curved tail */
     order: -1; /* Put bubble before bird in flex order */
+    flex-shrink: 0;
 }
 
-/* Arrow pointing down (at bottom of bubble) */
+/* Curved speech bubble tail using SVG-like CSS */
 .nightjar-mascot--large .nightjar-mascot__bubble::after {
     content: '';
     position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 12px solid transparent;
-    border-right: 12px solid transparent;
-    border-top: 14px solid var(--text-primary, #e4e4e7);
+    bottom: -20px;
+    right: 30%; /* Position toward bird's beak (right side) */
+    width: 24px;
+    height: 20px;
+    background: var(--bg-secondary, #252538);
+    border-right: 2px solid var(--text-primary, #e4e4e7);
+    border-bottom: 2px solid var(--text-primary, #e4e4e7);
+    border-radius: 0 0 20px 0;
+    transform: skewX(-15deg);
 }
 
+/* Hide the old ::before pseudo-element, use only ::after for curved tail */
 .nightjar-mascot--large .nightjar-mascot__bubble::before {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 10px solid transparent;
-    border-right: 10px solid transparent;
-    border-top: 12px solid var(--bg-secondary, #252538);
-    z-index: 1;
-    margin-top: -2px;
+    display: none;
 }
 
 /* ========== Mini Mode (32x32) ========== */
@@ -205,11 +204,19 @@
         border-color: #1f2937;
     }
     
-    .nightjar-mascot__bubble::after {
+    /* Curved tail for large mode */
+    .nightjar-mascot--large .nightjar-mascot__bubble::after {
+        background: #ffffff;
+        border-right-color: #1f2937;
+        border-bottom-color: #1f2937;
+    }
+    
+    /* Mini mode triangle tail */
+    .nightjar-mascot--mini .nightjar-mascot__bubble::after {
         border-top-color: #1f2937 !important;
     }
     
-    .nightjar-mascot__bubble::before {
+    .nightjar-mascot--mini .nightjar-mascot__bubble::before {
         border-top-color: #ffffff !important;
     }
     
@@ -227,11 +234,19 @@
     background: #f3f4f6;
 }
 
-[data-theme="light"] .nightjar-mascot__bubble::after {
+/* Curved tail for large mode in light theme */
+[data-theme="light"] .nightjar-mascot--large .nightjar-mascot__bubble::after {
+    background: #ffffff;
+    border-right-color: #1f2937;
+    border-bottom-color: #1f2937;
+}
+
+/* Mini mode triangle tail in light theme */
+[data-theme="light"] .nightjar-mascot--mini .nightjar-mascot__bubble::after {
     border-top-color: #1f2937 !important;
 }
 
-[data-theme="light"] .nightjar-mascot__bubble::before {
+[data-theme="light"] .nightjar-mascot--mini .nightjar-mascot__bubble::before {
     border-top-color: #ffffff !important;
 }
 
