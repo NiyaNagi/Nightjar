@@ -91,37 +91,29 @@ let relayBridgeEnabled = process.env.NIGHTJAR_RELAY_BRIDGE === 'true'; // Defaul
 // Track if P2P is initialized with identity
 let p2pInitialized = false;
 
-// Dynamically import uint8arrays to handle ES module
-let uint8ArrayFromString = null;
-let uint8arraysLoaded = false;
-
-// Function to load uint8arrays once at startup
-async function loadUint8Arrays() {
-    if (uint8arraysLoaded) return true; // Already loaded
-    
-    try {
-        console.log('[Sidecar] Loading uint8arrays module via dynamic import...');
-        // uint8arrays is an ESM-only module, must use dynamic import
-        const uint8arrays = await import('uint8arrays');
-        uint8ArrayFromString = uint8arrays.fromString;
-        uint8arraysLoaded = true;
-        console.log('[Sidecar] uint8arrays module loaded successfully');
-        return true;
-    } catch (error) {
-        console.error('[Sidecar] Failed to load uint8arrays:', error.message);
-        return false;
+// Native uint8array conversion functions using Node.js Buffer (always available)
+// This replaces the ESM-only 'uint8arrays' package which fails in ASAR builds
+function uint8ArrayFromString(str, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return new Uint8Array(Buffer.from(str, 'base64'));
     }
+    return new Uint8Array(Buffer.from(str, encoding));
 }
 
-// Load uint8arrays module in background (don't block startup)
-loadUint8Arrays().then(loaded => {
-    if (loaded) {
-        console.log(`[Sidecar] uint8arrays loaded in background (${Date.now() - startTime}ms)`);
-    } else {
-        console.warn('[Sidecar] Warning: uint8arrays failed to load, some features may not work');
-        // Don't exit - allow sidecar to continue without this module
+function uint8ArrayToString(arr, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return Buffer.from(arr).toString('base64');
     }
-});
+    return Buffer.from(arr).toString(encoding);
+}
+
+// Mark as always loaded since we use native Buffer
+const uint8arraysLoaded = true;
+
+// Legacy function for backwards compatibility - now a no-op since we use native Buffer
+async function loadUint8Arrays() {
+    return true; // Always available with native Buffer
+}
 
 const path = require('path');
 

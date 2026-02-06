@@ -178,15 +178,42 @@ export function formatDiagnosticReport(report) {
 }
 
 /**
- * Copy diagnostic report to clipboard
+ * Copy diagnostic report to clipboard with fallback for unfocused documents
  */
 export async function copyDiagnosticReportToClipboard() {
     try {
         const report = await generateDiagnosticReport();
         const formatted = formatDiagnosticReport(report);
         
-        await navigator.clipboard.writeText(formatted);
-        return { success: true, size: formatted.length };
+        // Try the modern clipboard API first
+        try {
+            await navigator.clipboard.writeText(formatted);
+            return { success: true, size: formatted.length };
+        } catch (clipboardError) {
+            // Fallback for when document is not focused or clipboard API fails
+            // Use a temporary textarea element
+            const textarea = document.createElement('textarea');
+            textarea.value = formatted;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            
+            try {
+                const success = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (success) {
+                    return { success: true, size: formatted.length };
+                } else {
+                    throw new Error('execCommand copy failed');
+                }
+            } catch (execError) {
+                document.body.removeChild(textarea);
+                throw execError;
+            }
+        }
     } catch (err) {
         console.error('Failed to copy diagnostic report:', err);
         return { success: false, error: err.message };

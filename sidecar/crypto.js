@@ -3,7 +3,22 @@
 // Security-hardened with input validation and constant-time operations.
 
 const nacl = require('tweetnacl');
-const { fromString: uint8ArrayFromString, toString: uint8ArrayToString } = require('uint8arrays');
+
+// Native uint8array conversion functions using Node.js Buffer
+// Replaces the ESM-only 'uint8arrays' package which fails in ASAR builds
+function uint8ArrayFromString(str, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return new Uint8Array(Buffer.from(str, 'base64'));
+    }
+    return new Uint8Array(Buffer.from(str, encoding));
+}
+
+function uint8ArrayToString(arr, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return Buffer.from(arr).toString('base64');
+    }
+    return Buffer.from(arr).toString(encoding);
+}
 
 const PADDING_BLOCK_SIZE = 4096; // As specified in the design document
 const MIN_PACKED_LENGTH = nacl.secretbox.nonceLength + nacl.secretbox.overheadLength + 4;
