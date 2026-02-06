@@ -291,6 +291,13 @@ function App() {
                 const success = await createIdentity(identity);
                 
                 if (success) {
+                    // Clear legacy identity keys to prevent re-migration
+                    // These are checked by needsMigration() and would cause a loop
+                    localStorage.removeItem('identity');
+                    localStorage.removeItem('Nightjar-identity');
+                    localStorage.removeItem('Nightjar_secure_identity');
+                    console.log('[App] Cleared legacy identity keys');
+                    
                     if (hadLocalData || needsMigration) {
                         showToast(`Welcome back, ${identity.handle}! 🔓`, 'success');
                     } else {

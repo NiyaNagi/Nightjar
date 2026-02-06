@@ -346,6 +346,11 @@ export async function createIdentity(identityData, pin) {
     identities.push(metadata);
     saveIdentities(identities);
     
+    // Clear legacy identity keys to prevent re-migration
+    localStorage.removeItem('identity');
+    localStorage.removeItem('Nightjar-identity');
+    localStorage.removeItem('Nightjar_secure_identity');
+    
     // Set as active and create session
     setActiveIdentityId(id);
     createSession(id, encryptionKey);
