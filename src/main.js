@@ -51,9 +51,17 @@ app.commandLine.appendSwitch('disable-dev-shm-usage');
 app.commandLine.appendSwitch('use-gl', 'swiftshader');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
-// Dynamically import electron-is-dev and uint8arrays to handle ES modules
+// Dynamically import electron-is-dev to handle ES modules
 let isDev = false; // Default to prod mode (safer)
-let uint8ArrayFromString;
+
+// Native uint8array conversion using Node.js Buffer (always available)
+// Replaces the ESM-only 'uint8arrays' package which fails in ASAR builds
+function uint8ArrayFromString(str, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return new Uint8Array(Buffer.from(str, 'base64'));
+    }
+    return new Uint8Array(Buffer.from(str, encoding));
+}
 
 // --- Global State ---
 let mainWindow;
@@ -247,17 +255,6 @@ app.on('ready', async () => {
         console.error('[Main] Full error:', e);
         isDev = !app.isPackaged;
         console.log('[Main] Using fallback isDev check:', isDev);
-    }
-    
-    try {
-        console.log('[Main] Importing uint8arrays...');
-        const uint8arrays = await import('uint8arrays');
-        uint8ArrayFromString = uint8arrays.fromString;
-        console.log('[Main] uint8arrays loaded');
-    } catch (e) {
-        console.error('[Main] Failed to import uint8arrays:', e.message);
-        console.error('[Main] Full error:', e);
-        // This is critical, so we'll try to continue without it
     }
     
     console.log('[Main] Modules loaded, starting backend...');

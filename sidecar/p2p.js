@@ -10,8 +10,22 @@ const { noise } = require('@chainsafe/libp2p-noise');
 const { mplex } = require('@libp2p/mplex');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { gossipsub } = require('@libp2p/gossipsub');
-const { fromString: uint8ArrayFromString } = require('uint8arrays/from-string');
-const { toString: uint8ArrayToString } = require('uint8arrays/to-string');
+
+// Native uint8array conversion functions using Node.js Buffer
+// Replaces the ESM-only 'uint8arrays' package which fails in ASAR builds
+function uint8ArrayFromString(str, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return new Uint8Array(Buffer.from(str, 'base64'));
+    }
+    return new Uint8Array(Buffer.from(str, encoding));
+}
+
+function uint8ArrayToString(arr, encoding = 'utf8') {
+    if (encoding === 'base64') {
+        return Buffer.from(arr).toString('base64');
+    }
+    return Buffer.from(arr).toString(encoding);
+}
 
 // The design doc specifies using a SOCKS5 proxy for all TCP traffic to route it through Tor.
 const torAgent = new SocksProxyAgent('socks5h://127.0.0.1:9050');
