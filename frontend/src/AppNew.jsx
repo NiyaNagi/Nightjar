@@ -263,6 +263,7 @@ function App() {
     const [showIdentitySelector, setShowIdentitySelector] = useState(false); // Identity selector for multiple identities
     const [needsMigration, setNeedsMigration] = useState(false); // Migration needed for legacy identity
     const [legacyIdentity, setLegacyIdentity] = useState(null); // Legacy identity data for migration
+    const [startupComplete, setStartupComplete] = useState(false); // Track if startup identity check is complete
 
     // --- Auto-Lock Hook ---
     const { isLocked, setIsLocked, unlock: unlockApp } = useAutoLock();
@@ -1055,6 +1056,7 @@ function App() {
         if (identityManager.needsMigration()) {
             console.log('[App] Migration needed for legacy identity');
             handleNeedsMigration();
+            setStartupComplete(true);
             return;
         }
         
@@ -1084,19 +1086,11 @@ function App() {
             setNeedsMigration(true);
         }
         // If no identities at all, IdentityContext will handle showing onboarding via needsOnboarding
+        setStartupComplete(true);
     }, [identityLoading, handleNeedsMigration, userIdentity, userProfile]);
     
-    // Show lock screen if app is locked
-    if (isLocked && !showIdentitySelector) {
-        return (
-            <LockScreen
-                onUnlock={handleLockScreenUnlock}
-                onSwitchIdentity={handleSwitchIdentity}
-            />
-        );
-    }
-    
-    // Show identity selector
+    // Show identity selector first (takes priority over lock screen to avoid double unlock)
+    // This handles both: locked session + multiple identities
     if (showIdentitySelector) {
         return (
             <IdentitySelector
@@ -1106,6 +1100,17 @@ function App() {
                     // Continue to onboarding
                 }}
                 onNeedsMigration={handleNeedsMigration}
+            />
+        );
+    }
+    
+    // Show lock screen if app is locked during use (NOT on startup - startup uses IdentitySelector)
+    // Only show after startup check is complete to avoid flashing LockScreen before IdentitySelector
+    if (isLocked && startupComplete) {
+        return (
+            <LockScreen
+                onUnlock={handleLockScreenUnlock}
+                onSwitchIdentity={handleSwitchIdentity}
             />
         );
     }
@@ -1122,7 +1127,9 @@ function App() {
     }
     
     // Show onboarding if identity doesn't exist and not loading
-    if (needsOnboarding && !userIdentity && !identityLoading) {
+    // Also check the new identity manager - if we have identities there, skip onboarding
+    const hasNewSystemIdentities = identityManager.listIdentities().length > 0;
+    if (needsOnboarding && !userIdentity && !identityLoading && !hasNewSystemIdentities) {
         return <OnboardingFlow onComplete={handleOnboardingComplete} />;
     }
     

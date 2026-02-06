@@ -23,7 +23,8 @@ async function loadSayings() {
     if (sayingsCache) return sayingsCache;
     if (sayingsPromise) return sayingsPromise;
     
-    sayingsPromise = fetch('/assets/nightjar-sayings.md')
+    // Use relative path for Electron file:// protocol compatibility
+    sayingsPromise = fetch('./assets/nightjar-sayings.md')
         .then(res => res.text())
         .then(text => {
             // Parse markdown - only keep lines that aren't headers, comments, or empty

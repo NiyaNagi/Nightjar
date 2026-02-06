@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import secureStorage from '../utils/secureStorage';
 import { secureError, secureLog } from '../utils/secureLogger';
+import identityManager from '../utils/identityManager';
 
 const IdentityContext = createContext(null);
 
@@ -36,7 +37,18 @@ export function IdentityProvider({ children }) {
         setError(null);
         
         try {
-            // Check if running in Electron with IPC
+            // First check the new multi-identity system
+            const newSystemIdentities = identityManager.listIdentities();
+            if (newSystemIdentities.length > 0) {
+                // Have identities in new system - don't need onboarding
+                // The actual unlock will be handled by IdentitySelector in AppNew.jsx
+                setHasExistingIdentity(true);
+                setNeedsOnboarding(false);
+                setLoading(false);
+                return;
+            }
+            
+            // Check if running in Electron with IPC (legacy system)
             if (window.electronAPI?.identity) {
                 const exists = await window.electronAPI.identity.has();
                 setHasExistingIdentity(exists);
