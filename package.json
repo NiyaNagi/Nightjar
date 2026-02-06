@@ -1,6 +1,6 @@
 {
   "name": "nightjar",
-  "version": "1.2.12",
+  "version": "1.2.13",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
   "author": {
@@ -23,8 +23,10 @@
     "test:p2p:network": "node tests/test-p2p-networking.js",
     "test:ip": "node tests/test-ip-detection.js",
     "build": "vite build",
-    "package": "npm run build && electron-builder",
-    "package:win": "npm run build && electron-builder --win",
+    "package": "npm run build && electron-builder --dir",
+    "package:win": "npm run build && electron-builder --win --dir",
+    "package:win:full": "npm run build && electron-builder --win",
+    "package:win:ci": "npm run build && electron-builder --win",
     "package:mac": "npm run build && electron-builder --mac",
     "package:linux": "npm run build && electron-builder --linux",
     "postinstall": "node scripts/setup-tor.js && electron-builder install-app-deps",
@@ -66,8 +68,14 @@
     "appId": "com.nightjarx.Nightjar",
     "productName": "Nightjar",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
+    "electronVersion": "30.0.1",
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "asar": false,
+    "compression": "store",
     "files": [
       "frontend/dist/**/*",
       "src/**/*",
@@ -75,11 +83,6 @@
       "backend/**/*",
       "tor/**/*",
       "package.json",
-      "node_modules/**/*"
-    ],
-    "asarUnpack": [
-      "sidecar/**/*",
-      "backend/**/*",
       "node_modules/**/*"
     ],
     "extraResources": [
