@@ -327,8 +327,29 @@ export function WorkspaceProvider({ children }) {
     let retryCount = 0;
     const maxRetries = 10;
     const baseDelay = 500; // Start with 500ms delay
+    let sidecarUnavailable = false; // Track if sidecar appears to be completely unavailable
     
     const connectToSidecar = () => {
+      // If sidecar has been determined unavailable, fall back to web mode
+      if (sidecarUnavailable) {
+        secureLog('[WorkspaceContext] Sidecar unavailable, falling back to web mode');
+        // Load from localStorage as fallback
+        try {
+          const stored = localStorage.getItem('nahma-workspaces');
+          const storedWorkspaces = stored ? JSON.parse(stored) : [];
+          setWorkspaces(storedWorkspaces);
+          if (storedWorkspaces.length > 0) {
+            const lastWorkspaceId = localStorage.getItem('nahma-current-workspace');
+            setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
+          }
+        } catch (e) {
+          secureError('[WorkspaceContext] Failed to load fallback:', e);
+        }
+        setLoading(false);
+        setConnected(true); // Mark as "connected" in offline mode
+        return;
+      }
+      
       try {
         const ws = new WebSocket('ws://localhost:8081');
         
@@ -365,8 +386,10 @@ export function WorkspaceProvider({ children }) {
           secureLog('[WorkspaceContext] Disconnected from sidecar');
           setConnected(false);
           
-          // Attempt reconnection after delay
-          setTimeout(connectToSidecar, 3000);
+          // Only attempt reconnection if sidecar was previously working
+          if (!sidecarUnavailable) {
+            setTimeout(connectToSidecar, 3000);
+          }
         };
         
         ws.onerror = (error) => {
@@ -380,6 +403,11 @@ export function WorkspaceProvider({ children }) {
             const delay = Math.min(baseDelay * Math.pow(1.5, retryCount), 5000);
             secureLog(`[WorkspaceContext] Sidecar not ready, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
             setTimeout(connectToSidecar, delay);
+          } else {
+            // Max retries reached - sidecar is unavailable
+            secureError('[WorkspaceContext] Sidecar unavailable after max retries, falling back to web mode');
+            sidecarUnavailable = true;
+            connectToSidecar(); // This will now trigger fallback
           }
         };
         
