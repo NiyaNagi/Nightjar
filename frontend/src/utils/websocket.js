@@ -54,13 +54,24 @@ export function getYjsWebSocketUrl(serverUrl = null) {
     
     // If a remote serverUrl is provided, use it (cross-platform sharing)
     if (serverUrl) {
-        // Convert http(s) URL to ws(s) URL
-        const wsUrl = serverUrl
-            .replace(/^https:/, 'wss:')
-            .replace(/^http:/, 'ws:');
-        url = wsUrl;
-        console.log(`[WebSocket] getYjsWebSocketUrl(serverUrl: ${serverUrl}) => ${url} (remote workspace)`);
-        return url;
+        // Validate the URL scheme - reject file:// and other invalid schemes
+        const lowerUrl = serverUrl.toLowerCase();
+        if (lowerUrl.startsWith('file:')) {
+            console.warn(`[WebSocket] Invalid serverUrl: file:// protocol cannot be used for WebSocket connections. Using local server.`);
+            // Fall through to use local server instead
+        } else if (lowerUrl.startsWith('ws:') || lowerUrl.startsWith('wss:') || 
+                   lowerUrl.startsWith('http:') || lowerUrl.startsWith('https:')) {
+            // Convert http(s) URL to ws(s) URL
+            const wsUrl = serverUrl
+                .replace(/^https:/i, 'wss:')
+                .replace(/^http:/i, 'ws:');
+            url = wsUrl;
+            console.log(`[WebSocket] getYjsWebSocketUrl(serverUrl: ${serverUrl}) => ${url} (remote workspace)`);
+            return url;
+        } else {
+            console.warn(`[WebSocket] Invalid serverUrl protocol: ${serverUrl}. Using local server.`);
+            // Fall through to use local server instead
+        }
     }
     
     // Check for mobile relay preference (non-Electron mode)
@@ -83,9 +94,18 @@ export function getYjsWebSocketUrl(serverUrl = null) {
     if (isElectronMode) {
         url = `ws://localhost:${YJS_WS_PORT}`;
     } else {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host || `localhost:${WEB_SERVER_PORT}`;
-        url = `${protocol}//${host}`;
+        // Check if we're in a file:// context (Electron with failed preload)
+        // This is a fallback - normally isElectron() would be true
+        const protocol = window.location.protocol;
+        if (protocol === 'file:') {
+            // We're likely in Electron but preload failed - use local sidecar
+            console.warn('[WebSocket] Detected file:// protocol but isElectron=false. Using local sidecar as fallback.');
+            url = `ws://localhost:${YJS_WS_PORT}`;
+        } else {
+            const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host || `localhost:${WEB_SERVER_PORT}`;
+            url = `${wsProtocol}//${host}`;
+        }
     }
     console.log(`[WebSocket] getYjsWebSocketUrl() => ${url} (isElectron: ${isElectronMode})`);
     return url;

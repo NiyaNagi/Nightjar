@@ -85,13 +85,27 @@ export default function WorkspaceSettings({
   const modalRef = useRef(null);
   
   // Auto-detect relay from current server
+  // Returns empty string for Electron (dev or production) - uses Hyperswarm DHT, not relays
+  // In browser mode, returns ws/wss URL based on hosting server
   const autoDetectedRelay = React.useMemo(() => {
+    // Electron mode (dev or production) - no relay needed, uses P2P
+    if (isElectron()) {
+      return '';
+    }
+    // Browser mode - use bootstrap relay nodes if available
     if (BOOTSTRAP_RELAY_NODES.length > 0) {
       return BOOTSTRAP_RELAY_NODES[0];
     }
+    // Fallback: convert current origin to WebSocket URL
     if (typeof window !== 'undefined' && window.location.origin) {
+      const protocol = window.location.protocol;
       const origin = window.location.origin;
-      return origin.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+      if (protocol === 'https:') {
+        return origin.replace(/^https:/, 'wss:');
+      }
+      if (protocol === 'http:') {
+        return origin.replace(/^http:/, 'ws:');
+      }
     }
     return '';
   }, []);

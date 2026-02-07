@@ -916,6 +916,12 @@ async function startBackend() {
 }
 
 // --- IPC Handlers ---
+
+// Synchronous handler for app version (needed by preload script at startup)
+ipcMain.on('get-app-version', (event) => {
+    event.returnValue = app.getVersion();
+});
+
 ipcMain.on('set-key', async (event, keyPayload) => {
     if (!validateSender(event)) {
         console.warn('[Security] Rejected IPC from unknown sender');

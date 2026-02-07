@@ -9,10 +9,27 @@ import { useMemo } from 'react';
 
 /**
  * Check if running in Electron
+ * Uses multiple detection methods for resilience:
+ * 1. window.electronAPI (primary - set by preload script)
+ * 2. userAgent contains "Electron" (fallback if preload failed)
+ * 3. file:// protocol (fallback - only Electron uses file://)
  * @returns {boolean}
  */
 export function isElectron() {
-    return typeof window !== 'undefined' && !!window.electronAPI;
+    // Primary check: electronAPI exposed by preload script
+    const hasElectronAPI = typeof window !== 'undefined' && !!window.electronAPI;
+    
+    // Fallback check: userAgent contains Electron
+    const hasElectronUA = typeof navigator !== 'undefined' && 
+        /electron/i.test(navigator.userAgent);
+    
+    // Fallback check: file:// protocol (only used in Electron production builds)
+    const hasFileProtocol = typeof window !== 'undefined' && 
+        window.location?.protocol === 'file:';
+    
+    // Use electronAPI if available, otherwise fall back to UA/protocol detection
+    // This ensures the app still works even if preload fails
+    return hasElectronAPI || hasElectronUA || hasFileProtocol;
 }
 
 /**

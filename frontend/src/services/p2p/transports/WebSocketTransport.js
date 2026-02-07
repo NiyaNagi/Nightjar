@@ -48,10 +48,25 @@ export class WebSocketTransport extends BaseTransport {
       this.serverSocket = null;
     }
 
+    // Validate URL scheme - must be ws, wss, http, or https (not file://)
+    if (!url || typeof url !== 'string') {
+      throw new Error('Invalid server URL: URL is required');
+    }
+    
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.startsWith('file:')) {
+      throw new Error('Invalid server URL: file:// protocol cannot be used for WebSocket connections');
+    }
+    
+    if (!lowerUrl.startsWith('ws:') && !lowerUrl.startsWith('wss:') && 
+        !lowerUrl.startsWith('http:') && !lowerUrl.startsWith('https:')) {
+      throw new Error(`Invalid server URL: unsupported protocol in "${url}"`);
+    }
+
     return new Promise((resolve, reject) => {
       try {
         // Convert http(s) to ws(s) if needed
-        const wsUrl = url.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+        const wsUrl = url.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
         const ws = new WebSocket(wsUrl);
         this.serverUrl = wsUrl;
         

@@ -1,37 +1,21 @@
 // src/preload.js
+// NOTE: In sandboxed preload scripts, Node.js built-in modules (path, fs) are NOT available.
+// Only 'electron' modules (contextBridge, ipcRenderer) can be required.
 const { contextBridge, ipcRenderer } = require('electron');
-const path = require('path');
-const fs = require('fs');
 
-// Read version directly from package.json since preload runs in separate context from main
-function getAppVersion() {
-    try {
-        // Try multiple possible locations for package.json
-        const possiblePaths = [
-            path.join(__dirname, '..', 'package.json'),  // Development
-            path.join(__dirname, '..', '..', 'package.json'),  // Packaged (inside app.asar)
-            path.join(process.resourcesPath || '', 'app.asar', 'package.json'),  // Alternative packaged path
-        ];
-        
-        for (const pkgPath of possiblePaths) {
-            try {
-                if (fs.existsSync(pkgPath)) {
-                    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-                    if (pkg.version) {
-                        return pkg.version;
-                    }
-                }
-            } catch (e) {
-                // Try next path
-            }
-        }
-    } catch (e) {
-        console.warn('[Preload] Could not read version from package.json:', e.message);
-    }
-    return '1.0.0';
+console.log('[Preload] Script starting...');
+
+// Get version from main process via IPC (synchronous for simplicity at startup)
+// The main process sets this via app.getVersion()
+let appVersion = '1.0.0';
+try {
+    appVersion = ipcRenderer.sendSync('get-app-version') || '1.0.0';
+} catch (e) {
+    console.warn('[Preload] Could not get app version:', e.message);
 }
 
-const appVersion = getAppVersion();
+console.log('[Preload] App version:', appVersion);
+console.log('[Preload] Exposing electronAPI to window...');
 
 // We are exposing a controlled API to the frontend (renderer process)
 // instead of giving it full access to Node.js APIs.
@@ -111,3 +95,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeAllListeners('protocol-link');
     }
 });
+
+console.log('[Preload] electronAPI exposed successfully!');

@@ -33,6 +33,7 @@
 
 import { secureError, secureWarn } from './secureLogger';
 import { signData, verifySignature, uint8ToBase62, base62ToUint8 } from './identity';
+import { isElectron } from '../hooks/useEnvironment';
 
 // Import types for reference
 // import type { EntityType, Permission, EntityTypeCode, PermissionCode } from '../types/workspace';
@@ -479,7 +480,17 @@ export function parseShareLink(link) {
       meshRelays = param.slice(6).split(',').map(r => decodeURIComponent(r)).filter(Boolean);
     } else if (param.startsWith('srv:')) {
       // Sync server URL (for cross-platform workspace joining)
-      serverUrl = decodeURIComponent(param.slice(4));
+      const rawServerUrl = decodeURIComponent(param.slice(4));
+      // Validate the URL scheme - reject file:// and other invalid schemes
+      const lowerUrl = rawServerUrl.toLowerCase();
+      if (lowerUrl.startsWith('ws:') || lowerUrl.startsWith('wss:') || 
+          lowerUrl.startsWith('http:') || lowerUrl.startsWith('https:')) {
+        serverUrl = rawServerUrl;
+      } else {
+        // Invalid scheme (e.g., file://) - ignore this serverUrl
+        console.warn(`[Sharing] Ignoring invalid serverUrl in share link: ${rawServerUrl}`);
+        serverUrl = null;
+      }
     } else if (param.startsWith('topic:')) {
       // Hyperswarm topic for P2P discovery
       // This is used to find peers via DHT
@@ -1436,15 +1447,17 @@ function getBootstrapRelayNodes() {
     return []; // Server-side, no relay needed
   }
   
-  const protocol = window.location.protocol;
-  const host = window.location.hostname;
-  
-  // Electron production (file:// protocol) - use Hyperswarm DHT, no relay
-  if (protocol === 'file:') {
+  // Electron mode (dev or production) - use Hyperswarm DHT, no relay needed
+  // This check works in both dev mode (http://127.0.0.1:5174) and production (file://)
+  // because isElectron() checks for window.electronAPI which is set by preload.js
+  if (isElectron()) {
     return [];
   }
   
-  // Development mode - use local unified server
+  const protocol = window.location.protocol;
+  const host = window.location.hostname;
+  
+  // Pure web development mode (no Electron) - use local unified server
   if (host === 'localhost' || host === '127.0.0.1') {
     return ['ws://localhost:3000'];
   }
