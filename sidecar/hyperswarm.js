@@ -597,11 +597,23 @@ class HyperswarmManager extends EventEmitter {
           for (const topicHex of this.topics.keys()) {
             this._sendPeerListToPeer(peerId, topicHex);
           }
+          
+          // CRITICAL: Also send join-topic messages for all our topics to the new peer
+          // This ensures they know we're in these topics and can request sync from us
+          for (const topicHex of this.topics.keys()) {
+            console.log(`[Hyperswarm] Sending join-topic to ${peerId.slice(0, 16)}... for topic ${topicHex.slice(0, 16)}...`);
+            this._sendMessage(conn.socket, {
+              type: 'join-topic',
+              topic: topicHex
+            });
+          }
           break;
 
         case 'join-topic':
           conn.topics.add(message.topic);
           this.emit('peer-joined', { peerId, topic: message.topic, identity: conn.identity });
+          // When a peer joins our topic, send them our full state
+          this.emit('sync-state-request', { peerId, topic: message.topic });
           break;
 
         case 'leave-topic':
@@ -611,6 +623,18 @@ class HyperswarmManager extends EventEmitter {
 
         case 'sync':
           this.emit('sync-message', { peerId, topic: message.topic, data: message.data });
+          break;
+        
+        case 'sync-request':
+          // Peer is requesting our full state for a topic
+          console.log(`[Hyperswarm] Received sync-request from ${peerId.slice(0, 16)}... for topic ${message.topic?.slice(0, 16)}...`);
+          this.emit('sync-state-request', { peerId, topic: message.topic });
+          break;
+        
+        case 'sync-state':
+          // Peer is sending us their full state (initial sync)
+          console.log(`[Hyperswarm] Received sync-state from ${peerId.slice(0, 16)}... for topic ${message.topic?.slice(0, 16)}...`);
+          this.emit('sync-state-received', { peerId, topic: message.topic, data: message.data });
           break;
 
         case 'awareness':
@@ -834,6 +858,44 @@ class HyperswarmManager extends EventEmitter {
         });
       }
     }
+  }
+
+  /**
+   * Send a sync request to a specific peer asking for their full state
+   * @param {string} peerId - Target peer's public key hex
+   * @param {string} topicHex - Topic to sync
+   */
+  sendSyncRequest(peerId, topicHex) {
+    const conn = this.connections.get(peerId);
+    if (!conn || !conn.socket) {
+      console.warn(`[Hyperswarm] Cannot send sync-request - peer ${peerId.slice(0, 16)}... not connected`);
+      return false;
+    }
+    console.log(`[Hyperswarm] Sending sync-request to ${peerId.slice(0, 16)}... for topic ${topicHex.slice(0, 16)}...`);
+    return this._sendMessage(conn.socket, {
+      type: 'sync-request',
+      topic: topicHex
+    });
+  }
+
+  /**
+   * Send full state to a specific peer (response to sync-request or on join)
+   * @param {string} peerId - Target peer's public key hex
+   * @param {string} topicHex - Topic the state belongs to
+   * @param {string} data - Base64-encoded state data
+   */
+  sendSyncState(peerId, topicHex, data) {
+    const conn = this.connections.get(peerId);
+    if (!conn || !conn.socket) {
+      console.warn(`[Hyperswarm] Cannot send sync-state - peer ${peerId.slice(0, 16)}... not connected`);
+      return false;
+    }
+    console.log(`[Hyperswarm] Sending sync-state to ${peerId.slice(0, 16)}... for topic ${topicHex.slice(0, 16)}... (${data?.length || 0} bytes)`);
+    return this._sendMessage(conn.socket, {
+      type: 'sync-state',
+      topic: topicHex,
+      data: data
+    });
   }
 
   /**
