@@ -12,6 +12,31 @@ const packageJson = require('../package.json');
 // Make version available to preload script
 global.APP_VERSION = packageJson.version;
 
+// Get app icon path for windows
+function getAppIconPath() {
+    if (process.platform === 'win32') {
+        const iconPath = app.isPackaged
+            ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.ico')
+            : path.join(__dirname, '..', 'build', 'icon.ico');
+        // Fallback to non-unpacked location
+        if (!fs.existsSync(iconPath)) {
+            const altPath = app.isPackaged
+                ? path.join(path.dirname(app.getPath('exe')), 'resources', 'icon.ico')
+                : path.join(__dirname, '..', 'build', 'icon.ico');
+            if (fs.existsSync(altPath)) return altPath;
+        }
+        if (fs.existsSync(iconPath)) return iconPath;
+    }
+    return undefined;
+}
+
+const appIconPath = getAppIconPath();
+
+// Set app user model ID for Windows taskbar icon (must match build.appId in package.json)
+if (process.platform === 'win32') {
+    app.setAppUserModelId('com.nightjarx.Nightjar');
+}
+
 // Cache the logo as base64 for the loading screen
 let logoBase64 = '';
 try {
@@ -163,6 +188,7 @@ function createWindow() {
         height: 1000,
         backgroundColor: '#242424',
         show: false, // Don't show until ready
+        icon: appIconPath, // Set window icon for taskbar/title bar
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -522,6 +548,7 @@ async function startBackendWithLoadingScreen() {
             backgroundColor: '#1a1a2e',
             resizable: false,
             show: false,
+            icon: appIconPath, // Set window icon
             webPreferences: {
                 contextIsolation: true,
                 nodeIntegration: false,

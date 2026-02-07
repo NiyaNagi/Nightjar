@@ -83,19 +83,41 @@ const SheetSelectionToolbar = ({
     const applyFormat = (attr, value) => {
         if (!workbookRef?.current || readOnly) return;
         
+        // Validate selection has valid row/column
+        if (!selection?.row || !selection?.column) {
+            console.warn('[SheetToolbar] No valid selection for formatting');
+            return;
+        }
+        
+        const rowStart = selection.row[0];
+        const rowEnd = selection.row[1] ?? rowStart;
+        const colStart = selection.column[0];
+        const colEnd = selection.column[1] ?? colStart;
+        
+        // Ensure we have valid numbers
+        if (rowStart == null || colStart == null) {
+            console.warn('[SheetToolbar] Invalid row/column in selection');
+            return;
+        }
+        
         try {
-            // Fortune Sheet uses setCellFormat or similar API
-            // The exact API depends on Fortune Sheet version
-            if (workbookRef.current.setCellFormat) {
-                workbookRef.current.setCellFormat(attr, value);
-            } else if (workbookRef.current.setRangeFormat) {
-                workbookRef.current.setRangeFormat({
-                    row: selection.row,
-                    column: selection.column,
-                }, attr, value);
+            // Use setCellFormatByRange for range formatting (preferred)
+            if (workbookRef.current.setCellFormatByRange) {
+                workbookRef.current.setCellFormatByRange(attr, value, {
+                    row: [rowStart, rowEnd],
+                    column: [colStart, colEnd],
+                });
+            } else if (workbookRef.current.setCellFormat) {
+                // Fall back to single cell format if range API not available
+                // Apply to each cell in the selection
+                for (let r = rowStart; r <= rowEnd; r++) {
+                    for (let c = colStart; c <= colEnd; c++) {
+                        workbookRef.current.setCellFormat(r, c, attr, value);
+                    }
+                }
             }
         } catch (e) {
-            console.warn('[SheetToolbar] Format API not available:', e.message);
+            console.warn('[SheetToolbar] Format API error:', e.message);
         }
     };
 

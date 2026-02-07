@@ -160,3 +160,61 @@ Build distributable:
 ```bash
 npm run package:win  # or :mac or :linux
 ```
+
+### Command: "release"
+When user says "release", perform the full release process:
+1. Bump version (patch by default, or as specified)
+2. Update version in package.json and package-lock.json
+3. Generate release notes from git commits
+4. Stage and commit all changes with descriptive message
+5. Create git tag for the new version
+6. Push to GitHub with tags
+
+```bash
+npm run version:bump:patch
+npm run release:notes
+git add -A
+git commit -m "chore: release v{version} - {summary}"
+git tag v{version}
+git push origin main --tags
+```
+
+## Pre-Release Checklist
+
+**IMPORTANT**: Before every release build, execute these steps:
+
+1. **Bump version** (choose appropriate level):
+   ```bash
+   npm run version:bump:patch   # Bug fixes only
+   npm run version:bump:minor   # New features
+   npm run version:bump:major   # Breaking changes
+   ```
+
+2. **Generate release notes**:
+   ```bash
+   npm run release:notes
+   ```
+   This creates `RELEASE_NOTES_v{version}.md` from git commit history.
+
+3. **Commit version bump and release notes**:
+   ```bash
+   git add package.json RELEASE_NOTES_*.md
+   git commit -m "chore: bump version to v{version}"
+   ```
+
+4. **Tag the release**:
+   ```bash
+   git tag v{version}
+   git push origin main --tags
+   ```
+
+5. **Build the release**:
+   ```bash
+   npm run package:win:full   # or :mac or :linux
+   ```
+
+6. **Verify the build**:
+   - Version displays correctly in About section
+   - App icon correct in taskbar and title bar
+   - All features working (editor, spreadsheet, P2P)
+

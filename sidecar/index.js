@@ -902,13 +902,78 @@ async function saveWorkspaceMetadata(workspaceId, metadata) {
     }
 }
 
-// Delete workspace metadata
+// Delete workspace metadata AND all associated data (folders, documents, keys)
 async function deleteWorkspaceMetadata(workspaceId) {
     await metadataDbReady;
     
     try {
+        console.log(`[Sidecar] Deleting workspace ${workspaceId} and all associated data...`);
+        
+        // 1. Find and delete all folders in this workspace
+        const foldersToDelete = [];
+        for await (const [key, value] of metadataDb.iterator()) {
+            if (key.startsWith('folder:') && value.workspaceId === workspaceId) {
+                foldersToDelete.push(key);
+            }
+        }
+        
+        // 2. Find and delete all documents in those folders (and workspace)
+        const docsToDelete = [];
+        for await (const [key, value] of metadataDb.iterator()) {
+            if (key.startsWith('doc:')) {
+                // Check if doc belongs to this workspace directly or via folder
+                if (value.workspaceId === workspaceId) {
+                    docsToDelete.push(key);
+                } else if (value.folderId) {
+                    const folderKey = `folder:${value.folderId}`;
+                    if (foldersToDelete.includes(folderKey)) {
+                        docsToDelete.push(key);
+                    }
+                }
+            }
+        }
+        
+        // 3. Delete Yjs document data from main db
+        for (const docKey of docsToDelete) {
+            const docId = docKey.slice(4); // Remove 'doc:' prefix
+            try {
+                // Delete all updates for this document
+                for await (const [key] of db.iterator()) {
+                    if (key.startsWith(`${docId}:`)) {
+                        await db.del(key);
+                    }
+                }
+                console.log(`[Sidecar] Deleted Yjs data for document: ${docId}`);
+            } catch (e) {
+                // Document might not have Yjs data
+            }
+        }
+        
+        // 4. Delete document metadata
+        for (const key of docsToDelete) {
+            await metadataDb.del(key);
+            const docId = key.slice(4);
+            console.log(`[Sidecar] Deleted document metadata: ${docId}`);
+            
+            // Also remove from documentKeys map if present
+            documentKeys.delete(docId);
+        }
+        
+        // 5. Delete folder metadata
+        for (const key of foldersToDelete) {
+            await metadataDb.del(key);
+            console.log(`[Sidecar] Deleted folder: ${key}`);
+        }
+        
+        // 6. Remove workspace-meta encryption key
+        const workspaceMetaDocName = `workspace-meta:${workspaceId}`;
+        documentKeys.delete(workspaceMetaDocName);
+        console.log(`[Sidecar] Removed encryption key for: ${workspaceMetaDocName}`);
+        
+        // 7. Delete workspace metadata itself
         await metadataDb.del(`workspace:${workspaceId}`);
-        console.log(`[Sidecar] Deleted metadata for workspace: ${workspaceId}`);
+        
+        console.log(`[Sidecar] Deleted workspace ${workspaceId}: ${foldersToDelete.length} folders, ${docsToDelete.length} documents`);
     } catch (err) {
         console.error('[Sidecar] Failed to delete workspace metadata:', err);
         throw err;

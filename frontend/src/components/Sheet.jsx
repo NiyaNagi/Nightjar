@@ -726,22 +726,30 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
         // Language - set to English
         lang: 'en',
         
-        // Toolbar customization - exclude comment button (shows Chinese)
+        // Toolbar customization - Fortune Sheet v1.0.3
+        // Full feature set for spreadsheet editing
         toolbarItems: [
-            'undo', 'redo', '|',
-            'format-painter', 'clear-format', '|',
-            'bold', 'italic', 'underline', 'strike-through', '|',
-            'font-color', 'background', 'border', '|',
-            'merge-cell', 'horizontal-align', 'vertical-align', '|',
-            'freeze', 'filter', 'formula', 'screenshot'
+            'undo', 'redo', 'format-painter', 'clear-format', '|',
+            'currency-format', 'percentage-format', 'number-decrease', 'number-increase', 'format', '|',
+            'font', '|',
+            'font-size', '|',
+            'bold', 'italic', 'strike-through', 'underline', '|',
+            'font-color', 'background', 'border', 'merge-cell', '|',
+            'horizontal-align', 'vertical-align', 'text-wrap', 'text-rotation', '|',
+            'freeze', 'sort', 'filter', 'conditionFormat', '|',
+            'link', 'image', '|',
+            'dataVerification', 'splitColumn', '|',
+            'quick-formula', 'screenshot', 'search'
             // Note: 'comment' excluded - we use our own comment system
         ],
         
-        // Context menu customization - remove built-in comment to avoid Chinese text
+        // Context menu customization - full feature set
         cellContextMenu: [
             'copy', 'paste', '|',
-            'insert-row', 'insert-column', 'delete-row', 'delete-column', '|',
-            'clear', 'sort', 'orderAZ', 'orderZA'
+            'insert-row', 'insert-column', 'delete-row', 'delete-column', 'delete-cell', '|',
+            'hide-row', 'hide-column', 'set-row-height', 'set-column-width', '|',
+            'clear', 'sort', 'orderAZ', 'orderZA', 'filter', '|',
+            'image', 'link', 'data', 'cell-format'
         ],
     }), [userHandle, userColor, readOnly]);
 

@@ -7,7 +7,7 @@ import React from 'react';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, copied: false };
   }
 
   static getDerivedStateFromError(error) {
@@ -30,7 +30,46 @@ class ErrorBoundary extends React.Component {
   };
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    this.setState({ hasError: false, error: null, errorInfo: null, copied: false });
+  };
+
+  handleCopyLogs = async () => {
+    const { error, errorInfo } = this.state;
+    
+    // Gather diagnostic info
+    const diagnosticInfo = [
+      '=== Nightjar Error Report ===',
+      `Timestamp: ${new Date().toISOString()}`,
+      `User Agent: ${navigator.userAgent}`,
+      `Platform: ${navigator.platform}`,
+      `URL: ${window.location.href}`,
+      '',
+      '=== Error ===',
+      error?.toString() || 'Unknown error',
+      '',
+      '=== Stack Trace ===',
+      error?.stack || 'No stack trace available',
+      '',
+      '=== Component Stack ===',
+      errorInfo?.componentStack || 'No component stack available',
+    ].join('\n');
+    
+    try {
+      await navigator.clipboard.writeText(diagnosticInfo);
+      this.setState({ copied: true });
+      setTimeout(() => this.setState({ copied: false }), 2000);
+    } catch (e) {
+      console.error('Failed to copy to clipboard:', e);
+      // Fallback: select text in a textarea
+      const textarea = document.createElement('textarea');
+      textarea.value = diagnosticInfo;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      this.setState({ copied: true });
+      setTimeout(() => this.setState({ copied: false }), 2000);
+    }
   };
 
   render() {
@@ -60,7 +99,7 @@ class ErrorBoundary extends React.Component {
               Your data has been saved and you can safely reload.
             </p>
             
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={this.handleReload}
                 style={{
@@ -91,9 +130,25 @@ class ErrorBoundary extends React.Component {
               >
                 Try to Continue
               </button>
+              <button
+                onClick={this.handleCopyLogs}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: this.state.copied ? '#22c55e' : '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                aria-label="Copy diagnostic information to clipboard"
+              >
+                {this.state.copied ? '✓ Copied!' : '📋 Copy Diagnostic Info'}
+              </button>
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {this.state.error && (
               <details style={{
                 marginTop: '32px',
                 textAlign: 'left',
@@ -103,7 +158,7 @@ class ErrorBoundary extends React.Component {
                 border: '1px solid #444',
               }}>
                 <summary style={{ cursor: 'pointer', color: '#ff6b6b', marginBottom: '8px' }}>
-                  Error Details (Development Only)
+                  Error Details
                 </summary>
                 <pre style={{
                   fontSize: '12px',
@@ -111,6 +166,8 @@ class ErrorBoundary extends React.Component {
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                   margin: 0,
+                  maxHeight: '300px',
+                  overflow: 'auto',
                 }}>
                   {this.state.error.toString()}
                   {this.state.errorInfo?.componentStack}

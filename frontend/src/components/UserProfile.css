@@ -318,6 +318,27 @@
     line-height: 1.4;
 }
 
+/* About section links */
+.github-link,
+.version-link,
+.release-notes-link {
+    color: var(--accent-color, #8b5cf6);
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+
+.github-link:hover,
+.version-link:hover,
+.release-notes-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+.github-link svg {
+    vertical-align: middle;
+    margin-left: 4px;
+}
+
 /* Success message */
 .profile-success {
     padding: 8px 12px;

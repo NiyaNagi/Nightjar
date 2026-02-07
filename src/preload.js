@@ -1,11 +1,43 @@
 // src/preload.js
 const { contextBridge, ipcRenderer } = require('electron');
+const path = require('path');
+const fs = require('fs');
+
+// Read version directly from package.json since preload runs in separate context from main
+function getAppVersion() {
+    try {
+        // Try multiple possible locations for package.json
+        const possiblePaths = [
+            path.join(__dirname, '..', 'package.json'),  // Development
+            path.join(__dirname, '..', '..', 'package.json'),  // Packaged (inside app.asar)
+            path.join(process.resourcesPath || '', 'app.asar', 'package.json'),  // Alternative packaged path
+        ];
+        
+        for (const pkgPath of possiblePaths) {
+            try {
+                if (fs.existsSync(pkgPath)) {
+                    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+                    if (pkg.version) {
+                        return pkg.version;
+                    }
+                }
+            } catch (e) {
+                // Try next path
+            }
+        }
+    } catch (e) {
+        console.warn('[Preload] Could not read version from package.json:', e.message);
+    }
+    return '1.0.0';
+}
+
+const appVersion = getAppVersion();
 
 // We are exposing a controlled API to the frontend (renderer process)
 // instead of giving it full access to Node.js APIs.
 contextBridge.exposeInMainWorld('electronAPI', {
     // --- App Info ---
-    appVersion: global.APP_VERSION || '1.0.0',
+    appVersion: appVersion,
     
     // --- Frontend to Backend ---
     setKey: (key) => ipcRenderer.send('set-key', key),
