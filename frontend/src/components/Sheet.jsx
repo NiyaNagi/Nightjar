@@ -792,6 +792,7 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
                     workbookRef={workbookRef}
                     onAddComment={handleToolbarAddComment}
                     readOnly={readOnly}
+                    containerRef={containerRef}
                 />
             )}
             

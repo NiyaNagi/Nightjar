@@ -199,6 +199,37 @@
 /* Sheet Selection Toolbar Styles */
 .sheet-selection-toolbar {
     animation: fadeInUp 0.15s ease-out;
+    transition: all 0.2s ease-out;
+    transform-origin: left center;
+}
+
+/* Collapsed chip state - semi-transparent and compact */
+.sheet-selection-toolbar.collapsed {
+    opacity: 0.6;
+    padding: 4px 8px;
+    background: rgba(26, 26, 46, 0.7);
+    backdrop-filter: blur(8px);
+}
+
+.sheet-selection-toolbar.collapsed:hover {
+    opacity: 1;
+}
+
+/* Expanded state - full opacity, slide-out animation */
+.sheet-selection-toolbar.expanded {
+    opacity: 1;
+    animation: slideOutRight 0.2s ease-out forwards;
+}
+
+@keyframes slideOutRight {
+    from {
+        opacity: 0.6;
+        max-width: 80px;
+    }
+    to {
+        opacity: 1;
+        max-width: 600px;
+    }
 }
 
 @keyframes fadeInUp {
