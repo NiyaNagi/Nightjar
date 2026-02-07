@@ -1389,6 +1389,24 @@ async function handleMetadataMessage(ws, parsed) {
                                     console.error(`[Sidecar] âœ— Failed to connect to peer ${peerKey.slice(0, 16)}:`, e.message);
                                 }
                             }
+                            
+                            // Request full state from bootstrap peers (initial sync)
+                            // Wait a short delay for connections to stabilize
+                            const topicForSync = topicHash;
+                            const peersForSync = [...bootstrapPeers];
+                            setTimeout(() => {
+                                if (topicForSync && p2pBridge.hyperswarm) {
+                                    console.log(`[Sidecar] Requesting initial sync from peers...`);
+                                    for (const peerKey of peersForSync) {
+                                        try {
+                                            p2pBridge.hyperswarm.sendSyncRequest(peerKey, topicForSync);
+                                            console.log(`[Sidecar] Sent sync-request to ${peerKey.slice(0, 16)}...`);
+                                        } catch (e) {
+                                            console.error(`[Sidecar] Failed to send sync-request to ${peerKey.slice(0, 16)}:`, e.message);
+                                        }
+                                    }
+                                }
+                            }, 1000); // 1 second delay for connection stabilization
                         } else {
                             console.warn('[Sidecar] âš  No bootstrap peers provided');
                         }
@@ -2157,6 +2175,7 @@ async function initializeMesh() {
 // This bridges Hyperswarm P2P connections with Yjs document sync
 // When a peer sends a sync message, apply it to the local Yjs doc
 // When a local Yjs doc updates, broadcast to P2P peers
+// NEW: When a peer joins, send them our full document state
 
 // Map of topicHash -> workspaceId for reverse lookup
 const topicToWorkspace = new Map();
@@ -2169,15 +2188,133 @@ function setupYjsP2PBridge() {
     
     const hyperswarm = p2pBridge.hyperswarm;
     
-    // Listen for sync messages from P2P peers
+    // Listen for sync messages from P2P peers (incremental updates)
     hyperswarm.on('sync-message', ({ peerId, topic, data }) => {
         handleP2PSyncMessage(peerId, topic, data);
+    });
+    
+    // Listen for sync state requests (peer wants our full state)
+    hyperswarm.on('sync-state-request', ({ peerId, topic }) => {
+        handleSyncStateRequest(peerId, topic);
+    });
+    
+    // Listen for full sync state from peers (initial sync)
+    hyperswarm.on('sync-state-received', ({ peerId, topic, data }) => {
+        handleSyncStateReceived(peerId, topic, data);
     });
     
     console.log('[Sidecar] Yjs P2P bridge initialized');
 }
 
-// Handle incoming sync message from a P2P peer
+// Handle request for our full document state (called when a peer joins or requests sync)
+async function handleSyncStateRequest(peerId, topicHex) {
+    console.log(`[P2P-SYNC-STATE] ========== STATE REQUEST ==========`);
+    console.log(`[P2P-SYNC-STATE] From peer: ${peerId?.slice(0, 16)}...`);
+    console.log(`[P2P-SYNC-STATE] Topic: ${topicHex?.slice(0, 16)}...`);
+    
+    try {
+        // Find the workspace ID for this topic
+        const workspaceId = topicToWorkspace.get(topicHex);
+        if (!workspaceId) {
+            console.warn(`[P2P-SYNC-STATE] ✗ Unknown topic - not registered`);
+            return;
+        }
+        
+        const roomName = `workspace-meta:${workspaceId}`;
+        let doc = docs.get(roomName);
+        
+        // If doc doesn't exist (frontend not connected), try to load from persistence
+        if (!doc) {
+            console.log(`[P2P-SYNC-STATE] Doc not in memory, loading from persistence...`);
+            const key = getKeyForDocument(roomName);
+            if (key) {
+                doc = new Y.Doc();
+                await loadPersistedData(roomName, doc, key);
+                docs.set(roomName, doc);
+                console.log(`[P2P-SYNC-STATE] ✓ Loaded doc from persistence`);
+            } else {
+                console.warn(`[P2P-SYNC-STATE] ✗ Doc not found and no key for: ${roomName}`);
+                return;
+            }
+        }
+        
+        // Encode the full document state as an update
+        const stateUpdate = Y.encodeStateAsUpdate(doc);
+        console.log(`[P2P-SYNC-STATE] Encoding full state: ${stateUpdate.length} bytes`);
+        
+        // Create message with room name
+        const message = {
+            roomName: roomName,
+            update: Buffer.from(stateUpdate).toString('base64')
+        };
+        
+        // Send state to the requesting peer
+        const messageStr = JSON.stringify(message);
+        p2pBridge.hyperswarm.sendSyncState(peerId, topicHex, messageStr);
+        
+        console.log(`[P2P-SYNC-STATE] ✓ Sent full state to ${peerId.slice(0, 16)}...`);
+        console.log(`[P2P-SYNC-STATE] ==========================================`);
+    } catch (err) {
+        console.error(`[P2P-SYNC-STATE] ✗ Error:`, err.message);
+        console.log(`[P2P-SYNC-STATE] ==========================================`);
+    }
+}
+
+// Handle received full document state from a peer (initial sync)
+function handleSyncStateReceived(peerId, topicHex, data) {
+    console.log(`[P2P-SYNC-STATE] ========== STATE RECEIVED ==========`);
+    console.log(`[P2P-SYNC-STATE] From peer: ${peerId?.slice(0, 16)}...`);
+    console.log(`[P2P-SYNC-STATE] Topic: ${topicHex?.slice(0, 16)}...`);
+    console.log(`[P2P-SYNC-STATE] Data length: ${data?.length || 'unknown'}`);
+    
+    try {
+        // Find the workspace ID for this topic
+        const workspaceId = topicToWorkspace.get(topicHex);
+        if (!workspaceId) {
+            console.warn(`[P2P-SYNC-STATE] ✗ Unknown topic - not registered`);
+            return;
+        }
+        
+        // Parse the message
+        let roomName, updateData;
+        try {
+            const message = JSON.parse(data);
+            roomName = message.roomName;
+            updateData = Buffer.from(message.update, 'base64');
+            console.log(`[P2P-SYNC-STATE] ✓ Parsed state for room: ${roomName}, size: ${updateData.length}`);
+        } catch (e) {
+            console.error(`[P2P-SYNC-STATE] ✗ Failed to parse state message:`, e.message);
+            return;
+        }
+        
+        // Get the Yjs doc
+        let doc = docs.get(roomName);
+        if (!doc) {
+            doc = new Y.Doc();
+            docs.set(roomName, doc);
+            console.log(`[P2P-SYNC-STATE] Created new Yjs doc for: ${roomName}`);
+        }
+        
+        // Apply the full state update with 'p2p' origin to prevent re-broadcasting
+        Y.applyUpdate(doc, updateData, 'p2p');
+        
+        console.log(`[P2P-SYNC-STATE] ✓ Applied full state to ${roomName}`);
+        
+        // Also broadcast to local WebSocket clients so they get the sync
+        const wss = require('y-websocket/bin/utils').docs;
+        if (wss) {
+            // The doc is already in the shared docs Map, so local clients will get the update
+            console.log(`[P2P-SYNC-STATE] ✓ Local WebSocket clients will receive the update`);
+        }
+        
+        console.log(`[P2P-SYNC-STATE] ==========================================`);
+    } catch (err) {
+        console.error(`[P2P-SYNC-STATE] ✗ Error:`, err.message);
+        console.log(`[P2P-SYNC-STATE] ==========================================`);
+    }
+}
+
+// Handle incoming sync message from a P2P peer (incremental updates)
 function handleP2PSyncMessage(peerId, topicHex, data) {
     console.log(`[P2P-SYNC] ========== INCOMING MESSAGE ==========`);
     console.log(`[P2P-SYNC] From peer: ${peerId?.slice(0, 16)}...`);
@@ -2787,6 +2924,26 @@ docs.on('doc-added', async (doc, docName) => {
                 console.warn(`[Sidecar] Failed to connect ${docName} to relay:`, err.message);
                 // Non-fatal - P2P mesh will still work
             });
+        }
+        
+        // For workspace-meta docs, add P2P broadcast observer if topic is registered
+        // This handles the case where doc is created AFTER registerWorkspaceTopic() is called (e.g., joiners)
+        if (docName.startsWith('workspace-meta:')) {
+            const workspaceId = docName.replace('workspace-meta:', '');
+            // Find if this workspace has a registered topic
+            for (const [topicHex, wsId] of topicToWorkspace.entries()) {
+                if (wsId === workspaceId) {
+                    console.log(`[Sidecar] Adding deferred P2P observer for ${docName} on topic ${topicHex.slice(0, 16)}...`);
+                    doc.on('update', (update, origin) => {
+                        // Don't re-broadcast updates that came from P2P
+                        if (origin !== 'p2p') {
+                            broadcastYjsUpdate(workspaceId, topicHex, update);
+                        }
+                    });
+                    console.log(`[Sidecar] ✓ Registered deferred P2P observer for ${docName}`);
+                    break;
+                }
+            }
         }
     } catch (err) {
         console.error(`[Sidecar] Error in doc-added handler for ${docName}:`, err);
