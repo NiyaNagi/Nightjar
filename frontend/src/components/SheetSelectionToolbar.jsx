@@ -5,15 +5,17 @@
  * Provides quick access to formatting options and commenting.
  * 
  * Features:
+ * - Collapsed chip state (semi-transparent) by default
+ * - Expands on hover to reveal full toolbar
+ * - Hides when modals are open or focus leaves the spreadsheet
  * - Bold, Italic, Underline, Strikethrough
  * - Text color
  * - Background color
- * - Number format presets
  * - Text alignment
  * - Add comment on selection
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './SelectionToolbar.css';
 
 // Color presets for quick selection
@@ -24,15 +26,19 @@ const COLOR_PRESETS = [
     '#cfe2f3', '#d9d2e9', '#ead1dc', '#c9daf8',
 ];
 
-// Number format presets
-const NUMBER_FORMATS = [
-    { label: 'Auto', format: 'auto' },
-    { label: '123', format: 'number' },
-    { label: '12.34', format: 'decimal' },
-    { label: '$', format: 'currency' },
-    { label: '%', format: 'percent' },
-    { label: 'Date', format: 'date' },
-];
+// Check if any modal overlay is currently visible
+const isModalOpen = () => {
+    // Check for common modal overlay classes used in the app
+    const modalSelectors = [
+        '.kicked-modal-overlay',
+        '.recovery-modal-overlay', 
+        '.join-modal-overlay',
+        '[role="dialog"]',
+        '[role="alertdialog"]',
+        '.modal-overlay',
+    ];
+    return modalSelectors.some(sel => document.querySelector(sel) !== null);
+};
 
 const SheetSelectionToolbar = ({ 
     selection,           // { row: [start, end], column: [start, end], sheetId }
@@ -40,11 +46,96 @@ const SheetSelectionToolbar = ({
     workbookRef,         // Reference to Fortune Sheet workbook
     onAddComment,        // Callback to add comment on selection
     readOnly = false,
+    containerRef,        // Reference to the sheet container for focus tracking
 }) => {
     const [showColorPicker, setShowColorPicker] = useState(null); // 'text' | 'bg' | null
     const [showFormatMenu, setShowFormatMenu] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);          // Collapsed by default
+    const [isHidden, setIsHidden] = useState(false);              // Hidden when modal open or focus lost
     const toolbarRef = useRef(null);
     const colorPickerRef = useRef(null);
+    const hoverTimeoutRef = useRef(null);
+
+    // Check for modal visibility on mount and periodically
+    useEffect(() => {
+        const checkModals = () => {
+            setIsHidden(isModalOpen());
+        };
+        
+        // Check immediately
+        checkModals();
+        
+        // Use MutationObserver to detect modal changes
+        const observer = new MutationObserver(checkModals);
+        observer.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'role']
+        });
+        
+        return () => observer.disconnect();
+    }, []);
+
+    // Track focus to hide toolbar when focus leaves spreadsheet
+    useEffect(() => {
+        const handleFocusOut = (e) => {
+            // Small delay to allow focus to move to new element
+            setTimeout(() => {
+                const activeElement = document.activeElement;
+                const container = containerRef?.current;
+                const toolbar = toolbarRef.current;
+                
+                // Check if focus is within the sheet container or the toolbar itself
+                const focusInContainer = container && container.contains(activeElement);
+                const focusInToolbar = toolbar && toolbar.contains(activeElement);
+                
+                // Also check if focus is in a Fortune Sheet element
+                const focusInSheet = activeElement?.closest('.fortune-sheet-container, .luckysheet-cell-input, .sheet-container');
+                
+                // Hide if focus is completely outside
+                if (!focusInContainer && !focusInToolbar && !focusInSheet) {
+                    setIsHidden(true);
+                }
+            }, 100);
+        };
+        
+        document.addEventListener('focusout', handleFocusOut);
+        return () => document.removeEventListener('focusout', handleFocusOut);
+    }, [containerRef]);
+
+    // Reset hidden state when selection changes
+    useEffect(() => {
+        if (selection && position) {
+            setIsHidden(isModalOpen());
+        }
+    }, [selection, position]);
+
+    // Handle mouse enter/leave for expansion
+    const handleMouseEnter = useCallback(() => {
+        if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+        }
+        setIsExpanded(true);
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
+        // Close color pickers when leaving
+        setShowColorPicker(null);
+        // Small delay before collapsing for better UX
+        hoverTimeoutRef.current = setTimeout(() => {
+            setIsExpanded(false);
+        }, 150);
+    }, []);
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+            }
+        };
+    }, []);
 
     // Close menus when clicking outside
     useEffect(() => {
@@ -60,7 +151,7 @@ const SheetSelectionToolbar = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showFormatMenu]);
 
-    if (!selection || !position) return null;
+    if (!selection || !position || isHidden) return null;
 
     // Get cell range reference for display
     const getCellRef = () => {
@@ -173,18 +264,28 @@ const SheetSelectionToolbar = ({
         }
     };
 
-    // Calculate toolbar position (adjust if near edges)
+    // Calculate toolbar position (anchor at upper-right of selection)
     const getToolbarStyle = () => {
         const style = {
             position: 'fixed',
-            left: position.x,
-            top: position.y - 50, // Position above selection
             zIndex: 1200,
         };
         
+        // Position at upper-right of selection
+        // For collapsed chip: right edge aligned with selection right edge
+        // For expanded: slides out to the right from the chip
+        style.left = position.x + 50; // Offset to right of selection center
+        style.top = position.y - 20;  // Slightly above selection top
+        
         // Adjust if too close to top
-        if (position.y < 100) {
+        if (position.y < 80) {
             style.top = position.y + 30;
+        }
+        
+        // Adjust if too close to right edge
+        const viewportWidth = window.innerWidth;
+        if (style.left > viewportWidth - 100) {
+            style.left = viewportWidth - 100;
         }
         
         return style;
@@ -193,147 +294,154 @@ const SheetSelectionToolbar = ({
     return (
         <div 
             ref={toolbarRef}
-            className="selection-toolbar sheet-selection-toolbar"
+            className={`selection-toolbar sheet-selection-toolbar ${isExpanded ? 'expanded' : 'collapsed'}`}
             style={getToolbarStyle()}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
         >
-            {/* Cell Reference Badge */}
-            <div className="toolbar-group">
+            {/* Cell Reference Badge - Always visible */}
+            <div className="toolbar-group chip-content">
                 <span className="cell-ref-badge" title="Selected range">
                     {getCellRef()}
                 </span>
             </div>
 
-            <div className="toolbar-divider"></div>
-
-            {/* Text Formatting */}
-            {!readOnly && (
+            {/* Expanded content - only visible when expanded */}
+            {isExpanded && (
                 <>
-                    <div className="toolbar-group">
-                        <button
-                            onClick={toggleBold}
-                            className="toolbar-btn"
-                            title="Bold"
-                        >
-                            <strong>B</strong>
-                        </button>
-                        <button
-                            onClick={toggleItalic}
-                            className="toolbar-btn"
-                            title="Italic"
-                        >
-                            <em>I</em>
-                        </button>
-                        <button
-                            onClick={toggleUnderline}
-                            className="toolbar-btn"
-                            title="Underline"
-                        >
-                            <span style={{ textDecoration: 'underline' }}>U</span>
-                        </button>
-                        <button
-                            onClick={toggleStrikethrough}
-                            className="toolbar-btn"
-                            title="Strikethrough"
-                        >
-                            <span style={{ textDecoration: 'line-through' }}>S</span>
-                        </button>
-                    </div>
-
                     <div className="toolbar-divider"></div>
 
-                    {/* Colors */}
-                    <div className="toolbar-group">
-                        <div className="color-btn-wrapper">
-                            <button
-                                onClick={() => setShowColorPicker(showColorPicker === 'text' ? null : 'text')}
-                                className={`toolbar-btn ${showColorPicker === 'text' ? 'active' : ''}`}
-                                title="Text Color"
-                            >
-                                <span className="color-icon text-color">A</span>
-                            </button>
-                            {showColorPicker === 'text' && (
-                                <div ref={colorPickerRef} className="color-picker-dropdown">
-                                    <div className="color-grid">
-                                        {COLOR_PRESETS.map(color => (
-                                            <button
-                                                key={color}
-                                                className="color-swatch"
-                                                style={{ backgroundColor: color }}
-                                                onClick={() => setTextColor(color)}
-                                                title={color}
-                                            />
-                                        ))}
-                                    </div>
+                    {/* Text Formatting */}
+                    {!readOnly && (
+                        <>
+                            <div className="toolbar-group">
+                                <button
+                                    onClick={toggleBold}
+                                    className="toolbar-btn"
+                                    title="Bold"
+                                >
+                                    <strong>B</strong>
+                                </button>
+                                <button
+                                    onClick={toggleItalic}
+                                    className="toolbar-btn"
+                                    title="Italic"
+                                >
+                                    <em>I</em>
+                                </button>
+                                <button
+                                    onClick={toggleUnderline}
+                                    className="toolbar-btn"
+                                    title="Underline"
+                                >
+                                    <span style={{ textDecoration: 'underline' }}>U</span>
+                                </button>
+                                <button
+                                    onClick={toggleStrikethrough}
+                                    className="toolbar-btn"
+                                    title="Strikethrough"
+                                >
+                                    <span style={{ textDecoration: 'line-through' }}>S</span>
+                                </button>
+                            </div>
+
+                            <div className="toolbar-divider"></div>
+
+                            {/* Colors */}
+                            <div className="toolbar-group">
+                                <div className="color-btn-wrapper">
+                                    <button
+                                        onClick={() => setShowColorPicker(showColorPicker === 'text' ? null : 'text')}
+                                        className={`toolbar-btn ${showColorPicker === 'text' ? 'active' : ''}`}
+                                        title="Text Color"
+                                    >
+                                        <span className="color-icon text-color">A</span>
+                                    </button>
+                                    {showColorPicker === 'text' && (
+                                        <div ref={colorPickerRef} className="color-picker-dropdown">
+                                            <div className="color-grid">
+                                                {COLOR_PRESETS.map(color => (
+                                                    <button
+                                                        key={color}
+                                                        className="color-swatch"
+                                                        style={{ backgroundColor: color }}
+                                                        onClick={() => setTextColor(color)}
+                                                        title={color}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                        <div className="color-btn-wrapper">
-                            <button
-                                onClick={() => setShowColorPicker(showColorPicker === 'bg' ? null : 'bg')}
-                                className={`toolbar-btn ${showColorPicker === 'bg' ? 'active' : ''}`}
-                                title="Background Color"
-                            >
-                                <span className="color-icon bg-color">🎨</span>
-                            </button>
-                            {showColorPicker === 'bg' && (
-                                <div ref={colorPickerRef} className="color-picker-dropdown">
-                                    <div className="color-grid">
-                                        {COLOR_PRESETS.map(color => (
-                                            <button
-                                                key={color}
-                                                className="color-swatch"
-                                                style={{ backgroundColor: color }}
-                                                onClick={() => setBgColor(color)}
-                                                title={color}
-                                            />
-                                        ))}
-                                    </div>
+                                <div className="color-btn-wrapper">
+                                    <button
+                                        onClick={() => setShowColorPicker(showColorPicker === 'bg' ? null : 'bg')}
+                                        className={`toolbar-btn ${showColorPicker === 'bg' ? 'active' : ''}`}
+                                        title="Background Color"
+                                    >
+                                        <span className="color-icon bg-color">🎨</span>
+                                    </button>
+                                    {showColorPicker === 'bg' && (
+                                        <div ref={colorPickerRef} className="color-picker-dropdown">
+                                            <div className="color-grid">
+                                                {COLOR_PRESETS.map(color => (
+                                                    <button
+                                                        key={color}
+                                                        className="color-swatch"
+                                                        style={{ backgroundColor: color }}
+                                                        onClick={() => setBgColor(color)}
+                                                        title={color}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
+                            </div>
 
-                    <div className="toolbar-divider"></div>
+                            <div className="toolbar-divider"></div>
 
-                    {/* Alignment */}
+                            {/* Alignment */}
+                            <div className="toolbar-group">
+                                <button
+                                    onClick={() => setAlignment('left')}
+                                    className="toolbar-btn"
+                                    title="Align Left"
+                                >
+                                    ⬅
+                                </button>
+                                <button
+                                    onClick={() => setAlignment('center')}
+                                    className="toolbar-btn"
+                                    title="Align Center"
+                                >
+                                    ↔
+                                </button>
+                                <button
+                                    onClick={() => setAlignment('right')}
+                                    className="toolbar-btn"
+                                    title="Align Right"
+                                >
+                                    ➡
+                                </button>
+                            </div>
+
+                            <div className="toolbar-divider"></div>
+                        </>
+                    )}
+
+                    {/* Comment */}
                     <div className="toolbar-group">
                         <button
-                            onClick={() => setAlignment('left')}
-                            className="toolbar-btn"
-                            title="Align Left"
+                            onClick={handleAddComment}
+                            className="toolbar-btn comment-btn"
+                            title="Add Comment"
                         >
-                            ⬅
-                        </button>
-                        <button
-                            onClick={() => setAlignment('center')}
-                            className="toolbar-btn"
-                            title="Align Center"
-                        >
-                            ↔
-                        </button>
-                        <button
-                            onClick={() => setAlignment('right')}
-                            className="toolbar-btn"
-                            title="Align Right"
-                        >
-                            ➡
+                            💬 Comment
                         </button>
                     </div>
-
-                    <div className="toolbar-divider"></div>
                 </>
             )}
-
-            {/* Comment */}
-            <div className="toolbar-group">
-                <button
-                    onClick={handleAddComment}
-                    className="toolbar-btn comment-btn"
-                    title="Add Comment"
-                >
-                    💬 Comment
-                </button>
-            </div>
         </div>
     );
 };

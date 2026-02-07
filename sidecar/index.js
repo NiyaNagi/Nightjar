@@ -1,4 +1,4 @@
-console.log('[Sidecar] Starting up...');
+﻿console.log('[Sidecar] Starting up...');
 const startTime = Date.now();
 
 // Debug mode - reduces verbose logging in hot paths for better performance
@@ -1217,35 +1217,6 @@ async function handleMetadataMessage(ws, parsed) {
             }));
             break;
         
-        case 'reinitialize-p2p':
-            // Force P2P reinitialization (call after identity is created/changed)
-            try {
-                console.log('[Sidecar] Reinitializing P2P...');
-                const result = await initializeP2P(true);
-                const ownPublicKey = p2pBridge.getOwnPublicKey();
-                const directAddress = await p2pBridge.getDirectAddress();
-                console.log('[Sidecar] P2P reinitialized: initialized=', p2pInitialized, 'ownPublicKey=', ownPublicKey?.slice(0, 16));
-                ws.send(JSON.stringify({
-                    type: 'p2p-reinitialized',
-                    success: result.success,
-                    initialized: p2pInitialized,
-                    ownPublicKey,
-                    directAddress,
-                    reason: result.reason,
-                }));
-            } catch (err) {
-                console.error('[Sidecar] P2P reinitialization failed:', err);
-                ws.send(JSON.stringify({
-                    type: 'p2p-reinitialized',
-                    success: false,
-                    initialized: false,
-                    ownPublicKey: null,
-                    directAddress: null,
-                    error: err.message,
-                }));
-            }
-            break;
-        
         // --- Workspace Management ---
         case 'list-workspaces':
             try {
@@ -1337,6 +1308,8 @@ async function handleMetadataMessage(ws, parsed) {
             const joinWsData = workspace || parsed.payload?.workspace;
             if (joinWsData) {
                 try {
+                    console.log('[Sidecar] join-workspace: Processing workspace', joinWsData.id);
+                    
                     // Save or update workspace metadata
                     await saveWorkspaceMetadata(joinWsData.id, joinWsData);
                     
@@ -1364,14 +1337,88 @@ async function handleMetadataMessage(ws, parsed) {
                         }
                     }
                     
-                    // Join the topic
-                    if (p2pInitialized && joinWsData.topicHash) {
-                        await p2pBridge.joinTopic(joinWsData.topicHash);
+                    // --- P2P Connection ---
+                    // Auto-initialize P2P if needed (joiner may not have initialized yet)
+                    if (!p2pInitialized) {
+                        console.log('[Sidecar] P2P not initialized, attempting initialization for join...');
+                        await initializeP2P(true);
+                    }
+                    
+                    console.log('[Sidecar] join-workspace: P2P initialized:', p2pInitialized, ', P2P Bridge initialized:', p2pBridge.isInitialized);
+                    
+                    if (p2pInitialized && p2pBridge.isInitialized) {
+                        const topicHash = joinWsData.topicHash;
+                        const bootstrapPeers = joinWsData.bootstrapPeers;
+                        const peerDirectAddress = joinWsData.directAddress;
+                        
+                        console.log('[Sidecar] join-workspace: topicHash:', topicHash ? topicHash.slice(0, 16) + '...' : 'MISSING');
+                        console.log('[Sidecar] join-workspace: bootstrapPeers:', bootstrapPeers);
+                        console.log('[Sidecar] join-workspace: directAddress:', peerDirectAddress);
+                        
+                        // Log direct address if available (for debugging and potential future direct connections)
+                        if (peerDirectAddress) {
+                            console.log(`[Sidecar] Peer direct address: ${peerDirectAddress}`);
+                        }
+                        
+                        // Join the topic for P2P discovery
+                        if (topicHash) {
+                            try {
+                                console.log(`[Sidecar] Attempting to join P2P topic: ${topicHash.slice(0, 16)}...`);
+                                await p2pBridge.joinTopic(topicHash);
+                                console.log(`[Sidecar] âœ“ Successfully joined P2P topic: ${topicHash.slice(0, 16)}...`);
+                                
+                                // Register for Yjs P2P bridging
+                                registerWorkspaceTopic(joinWsData.id, topicHash);
+                                console.log(`[Sidecar] âœ“ Registered workspace topic for P2P bridging`);
+                            } catch (e) {
+                                console.error('[Sidecar] âœ— Failed to join P2P topic:', e.message);
+                            }
+                        } else {
+                            console.warn('[Sidecar] âš  No topicHash provided - P2P sync will not work!');
+                        }
+                        
+                        // Connect to bootstrap peers
+                        if (bootstrapPeers && Array.isArray(bootstrapPeers) && bootstrapPeers.length > 0) {
+                            console.log(`[Sidecar] Connecting to ${bootstrapPeers.length} bootstrap peer(s)...`);
+                            for (const peerKey of bootstrapPeers) {
+                                try {
+                                    console.log(`[Sidecar] Attempting to connect to peer: ${peerKey.slice(0, 16)}...`);
+                                    await p2pBridge.connectToPeer(peerKey);
+                                    console.log(`[Sidecar] âœ“ Connected to bootstrap peer: ${peerKey.slice(0, 16)}...`);
+                                } catch (e) {
+                                    console.error(`[Sidecar] âœ— Failed to connect to peer ${peerKey.slice(0, 16)}:`, e.message);
+                                }
+                            }
+                        } else {
+                            console.warn('[Sidecar] âš  No bootstrap peers provided');
+                        }
+                    } else {
+                        console.error('[Sidecar] âœ— Cannot join P2P: P2P not initialized or bridge not ready');
                     }
                     
                     ws.send(JSON.stringify({ type: 'workspace-joined', workspace: joinWsData }));
                 } catch (err) {
                     console.error('[Sidecar] Failed to join workspace:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'leave-workspace':
+            // Leave a workspace (for non-owners) - removes local copy only
+            // This is semantically different from delete but performs the same local cleanup
+            const leaveWsId = workspaceId || parsed.payload?.workspaceId;
+            if (leaveWsId) {
+                try {
+                    console.log('[Sidecar] leave-workspace: Removing local workspace', leaveWsId);
+                    await deleteWorkspaceMetadata(leaveWsId);
+                    metaWss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'workspace-left', workspaceId: leaveWsId }));
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Sidecar] Failed to leave workspace:', err);
                     ws.send(JSON.stringify({ type: 'error', message: err.message }));
                 }
             }
@@ -1435,6 +1482,105 @@ async function handleMetadataMessage(ws, parsed) {
             } catch (err) {
                 console.error('[Sidecar] Failed to list trash:', err);
                 ws.send(JSON.stringify({ type: 'trash-list', trash: [], error: err.message }));
+            }
+            break;
+        
+        case 'trash-document':
+            if (payload?.document) {
+                try {
+                    // Add deletedAt timestamp
+                    const trashed = {
+                        ...payload.document,
+                        deletedAt: Date.now(),
+                        deletedBy: payload.deletedBy || null
+                    };
+                    await saveDocumentMetadata(payload.document.id, trashed);
+                    metaWss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'document-trashed', document: trashed }));
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Sidecar] Failed to trash document:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'restore-document':
+            if (payload?.documentId) {
+                try {
+                    const doc = await metadataDb.get(`doc:${payload.documentId}`);
+                    const restored = { ...doc, deletedAt: null, deletedBy: null };
+                    await saveDocumentMetadata(payload.documentId, restored);
+                    metaWss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'document-restored', documentId: payload.documentId, document: restored }));
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Sidecar] Failed to restore document:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'purge-document':
+            if (payload?.documentId) {
+                try {
+                    await deleteDocumentMetadata(payload.documentId);
+                    await deleteDocumentData(payload.documentId);
+                    metaWss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'document-purged', documentId: payload.documentId }));
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Sidecar] Failed to purge document:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'restore-folder':
+            if (payload?.folderId) {
+                try {
+                    const folderToRestore = await metadataDb.get(`folder:${payload.folderId}`);
+                    const restored = { ...folderToRestore, deletedAt: null, deletedBy: null };
+                    await saveFolderMetadata(payload.folderId, restored);
+                    metaWss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'folder-restored', folderId: payload.folderId, folder: restored }));
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Sidecar] Failed to restore folder:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
+            }
+            break;
+        
+        case 'purge-folder':
+            if (payload?.folderId) {
+                try {
+                    await metadataDb.del(`folder:${payload.folderId}`);
+                    // Also permanently delete documents in this folder
+                    const allDocs = await loadDocumentList();
+                    for (const doc of allDocs) {
+                        if (doc.folderId === payload.folderId) {
+                            await deleteDocumentMetadata(doc.id);
+                            await deleteDocumentData(doc.id);
+                        }
+                    }
+                    metaWss.clients.forEach(client => {
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({ type: 'folder-purged', folderId: payload.folderId }));
+                        }
+                    });
+                } catch (err) {
+                    console.error('[Sidecar] Failed to purge folder:', err);
+                    ws.send(JSON.stringify({ type: 'error', message: err.message }));
+                }
             }
             break;
         
@@ -1725,9 +1871,9 @@ async function startServers() {
                 }
                 
                 if (upnpStatus.enabled) {
-                    console.log('[Sidecar] ✓ UPnP auto-configuration successful');
+                    console.log('[Sidecar] âœ“ UPnP auto-configuration successful');
                 } else {
-                    console.log('[Sidecar] ⚠ UPnP unavailable - manual port forwarding may be required');
+                    console.log('[Sidecar] âš  UPnP unavailable - manual port forwarding may be required');
                 }
             })(),
             new Promise(resolve => setTimeout(() => {
@@ -2042,12 +2188,12 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
         // Find the workspace ID for this topic
         const workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            console.warn(`[P2P-SYNC] ✗ Unknown topic - not registered`);
+            console.warn(`[P2P-SYNC] âœ— Unknown topic - not registered`);
             console.warn(`[P2P-SYNC] Known topics: ${Array.from(topicToWorkspace.keys()).map(t => t.slice(0, 8)).join(', ')}`);
             return;
         }
         
-        console.log(`[P2P-SYNC] ✓ Topic maps to workspace: ${workspaceId.slice(0, 16)}...`);
+        console.log(`[P2P-SYNC] âœ“ Topic maps to workspace: ${workspaceId.slice(0, 16)}...`);
         
         // Parse the message (new format includes roomName + update)
         let roomName, updateData;
@@ -2055,12 +2201,12 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
             const message = JSON.parse(data);
             roomName = message.roomName;
             updateData = Buffer.from(message.update, 'base64');
-            console.log(`[P2P-SYNC] ✓ Parsed new format - room: ${roomName}`);
+            console.log(`[P2P-SYNC] âœ“ Parsed new format - room: ${roomName}`);
         } catch (e) {
             // Fallback to old format (just base64 update for workspace-meta)
             roomName = `workspace-meta:${workspaceId}`;
             updateData = typeof data === 'string' ? Buffer.from(data, 'base64') : data;
-            console.log(`[P2P-SYNC] ⚠ Using fallback format - room: ${roomName}`);
+            console.log(`[P2P-SYNC] âš  Using fallback format - room: ${roomName}`);
         }
         
         console.log(`[P2P-SYNC] Update size: ${updateData?.length} bytes`);
@@ -2070,18 +2216,18 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
         if (!doc) {
             doc = new Y.Doc();
             docs.set(roomName, doc);
-            console.log(`[P2P-SYNC] ✓ Created new Yjs doc for: ${roomName}`);
+            console.log(`[P2P-SYNC] âœ“ Created new Yjs doc for: ${roomName}`);
         } else {
-            console.log(`[P2P-SYNC] ✓ Found existing Yjs doc for: ${roomName}`);
+            console.log(`[P2P-SYNC] âœ“ Found existing Yjs doc for: ${roomName}`);
         }
         
         // Apply the update with 'p2p' origin to prevent re-broadcasting
         Y.applyUpdate(doc, updateData, 'p2p');
         
-        console.log(`[P2P-SYNC] ✓ Successfully applied update to ${roomName}`);
+        console.log(`[P2P-SYNC] âœ“ Successfully applied update to ${roomName}`);
         console.log(`[P2P-SYNC] ==========================================`);
     } catch (err) {
-        console.error('[P2P-SYNC] ✗ Error handling sync:', err.message);
+        console.error('[P2P-SYNC] âœ— Error handling sync:', err.message);
         console.error('[P2P-SYNC] Stack:', err.stack);
         console.log(`[P2P-SYNC] ==========================================`);
     }
@@ -2090,7 +2236,7 @@ function handleP2PSyncMessage(peerId, topicHex, data) {
 // Broadcast a Yjs update to all P2P peers for a workspace
 function broadcastYjsUpdate(workspaceId, topicHex, update, roomName) {
     if (!p2pInitialized || !p2pBridge.hyperswarm) {
-        console.log(`[P2P-BROADCAST] ✗ Skipped - P2P not initialized`);
+        console.log(`[P2P-BROADCAST] âœ— Skipped - P2P not initialized`);
         return;
     }
     
@@ -2114,10 +2260,10 @@ function broadcastYjsUpdate(workspaceId, topicHex, update, roomName) {
         console.log(`[P2P-BROADCAST] Connected peers: ${connectedPeers.length}`);
         
         p2pBridge.hyperswarm.broadcastSync(topicHex, messageStr);
-        console.log(`[P2P-BROADCAST] ✓ Broadcast complete`);
+        console.log(`[P2P-BROADCAST] âœ“ Broadcast complete`);
         console.log(`[P2P-BROADCAST] ==========================================`);
     } catch (err) {
-        console.error('[P2P-BROADCAST] ✗ Error:', err.message);
+        console.error('[P2P-BROADCAST] âœ— Error:', err.message);
         console.log(`[P2P-BROADCAST] ==========================================`);
     }
 }
@@ -2339,948 +2485,6 @@ async function initializeP2PWithRetry() {
 
 // Start P2P initialization after a short delay to let everything start up
 setTimeout(initializeP2PWithRetry, 1000);
-
-// metaWss connection handler moved inside startServers() function
-/*
-    console.log('[Sidecar] Metadata client connected.');
-    
-    // Generate unique client ID for rate limiting per connection
-    // Include remote port to differentiate multiple connections from localhost
-    const clientId = `${req.socket.remoteAddress || 'unknown'}:${req.socket.remotePort || crypto.randomBytes(4).toString('hex')}`;
-    
-    // Immediately send current status
-    ws.send(JSON.stringify({
-        type: 'status',
-        status: connectionStatus,
-        isOnline: isOnline,
-        onionAddress: onionAddress ? `${onionAddress}.onion` : null,
-        multiaddr: fullMultiaddr,
-        peerId: p2pNode ? p2pNode.peerId.toString() : null
-    }));
-
-    ws.on('message', async (message) => {
-        // Apply rate limiting
-        const rateLimit = rateLimiter.check(clientId);
-        if (!rateLimit.allowed) {
-            ws.send(JSON.stringify({ 
-                type: 'error', 
-                code: 'RATE_LIMITED',
-                message: `Too many requests. Retry after ${rateLimit.retryAfter} seconds.`,
-                retryAfter: rateLimit.retryAfter
-            }));
-            console.warn(`[Sidecar] Rate limited client: ${clientId.slice(0, 8)}`);
-            return;
-        }
-        
-        try {
-            // Ensure uint8arrays module is loaded
-            if (!uint8arraysLoaded) {
-                await loadUint8Arrays();
-            }
-            
-            // Use safe JSON parsing with prototype pollution protection
-            const parsed = safeJsonParse(message.toString());
-            if (!parsed) {
-                ws.send(JSON.stringify({ type: 'error', code: 'INVALID_MESSAGE', message: 'Invalid message format' }));
-                return;
-            }
-            
-            const { type, payload, document, docId, metadata, docName, workspace, folder, workspaceId, folderId, updates } = parsed;
-            
-            // Validate message type
-            if (typeof type !== 'string' || type.length === 0 || type.length > 64) {
-                ws.send(JSON.stringify({ type: 'error', code: 'INVALID_TYPE', message: 'Invalid message type' }));
-                return;
-            }
-            
-            switch (type) {
-                case 'set-key':
-                    if (payload) {
-                        const key = uint8ArrayFromString(payload, 'base64');
-                        
-                        // Validate key length
-                        if (!isValidKey(key)) {
-                            ws.send(JSON.stringify({ type: 'error', code: 'INVALID_KEY', message: 'Invalid encryption key' }));
-                            return;
-                        }
-                        
-                        // Sanitize docName if provided
-                        const sanitizedDocName = docName ? sanitizeId(docName) : null;
-                        
-                        if (sanitizedDocName) {
-                            // Per-document key
-                            console.log(`[Sidecar] Received encryption key for document: ${sanitizedDocName}`);
-                            documentKeys.set(sanitizedDocName, key);
-                            
-                            // If this document is already loaded, reload its data with the correct key
-                            if (docs.has(sanitizedDocName)) {
-                                const doc = docs.get(sanitizedDocName);
-                                await loadPersistedData(sanitizedDocName, doc, key);
-                            }
-                            
-                            // Flush any pending updates for this document
-                            if (pendingUpdates.has(sanitizedDocName)) {
-                                const updates = pendingUpdates.get(sanitizedDocName);
-                                console.log(`[Sidecar] Flushing ${updates.length} pending updates for ${sanitizedDocName}`);
-                                for (const { update, origin } of updates) {
-                                    await persistUpdate(sanitizedDocName, update, origin);
-                                }
-                                pendingUpdates.set(sanitizedDocName, []);
-                            }
-                        } else {
-                            // Legacy: global session key (for backward compatibility)
-                            console.log('[Sidecar] Received global session key. Loading all documents...');
-                            sessionKey = key;
-                            
-                            // When the key is set, load data for all existing documents
-                            for (const [name, doc] of docs.entries()) {
-                                // Only use session key if no per-doc key exists
-                                if (!documentKeys.has(name)) {
-                                    await loadPersistedData(name, doc, sessionKey);
-                                }
-                            }
-                            console.log('[Sidecar] Finished applying persisted data to all docs.');
-                            
-                            // Flush any pending updates that were queued before the key was available
-                            for (const [name, updates] of pendingUpdates.entries()) {
-                                if (!documentKeys.has(name)) {
-                                    console.log(`[Sidecar] Flushing ${updates.length} pending updates for ${name}`);
-                                    for (const { update, origin } of updates) {
-                                        await persistUpdate(name, update, origin);
-                                    }
-                                    pendingUpdates.set(name, []);
-                                }
-                            }
-                        }
-                        
-                        // Confirm key was set
-                        ws.send(JSON.stringify({ type: 'key-set', success: true, docName: sanitizedDocName || docName }));
-                    }
-                    break;
-                
-                case 'list-documents':
-                    const documents = await loadDocumentList();
-                    ws.send(JSON.stringify({ type: 'document-list', documents }));
-                    break;
-                
-                case 'create-document':
-                    if (document) {
-                        // Validate document ID
-                        const safeDocId = sanitizeId(document.id);
-                        if (!safeDocId) {
-                            ws.send(JSON.stringify({ type: 'error', code: 'INVALID_DOC_ID', message: 'Invalid document ID' }));
-                            return;
-                        }
-                        
-                        // Sanitize name
-                        const safeDocName = sanitizeName(document.name) || 'Untitled';
-                        
-                        // Validate workspace/folder IDs if provided
-                        const safeWorkspaceId = document.workspaceId ? sanitizeId(document.workspaceId) : null;
-                        const safeFolderId = document.folderId ? sanitizeId(document.folderId) : null;
-                        
-                        // Validate document type
-                        const validTypes = ['text', 'sheet', 'code', 'markdown'];
-                        const safeType = validTypes.includes(document.type) ? document.type : 'text';
-                        
-                        await saveDocumentMetadata(safeDocId, {
-                            name: safeDocName,
-                            type: safeType,
-                            workspaceId: safeWorkspaceId,
-                            folderId: safeFolderId,
-                            encryptionKey: document.encryptionKey, // Store encryption key
-                            createdAt: document.createdAt || Date.now(),
-                            lastEdited: document.lastEdited || Date.now(),
-                            authorCount: Math.min(Math.max(1, parseInt(document.authorCount) || 1), 1000)
-                        });
-                        
-                        // Create sanitized document for broadcast
-                        const sanitizedDocument = {
-                            ...document,
-                            id: safeDocId,
-                            name: safeDocName,
-                            type: safeType,
-                            workspaceId: safeWorkspaceId,
-                            folderId: safeFolderId
-                        };
-                        
-                        // Broadcast to all clients
-                        metaWss.clients.forEach(client => {
-                            if (client.readyState === WebSocket.OPEN) {
-                                client.send(JSON.stringify({ type: 'document-created', document: sanitizedDocument }));
-                            }
-                        });
-                    }
-                    break;
-                
-                case 'delete-document':
-                    if (docId) {
-                        // Validate document ID
-                        const safeDeleteDocId = sanitizeId(docId);
-                        if (!safeDeleteDocId) {
-                            ws.send(JSON.stringify({ type: 'error', code: 'INVALID_DOC_ID', message: 'Invalid document ID' }));
-                            return;
-                        }
-                        
-                        // Delete both metadata and document data
-                        await deleteDocumentMetadata(safeDeleteDocId);
-                        await deleteDocumentData(safeDeleteDocId);
-                        
-                        // Also remove from y-websocket docs map if present
-                        if (docs.has(safeDeleteDocId)) {
-                            const doc = docs.get(safeDeleteDocId);
-                            doc.destroy();
-                            docs.delete(safeDeleteDocId);
-                            console.log(`[Sidecar] Removed Yjs doc from memory: ${safeDeleteDocId}`);
-                        }
-                        
-                        // Broadcast to all clients
-                        metaWss.clients.forEach(client => {
-                            if (client.readyState === WebSocket.OPEN) {
-                                client.send(JSON.stringify({ type: 'document-deleted', docId: safeDeleteDocId }));
-                            }
-                        });
-                    }
-                    break;
-                
-                case 'update-document-metadata':
-                    if (docId && metadata) {
-                        // Load existing, merge, save
-                        try {
-                            const existing = await metadataDb.get(`doc:${docId}`);
-                            await saveDocumentMetadata(docId, { ...existing, ...metadata, lastEdited: Date.now() });
-                        } catch (err) {
-                            await saveDocumentMetadata(docId, { ...metadata, lastEdited: Date.now() });
-                        }
-                    }
-                    break;
-                
-                case 'toggle-tor':
-                    const enable = payload?.enable;
-                    console.log(`[Sidecar] Toggle Tor: ${enable ? 'ON' : 'OFF'}`);
-                    
-                    if (enable && !torEnabled) {
-                        torEnabled = true;
-                        await startP2PStack();
-                    } else if (!enable && torEnabled) {
-                        torEnabled = false;
-                        await stopP2PStack();
-                    }
-                    
-                    // Send confirmation
-                    ws.send(JSON.stringify({ 
-                        type: 'tor-toggled', 
-                        enabled: torEnabled,
-                        status: connectionStatus
-                    }));
-                    break;
-                
-                case 'get-status':
-                    const meshStatus = meshParticipant ? meshParticipant.getStatus() : null;
-                    ws.send(JSON.stringify({
-                        type: 'status',
-                        status: connectionStatus,
-                        isOnline: isOnline,
-                        torEnabled: torEnabled,
-                        onionAddress: onionAddress ? `${onionAddress}.onion` : null,
-                        multiaddr: fullMultiaddr,
-                        peerId: p2pNode ? p2pNode.peerId.toString() : null,
-                        mesh: meshStatus
-                    }));
-                    break;
-                
-                case 'get-mesh-status':
-                    // Get detailed mesh network status
-                    if (meshParticipant) {
-                        ws.send(JSON.stringify({
-                            type: 'mesh-status',
-                            ...meshParticipant.getStatus(),
-                            topRelays: meshParticipant.getTopRelays(10)
-                        }));
-                    } else {
-                        ws.send(JSON.stringify({
-                            type: 'mesh-status',
-                            enabled: false,
-                            error: 'Mesh not initialized'
-                        }));
-                    }
-                    break;
-                
-                case 'set-mesh-enabled':
-                    // Enable/disable mesh participation
-                    meshEnabled = !!msg.enabled;
-                    if (meshEnabled && !meshParticipant) {
-                        await initializeMesh();
-                    } else if (!meshEnabled && meshParticipant) {
-                        await meshParticipant.stop();
-                        meshParticipant = null;
-                    }
-                    ws.send(JSON.stringify({
-                        type: 'mesh-enabled-changed',
-                        enabled: meshEnabled
-                    }));
-                    break;
-                
-                case 'query-mesh-peers':
-                    // Query mesh for peers in a workspace
-                    if (meshParticipant && msg.workspaceId) {
-                        try {
-                            const peers = await meshParticipant.queryWorkspacePeers(msg.workspaceId);
-                            ws.send(JSON.stringify({
-                                type: 'mesh-peers-result',
-                                workspaceId: msg.workspaceId,
-                                peers: peers
-                            }));
-                        } catch (err) {
-                            ws.send(JSON.stringify({
-                                type: 'mesh-peers-error',
-                                workspaceId: msg.workspaceId,
-                                error: err.message
-                            }));
-                        }
-                    }
-                    break;
-                
-                case 'clear-orphaned-data':
-                    // Clear all data that cannot be decrypted (orphaned from old sessions)
-                    console.log('[Sidecar] Clearing orphaned/unrecoverable data...');
-                    let clearedCount = 0;
-                    const keysToDelete = [];
-                    
-                    for await (const [dbKey, value] of db.iterator()) {
-                        // Try to decrypt with all known keys
-                        let canDecrypt = false;
-                        
-                        // Try session key
-                        if (sessionKey) {
-                            const decrypted = decryptUpdate(value, sessionKey);
-                            if (decrypted) canDecrypt = true;
-                        }
-                        
-                        // Try all document keys
-                        if (!canDecrypt) {
-                            for (const [docId, key] of documentKeys) {
-                                const decrypted = decryptUpdate(value, key);
-                                if (decrypted) {
-                                    canDecrypt = true;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (!canDecrypt) {
-                            keysToDelete.push(dbKey);
-                        }
-                    }
-                    
-                    for (const key of keysToDelete) {
-                        await withDbTimeout(db.del(key), `del orphaned ${key}`);
-                        clearedCount++;
-                    }
-                    
-                    console.log(`[Sidecar] Cleared ${clearedCount} orphaned entries`);
-                    ws.send(JSON.stringify({ 
-                        type: 'orphaned-data-cleared', 
-                        count: clearedCount 
-                    }));
-                    break;
-                
-                // --- Folder Management ---
-                case 'list-folders':
-                    try {
-                        const folders = await loadFolderList();
-                        ws.send(JSON.stringify({ type: 'folder-list', folders }));
-                    } catch (err) {
-                        console.error('[Sidecar] Failed to list folders:', err);
-                        ws.send(JSON.stringify({ type: 'folder-list', folders: [], error: err.message }));
-                    }
-                    break;
-                
-                case 'create-folder':
-                    // Accept folder from direct property or payload
-                    const folderData = folder || payload?.folder;
-                    console.log('[Sidecar] create-folder received:', folderData?.id, folderData?.name);
-                    if (folderData) {
-                        try {
-                            await saveFolderMetadata(folderData.id, folderData);
-                            console.log('[Sidecar] Folder saved successfully');
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'folder-created', folder: folderData }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to create folder:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'update-folder':
-                    // Accept folderId/updates from direct properties or payload
-                    const updateFolderId = folderId || payload?.folderId;
-                    const updateFolderData = updates || payload?.updates;
-                    if (updateFolderId && updateFolderData) {
-                        try {
-                            const existing = await metadataDb.get(`folder:${updateFolderId}`);
-                            const updated = { ...existing, ...updateFolderData };
-                            await saveFolderMetadata(updateFolderId, updated);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'folder-updated', folder: updated }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to update folder:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'delete-folder':
-                    // Soft delete - add deletedAt timestamp
-                    // Accept folderId from direct property or payload
-                    const deleteFolderId = folderId || payload?.folderId;
-                    if (deleteFolderId) {
-                        try {
-                            const folderToDelete = await metadataDb.get(`folder:${deleteFolderId}`);
-                            const trashed = {
-                                ...folderToDelete,
-                                deletedAt: Date.now(),
-                                deletedBy: payload?.deletedBy || null
-                            };
-                            await saveFolderMetadata(deleteFolderId, trashed);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'folder-deleted', folderId: deleteFolderId }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to delete folder:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'move-document':
-                case 'move-document-to-folder':
-                    // Handle both message formats: { documentId } or { docId }
-                    const moveDocId = payload?.documentId || payload?.docId;
-                    if (moveDocId) {
-                        try {
-                            const existing = await metadataDb.get(`doc:${moveDocId}`);
-                            await saveDocumentMetadata(moveDocId, { 
-                                ...existing, 
-                                folderId: payload.folderId || null 
-                            });
-                            console.log(`[Sidecar] Moved document ${moveDocId} to folder ${payload.folderId || 'root'}`);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ 
-                                        type: 'document-moved', 
-                                        docId: moveDocId,
-                                        documentId: moveDocId,
-                                        folderId: payload.folderId 
-                                    }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to move document:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                // --- Workspace Management ---
-                case 'list-workspaces':
-                    try {
-                        const workspaces = await loadWorkspaceList();
-                        ws.send(JSON.stringify({ type: 'workspace-list', workspaces }));
-                    } catch (err) {
-                        console.error('[Sidecar] Failed to list workspaces:', err);
-                        ws.send(JSON.stringify({ type: 'workspace-list', workspaces: [], error: err.message }));
-                    }
-                    break;
-                
-                case 'create-workspace':
-                    // Accept workspace from either direct property or payload.workspace
-                    const wsData = workspace || payload?.workspace;
-                    console.log('[Sidecar] create-workspace received:', wsData?.id, wsData?.name);
-                    if (wsData) {
-                        try {
-                            // Add current identity's public key as owner
-                            const currentIdentity = identity.loadIdentity();
-                            if (currentIdentity?.publicKeyBase62) {
-                                wsData.ownerPublicKey = currentIdentity.publicKeyBase62;
-                                console.log('[Sidecar] Associating workspace with identity:', currentIdentity.publicKeyBase62);
-                            }
-                            
-                            await saveWorkspaceMetadata(wsData.id, wsData);
-                            console.log('[Sidecar] Workspace saved successfully');
-                            
-                            // --- P2P: Join the Hyperswarm topic for this workspace ---
-                            // This is CRITICAL - without this, the sharer isn't discoverable on DHT
-                            // Auto-initialize P2P if needed
-                            if (!p2pInitialized && wsData.topicHash) {
-                                console.log('[Sidecar] P2P not initialized, attempting initialization for workspace creation...');
-                                await initializeP2P(true);
-                            }
-                            
-                            if (p2pInitialized && p2pBridge.isInitialized && wsData.topicHash) {
-                                try {
-                                    await p2pBridge.joinTopic(wsData.topicHash);
-                                    console.log(`[Sidecar] Joined P2P topic for new workspace: ${wsData.topicHash.slice(0, 16)}...`);
-                                    
-                                    // Register for Yjs P2P bridging
-                                    registerWorkspaceTopic(wsData.id, wsData.topicHash);
-                                } catch (e) {
-                                    console.warn('[Sidecar] Failed to join P2P topic for workspace:', e.message);
-                                }
-                            } else if (wsData.topicHash && !p2pInitialized) {
-                                console.log('[Sidecar] P2P could not be initialized, topic will be joined on next startup');
-                            }
-                            
-                            // Register encryption key for workspace-meta documents
-                            if (wsData.encryptionKey) {
-                                try {
-                                    if (!uint8arraysLoaded) await loadUint8Arrays();
-                                    // Convert base64url to standard base64
-                                    const base64Key = wsData.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
-                                    const keyBytes = uint8ArrayFromString(base64Key, 'base64');
-                                    documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes);
-                                    documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes);
-                                    console.log(`[Sidecar] Registered encryption key for created workspace-meta: ${wsData.id}`);
-                                } catch (e) {
-                                    console.error(`[Sidecar] Failed to register key for workspace ${wsData.id}:`, e.message);
-                                }
-                            }
-                            
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'workspace-created', workspace: wsData }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to create workspace:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    } else {
-                        console.log('[Sidecar] create-workspace: No workspace in payload');
-                    }
-                    break;
-                
-                case 'update-workspace':
-                    // Accept workspaceId/updates from direct properties or payload
-                    const updateWsId = workspaceId || payload?.workspaceId;
-                    const updateWsData = updates || payload?.updates;
-                    if (updateWsId && updateWsData) {
-                        try {
-                            const existing = await metadataDb.get(`workspace:${updateWsId}`);
-                            const updated = { ...existing, ...updateWsData, updatedAt: Date.now() };
-                            await saveWorkspaceMetadata(updateWsId, updated);
-                            
-                            // --- P2P: Join topic if topicHash was added/changed ---
-                            if (p2pInitialized && p2pBridge.isInitialized && updateWsData.topicHash && updateWsData.topicHash !== existing.topicHash) {
-                                try {
-                                    await p2pBridge.joinTopic(updateWsData.topicHash);
-                                    console.log(`[Sidecar] Joined P2P topic for updated workspace: ${updateWsData.topicHash.slice(0, 16)}...`);
-                                    registerWorkspaceTopic(updateWsId, updateWsData.topicHash);
-                                } catch (e) {
-                                    console.warn('[Sidecar] Failed to join P2P topic on update:', e.message);
-                                }
-                            }
-                            
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'workspace-updated', workspace: updated }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to update workspace:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'delete-workspace':
-                    // Accept workspaceId from direct property or payload
-                    const deleteWsId = workspaceId || payload?.workspaceId;
-                    if (deleteWsId) {
-                        try {
-                            await deleteWorkspaceMetadata(deleteWsId);
-                            // Note: Folders and documents are NOT deleted - they become orphaned
-                            // This is intentional for safety - actual cleanup is separate
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'workspace-deleted', workspaceId: deleteWsId }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to delete workspace:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'leave-workspace':
-                    // Leave a workspace (for non-owners) - removes local copy only
-                    // This is semantically different from delete but performs the same local cleanup
-                    const leaveWsId = workspaceId || payload?.workspaceId;
-                    if (leaveWsId) {
-                        try {
-                            console.log('[Sidecar] leave-workspace: Removing local workspace', leaveWsId);
-                            await deleteWorkspaceMetadata(leaveWsId);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'workspace-left', workspaceId: leaveWsId }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to leave workspace:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'join-workspace':
-                    // Join a workspace via share link - store permission grant
-                    // Accept workspace from either direct property or payload.workspace
-                    const joinWsData = workspace || payload?.workspace;
-                    if (joinWsData) {
-                        try {
-                            console.log('[Sidecar] join-workspace: Processing workspace', joinWsData.id);
-                            // Check if workspace already exists locally
-                            let existing = null;
-                            try {
-                                existing = await metadataDb.get(`workspace:${joinWsData.id}`);
-                            } catch (e) {
-                                // Workspace doesn't exist locally
-                            }
-                            
-                            if (existing) {
-                                // Upgrade permission if new one is higher
-                                const permLevels = { owner: 3, editor: 2, viewer: 1 };
-                                const existingLevel = permLevels[existing.myPermission] || 0;
-                                const newLevel = permLevels[joinWsData.myPermission] || 0;
-                                
-                                // Build updates object with serverUrl and optionally permission
-                                const updates = { ...existing };
-                                let needsUpdate = false;
-                                
-                                // Update serverUrl if provided and different (for cross-platform sync)
-                                if (joinWsData.serverUrl && joinWsData.serverUrl !== existing.serverUrl) {
-                                    updates.serverUrl = joinWsData.serverUrl;
-                                    console.log('[Sidecar] join-workspace: Updating serverUrl to', joinWsData.serverUrl);
-                                    needsUpdate = true;
-                                }
-                                
-                                // Update encryptionKey if provided and not present
-                                if (joinWsData.encryptionKey && !existing.encryptionKey) {
-                                    updates.encryptionKey = joinWsData.encryptionKey;
-                                    needsUpdate = true;
-                                }
-                                
-                                // Update topicHash if provided
-                                if (joinWsData.topicHash && joinWsData.topicHash !== existing.topicHash) {
-                                    updates.topicHash = joinWsData.topicHash;
-                                    needsUpdate = true;
-                                }
-                                
-                                // Update bootstrapPeers if provided
-                                if (joinWsData.bootstrapPeers && Array.isArray(joinWsData.bootstrapPeers)) {
-                                    updates.lastKnownPeers = joinWsData.bootstrapPeers.map(pk => ({
-                                        publicKey: pk,
-                                        lastSeen: Date.now()
-                                    }));
-                                    needsUpdate = true;
-                                }
-                                
-                                // Update directAddress if provided
-                                if (joinWsData.directAddress && joinWsData.directAddress !== existing.directAddress) {
-                                    updates.directAddress = joinWsData.directAddress;
-                                    needsUpdate = true;
-                                }
-                                
-                                // Upgrade permission if new one is higher
-                                if (newLevel > existingLevel) {
-                                    updates.myPermission = joinWsData.myPermission;
-                                    needsUpdate = true;
-                                }
-                                
-                                if (needsUpdate) {
-                                    await saveWorkspaceMetadata(joinWsData.id, updates);
-                                    
-                                    // Register encryption key for workspace-meta documents
-                                    const keyToRegister = updates.encryptionKey || existing.encryptionKey;
-                                    if (keyToRegister) {
-                                        try {
-                                            if (!uint8arraysLoaded) await loadUint8Arrays();
-                                            // Convert base64url to standard base64
-                                            const base64Key = keyToRegister.replace(/-/g, '+').replace(/_/g, '/');
-                                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
-                                            documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
-                                            documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
-                                            console.log(`[Sidecar] Registered encryption key for workspace-meta: ${joinWsData.id}`);
-                                        } catch (e) {
-                                            console.error(`[Sidecar] Failed to register key for workspace ${joinWsData.id}:`, e.message);
-                                        }
-                                    }
-                                    
-                                    ws.send(JSON.stringify({ type: 'workspace-joined', workspace: updates, upgraded: true }));
-                                } else {
-                                    // Even if no update needed, register existing key
-                                    if (existing.encryptionKey) {
-                                        try {
-                                            if (!uint8arraysLoaded) await loadUint8Arrays();
-                                            // Convert base64url to standard base64
-                                            const base64Key = existing.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
-                                            const keyBytes = uint8ArrayFromString(base64Key, 'base64');
-                                            documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
-                                            documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
-                                            console.log(`[Sidecar] Registered encryption key for existing workspace-meta: ${joinWsData.id}`);
-                                        } catch (e) {
-                                            console.error(`[Sidecar] Failed to register key for workspace ${joinWsData.id}:`, e.message);
-                                        }
-                                    }
-                                    ws.send(JSON.stringify({ type: 'workspace-joined', workspace: existing, upgraded: false }));
-                                }
-                            } else {
-                                // New workspace - save with P2P info
-                                const wsToSave = { ...joinWsData };
-                                if (joinWsData.bootstrapPeers && Array.isArray(joinWsData.bootstrapPeers)) {
-                                    wsToSave.lastKnownPeers = joinWsData.bootstrapPeers.map(pk => ({
-                                        publicKey: pk,
-                                        lastSeen: Date.now()
-                                    }));
-                                }
-                                await saveWorkspaceMetadata(joinWsData.id, wsToSave);
-                                
-                                // Register encryption key for new workspace
-                                if (wsToSave.encryptionKey) {
-                                    try {
-                                        if (!uint8arraysLoaded) await loadUint8Arrays();
-                                        // Convert base64url to standard base64
-                                        const base64Key = wsToSave.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
-                                        const keyBytes = uint8ArrayFromString(base64Key, 'base64');
-                                        documentKeys.set(`workspace-meta:${joinWsData.id}`, keyBytes);
-                                        documentKeys.set(`workspace-folders:${joinWsData.id}`, keyBytes);
-                                        console.log(`[Sidecar] Registered encryption key for new workspace-meta: ${joinWsData.id}`);
-                                    } catch (e) {
-                                        console.error(`[Sidecar] Failed to register key for workspace ${joinWsData.id}:`, e.message);
-                                    }
-                                }
-                                
-                                ws.send(JSON.stringify({ type: 'workspace-joined', workspace: wsToSave, upgraded: false }));
-                            }
-                            
-                            // --- P2P Connection ---
-                            // Join Hyperswarm topic and connect to bootstrap peers
-                            // Auto-initialize P2P if needed (joiner may not have initialized yet)
-                            if (!p2pInitialized) {
-                                console.log('[Sidecar] P2P not initialized, attempting initialization for join...');
-                                await initializeP2P(true);
-                            }
-                            
-                            console.log('[Sidecar] join-workspace: P2P initialized:', p2pInitialized, ', P2P Bridge initialized:', p2pBridge.isInitialized);
-                            
-                            if (p2pInitialized && p2pBridge.isInitialized) {
-                                const topicHash = joinWsData.topicHash;
-                                const bootstrapPeers = joinWsData.bootstrapPeers;
-                                const peerDirectAddress = joinWsData.directAddress;
-                                
-                                console.log('[Sidecar] join-workspace: topicHash:', topicHash ? topicHash.slice(0, 16) + '...' : 'MISSING');
-                                console.log('[Sidecar] join-workspace: bootstrapPeers:', bootstrapPeers);
-                                console.log('[Sidecar] join-workspace: directAddress:', peerDirectAddress);
-                                
-                                // Log direct address if available (for debugging and potential future direct connections)
-                                if (peerDirectAddress) {
-                                    console.log(`[Sidecar] Peer direct address: ${peerDirectAddress}`);
-                                }
-                                
-                                if (topicHash) {
-                                    try {
-                                        console.log(`[Sidecar] Attempting to join P2P topic: ${topicHash.slice(0, 16)}...`);
-                                        await p2pBridge.joinTopic(topicHash);
-                                        console.log(`[Sidecar] ✓ Successfully joined P2P topic: ${topicHash.slice(0, 16)}...`);
-                                        
-                                        // Register for Yjs P2P bridging
-                                        registerWorkspaceTopic(joinWsData.id, topicHash);
-                                        console.log(`[Sidecar] ✓ Registered workspace topic for P2P bridging`);
-                                    } catch (e) {
-                                        console.error('[Sidecar] ✗ Failed to join P2P topic:', e.message, e.stack);
-                                    }
-                                } else {
-                                    console.warn('[Sidecar] ⚠ No topicHash provided - P2P sync will not work!');
-                                }
-                                
-                                if (bootstrapPeers && Array.isArray(bootstrapPeers)) {
-                                    console.log(`[Sidecar] Connecting to ${bootstrapPeers.length} bootstrap peer(s)...`);
-                                    for (const peerKey of bootstrapPeers) {
-                                        try {
-                                            console.log(`[Sidecar] Attempting to connect to peer: ${peerKey.slice(0, 16)}...`);
-                                            await p2pBridge.connectToPeer(peerKey);
-                                            console.log(`[Sidecar] ✓ Connected to bootstrap peer: ${peerKey.slice(0, 16)}...`);
-                                        } catch (e) {
-                                            console.error(`[Sidecar] ✗ Failed to connect to peer ${peerKey.slice(0, 16)}:`, e.message);
-                                        }
-                                    }
-                                } else {
-                                    console.warn('[Sidecar] ⚠ No bootstrap peers provided');
-                                }
-                            } else {
-                                console.error('[Sidecar] ✗ Cannot join P2P: P2P not initialized or bridge not ready');
-                                console.error('[Sidecar] p2pInitialized:', p2pInitialized);
-                                console.error('[Sidecar] p2pBridge.isInitialized:', p2pBridge.isInitialized);
-                            }
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to join workspace:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    } else {
-                        console.log('[Sidecar] join-workspace: No workspace data provided');
-                    }
-                    break;
-                
-                // --- Trash Management ---
-                case 'list-trash':
-                    if (payload?.workspaceId) {
-                        try {
-                            const trash = await loadTrashList(payload.workspaceId);
-                            ws.send(JSON.stringify({ 
-                                type: 'trash-list', 
-                                workspaceId: payload.workspaceId,
-                                documents: trash.documents,
-                                folders: trash.folders
-                            }));
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to list trash:', err);
-                            ws.send(JSON.stringify({ type: 'trash-list', documents: [], folders: [], error: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'trash-document':
-                    if (payload?.document) {
-                        try {
-                            // Add deletedAt timestamp
-                            const trashed = {
-                                ...payload.document,
-                                deletedAt: Date.now(),
-                                deletedBy: payload.deletedBy || null
-                            };
-                            await saveDocumentMetadata(payload.document.id, trashed);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'document-trashed', document: trashed }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to trash document:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'restore-document':
-                    if (payload?.documentId) {
-                        try {
-                            const doc = await metadataDb.get(`doc:${payload.documentId}`);
-                            const restored = { ...doc, deletedAt: null, deletedBy: null };
-                            await saveDocumentMetadata(payload.documentId, restored);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'document-restored', documentId: payload.documentId, document: restored }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to restore document:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'purge-document':
-                    if (payload?.documentId) {
-                        try {
-                            await deleteDocumentMetadata(payload.documentId);
-                            await deleteDocumentData(payload.documentId);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'document-purged', documentId: payload.documentId }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to purge document:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'restore-folder':
-                    if (payload?.folderId) {
-                        try {
-                            const folder = await metadataDb.get(`folder:${payload.folderId}`);
-                            const restored = { ...folder, deletedAt: null, deletedBy: null };
-                            await saveFolderMetadata(payload.folderId, restored);
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'folder-restored', folderId: payload.folderId, folder: restored }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to restore folder:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                case 'purge-folder':
-                    if (payload?.folderId) {
-                        try {
-                            await metadataDb.del(`folder:${payload.folderId}`);
-                            // Also permanently delete documents in this folder
-                            const allDocs = await loadDocumentList();
-                            for (const doc of allDocs) {
-                                if (doc.folderId === payload.folderId) {
-                                    await deleteDocumentMetadata(doc.id);
-                                    await deleteDocumentData(doc.id);
-                                }
-                            }
-                            metaWss.clients.forEach(client => {
-                                if (client.readyState === WebSocket.OPEN) {
-                                    client.send(JSON.stringify({ type: 'folder-purged', folderId: payload.folderId }));
-                                }
-                            });
-                        } catch (err) {
-                            console.error('[Sidecar] Failed to purge folder:', err);
-                            ws.send(JSON.stringify({ type: 'error', message: err.message }));
-                        }
-                    }
-                    break;
-                
-                default:
-                    // Check if it's a P2P message and route to P2PBridge
-                    if (type.startsWith('p2p-') || type.startsWith('mdns-')) {
-                        p2pBridge.handleMessage(ws, parsed).catch(err => {
-                            console.error('[Sidecar] P2P message error:', err);
-                        });
-                    } else {
-                        console.log(`[Sidecar] Unknown message type: ${type}`);
-                    }
-            }
-        } catch (e) {
-            console.error('[Sidecar] Failed to handle metadata message:', e);
-        }
-    });
-    
-    ws.on('close', () => {
-        console.log('[Sidecar] Metadata client disconnected.');
-    });
-    
-    // Register client with P2P bridge
-    p2pBridge.handleClient(ws);
-});
-*/
 
 // Initialize: Load all document keys from metadata on startup (after servers are ready)
 // This is deferred to not block startup - documents will be loaded by the time the client connects
