@@ -1264,6 +1264,10 @@ async function handleMetadataMessage(ws, parsed) {
                             console.log('[Sidecar] Joining Hyperswarm topic for new workspace:', wsData.topicHash?.slice(0, 16));
                             await p2pBridge.joinTopic(wsData.topicHash);
                             console.log('[Sidecar] Successfully joined workspace topic');
+                            
+                            // Register for Yjs P2P bridging - CRITICAL for responding to sync requests
+                            registerWorkspaceTopic(wsData.id, wsData.topicHash);
+                            console.log('[Sidecar] ✓ Registered workspace topic for P2P bridging');
                         } catch (joinErr) {
                             console.error('[Sidecar] Failed to join workspace topic:', joinErr);
                         }
