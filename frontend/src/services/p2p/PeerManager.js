@@ -25,7 +25,8 @@ const DEFAULT_CONFIG = {
   bootstrapTimeout: 10000,
   discoveryInterval: 30000,
   awarenessThrottle: 100,
-  sidecarUrl: 'ws://localhost:8081',
+  // Get port from electronAPI if available, otherwise use default
+  sidecarUrl: `ws://localhost:${window.electronAPI?.sidecarPorts?.meta || 8081}`,
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },

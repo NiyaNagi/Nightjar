@@ -237,7 +237,9 @@ function AppContent() {
         }
 
         // Electron mode: Set up metadata WebSocket connection
-        const metaSocket = new WebSocket('ws://localhost:8081');
+        // Get port from electronAPI if available, otherwise use default
+        const metaPort = window.electronAPI?.sidecarPorts?.meta || 8081;
+        const metaSocket = new WebSocket(`ws://localhost:${metaPort}`);
 
         metaSocket.onopen = () => {
             console.log('Metadata socket connected.');

@@ -39,6 +39,7 @@ import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
 import { getYjsWebSocketUrl } from './utils/websocket';
 import { parseShareLink, clearUrlFragment } from './utils/sharing';
+import { META_WS_PORT } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
 
 import './styles/global.css';
@@ -695,7 +696,7 @@ function App() {
             }
             
             try {
-                metaSocket = new WebSocket('ws://localhost:8081');
+                metaSocket = new WebSocket(`ws://localhost:${META_WS_PORT}`);
                 metaSocketRef.current = metaSocket;
 
                 metaSocket.onopen = () => {

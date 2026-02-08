@@ -10,9 +10,24 @@
 // =============================================================================
 
 /**
- * WebSocket port for Yjs document sync (plain WS)
+ * Get sidecar ports from Electron preload if available, otherwise use defaults
+ * This allows tests to run with custom ports
  */
-export const YJS_WS_PORT = 8080;
+function getSidecarPorts() {
+  if (typeof window !== 'undefined' && window.electronAPI?.sidecarPorts) {
+    return window.electronAPI.sidecarPorts;
+  }
+  return { yjs: 8080, meta: 8081 };
+}
+
+// Cache the ports at module load time
+const _cachedPorts = getSidecarPorts();
+
+/**
+ * WebSocket port for Yjs document sync (plain WS)
+ * Can be overridden via Electron environment for testing
+ */
+export const YJS_WS_PORT = _cachedPorts.yjs;
 
 /**
  * WebSocket port for Yjs document sync (secure WSS)
@@ -21,8 +36,9 @@ export const YJS_WSS_PORT = 8443;
 
 /**
  * WebSocket port for metadata/command sync
+ * Can be overridden via Electron environment for testing
  */
-export const META_WS_PORT = 8081;
+export const META_WS_PORT = _cachedPorts.meta;
 
 /**
  * Default port for web server

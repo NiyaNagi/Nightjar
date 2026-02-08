@@ -23,9 +23,9 @@ const { defineConfig, devices } = require('@playwright/test');
 module.exports = defineConfig({
   testDir: './specs',
   
-  // Run tests in parallel for speed (each test is isolated)
-  // Set to false for debugging or if tests interfere
-  fullyParallel: process.env.E2E_PARALLEL !== 'false',
+  // Run tests sequentially - Electron tests share ports and resources
+  // that conflict when run in parallel. Use E2E_PARALLEL=true to override.
+  fullyParallel: process.env.E2E_PARALLEL === 'true',
   
   // Fail the build on CI if you accidentally left test.only in the source code.
   forbidOnly: !!process.env.CI,
@@ -33,9 +33,10 @@ module.exports = defineConfig({
   // Retry failed tests (more retries in CI)
   retries: process.env.CI ? 2 : 1,
   
-  // Parallel workers - limited to avoid resource exhaustion with Electron
-  // In CI, use 1 worker for reliability. Locally, can use more.
-  workers: process.env.CI ? 1 : (process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS) : 2),
+  // Single worker by default - Electron tests need isolated resources
+  // Multiple workers cause port conflicts (3100, etc.)
+  // Override with E2E_WORKERS env var if needed
+  workers: process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS) : 1,
   
   // Rich reporting
   reporter: [

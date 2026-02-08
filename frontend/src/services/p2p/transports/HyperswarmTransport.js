@@ -12,7 +12,9 @@ export class HyperswarmTransport extends BaseTransport {
   constructor() {
     super('hyperswarm');
     this.socket = null; // WebSocket to sidecar
-    this.sidecarUrl = 'ws://localhost:8081';
+    // Get port from electronAPI if available, otherwise use default
+    const metaPort = window.electronAPI?.sidecarPorts?.meta || 8081;
+    this.sidecarUrl = `ws://localhost:${metaPort}`;
     this.topics = new Set();
     this.isElectron = false;
     this.reconnectTimer = null;

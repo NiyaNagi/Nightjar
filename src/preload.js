@@ -14,7 +14,16 @@ try {
     console.warn('[Preload] Could not get app version:', e.message);
 }
 
+// Get sidecar ports from main process (can be customized via env vars for testing)
+let sidecarPorts = { yjs: 8080, meta: 8081 };
+try {
+    sidecarPorts = ipcRenderer.sendSync('get-sidecar-ports') || sidecarPorts;
+} catch (e) {
+    console.warn('[Preload] Could not get sidecar ports:', e.message);
+}
+
 console.log('[Preload] App version:', appVersion);
+console.log('[Preload] Sidecar ports:', sidecarPorts);
 console.log('[Preload] Exposing electronAPI to window...');
 
 // We are exposing a controlled API to the frontend (renderer process)
@@ -22,6 +31,9 @@ console.log('[Preload] Exposing electronAPI to window...');
 contextBridge.exposeInMainWorld('electronAPI', {
     // --- App Info ---
     appVersion: appVersion,
+    
+    // --- Sidecar Ports (customizable for testing) ---
+    sidecarPorts: sidecarPorts,
     
     // --- Frontend to Backend ---
     setKey: (key) => ipcRenderer.send('set-key', key),
