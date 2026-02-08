@@ -311,9 +311,13 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
         createdBy: yInfo.get('createdBy'),
         createdAt: yInfo.get('createdAt'),
       };
+      console.log(`[WorkspaceSync] syncInfo called:`, JSON.stringify(info));
       // Only update if we have a name (indicates data exists)
       if (info.name) {
+        console.log(`[WorkspaceSync] Updating workspaceInfo state with name: "${info.name}"`);
         setWorkspaceInfo(info);
+      } else {
+        console.log(`[WorkspaceSync] Skipping workspaceInfo update - no name in Yjs`);
       }
     };
     
@@ -328,19 +332,48 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     const trySetInitialInfo = () => {
       if (hasSetInitialInfo || !initialWorkspaceInfo) return;
       // Only set if remote is empty (no name set)
-      if (!yInfo.get('name')) {
+      const existingName = yInfo.get('name');
+      console.log(`[WorkspaceSync] trySetInitialInfo - existingName: "${existingName}", initialName: "${initialWorkspaceInfo?.name}"`);
+      if (!existingName) {
         hasSetInitialInfo = true;
+        console.log(`[WorkspaceSync] Setting initial workspace info (no existing name in Yjs)`);
         yInfo.set('name', initialWorkspaceInfo.name);
         yInfo.set('icon', initialWorkspaceInfo.icon || '📁');
         yInfo.set('color', initialWorkspaceInfo.color || '#6366f1');
         yInfo.set('createdBy', initialWorkspaceInfo.createdBy || 'unknown');
         yInfo.set('createdAt', initialWorkspaceInfo.createdAt || Date.now());
+      } else {
+        console.log(`[WorkspaceSync] NOT setting initial info - Yjs already has name: "${existingName}"`);
       }
     };
     
     // Wait for initial sync before setting info (to check if remote has data)
     provider.on('synced', () => {
+      console.log(`[WorkspaceSync] ========== SYNC RECEIVED ==========`);
       console.log(`[WorkspaceSync] synced event - resyncing all data to React state`);
+      
+      // Log what we received from peers
+      const receivedDocs = yDocuments.toArray();
+      const receivedFolders = yFolders.toArray();
+      const receivedInfo = {
+        name: yInfo.get('name'),
+        icon: yInfo.get('icon'),
+        color: yInfo.get('color'),
+        createdBy: yInfo.get('createdBy'),
+      };
+      const receivedMembersCount = yMembers.size;
+      const receivedKickedCount = yKicked.size;
+      
+      console.log(`[WorkspaceSync] Received from peers:`, JSON.stringify({
+        documentsCount: receivedDocs.length,
+        documentNames: receivedDocs.map(d => ({ id: d.id?.substring(0, 10), name: d.name })),
+        foldersCount: receivedFolders.length,
+        workspaceInfo: receivedInfo,
+        membersCount: receivedMembersCount,
+        kickedCount: receivedKickedCount,
+      }, null, 2));
+      console.log(`[WorkspaceSync] ==================================`);
+      
       setSynced(true);
       // Re-sync all data to React state after provider sync
       syncDocuments();
