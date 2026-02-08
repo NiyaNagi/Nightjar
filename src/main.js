@@ -283,6 +283,12 @@ app.on('ready', async () => {
         console.log('[Main] Using fallback isDev check:', isDev);
     }
     
+    // Allow forcing production mode via environment variable (for testing)
+    if (process.env.NIGHTJAR_FORCE_PROD === 'true' || process.env.NIGHTJAR_TEST_MODE === 'true') {
+        console.log('[Main] Force production mode enabled via environment variable');
+        isDev = false;
+    }
+    
     console.log('[Main] Modules loaded, starting backend...');
     
     // Add a timeout fallback to ensure a window is always created

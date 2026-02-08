@@ -1,0 +1,257 @@
+name: E2E Cross-Network Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run full matrix nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_tier:
+        description: 'Test tier to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - matrix
+          - full
+          - relay
+
+env:
+  CI: true
+  PLAYWRIGHT_BROWSERS_PATH: 0
+
+jobs:
+  # Tier 1: Smoke tests - run on every PR
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
+      - name: Setup Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Run Smoke Tests
+        run: xvfb-run --auto-servernum npm run test:e2e:smoke
+        env:
+          DISPLAY: ':99'
+      
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: smoke-test-artifacts
+          path: |
+            tests/e2e/test-results/
+            playwright-report/
+          retention-days: 7
+
+  # Tier 2: Standard matrix - run on main branch pushes
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event.inputs.test_tier == 'matrix'
+    needs: smoke
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
+      - name: Setup Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Run Matrix Tests
+        run: xvfb-run --auto-servernum npm run test:e2e:matrix
+        env:
+          DISPLAY: ':99'
+      
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: matrix-test-artifacts
+          path: |
+            tests/e2e/test-results/
+            playwright-report/
+          retention-days: 7
+
+  # Tier 3: Full matrix + adversarial - nightly or manual
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: github.event_name == 'schedule' || github.event.inputs.test_tier == 'full'
+    needs: matrix
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
+      - name: Setup Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Run Full Matrix Tests
+        run: xvfb-run --auto-servernum npm run test:e2e:full
+        env:
+          DISPLAY: ':99'
+          # Longer timeout for DHT tests
+          DHT_DISCOVERY_TIMEOUT: '90000'
+      
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-test-artifacts
+          path: |
+            tests/e2e/test-results/
+            playwright-report/
+          retention-days: 14
+
+  # Relay bridge tests - part of full suite
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event.inputs.test_tier == 'relay' || github.event.inputs.test_tier == 'full'
+    needs: smoke
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
+      - name: Setup Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Run Relay Bridge Tests
+        run: xvfb-run --auto-servernum npm run test:e2e:relay
+        env:
+          DISPLAY: ':99'
+      
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: relay-test-artifacts
+          path: |
+            tests/e2e/test-results/
+            playwright-report/
+          retention-days: 7
+
+  # Windows smoke test
+  smoke-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
+      - name: Run Smoke Tests (Windows)
+        run: npm run test:e2e:smoke
+      
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: windows-smoke-artifacts
+          path: |
+            tests/e2e/test-results/
+            playwright-report/
+          retention-days: 7
+
+  # macOS smoke test
+  smoke-macos:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+      
+      - name: Run Smoke Tests (macOS)
+        run: npm run test:e2e:smoke
+      
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: macos-smoke-artifacts
+          path: |
+            tests/e2e/test-results/
+            playwright-report/
+          retention-days: 7

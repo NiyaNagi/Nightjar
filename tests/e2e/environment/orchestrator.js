@@ -174,10 +174,16 @@ class ManagedProcess {
     this.logCollector.add(this.name, 'info', `Starting: ${this.command} ${this.args.join(' ')}`);
     this.logCollector.add(this.name, 'info', `Environment: YJS=${this.options.env?.YJS_WEBSOCKET_PORT}, META=${this.options.env?.METADATA_WEBSOCKET_PORT}`);
     
-    this.process = spawn(this.command, this.args, {
+    // On Windows, use shell with properly quoted args to handle paths with spaces
+    const isWindows = process.platform === 'win32';
+    const quotedArgs = isWindows 
+      ? this.args.map(arg => arg.includes(' ') ? `"${arg}"` : arg)
+      : this.args;
+    
+    this.process = spawn(this.command, quotedArgs, {
       ...this.options,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: process.platform === 'win32'
+      shell: isWindows
     });
 
     this.logCollector.add(this.name, 'info', `Process spawned with PID: ${this.process.pid}`);
