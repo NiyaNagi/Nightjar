@@ -6,135 +6,17 @@
  */
 const { test, expect } = require('../fixtures/test-fixtures.js');
 const { env, PORTS } = require('../environment/orchestrator.js');
+const {
+  waitForAppReady,
+  ensureIdentityExists,
+  createWorkspaceViaUI,
+  getShareLinkViaUI,
+  openWorkspaceSettings,
+} = require('../helpers/assertions.js');
 
-// Helper to wait for page to be ready
-async function waitForAppReady(page, timeout = 60000) {
-  // Wait for either main app, onboarding, or post-identity welcome
-  await page.waitForSelector('[data-testid="workspace-sidebar"], [data-testid="onboarding-welcome"], .workspace-switcher, .sidebar, .create-step, .empty-editor-state.onboarding-welcome, .onboarding-welcome', { 
-    timeout 
-  });
-}
-
-// Helper to create identity if needed
-async function ensureIdentityExists(page, name = 'TestUser') {
-  // Check if we're on onboarding welcome screen
-  const onboarding = page.locator('[data-testid="onboarding-welcome"]');
-  if (await onboarding.isVisible({ timeout: 5000 }).catch(() => false)) {
-    console.log('[TEST] Onboarding screen detected, creating identity...');
-    
-    // Click create new identity
-    await page.click('[data-testid="create-identity-btn"]');
-    await page.waitForSelector('[data-testid="identity-name-input"]', { timeout: 10000 });
-    
-    // Fill in the name
-    await page.fill('[data-testid="identity-name-input"]', name);
-    console.log('[TEST] Filled identity name:', name);
-    
-    // Click confirm to create identity
-    await page.click('[data-testid="confirm-identity-btn"]');
-    console.log('[TEST] Clicked confirm identity button');
-    
-    // Now we should see the recovery phrase step
-    await page.waitForSelector('[data-testid="recovery-phrase"], [data-testid="understood-checkbox"]', { timeout: 10000 });
-    console.log('[TEST] Recovery phrase step visible');
-    
-    // Click the checkbox to confirm we've saved the phrase
-    await page.click('[data-testid="understood-checkbox"]');
-    
-    // Click continue
-    await page.click('[data-testid="continue-btn"]');
-    console.log('[TEST] Clicked continue after recovery phrase');
-    
-    // Wait for main app to load - either no-workspace welcome or full sidebar
-    await page.waitForSelector('.onboarding-welcome, .workspace-switcher, [data-testid="workspace-sidebar"], .sidebar', { timeout: 30000 });
-    console.log('[TEST] Main app loaded after identity creation');
-  } else {
-    console.log('[TEST] Already have identity or main app visible');
-  }
-}
-
-// Helper to create workspace via UI
-async function createWorkspaceViaUI(page, workspaceName) {
-  // Check if we're on the "no workspace" welcome screen
-  const noWorkspaceWelcome = page.locator('.empty-editor-state.onboarding-welcome, .onboarding-welcome:not([data-testid])');
-  const createBtn = page.locator('.btn-create.primary:has-text("Create Workspace"), button:has-text("Create Workspace")');
-  
-  if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    console.log('[TEST] No workspace welcome screen detected');
-    await createBtn.click();
-  } else {
-    // Try workspace switcher for existing workspace scenario
-    const switcherCreateBtn = page.locator('[data-testid="create-workspace-btn"], [data-testid="dropdown-create-workspace-btn"]');
-    if (await switcherCreateBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await switcherCreateBtn.click();
-    } else {
-      // Click workspace switcher to open menu
-      await page.click('[data-testid="workspace-selector"], .workspace-switcher__current');
-      await page.waitForTimeout(500);
-      await page.click('[data-testid="dropdown-create-workspace-btn"]');
-    }
-  }
-  
-  // Wait for create workspace dialog
-  await page.waitForSelector('[data-testid="workspace-name-input"]', { timeout: 10000 });
-  await page.fill('[data-testid="workspace-name-input"]', workspaceName);
-  console.log('[TEST] Filled workspace name:', workspaceName);
-  
-  await page.click('[data-testid="confirm-workspace-btn"]');
-  console.log('[TEST] Clicked confirm workspace button');
-  
-  // Wait for workspace to be created - the sidebar should now appear
-  await page.waitForSelector('.workspace-switcher, [data-testid="workspace-sidebar"], .sidebar', { timeout: 30000 });
-  console.log('[TEST] Workspace created, sidebar visible');
-  
-  await page.waitForTimeout(2000);
-}
-
-// Helper to open workspace settings
-async function openWorkspaceSettings(page) {
-  // Click the settings gear button
-  const settingsBtn = page.locator('[data-testid="workspace-settings-btn"]');
-  await settingsBtn.waitFor({ timeout: 10000 });
-  await settingsBtn.click();
-  console.log('[TEST] Clicked workspace settings button');
-  
-  // Wait for settings panel to appear
-  await page.waitForSelector('.workspace-settings, .workspace-settings__panel', { timeout: 10000 });
-  console.log('[TEST] Workspace settings panel opened');
-}
-
-// Helper to get share link from workspace settings
+// Helper to get share link from workspace settings (wrapper around consolidated helper)
 async function getShareLink(page) {
-  await openWorkspaceSettings(page);
-  
-  // Set up clipboard interceptor before clicking
-  await page.evaluate(() => {
-    window.__capturedClipboard = null;
-    const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
-    navigator.clipboard.writeText = async (text) => {
-      window.__capturedClipboard = text;
-      return originalWriteText(text);
-    };
-  });
-  
-  // Click the copy link button
-  const copyBtn = page.locator('[data-testid="copy-share-link-btn"]');
-  await copyBtn.waitFor({ timeout: 10000 });
-  await copyBtn.click();
-  console.log('[TEST] Clicked copy share link button');
-  
-  // Wait for clipboard operation
-  await page.waitForTimeout(1500);
-  
-  // Get the captured clipboard content
-  const clipboardText = await page.evaluate(() => window.__capturedClipboard);
-  
-  if (clipboardText && (clipboardText.includes('nahma://') || clipboardText.includes('k:'))) {
-    console.log('[TEST] Captured share link:', clipboardText.substring(0, 60) + '...');
-    return clipboardText;
-  }
-  
-  throw new Error('Could not get share link from clipboard interceptor');
+  return await getShareLinkViaUI(page);
 }
 
 test.describe('UI Sharing - Cross-Client', () => {
@@ -274,8 +156,8 @@ test.describe('UI Sharing - Cross-Client', () => {
       await ensureIdentityExists(page2, 'Viewer');
       
       // Navigate to join URL
-      let joinUrl = shareLink.startsWith('nahma://') 
-        ? shareLink.replace('nahma://', `${unifiedServer1.url}/#`)
+      let joinUrl = shareLink.startsWith('nightjar://') 
+        ? shareLink.replace('nightjar://', `${unifiedServer1.url}/#`)
         : `${unifiedServer1.url}/#${shareLink}`;
       
       await page2.goto(joinUrl);
@@ -353,8 +235,8 @@ test.describe('UI Sharing - Cross-Client', () => {
       await waitForAppReady(page2);
       await ensureIdentityExists(page2, 'Editor2');
       
-      let joinUrl = shareLink.startsWith('nahma://') 
-        ? shareLink.replace('nahma://', `${unifiedServer1.url}/#`)
+      let joinUrl = shareLink.startsWith('nightjar://') 
+        ? shareLink.replace('nightjar://', `${unifiedServer1.url}/#`)
         : `${unifiedServer1.url}/#${shareLink}`;
       
       await page2.goto(joinUrl);

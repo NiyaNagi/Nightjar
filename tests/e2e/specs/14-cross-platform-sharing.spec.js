@@ -9,131 +9,17 @@
  */
 const { test, expect } = require('../fixtures/test-fixtures.js');
 const crypto = require('crypto');
+const {
+  waitForAppReady,
+  ensureIdentityExists,
+  createWorkspaceViaUI,
+  getShareLinkViaUI,
+  joinWorkspaceViaUI,
+  parseNightjarLink,
+} = require('../helpers/assertions.js');
 
 // Increase timeout for cross-platform tests (sidecars take ~20-25 seconds to start each)
 test.setTimeout(180000); // 3 minutes per test
-
-// Helper to wait for page to be ready
-async function waitForAppReady(page, timeout = 60000) {
-  await page.waitForSelector('[data-testid="workspace-sidebar"], [data-testid="onboarding-welcome"], .workspace-switcher, .sidebar, .empty-editor-state.onboarding-welcome, .onboarding-welcome', { 
-    timeout 
-  });
-}
-
-// Helper to create identity if needed
-async function ensureIdentityExists(page, name = 'TestUser') {
-  const onboarding = page.locator('[data-testid="onboarding-welcome"]');
-  if (await onboarding.isVisible({ timeout: 5000 }).catch(() => false)) {
-    console.log('[TEST] Onboarding screen detected, creating identity...');
-    
-    await page.click('[data-testid="create-identity-btn"]');
-    await page.waitForSelector('[data-testid="identity-name-input"]', { timeout: 10000 });
-    await page.fill('[data-testid="identity-name-input"]', name);
-    await page.click('[data-testid="confirm-identity-btn"]');
-    
-    await page.waitForSelector('[data-testid="recovery-phrase"], [data-testid="understood-checkbox"]', { timeout: 10000 });
-    await page.click('[data-testid="understood-checkbox"]');
-    await page.click('[data-testid="continue-btn"]');
-    
-    await page.waitForSelector('.onboarding-welcome, .workspace-switcher, [data-testid="workspace-sidebar"], .sidebar', { timeout: 30000 });
-    console.log('[TEST] Identity created');
-  }
-}
-
-// Helper to create workspace via UI
-async function createWorkspaceViaUI(page, workspaceName) {
-  const createBtn = page.locator('.btn-create.primary:has-text("Create Workspace"), button:has-text("Create Workspace")');
-  
-  if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await createBtn.click();
-  } else {
-    const switcherCreateBtn = page.locator('[data-testid="create-workspace-btn"], [data-testid="dropdown-create-workspace-btn"]');
-    if (await switcherCreateBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await switcherCreateBtn.click();
-    } else {
-      await page.click('[data-testid="workspace-selector"], .workspace-switcher__current');
-      await page.waitForTimeout(500);
-      await page.click('[data-testid="dropdown-create-workspace-btn"]');
-    }
-  }
-  
-  await page.waitForSelector('[data-testid="workspace-name-input"]', { timeout: 10000 });
-  await page.fill('[data-testid="workspace-name-input"]', workspaceName);
-  await page.click('[data-testid="confirm-workspace-btn"]');
-  
-  await page.waitForSelector('.workspace-switcher, [data-testid="workspace-sidebar"], .sidebar', { timeout: 30000 });
-  await page.waitForTimeout(2000);
-  console.log('[TEST] Workspace created:', workspaceName);
-}
-
-// Helper to get share link via UI
-async function getShareLinkViaUI(page) {
-  // Click settings button
-  const settingsBtn = page.locator('[data-testid="workspace-settings-btn"]');
-  await settingsBtn.waitFor({ timeout: 10000 });
-  await settingsBtn.click();
-  
-  await page.waitForSelector('.workspace-settings, .workspace-settings__panel', { timeout: 10000 });
-  
-  // Set up clipboard interceptor
-  await page.evaluate(() => {
-    window.__capturedClipboard = null;
-    const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
-    navigator.clipboard.writeText = async (text) => {
-      window.__capturedClipboard = text;
-      return originalWriteText(text);
-    };
-  });
-  
-  const copyBtn = page.locator('[data-testid="copy-share-link-btn"]');
-  await copyBtn.waitFor({ timeout: 10000 });
-  await copyBtn.click();
-  
-  await page.waitForTimeout(1500);
-  
-  const clipboardText = await page.evaluate(() => window.__capturedClipboard);
-  
-  if (clipboardText && (clipboardText.includes('nightjar://') || clipboardText.includes('k:'))) {
-    console.log('[TEST] Captured share link:', clipboardText.substring(0, 60) + '...');
-    // Close settings
-    await page.keyboard.press('Escape');
-    return clipboardText;
-  }
-  
-  throw new Error('Could not get share link from clipboard');
-}
-
-// Helper to join workspace via UI with share link
-async function joinWorkspaceViaUI(page, shareLink) {
-  const joinCodeBtn = page.locator('button:has-text("Join with a Code"), [data-testid="join-workspace-btn"]');
-  await joinCodeBtn.waitFor({ timeout: 10000 });
-  await joinCodeBtn.click();
-  
-  await page.waitForSelector('[data-testid="share-link-input"], .join-with-link input, input[placeholder*="nightjar"]', { timeout: 10000 });
-  await page.fill('[data-testid="share-link-input"], .join-with-link input, input[placeholder*="nightjar"]', shareLink);
-  
-  await page.waitForTimeout(1000);
-  
-  const joinBtn = page.locator('[data-testid="join-btn"]');
-  await joinBtn.waitFor({ timeout: 10000 });
-  await joinBtn.click();
-  
-  await page.waitForTimeout(5000);
-  console.log('[TEST] Joined workspace via UI');
-}
-
-// Helper to parse nightjar:// link to extract workspace ID and key
-function parseNightjarLink(link) {
-  // Format: nightjar://w/{id}#k:{key}&perm:{permission}
-  const match = link.match(/nightjar:\/\/w\/([^#]+)#k:([^&]+)/);
-  if (match) {
-    return {
-      workspaceId: match[1],
-      encryptionKey: match[2]
-    };
-  }
-  return null;
-}
 
 test.describe('Cross-Platform Sharing', () => {
 
