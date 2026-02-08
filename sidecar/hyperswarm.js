@@ -610,10 +610,25 @@ class HyperswarmManager extends EventEmitter {
           break;
 
         case 'join-topic':
+          // Only add if not already in topics (prevents duplicates from reciprocal messages)
+          const alreadyTracked = conn.topics.has(message.topic);
           conn.topics.add(message.topic);
-          this.emit('peer-joined', { peerId, topic: message.topic, identity: conn.identity });
-          // When a peer joins our topic, send them our full state
-          this.emit('sync-state-request', { peerId, topic: message.topic });
+          
+          if (!alreadyTracked) {
+            this.emit('peer-joined', { peerId, topic: message.topic, identity: conn.identity });
+            // When a peer joins our topic, send them our full state
+            this.emit('sync-state-request', { peerId, topic: message.topic });
+            
+            // CRITICAL: If we're also on this topic, send back a join-topic so they can broadcast to us
+            // This enables bidirectional communication immediately
+            if (this.topics.has(message.topic)) {
+              console.log(`[Hyperswarm] Sending reciprocal join-topic to ${peerId.slice(0, 16)}... for topic ${message.topic?.slice(0, 16)}...`);
+              this._sendMessage(conn.socket, {
+                type: 'join-topic',
+                topic: message.topic
+              });
+            }
+          }
           break;
 
         case 'leave-topic':

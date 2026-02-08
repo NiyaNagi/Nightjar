@@ -146,7 +146,8 @@ function App() {
         identity: userIdentity, 
         needsOnboarding, 
         createIdentity,
-        loading: identityLoading 
+        loading: identityLoading,
+        syncFromIdentityManager,
     } = useIdentity();
     
     // --- Workspace & Folder Context ---
@@ -425,8 +426,12 @@ function App() {
         // Clear locked state since identity is now selected/unlocked
         setIsLocked(false);
         
-        // Update user profile with selected identity
+        // CRITICAL: Sync identity data (including privateKey) to IdentityContext
+        // This enables signed share links to work
         if (identityData) {
+            syncFromIdentityManager(identityData);
+            
+            // Update user profile with selected identity
             setUserProfile({
                 name: identityData.handle || metadata?.handle || 'Anonymous',
                 icon: identityData.icon || metadata?.icon || '😊',
@@ -435,7 +440,7 @@ function App() {
         }
         
         showToast(`Signed in as ${metadata?.handle || 'User'}`, 'success');
-    }, [showToast, setIsLocked]);
+    }, [showToast, setIsLocked, syncFromIdentityManager]);
     
     const handleNeedsMigration = useCallback(() => {
         // Legacy identity detected, need to migrate
@@ -1228,8 +1233,13 @@ function App() {
                 const unlocked = identityManager.getUnlockedIdentity();
                 if (unlocked) {
                     console.log('[App] Valid session with unlocked identity:', unlocked.metadata?.handle);
-                    // Update user profile from unlocked identity
+                    
+                    // CRITICAL: Sync identity data (including privateKey) to IdentityContext
+                    // This enables signed share links to work on app restart with existing session
                     if (unlocked.identityData) {
+                        syncFromIdentityManager(unlocked.identityData);
+                        
+                        // Update user profile from unlocked identity
                         setUserProfile({
                             name: unlocked.identityData.handle || 'Anonymous',
                             icon: unlocked.identityData.icon || '😊',
@@ -1257,7 +1267,7 @@ function App() {
         }
         // If no identities at all, IdentityContext will handle showing onboarding via needsOnboarding
         setStartupComplete(true);
-    }, [identityLoading, handleNeedsMigration, userIdentity, userProfile]);
+    }, [identityLoading, handleNeedsMigration, userIdentity, userProfile, syncFromIdentityManager]);
     
     // Show loading screen while checking identity status
     if (identityLoading || !startupComplete) {

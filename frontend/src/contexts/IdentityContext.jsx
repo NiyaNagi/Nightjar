@@ -361,6 +361,17 @@ export function IdentityProvider({ children }) {
         }
     }, []);
     
+    // Sync identity from identityManager (multi-identity system)
+    // This should be called when an identity is unlocked from the new system
+    const syncFromIdentityManager = useCallback((identityData) => {
+        if (identityData) {
+            secureLog('[Identity] Syncing identity from identityManager:', identityData.handle);
+            setIdentity(identityData);
+            setNeedsOnboarding(false);
+            setHasExistingIdentity(true);
+        }
+    }, []);
+    
     // Get current device info from identity
     const currentDevice = identity?.devices?.find(d => d.isCurrent);
     
@@ -386,7 +397,8 @@ export function IdentityProvider({ children }) {
         deleteIdentity,
         exportIdentity,
         importIdentity,
-        reloadIdentity: loadIdentity
+        reloadIdentity: loadIdentity,
+        syncFromIdentityManager,
     };
     
     return (
