@@ -189,8 +189,8 @@ describe('Sharing Utilities', () => {
   });
 
   describe('createNewEntity', () => {
-    test('creates new workspace with ID and share link', () => {
-      const result = createNewEntity('workspace', {
+    test('creates new workspace with ID and share link', async () => {
+      const result = await createNewEntity('workspace', {
         password: 'workspace-pass',
         permission: 'owner',
       });
@@ -200,8 +200,8 @@ describe('Sharing Utilities', () => {
       expect(result.shareLink).toMatch(/^nightjar:\/\/w\//i);
     });
 
-    test('creates new folder with ID and share link', () => {
-      const result = createNewEntity('folder', {
+    test('creates new folder with ID and share link', async () => {
+      const result = await createNewEntity('folder', {
         password: 'folder-pass',
         permission: 'editor',
       });
@@ -210,8 +210,8 @@ describe('Sharing Utilities', () => {
       expect(result.shareLink).toMatch(/^nightjar:\/\/f\//i);
     });
 
-    test('creates new document with ID and share link', () => {
-      const result = createNewEntity('document', {
+    test('creates new document with ID and share link', async () => {
+      const result = await createNewEntity('document', {
         password: 'doc-pass',
         permission: 'viewer',
       });
@@ -220,10 +220,10 @@ describe('Sharing Utilities', () => {
       expect(result.shareLink).toMatch(/^nightjar:\/\/d\//i);
     });
 
-    test('generated IDs are unique', () => {
+    test('generated IDs are unique', async () => {
       const ids = new Set();
       for (let i = 0; i < 100; i++) {
-        const result = createNewEntity('workspace', { password: 'test' });
+        const result = await createNewEntity('workspace', { password: 'test' });
         ids.add(result.entityId);
       }
       expect(ids.size).toBe(100);

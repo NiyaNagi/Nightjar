@@ -129,7 +129,7 @@ export async function runMigration(options = {}) {
     // 2. Create default workspace for migrated content
     const workspaceName = 'My Documents';
     const password = generatePassword();
-    const { entityId: workspaceId, shareLink } = createNewEntity('workspace', {
+    const { entityId: workspaceId, shareLink } = await createNewEntity('workspace', {
       password,
       permission: 'owner',
     });

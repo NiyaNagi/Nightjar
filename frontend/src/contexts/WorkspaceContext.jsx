@@ -526,8 +526,8 @@ export function WorkspaceProvider({ children }) {
     
     // Password is optional
     
-    // Create entity with share link
-    const { entityId, shareLink, topic } = createNewEntity('workspace', {
+    // Create entity with share link (async to ensure correct topic hash)
+    const { entityId, shareLink, topic } = await createNewEntity('workspace', {
       password: password || null,
       permission: 'owner',
     });
