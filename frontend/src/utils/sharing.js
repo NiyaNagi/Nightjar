@@ -629,9 +629,9 @@ export async function createNewDocument(options = {}) {
  * Generate a new entity (workspace, folder, or document) with share link
  * @param {string} entityType - 'workspace' | 'folder' | 'document'
  * @param {Object} options - Share link options
- * @returns {Object} { entityId, shareLink, topic }
+ * @returns {Promise<Object>} { entityId, shareLink, topic }
  */
-export function createNewEntity(entityType, options = {}) {
+export async function createNewEntity(entityType, options = {}) {
   // Generate random 16-byte entity ID
   const idBytes = new Uint8Array(16);
   crypto.getRandomValues(idBytes);
@@ -648,7 +648,8 @@ export function createNewEntity(entityType, options = {}) {
   // Generate topic hash for P2P discovery
   // For workspaces, the topic is based on workspace ID
   // For folders/documents, it inherits from workspace
-  const topic = generateTopicFromEntityId(entityType, entityId, options.password);
+  // MUST await - generateTopicFromEntityId is now async to use correct sha256
+  const topic = await generateTopicFromEntityId(entityType, entityId, options.password);
   
   return {
     entityId,
@@ -666,21 +667,23 @@ const WORKSPACE_TOPIC_PREFIX = 'nightjar-workspace:';
 
 /**
  * Generate topic hash from entity ID
+ * IMPORTANT: Must use sha256Async for correct output (the sync sha256 has a padding bug)
  * @param {string} entityType - Entity type
  * @param {string} entityId - Entity ID (hex)
  * @param {string} password - Password for the entity (ignored for topic generation)
- * @returns {string} Topic hash (hex)
+ * @returns {Promise<string>} Topic hash (hex)
  */
-export function generateTopicFromEntityId(entityType, entityId, password = '') {
+export async function generateTopicFromEntityId(entityType, entityId, password = '') {
   // For workspaces, use the standard prefix that matches sidecar/mesh-constants.js
   // This ensures all peers join the SAME DHT topic regardless of password
+  // MUST use sha256Async - the sync sha256 has a padding bug that produces wrong hashes
   if (entityType === 'workspace') {
-    return sha256(WORKSPACE_TOPIC_PREFIX + entityId);
+    return await sha256Async(WORKSPACE_TOPIC_PREFIX + entityId);
   }
   // Folders and documents inherit from their workspace's topic
   // They use a different prefix to avoid collisions
   const data = `nightjar-${entityType}:${entityId}`;
-  return sha256(data);
+  return await sha256Async(data);
 }
 
 /**
