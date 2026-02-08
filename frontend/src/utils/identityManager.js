@@ -169,6 +169,38 @@ function encryptData(data, key) {
 }
 
 /**
+ * Convert Uint8Array-like objects back to Uint8Array after JSON parse
+ * When Uint8Array is serialized with JSON.stringify, it becomes {0: val, 1: val, ...}
+ * This function detects and converts those back to proper Uint8Array instances
+ */
+function restoreUint8Arrays(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    
+    // If it looks like a serialized Uint8Array (numeric keys 0, 1, 2, ...)
+    if (!Array.isArray(obj)) {
+        const keys = Object.keys(obj);
+        // Check specific known Uint8Array fields
+        if (obj.privateKey && typeof obj.privateKey === 'object' && !ArrayBuffer.isView(obj.privateKey)) {
+            obj.privateKey = new Uint8Array(Object.values(obj.privateKey));
+        }
+        if (obj.publicKey && typeof obj.publicKey === 'object' && !ArrayBuffer.isView(obj.publicKey)) {
+            obj.publicKey = new Uint8Array(Object.values(obj.publicKey));
+        }
+        // Also handle keypair if present
+        if (obj.keypair) {
+            if (obj.keypair.secretKey && typeof obj.keypair.secretKey === 'object' && !ArrayBuffer.isView(obj.keypair.secretKey)) {
+                obj.keypair.secretKey = new Uint8Array(Object.values(obj.keypair.secretKey));
+            }
+            if (obj.keypair.publicKey && typeof obj.keypair.publicKey === 'object' && !ArrayBuffer.isView(obj.keypair.publicKey)) {
+                obj.keypair.publicKey = new Uint8Array(Object.values(obj.keypair.publicKey));
+            }
+        }
+    }
+    
+    return obj;
+}
+
+/**
  * Decrypt data with a key
  */
 function decryptData(encryptedString, key) {
@@ -180,7 +212,9 @@ function decryptData(encryptedString, key) {
         const decrypted = nacl.secretbox.open(ciphertext, nonce, key);
         if (!decrypted) return null;
         
-        return JSON.parse(new TextDecoder().decode(decrypted));
+        const parsed = JSON.parse(new TextDecoder().decode(decrypted));
+        // Restore Uint8Array fields that were serialized as plain objects
+        return restoreUint8Arrays(parsed);
     } catch {
         return null;
     }
