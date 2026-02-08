@@ -235,10 +235,62 @@ function App() {
     const isElectronMode = isElectron();
     const isRemoteWorkspace = !!workspaceServerUrl;
     const [localDocuments, setLocalDocuments] = useState([]);
+    // Track if we've migrated local docs to Yjs this session
+    const localDocsMigratedRef = useRef(false);
     // Use syncedDocuments for: 1) web mode, 2) Electron joining remote workspace
     // Use localDocuments for: Electron with local workspace (no serverUrl)
     const documents = (isElectronMode && !isRemoteWorkspace) ? localDocuments : syncedDocuments;
     const setDocuments = (isElectronMode && !isRemoteWorkspace) ? setLocalDocuments : () => {}; // No-op for synced mode
+    
+    // --- Migrate local documents to Yjs for P2P sync ---
+    // In Electron mode, documents are stored in sidecar's metadata DB.
+    // They need to be synced to Yjs so they can be shared via P2P.
+    useEffect(() => {
+        // Debug: log all conditions on every run
+        console.log('[P2P-Migration] Effect check:', JSON.stringify({
+            isElectronMode,
+            isRemoteWorkspace,
+            workspaceSyncConnected,
+            localDocsCount: localDocuments.length,
+            syncedDocsCount: syncedDocuments.length,
+            alreadyMigrated: localDocsMigratedRef.current,
+            hasSyncAddDocument: !!syncAddDocument,
+        }));
+        
+        // Only run in Electron local mode (not remote workspace)
+        if (!isElectronMode || isRemoteWorkspace) return;
+        // Need workspace sync to be connected
+        if (!workspaceSyncConnected) return;
+        // Need local documents to migrate
+        if (localDocuments.length === 0) return;
+        // Don't migrate if we've already done it this session
+        if (localDocsMigratedRef.current) return;
+        // Need syncAddDocument function
+        if (!syncAddDocument) return;
+        
+        // Check if Yjs already has documents (don't overwrite existing P2P state)
+        if (syncedDocuments.length > 0) {
+            console.log('[P2P-Migration] Yjs already has documents, skipping migration');
+            localDocsMigratedRef.current = true;
+            return;
+        }
+        
+        console.log(`[P2P-Migration] Migrating ${localDocuments.length} local documents to Yjs for P2P sync`);
+        localDocsMigratedRef.current = true;
+        
+        // Add each local document to Yjs (syncAddDocument checks for duplicates)
+        for (const doc of localDocuments) {
+            console.log(`[P2P-Migration] Adding document: ${doc.id} - ${doc.name}`);
+            syncAddDocument(doc);
+        }
+        
+        console.log('[P2P-Migration] Migration complete');
+    }, [isElectronMode, isRemoteWorkspace, workspaceSyncConnected, localDocuments, syncedDocuments, syncAddDocument]);
+    
+    // Reset migration flag when workspace changes
+    useEffect(() => {
+        localDocsMigratedRef.current = false;
+    }, [currentWorkspaceId]);
     
     // --- Document State ---
     const [openTabs, setOpenTabs] = useState([]);
@@ -689,6 +741,7 @@ function App() {
                             // Request P2P info after key is set to get public IP
                             metaSocket.send(JSON.stringify({ type: 'get-p2p-info' }));
                         } else if (data.type === 'document-list') {
+                            console.log(`[App] Received document-list from sidecar: ${(data.documents || []).length} documents`);
                             setDocuments(data.documents || []);
                         } else if (data.type === 'document-created') {
                             // Add document if not already in list (avoids duplicates from optimistic update)

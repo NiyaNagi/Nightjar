@@ -12,6 +12,32 @@ const IdentityContext = createContext(null);
 const IDENTITY_KEY = 'identity';
 const LEGACY_KEY = 'Nightjar-identity';
 
+/**
+ * Convert hex string keys from Electron IPC back to Uint8Array
+ * Electron IPC returns privateKeyHex/publicKeyHex but crypto operations need Uint8Arrays
+ */
+function convertHexKeysToUint8Arrays(identityData) {
+    if (!identityData) return identityData;
+    
+    const result = { ...identityData };
+    
+    // Convert privateKeyHex to privateKey (Uint8Array)
+    if (result.privateKeyHex && !result.privateKey) {
+        result.privateKey = new Uint8Array(
+            result.privateKeyHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+        );
+    }
+    
+    // Convert publicKeyHex to publicKey (Uint8Array)
+    if (result.publicKeyHex && !result.publicKey) {
+        result.publicKey = new Uint8Array(
+            result.publicKeyHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+        );
+    }
+    
+    return result;
+}
+
 export function useIdentity() {
     const context = useContext(IdentityContext);
     if (!context) {
@@ -59,7 +85,9 @@ export function IdentityProvider({ children }) {
                     const stored = await window.electronAPI.identity.load();
                     if (stored) {
                         const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
-                        setIdentity(parsed);
+                        // Convert hex keys from Electron IPC to Uint8Arrays for crypto operations
+                        const converted = convertHexKeysToUint8Arrays(parsed);
+                        setIdentity(converted);
                         setNeedsOnboarding(false);
                     } else {
                         setNeedsOnboarding(true);
@@ -99,9 +127,10 @@ export function IdentityProvider({ children }) {
             if (window.electronAPI?.identity) {
                 const stored = await window.electronAPI.identity.load();
                 if (stored) {
-                    // Convert hex strings back to Uint8Arrays if needed
+                    // Convert hex strings back to Uint8Arrays for crypto operations
                     const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
-                    setIdentity(parsed);
+                    const converted = convertHexKeysToUint8Arrays(parsed);
+                    setIdentity(converted);
                     setNeedsOnboarding(false);
                 } else {
                     setNeedsOnboarding(true);

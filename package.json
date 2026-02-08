@@ -1,6 +1,6 @@
 {
   "name": "nightjar",
-  "version": "1.3.6",
+  "version": "1.3.9",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
   "author": {
@@ -17,6 +17,13 @@
     "test:multi:3": "node scripts/test-multi-client.js 3",
     "test:integration": "node tests/integration/test-runner.js",
     "test:integration:verbose": "node tests/integration/test-runner.js --verbose",
+    "test:dht": "node tests/integration/dht-real-runner.js",
+    "test:dht:discovery": "node tests/integration/dht-real-runner.js discovery",
+    "test:dht:sync": "node tests/integration/dht-real-runner.js sync",
+    "test:e2e:sharing": "node tests/integration/e2e-sharing.test.js",
+    "test:e2e:sharing:links": "node tests/integration/e2e-sharing.test.js \"Share Link\"",
+    "test:e2e:sharing:signed": "node tests/integration/e2e-sharing.test.js \"Signed Invite\"",
+    "test:e2e:sharing:full": "node tests/integration/e2e-sharing.test.js \"Full Workspace\"",
     "test:p2p": "node tests/integration/p2p-sync-e2e.test.js",
     "test:p2p:webrtc": "node tests/integration/p2p-sync-e2e.test.js --webrtc",
     "test:p2p:verbose": "node tests/integration/p2p-sync-e2e.test.js --verbose",

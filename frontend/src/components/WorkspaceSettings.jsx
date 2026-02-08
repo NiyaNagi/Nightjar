@@ -310,12 +310,15 @@ export default function WorkspaceSettings({
     }
     
     // If we have owner identity, use signed invite with expiry
-    console.log('[WorkspaceSettings] Share link generation check:', {
+    // Log with JSON.stringify to ensure values are captured in diagnostic logs
+    console.log('[WorkspaceSettings] Share link generation check:', JSON.stringify({
       isOwner,
       hasPrivateKey: !!userIdentity?.privateKey,
       hasEncryptionKey: !!encryptionKey,
       userIdentityPublicKey: userIdentity?.publicKeyBase62?.substring(0, 8) + '...',
-    });
+      workspaceMyPermission: workspace?.myPermission,
+      workspaceId: workspace?.id?.substring(0, 8) + '...',
+    }));
     
     if (isOwner && userIdentity?.privateKey && encryptionKey) {
       try {
