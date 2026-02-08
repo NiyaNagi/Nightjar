@@ -12,7 +12,9 @@ export class mDNSTransport extends BaseTransport {
   constructor() {
     super('mdns');
     this.socket = null;
-    this.sidecarUrl = 'ws://localhost:8081';
+    // Get port from electronAPI if available, otherwise use default
+    const metaPort = window.electronAPI?.sidecarPorts?.meta || 8081;
+    this.sidecarUrl = `ws://localhost:${metaPort}`;
     this.serviceName = 'nightjar-p2p';
     this.discoveredPeers = new Map();
     this.isElectron = false;

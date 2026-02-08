@@ -1362,7 +1362,8 @@ export async function getMeshRelaysForSharing(limit = 5) {
   try {
     // First try the sidecar (Electron environment)
     if (typeof window !== 'undefined' && window.electronAPI) {
-      const ws = new WebSocket('ws://localhost:8081');
+      const { META_WS_PORT } = await import('../config/constants.js');
+      const ws = new WebSocket(`ws://localhost:${META_WS_PORT}`);
       const meshStatus = await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           ws.close();

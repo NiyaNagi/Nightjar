@@ -15,8 +15,17 @@ const Y = require('yjs');
 const { docs } = require('y-websocket/bin/utils');
 const { BOOTSTRAP_NODES, DEV_BOOTSTRAP_NODES } = require('./mesh-constants');
 
-// Use development nodes if not in production
-const RELAY_NODES = process.env.NODE_ENV === 'development' ? DEV_BOOTSTRAP_NODES : BOOTSTRAP_NODES;
+// RELAY_OVERRIDE allows tests to specify a custom relay URL
+const RELAY_OVERRIDE = process.env.RELAY_OVERRIDE;
+
+// Use development nodes if not in production, but prefer RELAY_OVERRIDE if set
+const RELAY_NODES = RELAY_OVERRIDE 
+  ? [RELAY_OVERRIDE] 
+  : (process.env.NODE_ENV === 'development' ? DEV_BOOTSTRAP_NODES : BOOTSTRAP_NODES);
+
+if (RELAY_OVERRIDE) {
+  console.log(`[RelayBridge] Using RELAY_OVERRIDE: ${RELAY_OVERRIDE}`);
+}
 
 // Exponential backoff configuration
 const BACKOFF_INITIAL_DELAY = 1000; // Start with 1 second

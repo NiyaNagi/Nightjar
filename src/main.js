@@ -96,6 +96,16 @@ const ydocs = new Map();
 const userDataPath = app.getPath('userData');
 // NOTE: LevelDB is ONLY opened by the sidecar process to avoid lock conflicts
 
+// Port configuration - read from environment for testing, fallback to defaults
+const SIDECAR_YJS_PORT = parseInt(process.env.YJS_WEBSOCKET_PORT, 10) || 8080;
+const SIDECAR_META_PORT = parseInt(process.env.METADATA_WEBSOCKET_PORT, 10) || 8081;
+
+// Make ports available globally for preload script
+global.SIDECAR_PORTS = {
+    yjs: SIDECAR_YJS_PORT,
+    meta: SIDECAR_META_PORT,
+};
+
 // Initialize identity storage path to match userData for consistency
 // This ensures identity.json is stored in the same location as other app data
 // and enables migration from the legacy ~/.Nightjar path
@@ -928,6 +938,11 @@ ipcMain.on('get-app-version', (event) => {
     event.returnValue = app.getVersion();
 });
 
+// Synchronous handler for sidecar ports (needed by preload script at startup)
+ipcMain.on('get-sidecar-ports', (event) => {
+    event.returnValue = global.SIDECAR_PORTS;
+});
+
 ipcMain.on('set-key', async (event, keyPayload) => {
     if (!validateSender(event)) {
         console.warn('[Security] Rejected IPC from unknown sender');
@@ -1348,7 +1363,7 @@ ipcMain.handle('get-diagnostic-data', async () => {
     try {
         const WebSocket = require('ws');
         const p2pInfoPromise = new Promise((resolve, reject) => {
-            const ws = new WebSocket('ws://localhost:8081');
+            const ws = new WebSocket(`ws://localhost:${SIDECAR_META_PORT}`);
             const timeout = setTimeout(() => {
                 ws.close();
                 reject(new Error('Timeout'));
