@@ -72,14 +72,21 @@ export function decodeBase64(base64) {
 // ============ Topic Generation ============
 
 /**
+ * Workspace topic prefix - MUST match sidecar/mesh-constants.js
+ * Full topic = SHA256(WORKSPACE_TOPIC_PREFIX + workspaceId)
+ */
+const WORKSPACE_TOPIC_PREFIX = 'nightjar-workspace:';
+
+/**
  * Generate a Hyperswarm topic from workspace ID
- * TODO: Make more secure by including password hash (SHA256(password + workspaceId))
+ * IMPORTANT: Must use 'nightjar-workspace:' prefix to match sidecar/mesh-constants.js
  * @param {string} workspaceId - Workspace ID
  * @returns {Promise<string>} 32-byte hex topic
  */
 export async function generateTopic(workspaceId) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(workspaceId);
+  // CRITICAL: Use the same formula as sidecar/mesh-constants.js getWorkspaceTopic()
+  const data = encoder.encode(WORKSPACE_TOPIC_PREFIX + workspaceId);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = new Uint8Array(hashBuffer);
   return uint8ArrayToString(hashArray, 'hex');

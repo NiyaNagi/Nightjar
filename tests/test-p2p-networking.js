@@ -23,9 +23,10 @@ function createIdentity(name) {
     };
 }
 
-// Generate topic hash
+// Generate topic hash - MUST match sidecar/mesh-constants.js formula
+const WORKSPACE_TOPIC_PREFIX = 'nightjar-workspace:';
 function generateTopicHash(workspaceId) {
-    return crypto.createHash('sha256').update(workspaceId).digest('hex');
+    return crypto.createHash('sha256').update(WORKSPACE_TOPIC_PREFIX + workspaceId).digest('hex');
 }
 
 async function runTest() {

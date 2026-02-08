@@ -63,9 +63,11 @@ function generateKey() {
 
 /**
  * Generate topic from workspace ID
+ * MUST match sidecar/mesh-constants.js formula
  */
+const WORKSPACE_TOPIC_PREFIX = 'nightjar-workspace:';
 function generateTopic(workspaceId) {
-  return crypto.createHash('sha256').update(`nightjar:${workspaceId}`).digest('hex');
+  return crypto.createHash('sha256').update(WORKSPACE_TOPIC_PREFIX + workspaceId).digest('hex');
 }
 
 /**
