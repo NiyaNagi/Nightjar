@@ -129,6 +129,19 @@ const EditorPane = ({
                 showSelection: userPrefs.showSelection !== false,
             });
         }
+        
+        // Clear awareness state on unmount to remove stale cursor and selection
+        return () => {
+            if (provider?.awareness) {
+                try {
+                    provider.awareness.setLocalStateField('user', null);
+                    provider.awareness.setLocalStateField('cursor', null);
+                    provider.awareness.setLocalStateField('selection', null);
+                } catch (e) {
+                    // Ignore errors if awareness is already destroyed
+                }
+            }
+        };
     }, [userHandle, provider, userColor, editor, userPrefs.showCursor, userPrefs.showSelection]);
 
     // Periodic awareness heartbeat to keep lastActive fresh

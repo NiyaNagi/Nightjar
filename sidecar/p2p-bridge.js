@@ -219,6 +219,12 @@ class P2PBridge extends EventEmitter {
     const { topic } = message;
     if (!topic) return;
 
+    // Already in topic - skip to avoid duplicate joins
+    if (client.topics.has(topic)) {
+      console.log(`[P2PBridge] Client already in topic ${topic.slice(0, 16)}...`);
+      return;
+    }
+
     client.topics.add(topic);
 
     if (!this.topics.has(topic)) {
@@ -233,6 +239,13 @@ class P2PBridge extends EventEmitter {
         console.log(`[P2PBridge] Joined Hyperswarm topic: ${topic.slice(0, 16)}...`);
       } catch (e) {
         console.warn('[P2PBridge] Failed to join Hyperswarm topic:', e.message);
+        // Notify client of P2P join failure (relay may still work)
+        this._sendToClient(ws, {
+          type: 'p2p-topic-join-failed',
+          topic,
+          error: e.message,
+        });
+        // Continue to send topic-joined since local relay still works
       }
     }
 

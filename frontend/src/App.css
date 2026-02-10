@@ -251,7 +251,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: var(--z-toast, 1300); /* Loading overlay should be above modals */
 }
 
 .app-loading__content {

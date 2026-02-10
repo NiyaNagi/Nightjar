@@ -18,11 +18,11 @@ export function generateIdentityColor(identifier) {
     let hash = 5381;
     for (let i = 0; i < identifier.length; i++) {
         hash = ((hash << 5) + hash) + identifier.charCodeAt(i);
-        hash = hash & hash; // Convert to 32-bit integer
+        hash = hash >>> 0; // Convert to unsigned 32-bit integer (prevents negative values)
     }
     
-    // Use absolute value and modulo to get hue (0-360)
-    const hue = Math.abs(hash % 360);
+    // Use modulo to get hue (0-360) - no need for Math.abs since hash is now unsigned
+    const hue = hash % 360;
     
     // Use fixed saturation and lightness for vibrant, readable colors
     return `hsl(${hue}, 70%, 60%)`;

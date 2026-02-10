@@ -307,11 +307,25 @@ function App() {
 
     // --- Refs ---
     const metaSocketRef = useRef(null);
+    const toastTimeoutRef = useRef(null);
 
     // --- UI Helpers (defined early so callbacks can use them) ---
     const showToast = useCallback((message, type = 'info') => {
+        // Clear any existing timeout to prevent stale updates
+        if (toastTimeoutRef.current) {
+            clearTimeout(toastTimeoutRef.current);
+        }
         setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
+        toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+    }, []);
+    
+    // Cleanup toast timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (toastTimeoutRef.current) {
+                clearTimeout(toastTimeoutRef.current);
+            }
+        };
     }, []);
 
     // --- Onboarding Handler ---
@@ -796,24 +810,19 @@ function App() {
                             // Request P2P info after key is set to get public IP
                             metaSocket.send(JSON.stringify({ type: 'get-p2p-info' }));
                         } else if (data.type === 'document-list') {
-                            console.log(`[App] Received document-list from sidecar: ${(data.documents || []).length} documents`);
-                            setDocuments(data.documents || []);
+                            // Documents are now synced via Yjs (syncedDocuments from WorkspaceSyncContext)
+                            // This handler is kept for logging but no longer updates state
+                            console.log(`[App] Received document-list from sidecar: ${(data.documents || []).length} documents (handled by Yjs sync)`);
                         } else if (data.type === 'document-created') {
-                            // Add document if not already in list (avoids duplicates from optimistic update)
-                            setDocuments(prev => {
-                                if (prev.some(d => d.id === data.document.id)) return prev;
-                                return [...prev, data.document];
-                            });
+                            // Documents are now created/synced via Yjs
+                            console.log('[App] Document created via sidecar (handled by Yjs sync):', data.document?.id);
                         } else if (data.type === 'document-deleted') {
-                            setDocuments(prev => prev.filter(d => d.id !== data.docId));
+                            // Documents are now deleted/synced via Yjs
+                            console.log('[App] Document deleted via sidecar (handled by Yjs sync):', data.docId);
                         } else if (data.type === 'document-moved') {
-                            // Update document's folderId when moved via drag-drop
+                            // Document moves are now synced via Yjs
                             const docId = data.documentId || data.docId;
-                            setDocuments(prev => prev.map(d => 
-                                d.id === docId 
-                                    ? { ...d, folderId: data.folderId || null }
-                                    : d
-                            ));
+                            console.log('[App] Document moved via sidecar (handled by Yjs sync):', docId);
                         }
                     } catch (e) {
                         console.error('Failed to parse metadata message:', e);
@@ -1100,6 +1109,87 @@ function App() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isFullscreen]);
+    
+    // Global hotkeys for application-level actions
+    useEffect(() => {
+        const handleGlobalHotkeys = (e) => {
+            const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+            
+            // Don't handle hotkeys when typing in inputs/textareas (except specific ones)
+            const activeElement = document.activeElement;
+            const isInInput = activeElement && (
+                activeElement.tagName === 'INPUT' || 
+                activeElement.tagName === 'TEXTAREA' ||
+                activeElement.isContentEditable
+            );
+            
+            // Ctrl+N: New document
+            if (isCtrlOrCmd && e.key === 'n' && !e.shiftKey && !isInInput) {
+                e.preventDefault();
+                if (currentWorkspaceId) {
+                    setCreateDocumentType('text');
+                    setShowCreateDocumentDialog(true);
+                }
+                return;
+            }
+            
+            // Ctrl+Shift+N: New folder
+            if (isCtrlOrCmd && e.key === 'N' && e.shiftKey && !isInInput) {
+                e.preventDefault();
+                // Trigger new folder creation via sidebar
+                // The sidebar will need to expose a method for this
+                return;
+            }
+            
+            // Ctrl+W: Close current tab
+            if (isCtrlOrCmd && e.key === 'w' && !e.shiftKey) {
+                e.preventDefault();
+                if (activeDocId) {
+                    closeDocument(activeDocId);
+                }
+                return;
+            }
+            
+            // Ctrl+Tab: Next tab
+            if (e.ctrlKey && e.key === 'Tab' && !e.shiftKey) {
+                e.preventDefault();
+                if (openTabs.length > 1) {
+                    const currentIndex = openTabs.findIndex(t => t.id === activeDocId);
+                    const nextIndex = (currentIndex + 1) % openTabs.length;
+                    setActiveDocId(openTabs[nextIndex].id);
+                }
+                return;
+            }
+            
+            // Ctrl+Shift+Tab: Previous tab
+            if (e.ctrlKey && e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                if (openTabs.length > 1) {
+                    const currentIndex = openTabs.findIndex(t => t.id === activeDocId);
+                    const prevIndex = (currentIndex - 1 + openTabs.length) % openTabs.length;
+                    setActiveDocId(openTabs[prevIndex].id);
+                }
+                return;
+            }
+            
+            // Ctrl+,: Open settings (toggle changelog/settings panel)
+            if (isCtrlOrCmd && e.key === ',' && !isInInput) {
+                e.preventDefault();
+                setShowChangelog(prev => !prev);
+                return;
+            }
+            
+            // Ctrl+\: Toggle sidebar
+            if (isCtrlOrCmd && e.key === '\\' && !isInInput) {
+                e.preventDefault();
+                setSidebarCollapsed(prev => !prev);
+                return;
+            }
+        };
+        
+        window.addEventListener('keydown', handleGlobalHotkeys);
+        return () => window.removeEventListener('keydown', handleGlobalHotkeys);
+    }, [currentWorkspaceId, activeDocId, openTabs, closeDocument]);
 
     // --- Get active document ---
     const activeDoc = activeDocId ? ydocsRef.current.get(activeDocId) : null;

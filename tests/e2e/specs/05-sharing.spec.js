@@ -58,7 +58,10 @@ test.describe('Sharing', () => {
       
       // Validate share link structure
       expect(shareLink.searchParams.get('join')).toBe(ws.id);
-      expect(shareLink.searchParams.get('key')).toBeTruthy();
+      // Encryption key should be a valid base64url string of sufficient length
+      const key = shareLink.searchParams.get('key');
+      expect(typeof key).toBe('string');
+      expect(key.length).toBeGreaterThan(20);
       expect(shareLink.searchParams.get('permission')).toBe('editor');
       
       testLogs.add('test', 'info', `Share link: ${shareLink.toString().substring(0, 60)}...`);
@@ -200,7 +203,7 @@ test.describe('Sharing', () => {
       // The workspace is end-to-end encrypted
       // Without the key, the content should be unreadable
       // Verify that the key is stored and required
-      expect(ws.encryptionKey).toBeTruthy();
+      expect(typeof ws.encryptionKey).toBe('string');
       expect(ws.encryptionKey.length).toBeGreaterThan(20); // Base64 of 32 bytes
       
       testLogs.add('test', 'info', `Encryption key length: ${ws.encryptionKey.length} chars`);

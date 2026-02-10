@@ -12,11 +12,13 @@
     overflow-y: hidden;
     flex: 1;
     min-width: 0;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
 }
 
 .tabs-container::-webkit-scrollbar {
     height: 0;
-    display: none;
+    display: none; /* Chrome/Safari/Opera */
 }
 
 .tabs-container::-webkit-scrollbar-thumb {

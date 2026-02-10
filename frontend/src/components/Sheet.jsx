@@ -333,11 +333,12 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
                             clearTimeout(pendingRemoteUpdateTimeout.current);
                         }
                         
-                        // Clear the flag after a brief delay to allow React to process the onChange
+                        // Clear the flag after a delay that exceeds the debounce delay (300ms)
+                        // This ensures we don't overwrite remote changes with pending local debounced saves
                         pendingRemoteUpdateTimeout.current = setTimeout(() => {
                             isReceivingRemoteUpdate.current = false;
                             console.log('[Sheet] Remote update window closed, saves enabled');
-                        }, 150);
+                        }, 350);
                     }
                     
                     // Update lastLoadedVersion BEFORE setData

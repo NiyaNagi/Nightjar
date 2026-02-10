@@ -253,8 +253,11 @@ const StatusBar = ({
                     data-testid="sync-status"
                     data-synced={p2pStatus === 'connected' ? 'true' : 'false'}
                     title={publicIP ? `Your IP: ${publicIP}` : 'Connection status'}
+                    role="status"
+                    aria-live="polite"
+                    aria-label={`Connection status: ${connectionStatus.label}`}
                 >
-                    <span className="status-dot"></span>
+                    <span className="status-dot" aria-hidden="true"></span>
                     <span>{connectionStatus.label}</span>
                     {ipDisplay && (
                         <span className="ip-display" title={`Your public IP: ${publicIP}`}>
@@ -377,12 +380,12 @@ const StatusBar = ({
                                 onMouseLeave={() => setExpandedChip(null)}
                                 onClick={(e) => handleCollaboratorClick(collab, e)}
                                 data-testid={`collaborator-${collab.name?.replace(/\s+/g, '-') || idx}`}
-                                title={`${collab.name}${collab.contextInfo ? ` (${collab.contextInfo})` : ''} - Click for options`}
+                                title={`${collab.name || 'Unknown'}${collab.contextInfo ? ` (${collab.contextInfo})` : ''} - Click for options`}
                             >
                                 <span className="avatar-icon">
-                                    {collab.icon || collab.name.charAt(0).toUpperCase()}
+                                    {collab.icon || collab.name?.charAt(0)?.toUpperCase() || '?'}
                                 </span>
-                                <span className="avatar-name">{collab.name}</span>
+                                <span className="avatar-name">{collab.name || 'Unknown'}</span>
                                 {collab.contextInfo && (
                                     <span className="avatar-context">{collab.contextInfo}</span>
                                 )}
@@ -416,9 +419,9 @@ const StatusBar = ({
                                                 className="collab-avatar"
                                                 style={{ backgroundColor: collab.color }}
                                             >
-                                                {collab.icon || collab.name.charAt(0).toUpperCase()}
+                                                {collab.icon || collab.name?.charAt(0)?.toUpperCase() || '?'}
                                             </span>
-                                            <span className="collab-name">{collab.name}</span>
+                                            <span className="collab-name">{collab.name || 'Unknown'}</span>
                                         </div>
                                     ))}
                                 </div>

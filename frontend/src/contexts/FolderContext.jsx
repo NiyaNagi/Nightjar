@@ -893,12 +893,14 @@ export function FolderProvider({ children }) {
     });
   }, []);
 
-  // Get breadcrumb path for a folder
+  // Get breadcrumb path for a folder (with cycle detection)
   const getFolderPath = useCallback((folderId) => {
     const path = [];
+    const visited = new Set(); // Cycle detection
     let current = folders.find(f => f.id === folderId);
     
-    while (current) {
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
       path.unshift(current);
       current = current.parentId ? folders.find(f => f.id === current.parentId) : null;
     }
@@ -911,7 +913,8 @@ export function FolderProvider({ children }) {
     return documentFolders[documentId] || null;
   }, [documentFolders]);
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(() => ({
     // Folder state
     folders,
     allFolders,
@@ -952,7 +955,14 @@ export function FolderProvider({ children }) {
     // Constants
     TRASH_PURGE_DAYS,
     SYSTEM_FOLDER_IDS,
-  };
+  }), [
+    folders, allFolders, trashedFolders, documentFolders, trashedDocuments,
+    selectedFolderId, expandedFolders, setSelectedFolderId, toggleFolderExpand,
+    createFolder, updateFolder, renameFolder, deleteFolder, restoreFolder, purgeFolder,
+    moveDocumentToFolder, trashDocument, restoreDocument, purgeDocument,
+    getFolderHierarchy, getDocumentsInFolder, getFolderPath, getDocumentFolder,
+    getTrashItems, getDaysRemaining
+  ]);
 
   return (
     <FolderContext.Provider value={value}>

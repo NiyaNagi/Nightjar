@@ -124,7 +124,7 @@ const Sidebar = ({
 
     // Filter documents for current folder
     console.log('[Sidebar] Received documents:', documents?.length, documents);
-    const filteredDocuments = useMemo(() => documents.filter(doc => {
+    const filteredDocuments = useMemo(() => (documents || []).filter(doc => {
         if (activeFolderId === 'all' || !activeFolderId) return true;
         if (activeFolderId === 'recent') {
             // Show docs edited in last 7 days

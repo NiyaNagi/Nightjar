@@ -111,6 +111,12 @@ export function PresenceProvider({ children, awareness }) {
         
         return () => {
             awareness.off('change', handleChange);
+            // Clear local awareness state on unmount to remove stale presence
+            try {
+                awareness.setLocalState(null);
+            } catch (e) {
+                // Ignore errors if awareness is already destroyed
+            }
         };
     }, [awareness]);
     
@@ -195,8 +201,11 @@ export function PresenceProvider({ children, awareness }) {
     // Get online peers count
     const onlinePeersCount = peers.size;
     
-    // Get typing peers
-    const typingPeers = Array.from(peers.values()).filter(p => p.isTyping);
+    // Get typing peers - memoize to prevent unnecessary re-renders
+    const typingPeers = useMemo(() => 
+        Array.from(peers.values()).filter(p => p.isTyping), 
+        [peers]
+    );
     
     // Get peers on a specific document
     const getPeersOnDocument = useCallback((documentId) => {
@@ -206,7 +215,8 @@ export function PresenceProvider({ children, awareness }) {
         );
     }, [peers]);
     
-    const value = {
+    // Memoize context value to prevent unnecessary re-renders of consumers
+    const value = useMemo(() => ({
         peers,
         onlinePeersCount,
         typingPeers,
@@ -217,7 +227,8 @@ export function PresenceProvider({ children, awareness }) {
         setTypingIndicator,
         updateLastSeen,
         getPeersOnDocument
-    };
+    }), [peers, onlinePeersCount, typingPeers, isTyping, updateCursor, updateSelection, 
+         updateOpenDocument, setTypingIndicator, updateLastSeen, getPeersOnDocument]);
     
     return (
         <PresenceContext.Provider value={value}>

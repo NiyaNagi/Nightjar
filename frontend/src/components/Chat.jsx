@@ -222,7 +222,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         
         const updateUsers = () => {
             const states = provider.awareness.getStates();
-            const userMap = new Map(); // Use map to deduplicate by name
+            const userMap = new Map(); // Use map to deduplicate by publicKey
             const now = Date.now();
             
             states.forEach((state, clientId) => {
@@ -242,15 +242,18 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 }
                 
                 const userName = state.user.name || 'Anonymous';
+                // Use publicKey for deduplication if available, otherwise fall back to clientId
+                const userKey = state.user.publicKey || state.user.id || `client-${clientId}`;
                 
-                // Keep the most recently active user with this name
-                const existing = userMap.get(userName);
+                // Keep the most recently active session for this user
+                const existing = userMap.get(userKey);
                 if (!existing || (lastActive > (existing.lastActive || 0))) {
-                    userMap.set(userName, {
+                    userMap.set(userKey, {
                         clientId,
                         name: userName,
                         color: state.user.color || '#6366f1',
                         icon: state.user.icon,
+                        publicKey: state.user.publicKey || state.user.id,
                         lastActive
                     });
                 }
@@ -278,7 +281,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Start a DM with a user - uses publicKey for stable channel ID
     const startDirectMessage = (user) => {
-        // Use publicKey for stable tab ID (falls back to clientId for online-only users without publicKey)
+        // Prefer publicKey for stable tab ID that persists across sessions
+        // Fall back to clientId only if publicKey is unavailable (legacy clients)
+        if (!user.publicKey) {
+            console.warn('[Chat] Starting DM with user without publicKey - channel may not persist');
+        }
         const userKey = user.publicKey || `client-${user.clientId}`;
         const tabId = `dm-${userKey.slice(0, 16)}`;
         if (!chatTabs.find(t => t.id === tabId)) {
@@ -286,7 +293,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 id: tabId,
                 name: user.name,
                 type: 'dm',
-                user: { ...user, publicKey: user.publicKey || userKey }
+                user: { ...user, publicKey: user.publicKey || null }
             }]);
         }
         setActiveTab(tabId);
@@ -574,15 +581,19 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         // TODO: Migrate to per-channel arrays
         const ymessages = ydoc.getArray('chat-messages');
         ymessagesRef.current = ymessages;
+        
+        // Track message count in ref to avoid stale closure issues
+        let lastKnownCount = 0;
 
         const updateFromYjs = () => {
             const msgs = ymessages.toArray();
             setMessages(msgs);
             
-            // Count unread if minimized
-            if (chatState.isMinimized && msgs.length > messages.length) {
-                setUnreadCount(prev => prev + (msgs.length - messages.length));
+            // Count unread if minimized using local tracking (not stale closure)
+            if (chatState.isMinimized && msgs.length > lastKnownCount) {
+                setUnreadCount(prev => prev + (msgs.length - lastKnownCount));
             }
+            lastKnownCount = msgs.length;
         };
 
         ymessages.observe(updateFromYjs);
@@ -865,6 +876,14 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         // Handle mention popup navigation
         if (showMentionPopup) {
             const mentionCandidates = getMentionCandidates();
+            // Guard against empty array to prevent division by zero
+            if (mentionCandidates.length === 0) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setShowMentionPopup(false);
+                }
+                return;
+            }
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 setMentionIndex(prev => (prev + 1) % mentionCandidates.length);
@@ -925,7 +944,8 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         // Add online users first
         onlineUsers.forEach(user => {
             const key = user.publicKey || `client-${user.clientId}`;
-            if (!seenKeys.has(key) && user.name.toLowerCase().includes(mentionQuery)) {
+            // Add null check for user.name to prevent crash
+            if (!seenKeys.has(key) && user.name?.toLowerCase().includes(mentionQuery)) {
                 seenKeys.add(key);
                 allUsers.push({ ...user, isOnline: true });
             }

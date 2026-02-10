@@ -619,11 +619,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
         
         if (amIKicked) {
           console.warn(`[WorkspaceSync] Current user has been kicked from workspace ${workspaceId}`);
-          // Only set kicked if we're still connected to this workspace
-          // This prevents loops when switching workspaces
-          if (provider.awareness.getLocalState()?.workspaceId === workspaceId) {
-            setIsKicked(true);
-          }
+          // Set kicked state - the hook is per-workspace so this is already scoped correctly
+          setIsKicked(true);
         }
       } else {
         console.warn(`[WorkspaceSync] syncKicked - no userIdentity.publicKeyBase62 available`);
@@ -824,16 +821,17 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const updateDocument = useCallback((docId, updates) => {
     if (!yDocumentsRef.current || !ydocRef.current) return;
     
-    const docs = yDocumentsRef.current.toArray();
-    const index = docs.findIndex(d => d.id === docId);
-    if (index !== -1) {
-      // Yjs arrays don't have direct update - remove and re-add
-      const doc = { ...docs[index], ...updates };
-      ydocRef.current.transact(() => {
-        yDocumentsRef.current.delete(index, 1);
-        yDocumentsRef.current.insert(index, [doc]);
-      });
-    }
+    // Re-find index inside transaction to avoid race conditions
+    ydocRef.current.transact(() => {
+      const currentDocs = yDocumentsRef.current.toArray();
+      const currentIndex = currentDocs.findIndex(d => d.id === docId);
+      if (currentIndex !== -1) {
+        // Yjs arrays don't have direct update - remove and re-add
+        const doc = { ...currentDocs[currentIndex], ...updates };
+        yDocumentsRef.current.delete(currentIndex, 1);
+        yDocumentsRef.current.insert(currentIndex, [doc]);
+      }
+    });
   }, []);
   
   // Add a folder

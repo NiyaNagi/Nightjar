@@ -41,6 +41,9 @@ const TabBar = ({
     collaboratorsByDocument = {} // Map of documentId -> [{ name, color, icon }]
 }) => {
     const handleTabKeyDown = useCallback((e, tabIndex) => {
+        // Guard against empty tabs array
+        if (!tabs || tabs.length === 0) return;
+        
         if (e.key === 'ArrowRight') {
             e.preventDefault();
             const nextIndex = (tabIndex + 1) % tabs.length;

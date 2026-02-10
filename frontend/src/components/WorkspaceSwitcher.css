@@ -129,7 +129,7 @@
   border: 1px solid var(--border-color, #2d2d44);
   border-radius: 8px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: var(--z-dropdown, 100);
   max-height: 400px;
   display: flex;
   flex-direction: column;

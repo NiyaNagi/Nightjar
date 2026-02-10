@@ -2556,13 +2556,13 @@ async function handleMetadataMessage(ws, parsed) {
                     }
                 }
                 
-                // 2. Close mesh participant
+                // 2. Stop mesh participant
                 if (meshParticipant) {
                     try {
-                        await meshParticipant.close();
-                        console.log('[Sidecar] Mesh participant closed');
+                        await meshParticipant.stop();
+                        console.log('[Sidecar] Mesh participant stopped');
                     } catch (e) {
-                        console.warn('[Sidecar] Error closing mesh:', e.message);
+                        console.warn('[Sidecar] Error stopping mesh:', e.message);
                     }
                 }
                 
@@ -3342,7 +3342,13 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
         }
         
         // Apply the full state update with 'p2p' origin to prevent re-broadcasting
-        Y.applyUpdate(doc, updateData, 'p2p');
+        try {
+            Y.applyUpdate(doc, updateData, 'p2p');
+        } catch (applyErr) {
+            console.error(`[P2P-SYNC-STATE] Failed to apply update to ${roomName}:`, applyErr.message);
+            // Continue without crashing - the document may recover from other peers
+            return;
+        }
         
         console.log(`[P2P-SYNC-STATE] ✓ Applied full state to ${roomName}`);
         
@@ -3709,7 +3715,12 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
         }
         
         // Apply the update with 'p2p' origin to prevent re-broadcasting
-        Y.applyUpdate(doc, updateData, 'p2p');
+        try {
+            Y.applyUpdate(doc, updateData, 'p2p');
+        } catch (applyErr) {
+            console.error('[P2P-SYNC] Failed to apply update:', applyErr.message);
+            return;
+        }
         
         console.log(`[P2P-SYNC] âœ“ Successfully applied update to ${roomName}`);
         
@@ -4603,7 +4614,7 @@ async function shutdown() {
         if (p2pBridge) {
             console.log('[Sidecar] Stopping P2P bridge...');
             try {
-                await p2pBridge.stop();
+                await p2pBridge.destroy();
                 console.log('[Sidecar] P2P bridge stopped');
             } catch (err) {
                 console.error('[Sidecar] Error stopping P2P bridge:', err);

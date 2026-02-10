@@ -21,6 +21,7 @@
     --text-secondary: #c4c4cc;
     --text-muted: #b0b0b8;
     --text-tertiary: #c4c4cc;
+    --text-placeholder: #9ca3af; /* WCAG AA compliant placeholder text */
     
     --border-color: #2d2d44;
     --hover-bg: #2d2d44;
@@ -60,6 +61,17 @@
     --z-popover: 1100;
     --z-tooltip: 1200;
     --z-toast: 1300;
+    
+    /* Border radius tokens for consistency */
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+    
+    /* Status bar height for positioning */
+    --status-bar-height: 28px;
 }
 
 /* Light theme */
@@ -515,4 +527,16 @@ button:focus-visible {
 input:focus {
     outline: none;
     border-color: var(--accent-color);
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

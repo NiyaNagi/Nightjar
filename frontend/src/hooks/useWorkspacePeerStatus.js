@@ -108,11 +108,14 @@ export function useWorkspacePeerStatus(workspaceId, pollIntervalOverride = null)
             setIsRetrying(true);
             setSyncStatus('syncing');
             
+            let timeoutId = null;
+            
             // Set up one-time handler for the response
             const handleMessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'peer-sync-result') {
+                        clearTimeout(timeoutId);
                         ws.removeEventListener('message', handleMessage);
                         if (mountedRef.current) {
                             setIsRetrying(false);
@@ -140,14 +143,17 @@ export function useWorkspacePeerStatus(workspaceId, pollIntervalOverride = null)
             
             ws.addEventListener('message', handleMessage);
             
-            // Timeout after 10 seconds
-            setTimeout(() => {
+            // Timeout after 10 seconds - store for cleanup
+            timeoutId = setTimeout(() => {
                 ws.removeEventListener('message', handleMessage);
                 if (mountedRef.current) {
                     setIsRetrying(false);
                 }
                 resolve({ success: false, message: 'Request timed out' });
             }, 10000);
+            
+            // Store timeout for potential cleanup on unmount
+            retryTimeoutRef.current = timeoutId;
             
             ws.send(JSON.stringify({
                 type: 'request-peer-sync',

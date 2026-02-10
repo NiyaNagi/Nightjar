@@ -416,11 +416,15 @@ class HyperswarmManager extends EventEmitter {
     
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
+      // Collect peers to clean up first, then clean up after iteration
+      // This avoids modifying the map during iteration
+      const peersToCleanup = [];
+      
       for (const [peerId, conn] of this.connections) {
         // Check if connection is still writable
         if (!conn.socket || !conn.socket.writable) {
           console.warn(`[Hyperswarm] Removing dead connection (not writable): ${peerId.slice(0, 16)}`);
-          this._cleanupConnection(peerId);
+          peersToCleanup.push(peerId);
           continue;
         }
         
@@ -429,7 +433,7 @@ class HyperswarmManager extends EventEmitter {
           const pingAge = now - conn.lastPingSent;
           if (pingAge > HEARTBEAT_TIMEOUT) {
             console.warn(`[Hyperswarm] Heartbeat timeout for peer: ${peerId.slice(0, 16)}`);
-            this._cleanupConnection(peerId);
+            peersToCleanup.push(peerId);
             continue;
           }
         }
@@ -437,6 +441,11 @@ class HyperswarmManager extends EventEmitter {
         // Send ping
         conn.lastPingSent = now;
         this._sendMessage(conn.socket, { type: 'ping', timestamp: now });
+      }
+      
+      // Clean up dead connections after iteration
+      for (const peerId of peersToCleanup) {
+        this._cleanupConnection(peerId);
       }
     }, HEARTBEAT_INTERVAL);
   }

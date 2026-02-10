@@ -67,7 +67,6 @@ export default function WorkspaceSettings({
   const [customRelayUrl, setCustomRelayUrl] = useState('');
   const [relayValidation, setRelayValidation] = useState(null);
   const [isValidatingRelay, setIsValidatingRelay] = useState(false);
-  const [validationDebounceTimer, setValidationDebounceTimer] = useState(null);
   const [customServerUrl, setCustomServerUrl] = useState(workspace?.serverUrl || ''); // Legacy - for compatibility
   const [p2pStatus, setP2pStatus] = useState({ initialized: false, ownPublicKey: null, publicIP: null }); // P2P status
   const [relayServerValid, setRelayServerValid] = useState(null); // null = not checked, true/false = validation result
@@ -83,6 +82,8 @@ export default function WorkspaceSettings({
   const [memberSearch, setMemberSearch] = useState(''); // Search filter for collaborators
   const shareMenuRef = useRef(null);
   const modalRef = useRef(null);
+  const validationDebounceTimerRef = useRef(null); // Use ref instead of state for timer
+  const copiedLinkTimerRef = useRef(null); // Timer for copied link feedback
   
   // Auto-detect relay from current server
   // Returns empty string for Electron (dev or production) - uses Hyperswarm DHT, not relays
@@ -184,6 +185,18 @@ export default function WorkspaceSettings({
     }
   }, []);
   
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (validationDebounceTimerRef.current) {
+        clearTimeout(validationDebounceTimerRef.current);
+      }
+      if (copiedLinkTimerRef.current) {
+        clearTimeout(copiedLinkTimerRef.current);
+      }
+    };
+  }, []);
+  
   // Handle relay URL input changes with debouncing
   const handleRelayUrlChange = useCallback((value) => {
     setCustomRelayUrl(value);
@@ -192,8 +205,8 @@ export default function WorkspaceSettings({
     setRelayValidation(null);
     
     // Clear previous debounce timer
-    if (validationDebounceTimer) {
-      clearTimeout(validationDebounceTimer);
+    if (validationDebounceTimerRef.current) {
+      clearTimeout(validationDebounceTimerRef.current);
     }
     
     // If empty, clear custom relay and use auto-detected
@@ -205,7 +218,7 @@ export default function WorkspaceSettings({
     }
     
     // Debounce validation by 500ms
-    const timer = setTimeout(async () => {
+    validationDebounceTimerRef.current = setTimeout(async () => {
       const result = await validateRelayUrl(value);
       setRelayValidation(result);
       
@@ -213,9 +226,7 @@ export default function WorkspaceSettings({
         localStorage.setItem('nightjar_customRelayServer', value);
       }
     }, 500);
-    
-    setValidationDebounceTimer(timer);
-  }, [validateRelayUrl, validationDebounceTimer]);
+  }, [validateRelayUrl]);
   
   // Fetch P2P status on mount (Electron only)
   useEffect(() => {
@@ -392,7 +403,11 @@ export default function WorkspaceSettings({
       await navigator.clipboard.writeText(textToCopy);
       setCopiedLink(true);
       setShowShareMenu(false);
-      setTimeout(() => setCopiedLink(false), 2000);
+      // Clear any previous timer and set new one
+      if (copiedLinkTimerRef.current) {
+        clearTimeout(copiedLinkTimerRef.current);
+      }
+      copiedLinkTimerRef.current = setTimeout(() => setCopiedLink(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
     }

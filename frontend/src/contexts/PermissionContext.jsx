@@ -12,7 +12,7 @@
  * - Full transparency (all users see collaborator list)
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useWorkspaces } from './WorkspaceContext';
 
 // Permission hierarchy for comparison
@@ -291,8 +291,8 @@ export function PermissionProvider({ children }) {
    */
   const canEditWorkspace = isAtLeast(currentWorkspace?.myPermission, 'editor');
 
-  // Context value
-  const value = {
+  // Context value - memoized to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     // Resolution
     getPermission,
     getWorkspacePermission,
@@ -328,7 +328,12 @@ export function PermissionProvider({ children }) {
     // Constants
     PERMISSION_LEVELS,
     ACTION_REQUIREMENTS,
-  };
+  }), [
+    getPermission, getWorkspacePermission, resolveFolderPermission, resolveDocumentPermission,
+    canPerformAction, canView, canEdit, canCreate, canDelete, canShare,
+    getAvailableShareLevels, grantPermission, updateFolderHierarchy, updateDocumentFolders,
+    isOwner, canEditWorkspace
+  ]);
 
   return (
     <PermissionContext.Provider value={value}>
