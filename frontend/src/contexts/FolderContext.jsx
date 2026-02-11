@@ -100,7 +100,7 @@ export function FolderProvider({ children }) {
   // This ensures P2P-synced folders show up correctly
   useEffect(() => {
     if (!useLocalMode && currentWorkspaceId && syncedFolders) {
-      console.log(`[FolderContext] Using synced folders from WorkspaceSyncContext: ${syncedFolders.length} folders`);
+      console.log(`[FolderContext] Using synced folders from WorkspaceSyncContext: ${syncedFolders.length} folders`, syncedFolders.map(f => ({ id: f.id, name: f.name, color: f.color })));
       setAllFolders(prev => {
         // Keep folders from other workspaces, replace folders for this workspace
         const otherFolders = prev.filter(f => f.workspaceId !== currentWorkspaceId);

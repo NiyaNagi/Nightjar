@@ -23,6 +23,7 @@ const EditorPane = ({
     provider, 
     userHandle, 
     userColor,
+    userPublicKey, // Stable identity for presence/chat
     onContentChange,
     onStatsChange,
     docName,
@@ -68,6 +69,31 @@ const EditorPane = ({
         };
     }, [undoManager]);
 
+    // Debug: Log provider awareness state
+    useEffect(() => {
+        if (!provider?.awareness) return;
+        
+        console.log('[EditorPane] Provider awareness initialized, clientID:', provider.awareness.clientID);
+        
+        const logAwareness = () => {
+            const states = provider.awareness.getStates();
+            const otherUsers = [];
+            states.forEach((state, clientId) => {
+                if (clientId !== provider.awareness.clientID && state.user) {
+                    otherUsers.push({ clientId, user: state.user });
+                }
+            });
+            if (otherUsers.length > 0) {
+                console.log('[EditorPane] Other users in document:', otherUsers);
+            }
+        };
+        
+        provider.awareness.on('change', logAwareness);
+        logAwareness(); // Initial check
+        
+        return () => provider.awareness.off('change', logAwareness);
+    }, [provider]);
+
     const editor = useEditor({
         editable: !readOnly, // Viewers get read-only mode
         editorProps: {
@@ -89,6 +115,19 @@ const EditorPane = ({
                 user: {
                     name: userHandle,
                     color: userColor,
+                },
+                render: user => {
+                    const cursor = document.createElement('span');
+                    cursor.classList.add('collaboration-cursor__caret');
+                    cursor.setAttribute('style', `border-color: ${user.color}`);
+                    
+                    const label = document.createElement('div');
+                    label.classList.add('collaboration-cursor__label');
+                    label.setAttribute('style', `background-color: ${user.color}`);
+                    label.textContent = user.name;
+                    cursor.appendChild(label);
+                    
+                    return cursor;
                 },
             }),
             Table.configure({
@@ -118,16 +157,35 @@ const EditorPane = ({
         },
     });
 
-    // Update awareness when user info changes
+    // Update awareness and CollaborationCursor when user info changes
     useEffect(() => {
         if (provider && userHandle && editor) {
+            // CRITICAL: Preserve existing awareness fields (especially publicKey)
+            // Without this, opening a document destroys the publicKey set by useWorkspaceSync
+            const currentUser = provider.awareness.getLocalState()?.user || {};
+            
+            // Update provider awareness state
             provider.awareness.setLocalStateField('user', {
+                ...currentUser, // Preserve publicKey and other identity fields
                 name: userHandle,
                 color: userColor,
+                publicKey: userPublicKey || currentUser.publicKey, // Ensure publicKey persists
                 lastActive: Date.now(),
                 showCursor: userPrefs.showCursor !== false, // Share cursor visibility preference
                 showSelection: userPrefs.showSelection !== false,
             });
+            
+            // Also update TipTap CollaborationCursor user info
+            // This ensures cursor labels show correct user info
+            try {
+                editor.commands.updateUser({
+                    name: userHandle,
+                    color: userColor,
+                });
+            } catch (e) {
+                // updateUser command might not be available if editor not ready
+                console.debug('[EditorPane] Could not update cursor user:', e.message);
+            }
         }
         
         // Clear awareness state on unmount to remove stale cursor and selection
@@ -142,7 +200,7 @@ const EditorPane = ({
                 }
             }
         };
-    }, [userHandle, provider, userColor, editor, userPrefs.showCursor, userPrefs.showSelection]);
+    }, [userHandle, provider, userColor, userPublicKey, editor, userPrefs.showCursor, userPrefs.showSelection]);
 
     // Periodic awareness heartbeat to keep lastActive fresh
     useEffect(() => {

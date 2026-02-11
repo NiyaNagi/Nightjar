@@ -536,6 +536,7 @@ const HierarchicalSidebar = ({
     }, [contextMenu, closeContextMenu]);
     
     const handleSaveProperties = useCallback(async ({ id, type, icon, color }) => {
+        console.log('[HierarchicalSidebar] handleSaveProperties:', { id, type, icon, color });
         if (type === 'folder') {
             updateFolder(id, { icon, color });
         } else if (type === 'document' && onUpdateDocument) {

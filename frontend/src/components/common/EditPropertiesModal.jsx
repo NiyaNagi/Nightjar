@@ -4,7 +4,7 @@
  * Modal for editing folder/document icon and color
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import IconColorPicker from './IconColorPicker';
 import { ensureContrastWithWhite, createColorGradient } from '../../utils/colorUtils';
 import './EditPropertiesModal.css';
@@ -17,8 +17,16 @@ export default function EditPropertiesModal({
     parentFolder = null, // For gradient previews when editing documents
 }) {
     const [icon, setIcon] = useState(item?.icon || (item?.type === 'folder' ? '📁' : '📄'));
-    const [color, setColor] = useState(item?.color || '#6366f1');
+    const [color, setColor] = useState(item?.color || null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Sync local state when item changes (e.g., when modal opens with a new item)
+    useEffect(() => {
+        if (item) {
+            setIcon(item.icon || (item.type === 'folder' ? '📁' : '📄'));
+            setColor(item.color || null);
+        }
+    }, [item?.id, item?.icon, item?.color, item?.type]);
     
     if (!isOpen || !item) return null;
     

@@ -112,7 +112,7 @@ const generateSheetId = () => 'sheet-' + Date.now().toString(36) + Math.random()
  * @param {boolean} props.readOnly - Whether sheet is in view-only mode
  * @param {function} props.onAddComment - Callback when user wants to add a comment
  */
-export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly = false, onStatsChange, onAddComment }) {
+export default function Sheet({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly = false, onStatsChange, onAddComment }) {
     const [data, setData] = useState(null);
     const [isInitialized, setIsInitialized] = useState(false);
     const [collaborators, setCollaborators] = useState([]);
@@ -131,6 +131,9 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
     const onChangeCountRef = useRef(0);         // Count onChange calls to skip the first one after mount
     const isReceivingRemoteUpdate = useRef(false); // Track when we're applying a remote update (to skip saving)
     const pendingRemoteUpdateTimeout = useRef(null); // Timeout to clear the remote update flag
+    
+    // Custom presence overlays (Fortune Sheet's API is unreliable)
+    const [presenceOverlays, setPresenceOverlays] = useState([]);
 
     // Subscribe to awareness for collaborator presence and selections
     useEffect(() => {
@@ -138,10 +141,16 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
         
         const awareness = provider.awareness;
         
+        // CRITICAL: Preserve existing awareness fields (especially publicKey)
+        // Without this, opening a sheet destroys the publicKey set by useWorkspaceSync
+        const currentUser = awareness.getLocalState()?.user || {};
+        
         // Set our own user info in awareness (selection is updated separately)
         awareness.setLocalStateField('user', {
+            ...currentUser, // Preserve publicKey and other identity fields
             name: userHandle || 'Anonymous',
             color: userColor || '#6366f1',
+            publicKey: userPublicKey || currentUser.publicKey, // Ensure publicKey persists
             lastActive: Date.now(),
         });
         
@@ -218,34 +227,34 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
             
             setCollaborators(collabs);
             
-            // Update Fortune Sheet's built-in presence display
-            if (workbookRef.current) {
-                try {
-                    // Find clientIds that were previously present but are now gone (disconnected)
-                    const disconnectedClientIds = [...previousClientIds].filter(id => !currentClientIds.has(id));
-                    
-                    // Remove disconnected users' presences
-                    if (disconnectedClientIds.length > 0) {
-                        const removeIds = disconnectedClientIds.map(id => ({ userId: String(id) }));
-                        console.log('[Sheet] Removing presences for disconnected users:', disconnectedClientIds);
-                        workbookRef.current.removePresences?.(removeIds);
-                    }
-                    
-                    // Remove all current presences and re-add them (to update positions)
-                    const currentUserIds = [...currentClientIds].map(id => ({ userId: String(id) }));
-                    if (currentUserIds.length > 0) {
-                        workbookRef.current.removePresences?.(currentUserIds);
-                    }
-                    
-                    // Add current presences
-                    if (presences.length > 0) {
-                        workbookRef.current.addPresences?.(presences);
-                    }
-                } catch (e) {
-                    // Fortune Sheet presence API might not be available
-                    console.debug('[Sheet] Presence API not available:', e.message);
-                }
-            }
+            // Build custom presence overlay positions
+            // Fortune Sheet's presence API is unreliable, so we render our own
+            const defaultColWidth = 100;
+            const defaultRowHeight = 25;
+            // Formula bar + toolbar height - these are fixed in Fortune Sheet
+            // Toolbar: ~40px, Formula bar: ~28px, Column headers: ~25px
+            const toolbarHeight = 40;
+            const formulaBarHeight = 28;
+            const columnHeaderHeight = 25;
+            const topOffset = toolbarHeight + formulaBarHeight + columnHeaderHeight;
+            const rowHeaderWidth = 46;
+            
+            const overlays = presences.map(p => ({
+                clientId: p.userId,
+                name: p.username,
+                color: p.color,
+                // Cell position for border
+                cellX: rowHeaderWidth + (p.selection.c * defaultColWidth),
+                cellY: topOffset + (p.selection.r * defaultRowHeight),
+                cellWidth: defaultColWidth,
+                cellHeight: defaultRowHeight,
+                // Dot position: upper-right corner of the cell (inside the cell, offset from corner)
+                dotX: rowHeaderWidth + ((p.selection.c + 1) * defaultColWidth) - 12,
+                dotY: topOffset + (p.selection.r * defaultRowHeight) + 2,
+                row: p.selection.r,
+                col: p.selection.c,
+            }));
+            setPresenceOverlays(overlays);
             
             // Update previousClientIds for next comparison
             previousClientIds = currentClientIds;
@@ -674,7 +683,8 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
                 const rowHeaderWidth = 46;
                 
                 const x = rect.left + rowHeaderWidth + (column[0] * defaultColWidth) + (defaultColWidth / 2);
-                const y = rect.top + headerHeight + (row[0] * defaultRowHeight);
+                // Position toolbar below the selected cell (add 1 row height offset)
+                const y = rect.top + headerHeight + ((row[0] + 1) * defaultRowHeight);
                 
                 setToolbarPosition({ x, y });
             }
@@ -806,7 +816,38 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, readOnly 
                     hooks={hooks}
                     {...settings}
                 />
-                {/* Presence overlays handled by Fortune Sheet's built-in presence system */}
+                {/* Custom presence overlays - Fortune Sheet's API is unreliable */}
+                {presenceOverlays.map((p) => (
+                    <React.Fragment key={p.clientId}>
+                        {/* Cell border showing selection */}
+                        <div
+                            className="sheet-presence-border"
+                            style={{
+                                position: 'absolute',
+                                left: p.cellX,
+                                top: p.cellY,
+                                width: p.cellWidth,
+                                height: p.cellHeight,
+                                border: `2px solid ${p.color}`,
+                                pointerEvents: 'none',
+                                boxSizing: 'border-box',
+                            }}
+                        />
+                        {/* Presence dot in upper-right corner */}
+                        <div
+                            className="sheet-presence-dot"
+                            style={{
+                                position: 'absolute',
+                                left: p.dotX,
+                                top: p.dotY,
+                                backgroundColor: p.color,
+                            }}
+                            title={p.name}
+                        >
+                            <span className="sheet-presence-name">{p.name}</span>
+                        </div>
+                    </React.Fragment>
+                ))}
             </div>
         </div>
     );

@@ -389,6 +389,12 @@
     color: white;
     text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
     flex-shrink: 0;
+    transition: box-shadow 0.15s ease;
+}
+
+/* Focused indicator - green ring around pip when user is actively editing */
+.user-pip.focused {
+    box-shadow: 0 0 0 2px #22c55e, 0 0 6px rgba(34, 197, 94, 0.5);
 }
 
 .user-pip.more {

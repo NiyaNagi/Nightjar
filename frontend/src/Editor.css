@@ -20,25 +20,30 @@
     position: relative;
     margin-left: -1px;
     margin-right: -1px;
-    border-left: 1px solid #0D0D0D;
-    border-right: 1px solid #0D0D0D;
+    border-left-width: 2px;
+    border-left-style: solid;
+    /* border-color is set via inline style from render function */
     word-break: normal;
     pointer-events: none;
+    z-index: 50;
 }
 
 .collaboration-cursor__label {
     position: absolute;
     top: -1.4em;
     left: -1px;
-    font-size: 12px;
+    font-size: 11px;
     font-style: normal;
     font-weight: 600;
     line-height: normal;
     user-select: none;
     pointer-events: none;
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px 3px 3px 0;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px 4px 4px 0;
     white-space: nowrap;
+    color: #fff;
+    /* background-color is set via inline style from render function */
+    z-index: 51;
 }
 
 /* Table styles */

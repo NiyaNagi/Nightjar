@@ -361,7 +361,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
                             <div className="section">
                                 <label className="section-label">Your ID</label>
                                 <div className="id-display">
-                                    <code>{publicIdentity?.publicKey?.slice(0, 24)}...</code>
+                                    <code>{publicIdentity?.publicKeyBase62?.slice(0, 24)}...</code>
                                 </div>
                             </div>
 

@@ -56,6 +56,19 @@ const Editor = ({ ydoc, provider, userHandle }) => {
                     name: userHandle,
                     color: userColor,
                 },
+                render: user => {
+                    const cursor = document.createElement('span');
+                    cursor.classList.add('collaboration-cursor__caret');
+                    cursor.setAttribute('style', `border-color: ${user.color}`);
+                    
+                    const label = document.createElement('div');
+                    label.classList.add('collaboration-cursor__label');
+                    label.setAttribute('style', `background-color: ${user.color}`);
+                    label.textContent = user.name;
+                    cursor.appendChild(label);
+                    
+                    return cursor;
+                },
             }),
             Table.configure({
                 resizable: true,

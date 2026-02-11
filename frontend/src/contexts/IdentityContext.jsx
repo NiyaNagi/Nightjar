@@ -391,9 +391,9 @@ export function IdentityProvider({ children }) {
     // Get current device info from identity
     const currentDevice = identity?.devices?.find(d => d.isCurrent);
     
-    // Get public identity for sharing
+    // Get public identity for sharing (uses publicKeyBase62 for consistency with full identity)
     const publicIdentity = identity ? {
-        publicKey: identity.publicKeyBase62,
+        publicKeyBase62: identity.publicKeyBase62,
         handle: identity.handle,
         color: identity.color,
         icon: identity.icon,

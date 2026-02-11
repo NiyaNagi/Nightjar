@@ -157,7 +157,8 @@ function App() {
     // --- Identity Context ---
     // Identity context is available for features like kick signatures, membership tracking
     const { 
-        identity: userIdentity, 
+        identity: userIdentity,
+        publicIdentity,  // For useWorkspaceSync (has .publicKeyBase62)
         needsOnboarding, 
         createIdentity,
         loading: identityLoading,
@@ -252,7 +253,7 @@ function App() {
         isKicked: isUserKicked,
         kickMember: syncKickMember,
         transferOwnership: syncTransferOwnership,
-    } = useWorkspaceSync(currentWorkspaceId, initialWorkspaceInfo, workspaceUserProfile, workspaceServerUrl, userIdentity, currentWorkspace?.myPermission);
+    } = useWorkspaceSync(currentWorkspaceId, initialWorkspaceInfo, workspaceUserProfile, workspaceServerUrl, publicIdentity, currentWorkspace?.myPermission);
     
     // --- P2P Peer Status (Electron only) ---
     const {
@@ -501,12 +502,14 @@ function App() {
         };
     }, []);
 
-    // --- Update workspace awareness with currently open document (for tab presence indicators) ---
+    // --- Update workspace awareness with currently open documents (for tab presence indicators) ---
     useEffect(() => {
         if (setOpenDocumentId) {
-            setOpenDocumentId(activeDocId);
+            // Send both the focused document and all open document IDs
+            const allOpenDocIds = openTabs.map(tab => tab.id);
+            setOpenDocumentId(activeDocId, true, allOpenDocIds);
         }
-    }, [activeDocId, setOpenDocumentId]);
+    }, [activeDocId, openTabs, setOpenDocumentId]);
 
     // --- Android Back Button Handling (Capacitor only) ---
     useEffect(() => {
@@ -927,6 +930,14 @@ function App() {
         console.log(`[App] Creating document ${docId} with wsUrl: ${wsUrl}`);
         const provider = new WebsocketProvider(wsUrl, docId, ydoc);
         
+        // Debug: Log provider connection status
+        provider.on('status', ({ status }) => {
+            console.log(`[App] Document ${docId.slice(0, 8)}... provider status: ${status}`);
+        });
+        provider.on('synced', (isSynced) => {
+            console.log(`[App] Document ${docId.slice(0, 8)}... synced: ${isSynced}`);
+        });
+        
         // Add local IndexedDB persistence in web mode (offline-first)
         let indexeddbProvider = null;
         if (!isElectronMode) {
@@ -982,6 +993,26 @@ function App() {
             const wsUrl = getWsUrl(workspaceServerUrl);
             console.log(`[App] Opening document ${docId} with wsUrl: ${wsUrl}`);
             const provider = new WebsocketProvider(wsUrl, docId, ydoc);
+            
+            // CRITICAL: Immediately set awareness with user identity to prevent P2P race condition
+            // This ensures publicKey is included in awareness BEFORE any P2P sync happens
+            if (provider.awareness && userProfile) {
+                provider.awareness.setLocalStateField('user', {
+                    name: userProfile.name || 'Anonymous',
+                    color: userProfile.color || '#6366f1',
+                    icon: userProfile.icon || '👤',
+                    publicKey: userIdentity?.publicKeyBase62 || null,
+                    lastActive: Date.now(),
+                });
+            }
+            
+            // Debug: Log provider connection status
+            provider.on('status', ({ status }) => {
+                console.log(`[App] Document ${docId.slice(0, 8)}... provider status: ${status}`);
+            });
+            provider.on('synced', (isSynced) => {
+                console.log(`[App] Document ${docId.slice(0, 8)}... synced: ${isSynced}`);
+            });
             
             // Add local IndexedDB persistence in web mode (offline-first)
             let indexeddbProvider = null;
@@ -1488,7 +1519,7 @@ function App() {
                     onMoveDocument={handleMoveDocument}
                     onRenameDocument={renameDocument}
                     onUpdateDocument={syncUpdateDocument}
-                    documentCollaborators={documentCollaborators}
+                    documentCollaborators={collaboratorsByDocument}
                     
                     // UI props
                     isCollapsed={sidebarCollapsed}
@@ -1577,6 +1608,8 @@ function App() {
                                 ydoc={activeDoc.ydoc}
                                 provider={activeDoc.provider}
                                 userColor={userColor}
+                                userHandle={userHandle}
+                                userPublicKey={userIdentity?.publicKeyBase62}
                                 readOnly={!canEditCurrentWorkspace}
                                 onAddComment={(selection) => {
                                     setPendingComment({
@@ -1593,6 +1626,7 @@ function App() {
                                 provider={activeDoc.provider}
                                 userColor={userColor}
                                 userHandle={userHandle}
+                                userPublicKey={userIdentity?.publicKeyBase62}
                                 readOnly={!canEditCurrentWorkspace}
                                 onStatsChange={setStats}
                                 onAddComment={(selection) => {
@@ -1610,6 +1644,7 @@ function App() {
                                     provider={activeDoc.provider}
                                     userHandle={userHandle}
                                     userColor={userColor}
+                                    userPublicKey={userIdentity?.publicKeyBase62}
                                     userIcon={userIcon}
                                     docName={activeTabName}
                                     onStatsChange={setStats}
@@ -1779,7 +1814,7 @@ function App() {
                     workspaceId={currentWorkspace?.id}
                     targetUser={chatTargetUser}
                     onTargetUserHandled={() => setChatTargetUser(null)}
-                    userPublicKey={userIdentity?.publicKey}
+                    userPublicKey={userIdentity?.publicKeyBase62}
                     workspaceMembers={Object.values(workspaceMembers || {}).map(m => ({
                         publicKey: m.publicKey,
                         displayName: m.displayName || m.name || 'Unknown',

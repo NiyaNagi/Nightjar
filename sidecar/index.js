@@ -22,6 +22,7 @@ const crypto = require('crypto');
 // const { createLibp2pNode } = require('../backend/p2p');
 let createLibp2pNode = null;
 const Y = require('yjs');
+const awarenessProtocol = require('y-protocols/awareness');
 const { setupWSConnection, docs, getYDoc } = require('y-websocket/bin/utils');
 const { encryptUpdate, decryptUpdate, isValidKey } = require('../backend/crypto');
 const { Level } = require('level');
@@ -3144,20 +3145,19 @@ function setupAwarenessP2PBridging() {
                 const changedClients = [...added, ...updated, ...removed];
                 if (changedClients.length === 0) return;
                 
-                // Get the local awareness state to broadcast
-                const localState = doc.awareness.getLocalState();
-                if (localState) {
+                // Use awarenessProtocol to properly encode the changed clients' states
+                // This captures the ACTUAL frontend client states, not the sidecar's empty local state
+                try {
+                    const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(doc.awareness, changedClients);
                     const awarenessPayload = {
-                        clientId: doc.awareness.clientID,
-                        ...localState
+                        type: 'awareness-protocol',
+                        update: Buffer.from(awarenessUpdate).toString('base64'),
+                        documentId: capturedDocumentId || null
                     };
                     
-                    // Include documentId for document-level awareness (spreadsheet selections)
-                    if (capturedDocumentId) {
-                        awarenessPayload.documentId = capturedDocumentId;
-                    }
-                    
                     broadcastAwarenessUpdate(capturedWorkspaceId, capturedTopicHex, awarenessPayload);
+                } catch (err) {
+                    console.error('[P2P-AWARENESS] Error encoding awareness update:', err.message);
                 }
             };
             
@@ -3227,6 +3227,25 @@ async function handleSyncStateRequest(peerId, topicHex) {
         p2pBridge.hyperswarm.sendSyncState(peerId, topicHex, messageStr);
         
         console.log(`[P2P-SYNC-STATE] ✓ Sent workspace-meta state to ${peerId.slice(0, 16)}...`);
+        
+        // CRITICAL: Also send awareness state so joining peer sees who's online
+        if (doc.awareness) {
+            try {
+                const allClients = Array.from(doc.awareness.getStates().keys());
+                if (allClients.length > 0) {
+                    const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(doc.awareness, allClients);
+                    const awarenessPayload = {
+                        type: 'awareness-protocol',
+                        update: Buffer.from(awarenessUpdate).toString('base64'),
+                        documentId: null
+                    };
+                    p2pBridge.hyperswarm.broadcastAwareness(topicHex, JSON.stringify(awarenessPayload));
+                    console.log(`[P2P-SYNC-STATE] ✓ Sent awareness state (${allClients.length} clients) to ${peerId.slice(0, 16)}...`);
+                }
+            } catch (awarenessErr) {
+                console.error(`[P2P-SYNC-STATE] Error sending awareness:`, awarenessErr.message);
+            }
+        }
         
         // CRITICAL: Also sync all document contents for this workspace
         // This ensures joiners get the actual document data, not just the list
@@ -3751,12 +3770,35 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
 // uses clientID-based states that don't work well for cross-process bridging
 const remotePeerAwareness = new Map(); // workspaceId -> Map<peerId, state>
 
-function handleP2PAwarenessUpdate(peerId, topicHex, state) {
+async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
     try {
         // Find the workspace ID for this topic
-        const workspaceId = topicToWorkspace.get(topicHex);
+        let workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            return; // Not a topic we're tracking
+            // Fallback: try to find workspace by topic hash from LevelDB
+            // This handles the case where P2P awareness arrives before autoRejoinWorkspaces completes
+            console.warn(`[P2P-AWARENESS] ⚠ Unknown topic ${topicHex?.slice(0, 16)}... - attempting fallback lookup...`);
+            try {
+                const workspaces = await loadWorkspaceList();
+                for (const ws of workspaces) {
+                    const canonicalHash = getWorkspaceTopicHex(ws.id);
+                    if (canonicalHash === topicHex) {
+                        workspaceId = ws.id;
+                        // Register topic for future messages
+                        registerWorkspaceTopic(ws.id, topicHex);
+                        console.log(`[P2P-AWARENESS] ✓ Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
+                        break;
+                    }
+                }
+            } catch (lookupErr) {
+                console.warn(`[P2P-AWARENESS] Fallback lookup failed:`, lookupErr.message);
+            }
+            
+            if (!workspaceId) {
+                console.warn(`[P2P-AWARENESS] ✗ Unknown topic - not registered and fallback failed`);
+                console.warn(`[P2P-AWARENESS] Known topics: ${Array.from(topicToWorkspace.keys()).map(t => t.slice(0, 8)).join(', ')}`);
+                return;
+            }
         }
         
         // Parse the state if it's a string (from JSON transport)
@@ -3775,7 +3817,40 @@ function handleP2PAwarenessUpdate(peerId, topicHex, state) {
         // Extract documentId if present (for document-level awareness like spreadsheet selections)
         const documentId = parsedState.documentId || null;
         
-        // Store remote peer state in our tracking map
+        // CRITICAL FIX: If this is a proper awareness-protocol encoded update, apply it to Yjs awareness
+        if (parsedState.type === 'awareness-protocol' && parsedState.update) {
+            // Decode the base64-encoded awareness update
+            const updateBytes = Buffer.from(parsedState.update, 'base64');
+            
+            // Determine the room name based on documentId or fall back to workspace-meta
+            const roomName = documentId || `workspace-meta:${workspaceId}`;
+            const doc = docs.get(roomName);
+            
+            if (doc && doc.awareness) {
+                // Apply the awareness update to the Yjs awareness with 'p2p' origin to prevent loops
+                awarenessProtocol.applyAwarenessUpdate(doc.awareness, updateBytes, 'p2p');
+                
+                // Debug: Log the resulting awareness states to see what was applied
+                const states = doc.awareness.getStates();
+                const statesSummary = [];
+                states.forEach((state, clientId) => {
+                    statesSummary.push({
+                        clientId,
+                        userName: state?.user?.name,
+                        hasPublicKey: !!state?.user?.publicKey,
+                        openDocId: state?.openDocumentId?.slice?.(0, 12) || null,
+                        userKeys: Object.keys(state?.user || {})
+                    });
+                });
+                console.log(`[P2P-AWARENESS] ✓ Applied awareness update from ${peerId.slice(0, 8)}... to ${roomName}`);
+                console.log(`[P2P-AWARENESS] States after apply:`, JSON.stringify(statesSummary));
+            } else {
+                console.log(`[P2P-AWARENESS] Doc not found for awareness: ${roomName}`);
+            }
+            return; // New protocol handled, skip legacy handling
+        }
+        
+        // Legacy fallback: Store remote peer state in our tracking map
         if (!remotePeerAwareness.has(workspaceId)) {
             remotePeerAwareness.set(workspaceId, new Map());
         }
@@ -3786,15 +3861,14 @@ function handleP2PAwarenessUpdate(peerId, topicHex, state) {
         });
         
         const logSuffix = documentId ? ` (doc: ${documentId.slice(0, 12)}...)` : '';
-        console.log(`[P2P-AWARENESS] Stored awareness from ${peerId.slice(0, 8)}... for workspace ${workspaceId.slice(0, 8)}...${logSuffix}`);
+        console.log(`[P2P-AWARENESS] Stored legacy awareness from ${peerId.slice(0, 8)}... for workspace ${workspaceId.slice(0, 8)}...${logSuffix}`);
         
-        // Notify WebSocket clients about the remote peer
-        // They can query the remote peer states via a message
+        // Notify WebSocket clients about the remote peer (legacy)
         if (metaWss) {
             const message = JSON.stringify({
                 type: 'p2p-awareness-update',
                 workspaceId,
-                documentId, // Include documentId for document-level awareness routing
+                documentId,
                 peerId: peerId.slice(0, 16),
                 state: parsedState
             });

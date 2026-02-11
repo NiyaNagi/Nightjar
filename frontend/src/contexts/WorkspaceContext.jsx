@@ -579,7 +579,7 @@ export function WorkspaceProvider({ children }) {
     // Get user identity for owner info
     // Use publicIdentity from IdentityContext (via useIdentity hook) - single source of truth
     const userIdentity = publicIdentity ? {
-      publicKey: publicIdentity.publicKey,
+      publicKey: publicIdentity.publicKeyBase62,
       handle: publicIdentity.handle || 'You',
     } : {
       publicKey: 'local-user',

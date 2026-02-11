@@ -329,6 +329,7 @@
     border-left: 3px solid transparent;
     transition: transform 0.15s, box-shadow 0.15s;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    position: relative; /* For presence indicator positioning */
 }
 
 .kanban-card:hover {
@@ -338,6 +339,30 @@
 .kanban-card.dragging {
     opacity: 0.5;
     transform: rotate(3deg);
+}
+
+/* Card presence indicator - shows who's editing a card */
+.card-presence-indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 3px;
+    z-index: 10;
+}
+
+.presence-pip {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--bg-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    animation: presence-pulse 2s ease-in-out infinite;
+}
+
+@keyframes presence-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 .card-content {

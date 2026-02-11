@@ -55,17 +55,17 @@ export function PresenceProvider({ children, awareness }) {
         if (!awareness || !publicIdentity) return;
         
         // Generate deterministic color from publicKey
-        const identityColor = publicIdentity.color || generateIdentityColor(publicIdentity.publicKey);
+        const identityColor = publicIdentity.color || generateIdentityColor(publicIdentity.publicKeyBase62);
         
         const localState = {
             user: {
-                id: publicIdentity.publicKey,
+                id: publicIdentity.publicKeyBase62,
                 name: publicIdentity.handle,
                 color: identityColor,
                 icon: publicIdentity.icon,
                 deviceId: publicIdentity.deviceId,
                 deviceName: publicIdentity.deviceName,
-                publicKey: publicIdentity.publicKey, // Include publicKey for DM routing
+                publicKey: publicIdentity.publicKeyBase62, // Include publicKey for DM routing
                 lastActive: Date.now()
             },
             cursor: null,

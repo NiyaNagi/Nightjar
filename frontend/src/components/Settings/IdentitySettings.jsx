@@ -129,7 +129,7 @@ export default function IdentitySettings({ onClose }) {
                                     {selectedEmoji}
                                 </div>
                                 <div className="preview-handle">{handle || 'Your Name'}</div>
-                                <div className="preview-id">ID: {publicIdentity?.publicKey?.slice(0, 12)}...</div>
+                                <div className="preview-id">ID: {publicIdentity?.publicKeyBase62?.slice(0, 12)}...</div>
                             </div>
                             
                             <div className="form-group">

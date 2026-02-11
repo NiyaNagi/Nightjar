@@ -9,7 +9,7 @@ const generateId = () => Date.now().toString(36) + Math.random().toString(36).su
 // Sync timeout - wait for provider to sync before initializing defaults
 const SYNC_TIMEOUT_MS = 10000;
 
-const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) => {
+const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly = false, onAddComment }) => {
     const [columns, setColumns] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [syncError, setSyncError] = useState(null);
@@ -19,6 +19,7 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
     const [editingColumn, setEditingColumn] = useState(null);
     const [newColumnName, setNewColumnName] = useState('');
     const [showNewColumn, setShowNewColumn] = useState(false);
+    const [cardPresence, setCardPresence] = useState({}); // cardId -> [{ name, color }]
     const ykanbanRef = useRef(null);
     const hasSyncedRef = useRef(false);
     const syncTimeoutRef = useRef(null);
@@ -103,6 +104,52 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
             }
         };
     }, [ydoc, provider]);
+
+    // Kanban card presence - track which cards other users are editing
+    useEffect(() => {
+        if (!provider?.awareness) return;
+        
+        const awareness = provider.awareness;
+        
+        // Set our user info in awareness
+        awareness.setLocalStateField('user', {
+            name: userHandle || 'Anonymous',
+            color: userColor || '#6366f1',
+            publicKey: userPublicKey || null,
+            lastActive: Date.now(),
+        });
+        
+        const updatePresence = () => {
+            const states = awareness.getStates();
+            const presenceMap = {};
+            
+            states.forEach((state, clientId) => {
+                if (clientId === awareness.clientID) return;
+                if (state.focusedCardId && state.user?.name) {
+                    if (!presenceMap[state.focusedCardId]) {
+                        presenceMap[state.focusedCardId] = [];
+                    }
+                    presenceMap[state.focusedCardId].push({
+                        name: state.user.name,
+                        color: state.user.color || '#6366f1',
+                    });
+                }
+            });
+            
+            setCardPresence(presenceMap);
+        };
+        
+        awareness.on('change', updatePresence);
+        updatePresence();
+        
+        return () => awareness.off('change', updatePresence);
+    }, [provider, userHandle, userColor, userPublicKey]);
+
+    // Update focused card in awareness when editing
+    useEffect(() => {
+        if (!provider?.awareness) return;
+        provider.awareness.setLocalStateField('focusedCardId', editingCard);
+    }, [provider, editingCard]);
 
     // Retry sync handler
     const handleRetrySync = useCallback(() => {
@@ -507,6 +554,19 @@ const Kanban = ({ ydoc, provider, userColor, readOnly = false, onAddComment }) =
                                         }
                                     }}
                                 >
+                                    {/* Presence indicator - show who's editing this card */}
+                                    {cardPresence[card.id]?.length > 0 && (
+                                        <div className="card-presence-indicator">
+                                            {cardPresence[card.id].map((user, idx) => (
+                                                <span 
+                                                    key={idx} 
+                                                    className="presence-pip"
+                                                    style={{ backgroundColor: user.color }}
+                                                    title={`${user.name} is editing`}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
                                     {!readOnly && editingCard === card.id ? (
                                         <KanbanCardEditor
                                             card={card}

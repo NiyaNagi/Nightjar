@@ -153,7 +153,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     const inputRef = useRef(null);
     
     // Notification sounds hook
-    const { playForMessageType, settings: notificationSettings } = useNotificationSounds();
+    const { playForMessageType, notifyForMessageType, requestNotificationPermission, settings: notificationSettings } = useNotificationSounds();
     const lastMessageCountRef = useRef(0);
     
     // Local messages when no ydoc (workspace-level chat)
@@ -177,6 +177,8 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     const [showMentionPopup, setShowMentionPopup] = useState(false);
     const [mentionQuery, setMentionQuery] = useState('');
     const [mentionStartIndex, setMentionStartIndex] = useState(-1);
+    // Track pending mentions - display @Name but store full data for conversion on send
+    const [pendingMentions, setPendingMentions] = useState([]); // [{displayName, publicKey, startIndex}]
     
     // Unread tracking per channel
     const [unreadCounts, setUnreadCounts] = useState(() => loadUnreadCounts(workspaceId));
@@ -232,6 +234,20 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 // Skip if no user state
                 if (!state.user) return;
                 
+                // CRITICAL: Only include users with a proper publicKey
+                // Users without publicKey cannot be reliably identified across sessions
+                const publicKey = state.user.publicKey;
+                if (!publicKey) {
+                    console.log(`[Chat] Skipping user ${state.user?.name} - no publicKey (awareness may still be initializing)`);
+                    return;
+                }
+                
+                // CRITICAL: Skip if this is our own user (same publicKey, different tab/session)
+                if (publicKey === userPublicKey) {
+                    console.log(`[Chat] Skipping self from user list (publicKey match)`);
+                    return;
+                }
+                
                 const lastActive = state.user?.lastActive || state.lastActive;
                 
                 // Skip states without lastActive (they're from before the heartbeat fix)
@@ -242,18 +258,16 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 }
                 
                 const userName = state.user.name || 'Anonymous';
-                // Use publicKey for deduplication if available, otherwise fall back to clientId
-                const userKey = state.user.publicKey || state.user.id || `client-${clientId}`;
                 
-                // Keep the most recently active session for this user
-                const existing = userMap.get(userKey);
+                // Keep the most recently active session for this user (dedupe by publicKey)
+                const existing = userMap.get(publicKey);
                 if (!existing || (lastActive > (existing.lastActive || 0))) {
-                    userMap.set(userKey, {
+                    userMap.set(publicKey, {
                         clientId,
                         name: userName,
                         color: state.user.color || '#6366f1',
                         icon: state.user.icon,
-                        publicKey: state.user.publicKey || state.user.id,
+                        publicKey,
                         lastActive
                     });
                 }
@@ -272,7 +286,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             provider.awareness.off('change', updateUsers);
             clearInterval(interval);
         };
-    }, [provider]);
+    }, [provider, userPublicKey]);
     
     // Filter users by search
     const filteredUsers = onlineUsers.filter(user => 
@@ -286,8 +300,12 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         if (!user.publicKey) {
             console.warn('[Chat] Starting DM with user without publicKey - channel may not persist');
         }
-        const userKey = user.publicKey || `client-${user.clientId}`;
-        const tabId = `dm-${userKey.slice(0, 16)}`;
+        // Use deterministic channel ID based on both publicKeys for consistent routing
+        // This ensures both parties compute the same tab ID
+        const targetKey = user.publicKey || `client-${user.clientId}`;
+        const tabId = userPublicKey && user.publicKey 
+            ? getDmChannelId(userPublicKey, user.publicKey)
+            : `dm-${targetKey.slice(0, 16)}`; // Fallback for legacy clients
         if (!chatTabs.find(t => t.id === tabId)) {
             setChatTabs(prev => [...prev, {
                 id: tabId,
@@ -440,8 +458,14 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     // Close a chat tab
     const closeTab = (tabId, e) => {
         e.stopPropagation();
+        e.preventDefault();
+        console.log('[Chat] closeTab called:', tabId);
         if (tabId === 'general') return; // Can't close general
-        setChatTabs(prev => prev.filter(t => t.id !== tabId));
+        setChatTabs(prev => {
+            const filtered = prev.filter(t => t.id !== tabId);
+            console.log('[Chat] Filtered tabs:', filtered.length, 'from', prev.length);
+            return filtered;
+        });
         if (activeTab === tabId) {
             setActiveTab('general');
         }
@@ -562,6 +586,13 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         window.addEventListener('resize', handleWindowResize);
         return () => window.removeEventListener('resize', handleWindowResize);
     }, [chatState.position]);
+    
+    // Request notification permission on mount (only if desktop notifications are enabled)
+    useEffect(() => {
+        if (notificationSettings?.desktopNotifications) {
+            requestNotificationPermission();
+        }
+    }, [notificationSettings?.desktopNotifications, requestNotificationPermission]);
 
     // Initialize Yjs array for chat messages with sync awareness
     useEffect(() => {
@@ -603,6 +634,61 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             ymessages.unobserve(updateFromYjs);
         };
     }, [ydoc, chatState.isMinimized]);
+    
+    // Watch for new messages and send notifications
+    useEffect(() => {
+        if (messages.length === 0) {
+            lastMessageCountRef.current = 0;
+            return;
+        }
+        
+        // Only notify for new messages (not initial load)
+        if (lastMessageCountRef.current === 0) {
+            lastMessageCountRef.current = messages.length;
+            return;
+        }
+        
+        // Check for new messages since last count
+        const newMessages = messages.slice(lastMessageCountRef.current);
+        lastMessageCountRef.current = messages.length;
+        
+        // Process each new message
+        for (const msg of newMessages) {
+            // Skip our own messages
+            if (msg.senderPublicKey === userPublicKey) continue;
+            // Skip system messages
+            if (msg.type === 'system') continue;
+            
+            // Determine message type for notification
+            let messageType = MESSAGE_TYPES.GENERAL_MESSAGE;
+            let title = 'Nightjar';
+            let body = `${msg.username}: ${msg.text}`;
+            
+            // Check if this message mentions us
+            const mentionsMe = msg.mentions?.some(m => m.publicKey === userPublicKey);
+            if (mentionsMe) {
+                messageType = MESSAGE_TYPES.MENTION;
+                title = `${msg.username} mentioned you`;
+                body = msg.text.replace(/@\[[^\]]+\]\([^)]+\)/g, (match) => {
+                    const name = match.match(/@\[([^\]]+)\]/)?.[1] || '';
+                    return `@${name}`;
+                });
+            } else if (msg.channel?.startsWith('dm-')) {
+                messageType = MESSAGE_TYPES.DIRECT_MESSAGE;
+                title = `Message from ${msg.username}`;
+            } else if (msg.channel?.startsWith('group-')) {
+                messageType = MESSAGE_TYPES.GROUP_MESSAGE;
+                title = `Message in group`;
+            }
+            
+            // Play sound and send notification
+            playForMessageType(messageType);
+            notifyForMessageType(messageType, title, body, {
+                tag: `nightjar-${msg.id}`,
+                renotify: true,
+            });
+        }
+    }, [messages, userPublicKey, playForMessageType, notifyForMessageType]);
     
     // Sync group tabs from ydoc (load on mount and observe changes)
     useEffect(() => {
@@ -776,12 +862,30 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             channel = activeTab;
         }
         
-        // Extract mentions from message text
-        const mentions = parseMentions(inputValue.trim());
+        // Convert @Name display format to @[Name](key) format for storage
+        // Find all @mentions in the input and replace with full format using pending mentions data
+        let messageText = inputValue.trim();
+        console.log('[Chat] sendMessage - input:', messageText, 'pendingMentions:', pendingMentions.length);
+        if (pendingMentions.length > 0) {
+            // Sort pending mentions by name length (longest first) to avoid partial replacements
+            const sortedMentions = [...pendingMentions].sort((a, b) => b.displayName.length - a.displayName.length);
+            for (const mention of sortedMentions) {
+                // Replace ALL occurrences of @Name with @[Name](publicKey)
+                const displayPattern = `@${mention.displayName}`;
+                const fullFormat = `@[${mention.displayName}](${mention.publicKey})`;
+                // Use replaceAll to handle multiple mentions of the same user
+                messageText = messageText.split(displayPattern).join(fullFormat);
+                console.log('[Chat] Converted mention:', displayPattern, '->', fullFormat);
+            }
+        }
+        console.log('[Chat] Final message text:', messageText);
+        
+        // Extract mentions from the converted message text
+        const mentions = parseMentions(messageText);
 
         const message = {
             id: Date.now().toString(36) + Math.random().toString(36).substring(2, 11),
-            text: inputValue.trim(),
+            text: messageText,
             username: username || 'Anonymous',
             color: userColor || '#6366f1',
             timestamp: Date.now(),
@@ -801,10 +905,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             setMessages(prev => [...prev, message]);
         }
         setInputValue('');
+        setPendingMentions([]); // Clear pending mentions after sending
         
         // Update last read timestamp for this channel (we just sent a message)
         updateLastRead(channel);
-    }, [inputValue, username, userColor, activeTab, chatTabs, myClientId, getDmChannelId, userPublicKey]);
+    }, [inputValue, username, userColor, activeTab, chatTabs, myClientId, getDmChannelId, userPublicKey, pendingMentions]);
     
     // Update last read timestamp for a channel
     const updateLastRead = useCallback((channelId) => {
@@ -968,15 +1073,30 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     }, [onlineUsers, workspaceMembers, mentionQuery]);
     
     // Insert a mention into the input
+    // Display @Name in the input, store full mention data for conversion on send
     const insertMention = useCallback((user) => {
         const beforeMention = inputValue.substring(0, mentionStartIndex);
-        const afterMention = inputValue.substring(inputRef.current?.selectionStart || inputValue.length);
-        const mentionText = `@[${user.name}](${user.publicKey || user.clientId}) `;
-        setInputValue(beforeMention + mentionText + afterMention);
+        // afterMention should start AFTER the @query, not from cursor position
+        // +1 for the @ symbol itself
+        const afterMention = inputValue.substring(mentionStartIndex + mentionQuery.length + 1);
+        // Display just @Name in the input (user-friendly)
+        const displayText = `@${user.name} `;
+        const newValue = beforeMention + displayText + afterMention;
+        
+        // Track this mention for conversion when sending
+        // Calculate where the mention ends in the new string
+        const mentionEndIndex = mentionStartIndex + displayText.length;
+        setPendingMentions(prev => [...prev, {
+            displayName: user.name,
+            publicKey: user.publicKey || user.clientId,
+            // Store position info for reconstruction - will be recalculated on send
+        }]);
+        
+        setInputValue(newValue);
         setShowMentionPopup(false);
         setMentionQuery('');
         inputRef.current?.focus();
-    }, [inputValue, mentionStartIndex]);
+    }, [inputValue, mentionStartIndex, mentionQuery]);
     
     // State for mention popup selection index
     const [mentionIndex, setMentionIndex] = useState(0);
@@ -1102,7 +1222,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 <h3>💬 Chat</h3>
                 <div className="chat-header-actions">
                     <span className="online-count">
-                        {provider?.awareness?.getStates()?.size || 1} online
+                        {onlineUsers.length + 1} online
                     </span>
                     {totalUnread > 0 && (
                         <button
@@ -1170,6 +1290,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                     type="button"
                                     className="tab-close"
                                     onClick={(e) => closeTab(tab.id, e)}
+                                    onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
                                     aria-label={`Close ${tab.name} chat`}
                                 >
                                     ×

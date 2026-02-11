@@ -68,6 +68,9 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     error: null,
   });
   
+  // Track when provider is ready (for triggering awareness update effect)
+  const [providerReady, setProviderReady] = useState(false);
+  
   const ydocRef = useRef(null);
   const providerRef = useRef(null);
   const yDocumentsRef = useRef(null);
@@ -84,6 +87,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     // Always reset kicked state when workspace changes
     setIsKicked(false);
     setSynced(false);
+    setProviderReady(false); // Reset provider ready state
     setSyncPhase('idle');
     setSyncProgress({ bytesReceived: 0, documentsReceived: 0, foldersReceived: 0, membersReceived: 0, startTime: null, error: null });
 
@@ -269,6 +273,9 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       provider._heartbeatInterval = heartbeatInterval;
     }
     
+    // Signal that provider is ready (triggers awareness update effect)
+    setProviderReady(true);
+    
     // Get shared types for documents, folders, and workspace info
     const yDocuments = ydoc.getArray('documents');
     const yFolders = ydoc.getArray('folders');
@@ -381,7 +388,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
         console.warn(`[WorkspaceSync] Deduplicated folders: ${rawFolders.length} -> ${dedupedFolders.length}`);
       }
       
-      console.log(`[WorkspaceSync] syncFolders called, count: ${dedupedFolders.length}`);
+      console.log(`[WorkspaceSync] syncFolders called, count: ${dedupedFolders.length}`, dedupedFolders.map(f => ({ id: f.id, name: f.name, color: f.color })));
       setFolders(dedupedFolders);
     };
     
@@ -635,6 +642,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       const states = provider.awareness.getStates();
       let online = 0;
       const myClientId = provider.awareness.clientID;
+      const myPublicKey = userIdentity?.publicKeyBase62; // Get our own publicKey for self-exclusion
       const now = Date.now();
       
       // Track which publicKeys are currently online
@@ -649,7 +657,21 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           const publicKey = state.user.publicKey;
           if (!publicKey) {
             // Skip legacy clients without publicKey - they need to update
-            console.log(`[WorkspaceSync] Skipping client ${clientId} without publicKey`);
+            // Debug: Show what fields ARE present to diagnose why publicKey is missing
+            console.log(`[WorkspaceSync] Skipping client ${clientId} without publicKey - state.user:`, JSON.stringify({
+              name: state.user.name,
+              color: state.user.color,
+              icon: state.user.icon,
+              hasPublicKey: !!state.user.publicKey,
+              openDocId: state.openDocumentId || state.user?.openDocumentId || null,
+              allUserKeys: Object.keys(state.user || {})
+            }));
+            return;
+          }
+          
+          // CRITICAL: Skip if this is our own user (same publicKey, different tab/session)
+          // This prevents the current user from appearing in their own presence indicators
+          if (myPublicKey && publicKey === myPublicKey) {
             return;
           }
           
@@ -659,17 +681,25 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           if (onlinePublicKeys.has(publicKey)) return;
           onlinePublicKeys.add(publicKey);
           
-          // Track which document this user has open (for tab presence)
-          const openDocId = state.openDocumentId || state.user?.openDocumentId;
-          if (openDocId) {
-            if (!docCollaborators[openDocId]) {
-              docCollaborators[openDocId] = [];
+          // Track which documents this user has open (for tab presence)
+          // Support both legacy single openDocumentId and new openDocumentIds array
+          const openDocIds = state.openDocumentIds || state.user?.openDocumentIds || [];
+          const focusedDocId = state.openDocumentId || state.user?.openDocumentId;
+          // Check if the user has focused state (working on a specific document)
+          const isFocused = state.isFocused || state.user?.isFocused || false;
+          
+          // Add user to ALL documents they have open
+          const allOpenDocs = openDocIds.length > 0 ? openDocIds : (focusedDocId ? [focusedDocId] : []);
+          for (const docId of allOpenDocs) {
+            if (!docCollaborators[docId]) {
+              docCollaborators[docId] = [];
             }
-            docCollaborators[openDocId].push({
+            docCollaborators[docId].push({
               name: state.user.name,
               color: state.user.color || '#888888',
               icon: state.user.icon || '👤',
               publicKey,
+              isFocused: isFocused && docId === focusedDocId, // Only focused if this is the active doc
             });
           }
           
@@ -706,6 +736,11 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       
       setOnlineCount(online);
       setCollaboratorsByDocument(docCollaborators);
+      
+      // Debug: Log collaborator presence data
+      if (Object.keys(docCollaborators).length > 0) {
+        console.log('[WorkspaceSync] Presence indicators:', docCollaborators);
+      }
     };
     
     // Subscribe to changes
@@ -766,27 +801,58 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       yDocFoldersRef.current = null;
       yTrashedDocsRef.current = null;
     };
-  }, [workspaceId, serverUrl, userIdentity?.publicKeyBase62]);
+  }, [workspaceId, serverUrl]);
   
-  // Update awareness when userProfile changes
+  // Update awareness when userProfile or userIdentity changes
+  // This is CRITICAL: The initial awareness setup may happen before userIdentity is loaded
+  // So we need to update publicKey as soon as it becomes available
+  // providerReady ensures this effect runs after the provider is created
   useEffect(() => {
-    const provider = providerRef.current;
-    if (!provider?.awareness || !userProfile) return;
-    
-    provider.awareness.setLocalStateField('user', {
-      name: userProfile.name || 'Anonymous',
-      color: userProfile.color || '#6366f1',
-      icon: userProfile.icon || '👤',
-      lastActive: Date.now(),
-    });
-  }, [userProfile?.name, userProfile?.color, userProfile?.icon]);
-  
-  // Set the currently open document ID in awareness (for tab presence indicators)
-  const setOpenDocumentId = useCallback((docId) => {
     const provider = providerRef.current;
     if (!provider?.awareness) return;
     
-    provider.awareness.setLocalStateField('openDocumentId', docId);
+    // Get current state to preserve existing fields
+    const currentState = provider.awareness.getLocalState()?.user || {};
+    
+    // Update even if only providerReady changed - we need to ensure publicKey is set
+    // This handles the case where userIdentity was already loaded before provider was created
+    const newPublicKey = userIdentity?.publicKeyBase62 || null;
+    
+    const updatedUser = {
+      name: userProfile?.name || currentState.name || 'Anonymous',
+      color: userProfile?.color || currentState.color || '#6366f1',
+      icon: userProfile?.icon || currentState.icon || '👤',
+      publicKey: newPublicKey || currentState.publicKey || null,
+      lastActive: Date.now(),
+    };
+    
+    // Debug: Log when we're updating awareness with publicKey
+    if (newPublicKey && !currentState.publicKey) {
+      console.log('[WorkspaceSync] Setting awareness publicKey (was missing):', newPublicKey.slice(0, 12) + '...');
+    }
+    
+    provider.awareness.setLocalStateField('user', updatedUser);
+  }, [providerReady, userProfile?.name, userProfile?.color, userProfile?.icon, userIdentity?.publicKeyBase62]);
+  
+  // Set the currently open document IDs in awareness (for tab presence indicators)
+  // Supports both single ID (legacy) and array of IDs (all open documents)
+  // The focusedDocId is the actively viewed document
+  const setOpenDocumentId = useCallback((focusedDocId, isFocused = true, allOpenDocIds = null) => {
+    const provider = providerRef.current;
+    if (!provider?.awareness) {
+      console.log('[WorkspaceSync] setOpenDocumentId: no provider/awareness yet');
+      return;
+    }
+    
+    // If allOpenDocIds is provided, use it; otherwise just use the focused ID
+    const openDocIds = allOpenDocIds || (focusedDocId ? [focusedDocId] : []);
+    
+    console.log('[WorkspaceSync] setOpenDocumentId - focused:', focusedDocId, 'all open:', openDocIds.length, 'ids:', openDocIds);
+    
+    // Set both the focused document ID (for backwards compatibility) and all open IDs
+    provider.awareness.setLocalStateField('openDocumentId', focusedDocId);
+    provider.awareness.setLocalStateField('openDocumentIds', openDocIds);
+    provider.awareness.setLocalStateField('isFocused', isFocused);
   }, []);
   
   // Get raw Yjs document count (for migration check - avoids React state lag)
@@ -861,8 +927,10 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     const folders = yFoldersRef.current.toArray();
     const index = folders.findIndex(f => f.id === folderId);
+    console.log('[WorkspaceSync] updateFolder:', { folderId, updates, found: index !== -1 });
     if (index !== -1) {
       const folder = { ...folders[index], ...updates };
+      console.log('[WorkspaceSync] updateFolder - merged folder:', folder);
       ydocRef.current.transact(() => {
         yFoldersRef.current.delete(index, 1);
         yFoldersRef.current.insert(index, [folder]);

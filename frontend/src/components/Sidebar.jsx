@@ -277,9 +277,9 @@ const Sidebar = ({
                                             {collabs.slice(0, 5).map((collab, idx) => (
                                                 <span 
                                                     key={idx}
-                                                    className="user-pip"
+                                                    className={`user-pip ${collab.isFocused ? 'focused' : ''}`}
                                                     style={{ backgroundColor: collab.color }}
-                                                    title={collab.name}
+                                                    title={collab.name + (collab.isFocused ? ' (editing)' : '')}
                                                 >
                                                     {collab.icon || collab.name.charAt(0).toUpperCase()}
                                                 </span>

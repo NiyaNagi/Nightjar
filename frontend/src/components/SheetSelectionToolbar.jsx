@@ -271,21 +271,20 @@ const SheetSelectionToolbar = ({
             zIndex: 1200,
         };
         
-        // Position at upper-right of selection
-        // For collapsed chip: right edge aligned with selection right edge
-        // For expanded: slides out to the right from the chip
-        style.left = position.x + 50; // Offset to right of selection center
-        style.top = position.y - 20;  // Slightly above selection top
+        // Position right at the upper-right corner of the cell
+        // Anchor directly next to the cell for easy access
+        style.left = position.x + 50; // Position at right edge of selection
+        style.top = position.y + 2;   // Just inside the top of the cell
         
         // Adjust if too close to top
-        if (position.y < 80) {
-            style.top = position.y + 30;
+        if (position.y < 40) {
+            style.top = position.y + 25;
         }
         
         // Adjust if too close to right edge
         const viewportWidth = window.innerWidth;
-        if (style.left > viewportWidth - 100) {
-            style.left = viewportWidth - 100;
+        if (style.left > viewportWidth - 120) {
+            style.left = viewportWidth - 120;
         }
         
         return style;
@@ -299,9 +298,9 @@ const SheetSelectionToolbar = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
-            {/* Cell Reference Badge - Always visible */}
+            {/* Cell Reference Badge - Always visible, expands toolbar on hover */}
             <div className="toolbar-group chip-content">
-                <span className="cell-ref-badge" title="Selected range">
+                <span className="cell-ref-badge" title="Selected range - hover to format">
                     {getCellRef()}
                 </span>
             </div>

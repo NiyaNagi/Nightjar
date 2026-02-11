@@ -295,25 +295,89 @@
     position: relative;
 }
 
-/* Fortune Sheet presence/collaboration overlays - fix positioning */
-.sheet-container .fortune-presence-username {
-    /* Position in upper-right corner of the cell, not floating above */
+/* Fortune Sheet presence/collaboration overlays - fix positioning and visibility */
+/* Target the presence container to ensure it can overflow cell boundaries */
+.sheet-container .luckysheet-cell-presence,
+.sheet-container [class*="presence"] {
+    overflow: visible !important;
+}
+
+/* Username label styling - ensure high contrast and visibility */
+.sheet-container .fortune-presence-username,
+.sheet-container [class*="presence-username"],
+.sheet-container [class*="collaborator-name"] {
+    /* Position in upper-right corner of the cell */
+    position: absolute !important;
     top: 0 !important;
     right: 0 !important;
     left: auto !important;
     transform: none !important;
     border-radius: 0 0 0 4px !important;
-    font-size: 10px !important;
-    padding: 2px 5px !important;
-    max-width: 80px !important;
-    z-index: 50 !important; /* Keep below modals (z-index 900+) */
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 3px 8px !important;
+    /* High contrast styling - solid background with white text */
+    background-color: inherit !important; /* Will use the user's color */
+    color: white !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
+    /* Ensure text is fully visible */
+    min-width: fit-content !important;
+    max-width: none !important;
+    width: auto !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    z-index: 50 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
 }
 
-.sheet-container .fortune-presence-selection {
-    z-index: 49 !important; /* Below username label */
+/* Selection border styling */
+.sheet-container .fortune-presence-selection,
+.sheet-container [class*="presence-selection"] {
+    z-index: 49 !important;
+    pointer-events: none !important;
 }
 
 /* Ensure presence overlays don't appear over modals */
 .sheet-workbook-wrapper {
     isolation: isolate; /* Create stacking context */
+}
+
+/* Custom presence dot overlays (replaces unreliable Fortune Sheet presence API) */
+.sheet-presence-border {
+    z-index: 99;
+    pointer-events: none;
+    border-radius: 2px;
+}
+
+.sheet-presence-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    z-index: 100;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    border: 2px solid white;
+}
+
+.sheet-presence-dot:hover {
+    width: auto;
+    height: auto;
+    border-radius: 12px;
+    padding: 2px 8px;
+}
+
+.sheet-presence-name {
+    display: none;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+
+.sheet-presence-dot:hover .sheet-presence-name {
+    display: inline;
 }

@@ -40,13 +40,18 @@ export const DEFAULT_NOTIFICATION_SETTINGS = {
     soundVolume: 0.5,
     selectedSound: 'chime',
     doNotDisturb: false,
-    desktopNotifications: false,
+    desktopNotifications: true, // Default ON as requested
     showPreview: true,
     // Per-type sound toggles
     soundOnDirectMessage: true,
     soundOnMention: true,
     soundOnGroupMessage: true,
     soundOnGeneralMessage: false,
+    // Per-type desktop notification toggles
+    notifyOnDirectMessage: true,
+    notifyOnMention: true,
+    notifyOnGroupMessage: true,
+    notifyOnGeneralMessage: false,
     // Channel-specific overrides
     defaultChannelSetting: 'all',
     channelOverrides: {},
@@ -198,6 +203,90 @@ export function useNotificationSounds() {
         updateSettings({ doNotDisturb: !settings.doNotDisturb });
     }, [settings.doNotDisturb, updateSettings]);
     
+    // Request notification permission (call this on user interaction)
+    const requestNotificationPermission = useCallback(async () => {
+        if (!('Notification' in window)) {
+            console.log('[Notifications] Desktop notifications not supported');
+            return 'denied';
+        }
+        
+        if (Notification.permission === 'granted') {
+            return 'granted';
+        }
+        
+        if (Notification.permission !== 'denied') {
+            const permission = await Notification.requestPermission();
+            return permission;
+        }
+        
+        return Notification.permission;
+    }, []);
+    
+    // Send a desktop notification
+    const sendDesktopNotification = useCallback((title, body, options = {}) => {
+        // Check if enabled and not in DND mode
+        if (!settings.enabled || !settings.desktopNotifications || settings.doNotDisturb) {
+            return null;
+        }
+        
+        if (!('Notification' in window) || Notification.permission !== 'granted') {
+            return null;
+        }
+        
+        try {
+            const notification = new Notification(title, {
+                body: settings.showPreview ? body : 'New message',
+                icon: '/icons/icon-192.png', // App icon
+                badge: '/icons/icon-72.png',
+                tag: options.tag || 'nightjar-chat',
+                renotify: options.renotify || false,
+                silent: !settings.soundEnabled, // Let our sound system handle it
+                ...options,
+            });
+            
+            // Auto-close after 5 seconds
+            setTimeout(() => notification.close(), 5000);
+            
+            // Handle click - focus window
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+                if (options.onClick) options.onClick();
+            };
+            
+            return notification;
+        } catch (err) {
+            console.error('[Notifications] Failed to send notification:', err);
+            return null;
+        }
+    }, [settings.enabled, settings.desktopNotifications, settings.doNotDisturb, settings.showPreview, settings.soundEnabled]);
+    
+    // Send notification for a specific message type
+    const notifyForMessageType = useCallback((messageType, title, body, options = {}) => {
+        // Check if notifications are enabled for this type
+        let shouldNotify = false;
+        switch (messageType) {
+            case MESSAGE_TYPES.DIRECT_MESSAGE:
+                shouldNotify = settings.notifyOnDirectMessage;
+                break;
+            case MESSAGE_TYPES.MENTION:
+                shouldNotify = settings.notifyOnMention;
+                break;
+            case MESSAGE_TYPES.GROUP_MESSAGE:
+                shouldNotify = settings.notifyOnGroupMessage;
+                break;
+            case MESSAGE_TYPES.GENERAL_MESSAGE:
+                shouldNotify = settings.notifyOnGeneralMessage;
+                break;
+            default:
+                shouldNotify = false;
+        }
+        
+        if (shouldNotify) {
+            sendDesktopNotification(title, body, options);
+        }
+    }, [settings, sendDesktopNotification]);
+    
     return {
         settings,
         updateSettings,
@@ -205,6 +294,9 @@ export function useNotificationSounds() {
         playForMessageType,
         testSound,
         toggleDoNotDisturb,
+        requestNotificationPermission,
+        sendDesktopNotification,
+        notifyForMessageType,
         NOTIFICATION_SOUNDS,
         MESSAGE_TYPES,
     };
