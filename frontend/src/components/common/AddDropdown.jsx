@@ -33,6 +33,12 @@ const ITEM_TYPES = {
     defaultColor: '#10b981',
     description: 'Visual task board',
   },
+  inventory: {
+    label: 'Inventory System',
+    icon: '📦',
+    defaultColor: '#8b5cf6',
+    description: 'Manage inventory requests',
+  },
   folder: {
     label: 'Folder',
     icon: '📁',
@@ -47,7 +53,9 @@ export default function AddDropdown({
   onCreateDocument,
   onCreateSheet,
   onCreateKanban,
+  onCreateInventory,
   onCreateFolder,
+  canCreateInventory = false,
   disabled = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -126,6 +134,9 @@ export default function AddDropdown({
         case 'kanban':
           await onCreateKanban?.(itemData);
           break;
+        case 'inventory':
+          await onCreateInventory?.(itemData);
+          break;
         case 'folder':
           await onCreateFolder?.(itemData);
           break;
@@ -177,7 +188,9 @@ export default function AddDropdown({
           {!creatingType ? (
             // Type selection
             <div className="add-dropdown__types">
-              {Object.entries(ITEM_TYPES).map(([type, info]) => (
+              {Object.entries(ITEM_TYPES)
+                .filter(([type]) => type !== 'inventory' || canCreateInventory)
+                .map(([type, info]) => (
                 <button
                   key={type}
                   type="button"

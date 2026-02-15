@@ -7,6 +7,7 @@ import { WorkspaceSyncProvider } from './contexts/WorkspaceSyncContext'
 import { FolderProvider } from './contexts/FolderContext'
 import { PermissionProvider } from './contexts/PermissionContext'
 import { IdentityProvider } from './contexts/IdentityContext'
+import { ToastProvider } from './contexts/ToastContext'
 
 /**
  * Application providers in dependency order:
@@ -16,6 +17,7 @@ import { IdentityProvider } from './contexts/IdentityContext'
  * 4. WorkspaceSyncProvider - Synced workspace data via Yjs (needs workspace, identity)
  * 5. FolderProvider - Folders (needs workspace, can consume sync data)
  * 6. PermissionProvider - Permissions (needs workspace, folder)
+ * 7. ToastProvider - Toast notifications (no deps, but wraps app for access)
  * 
  * Note: PresenceProvider is now inside App where it can receive workspace awareness
  */
@@ -27,7 +29,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <WorkspaceSyncProvider>
             <FolderProvider>
               <PermissionProvider>
-                <App />
+                <ToastProvider>
+                  <App />
+                </ToastProvider>
               </PermissionProvider>
             </FolderProvider>
           </WorkspaceSyncProvider>

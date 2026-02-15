@@ -1,0 +1,168 @@
+.admin-dashboard {
+  padding: 20px;
+  max-width: 960px;
+}
+.admin-dashboard__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.admin-dashboard__header h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+.admin-dashboard__date {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Summary cards */
+.admin-dashboard__cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-top: 3px solid;
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.summary-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-color);
+}
+.summary-card__label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.summary-card__value {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.summary-card__subtitle {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Sections */
+.admin-dashboard__section {
+  margin-bottom: 24px;
+}
+.admin-dashboard__section h3 {
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+.admin-dashboard__section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.admin-dashboard__section-header h3 {
+  margin: 0;
+}
+.admin-dashboard__count {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Approval cards */
+.admin-approval-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 8px;
+}
+.admin-approval-card--urgent {
+  border-left: 3px solid var(--warning-color);
+}
+.admin-approval-card__header {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.admin-approval-card__info {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.admin-approval-card__actions {
+  display: flex;
+  gap: 8px;
+}
+.btn-approve {
+  color: var(--success-color);
+  border-color: var(--success-color);
+}
+.btn-approve:hover {
+  background: var(--success-bg);
+}
+
+/* Blocked */
+.admin-blocked-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--error-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.admin-blocked-card__age {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Quick actions */
+.admin-dashboard__quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Aging */
+.admin-dashboard__aging {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.admin-dashboard__aging strong {
+  color: var(--warning-color);
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard__cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .admin-dashboard__cards {
+    grid-template-columns: 1fr;
+  }
+}

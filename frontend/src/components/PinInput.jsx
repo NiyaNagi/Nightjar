@@ -111,9 +111,9 @@ export default function PinInput({
     };
     
     return (
-        <div className="pin-input-container">
+        <div className="pin-input-container" data-testid="pin-input-container">
             {label && <label className="pin-input-label">{label}</label>}
-            <div className={`pin-input-digits ${error ? 'pin-input-error' : ''}`}>
+            <div className={`pin-input-digits ${error ? 'pin-input-error' : ''}`} data-testid="pin-input-digits">
                 {digits.map((digit, index) => (
                     <input
                         key={index}
@@ -131,10 +131,11 @@ export default function PinInput({
                         className={`pin-input-digit ${digit ? 'filled' : ''} ${focusIndex === index ? 'focused' : ''}`}
                         aria-label={`PIN digit ${index + 1}`}
                         autoComplete="off"
+                        data-testid={`pin-digit-${index}`}
                     />
                 ))}
             </div>
-            {error && <div className="pin-input-error-message">{error}</div>}
+            {error && <div className="pin-input-error-message" data-testid="pin-error">{error}</div>}
         </div>
     );
 }

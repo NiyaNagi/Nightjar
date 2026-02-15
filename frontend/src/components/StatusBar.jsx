@@ -31,6 +31,7 @@ const StatusBar = ({
     // Sync phase tracking
     syncPhase = 'complete',
     workspaceSynced = true,
+    workspaceConnected = false,
     // Sync verification props
     syncStatus = 'idle',
     syncDetails = null,
@@ -116,18 +117,36 @@ const StatusBar = ({
             }
         }
         
-        if (p2pStatus === 'connected') {
-            // Use activePeers if provided (new behavior), otherwise fall back to onlineCount
-            const currentActivePeers = activePeers > 0 ? activePeers : onlineCount;
-            if (currentActivePeers > 0) {
-                return { label: `${currentActivePeers} peer${currentActivePeers !== 1 ? 's' : ''} connected`, className: 'connected' };
+        // Electron mode: use p2pStatus from sidecar
+        if (isElectron) {
+            if (p2pStatus === 'connected') {
+                // Use activePeers if provided (new behavior), otherwise fall back to onlineCount
+                const currentActivePeers = activePeers > 0 ? activePeers : onlineCount;
+                if (currentActivePeers > 0) {
+                    return { label: `${currentActivePeers} peer${currentActivePeers !== 1 ? 's' : ''} connected`, className: 'connected' };
+                }
+                // Connected to P2P but no active peers - show warning
+                return { label: 'Offline copy', className: 'warning' };
             }
-            // Connected to P2P but no active peers - show warning
-            return { label: 'Offline copy', className: 'warning' };
+            if (p2pStatus === 'connecting') {
+                return { label: 'Connecting...', className: 'connecting' };
+            }
+            return { label: 'Offline', className: 'offline' };
         }
-        if (p2pStatus === 'connecting') {
-            return { label: 'Connecting...', className: 'connecting' };
+        
+        // Web mode: use workspaceConnected/workspaceSynced and onlineCount from Y.js sync
+        // Consider connected if:
+        // 1. WebSocket is connected (workspaceConnected), OR
+        // 2. Sync phase completed (syncPhase === 'complete'), OR
+        // 3. Provider synced (workspaceSynced)
+        if (workspaceConnected || syncPhase === 'complete' || workspaceSynced) {
+            // Use onlineCount from awareness for web mode
+            if (onlineCount > 0) {
+                return { label: `${onlineCount + 1} online`, className: 'connected' };
+            }
+            return { label: 'Connected', className: 'connected' };
         }
+        
         return { label: 'Offline', className: 'offline' };
     };
 
@@ -251,7 +270,8 @@ const StatusBar = ({
                 <div 
                     className={`connection-status ${connectionStatus.className}`}
                     data-testid="sync-status"
-                    data-synced={p2pStatus === 'connected' ? 'true' : 'false'}
+                    data-synced={workspaceSynced ? 'true' : 'false'}
+                    data-phase={syncPhase}
                     title={publicIP ? `Your IP: ${publicIP}` : 'Connection status'}
                     role="status"
                     aria-live="polite"

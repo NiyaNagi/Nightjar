@@ -249,7 +249,7 @@ const EditorPane = ({
     }
 
     return (
-        <div className={`editor-pane ${readOnly ? 'editor-pane--readonly' : ''}`}>
+        <div className={`editor-pane ${readOnly ? 'editor-pane--readonly' : ''}`} data-testid="editor-pane">
             {!readOnly && (
                 <Toolbar 
                     editor={editor}
@@ -260,8 +260,8 @@ const EditorPane = ({
                     onImport={handleImport}
                 />
             )}
-            <div className="editor-content-wrapper">
-                <EditorContent editor={editor} className="editor-content" />
+            <div className="editor-content-wrapper" data-testid="editor-content-wrapper">
+                <EditorContent editor={editor} className="editor-content" data-testid="editor-content" />
                 {!readOnly && (
                     <SelectionToolbar 
                         editor={editor} 
@@ -276,10 +276,11 @@ const EditorPane = ({
                     accept=".md,.markdown,.txt,.html,.json"
                     style={{ display: 'none' }}
                     onChange={handleFileSelect}
+                    data-testid="editor-file-input"
                 />
             )}
             {readOnly && (
-                <div className="editor-readonly-banner">
+                <div className="editor-readonly-banner" data-testid="editor-readonly-banner">
                     <span>📖</span> View Only
                 </div>
             )}

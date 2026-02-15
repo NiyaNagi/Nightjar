@@ -402,12 +402,13 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             className={`kanban-container ${readOnly ? 'kanban-container--readonly' : ''}`}
             role="region"
             aria-label="Kanban Board"
+            data-testid="kanban-container"
         >
             {ConfirmDialogComponent}
-            <div className="kanban-header">
+            <div className="kanban-header" data-testid="kanban-header">
                 <h2>Kanban Board</h2>
                 {readOnly && (
-                    <span className="readonly-badge">📖 View Only</span>
+                    <span className="readonly-badge" data-testid="kanban-readonly-badge">📖 View Only</span>
                 )}
                 {!readOnly && (
                     <div className="kanban-actions">
@@ -416,6 +417,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                             className="btn-add-column"
                             onClick={() => setShowNewColumn(true)}
                             disabled={isLoading || syncError}
+                            data-testid="kanban-add-column-btn"
                         >
                             + Add Column
                         </button>
@@ -445,12 +447,12 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                     </div>
                 </div>
             ) : isLoading ? (
-                <div className="kanban-loading">
+                <div className="kanban-loading" data-testid="kanban-loading">
                     <div className="kanban-loading__spinner"></div>
                     <p>Syncing board...</p>
                 </div>
             ) : (
-            <div className="kanban-board">
+            <div className="kanban-board" data-testid="kanban-board">
                 {columns.map((column) => (
                     <div
                         key={column.id}
@@ -458,6 +460,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                         style={{ '--column-color': column.color }}
                         role="region"
                         aria-labelledby={`column-header-${column.id}`}
+                        data-testid={`kanban-column-${column.name.toLowerCase().replace(/\s+/g, '-')}`}
                         draggable={!readOnly}
                         onDragStart={(e) => !readOnly && handleColumnDragStart(e, column)}
                         onDragEnd={!readOnly ? handleColumnDragEnd : undefined}

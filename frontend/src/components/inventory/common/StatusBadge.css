@@ -1,0 +1,105 @@
+/**
+ * StatusBadge.css
+ * 
+ * Status badge styling — color-coded pills for inventory request statuses.
+ * Uses CSS variables from global.css with hardcoded fallbacks.
+ */
+
+/* --- Base Badge --- */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  white-space: nowrap;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+/* --- Compact dot variant --- */
+
+.status-badge--compact {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0;
+}
+
+/* --- Status Colors --- */
+
+/* Open: blue — new, unassigned */
+.status-badge--open {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+}
+.status-badge--compact.status-badge--open {
+  background: #60a5fa;
+}
+
+/* Claimed: purple — producer claimed, pending approval */
+.status-badge--claimed {
+  color: var(--accent-light, #818cf8);
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.1));
+}
+.status-badge--compact.status-badge--claimed {
+  background: var(--accent-light, #818cf8);
+}
+
+/* Pending Approval: amber/warning */
+.status-badge--pending {
+  color: var(--warning-color, #f59e0b);
+  background: var(--warning-bg, rgba(245, 158, 11, 0.1));
+}
+.status-badge--compact.status-badge--pending {
+  background: var(--warning-color, #f59e0b);
+}
+
+/* Approved: green */
+.status-badge--approved {
+  color: var(--success-color, #22c55e);
+  background: var(--success-bg, rgba(34, 197, 94, 0.1));
+}
+.status-badge--compact.status-badge--approved {
+  background: var(--success-color, #22c55e);
+}
+
+/* Shipped: teal — in transit */
+.status-badge--shipped {
+  color: #2dd4bf;
+  background: rgba(45, 212, 191, 0.15);
+}
+.status-badge--compact.status-badge--shipped {
+  background: #2dd4bf;
+}
+
+/* Delivered: dark green — complete */
+.status-badge--delivered {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+}
+.status-badge--compact.status-badge--delivered {
+  background: #16a34a;
+}
+
+/* Blocked: red/error — no capacity */
+.status-badge--blocked {
+  color: var(--error-color, #ef4444);
+  background: var(--error-bg, rgba(239, 68, 68, 0.1));
+}
+.status-badge--compact.status-badge--blocked {
+  background: var(--error-color, #ef4444);
+}
+
+/* Cancelled: grey — inactive */
+.status-badge--cancelled {
+  color: var(--text-muted, #b0b0b8);
+  background: rgba(176, 176, 184, 0.1);
+}
+.status-badge--compact.status-badge--cancelled {
+  background: var(--text-muted, #b0b0b8);
+}

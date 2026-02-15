@@ -1,0 +1,350 @@
+/* frontend/src/components/inventory/analytics/AnalyticsDashboard.css */
+
+.analytics-dashboard {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Controls bar */
+.ad-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ad-controls h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.ad-controls-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ad-presets,
+.ad-granularity {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.ad-preset-btn,
+.ad-gran-btn {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ad-preset-btn.active,
+.ad-gran-btn.active {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.ad-preset-btn:hover:not(.active),
+.ad-gran-btn:hover:not(.active) {
+  background: var(--hover-bg);
+  color: var(--text-secondary);
+}
+
+/* Summary metrics KPI cards */
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sm-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sm-card-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sm-card-delta {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sm-card-delta.good {
+  color: var(--success-color);
+}
+
+.sm-card-delta.bad {
+  color: var(--error-color);
+}
+
+.sm-card-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Charts grid */
+.ad-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.ad-chart-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 18px;
+  min-height: 200px;
+}
+
+.ad-chart-panel h4 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ad-chart-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Fulfillment histogram target label */
+.fh-target-label {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--success-color);
+  margin-left: 8px;
+}
+
+/* Producer leaderboard */
+.producer-leaderboard {
+  width: 100%;
+}
+
+.pl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pl-header h4 {
+  margin: 0;
+}
+
+.pl-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pl-table th,
+.pl-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.pl-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pl-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pl-table th.sortable:hover {
+  color: var(--text-primary);
+}
+
+.pl-table td {
+  color: var(--text-secondary);
+}
+
+/* Blocked aging */
+.blocked-aging {
+  width: 100%;
+}
+
+.ba-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.ba-table th,
+.ba-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.82rem;
+}
+
+.ba-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.ba-table td {
+  color: var(--text-secondary);
+}
+
+.ba-table tr.aged-out td {
+  color: var(--error-color);
+}
+
+.ba-alert {
+  margin-right: 4px;
+}
+
+.ba-more {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+
+/* Item demand */
+.item-demand {
+  width: 100%;
+}
+
+.id-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.id-header h4 {
+  margin: 0;
+}
+
+.id-view-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+/* Pipeline funnel */
+.pipeline-funnel {
+  width: 100%;
+}
+
+/* Pivot table */
+.pivot-table {
+  width: 100%;
+}
+
+.pt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pt-header h4 {
+  margin: 0;
+}
+
+.pt-group-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.pt-group-select select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
+.pt-data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pt-data-table th,
+.pt-data-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.pt-data-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.pt-data-table td {
+  color: var(--text-secondary);
+}
+
+.pt-data-table tfoot td {
+  color: var(--text-primary);
+  border-top: 2px solid var(--border-color);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .ad-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-metrics {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  .ad-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

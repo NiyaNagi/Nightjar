@@ -1,0 +1,208 @@
+/* frontend/src/components/inventory/producer/ProducerMyRequests.css */
+
+.producer-my-requests {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pmr-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.pmr-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.pmr-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.pmr-filters {
+  margin-bottom: 16px;
+}
+
+.pmr-filters select {
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+/* Pipeline — horizontal kanban */
+.pmr-pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+  .pmr-pipeline {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .pmr-pipeline {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pmr-stage {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  min-height: 180px;
+}
+
+.pmr-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pmr-stage-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pmr-stage-count {
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pmr-stage-desc {
+  padding: 6px 14px 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pmr-stage-cards {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pmr-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pmr-card--urgent {
+  border-left: 3px solid var(--error-color);
+}
+
+.pmr-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.pmr-card-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pmr-card-urgent {
+  color: var(--error-color);
+}
+
+.pmr-card-item {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+
+.pmr-card-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.pmr-card-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.pmr-card-tracking {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--accent-color);
+  margin-bottom: 6px;
+}
+
+.pmr-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pmr-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+}
+
+.pmr-btn--reveal:hover {
+  background: var(--accent-color);
+  color: #fff;
+  border-color: var(--accent-color);
+}
+
+.pmr-btn--unclaim:hover {
+  background: var(--error-bg, rgba(239, 68, 68, 0.15));
+  color: var(--error-color);
+  border-color: var(--error-color);
+}
+
+.pmr-stage-empty {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Overlay / modal */
+.pmr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.pmr-modal {
+  max-width: 500px;
+  width: 90%;
+}

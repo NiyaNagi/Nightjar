@@ -145,6 +145,66 @@ const test = base.extend({
     
     await context1.close();
     await context2.close();
+  },
+
+  // 3-client fixture for mesh topology testing
+  collaboratorPages3: async ({ browser, unifiedServer1 }, use) => {
+    const context1 = await browser.newContext();
+    const context2 = await browser.newContext();
+    const context3 = await browser.newContext();
+    const page1 = await context1.newPage();
+    const page2 = await context2.newPage();
+    const page3 = await context3.newPage();
+    
+    await Promise.all([
+      page1.goto(unifiedServer1.url),
+      page2.goto(unifiedServer1.url),
+      page3.goto(unifiedServer1.url)
+    ]);
+    
+    await use({ 
+      page1, page2, page3, 
+      context1, context2, context3,
+      pages: [page1, page2, page3],
+      contexts: [context1, context2, context3]
+    });
+    
+    await context1.close();
+    await context2.close();
+    await context3.close();
+  },
+
+  // Factory fixture for N clients
+  collaboratorPagesFactory: async ({ browser, unifiedServer1 }, use) => {
+    const contexts = [];
+    const pages = [];
+    
+    const createClients = async (count) => {
+      // Clean up any existing
+      for (const ctx of contexts) {
+        await ctx.close().catch(() => {});
+      }
+      contexts.length = 0;
+      pages.length = 0;
+      
+      // Create new clients
+      for (let i = 0; i < count; i++) {
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await page.goto(unifiedServer1.url);
+        contexts.push(context);
+        pages.push(page);
+      }
+      
+      return { pages, contexts };
+    };
+    
+    await use({ createClients, pages, contexts });
+    
+    // Cleanup
+    for (const ctx of contexts) {
+      await ctx.close().catch(() => {});
+    }
   }
 });
 

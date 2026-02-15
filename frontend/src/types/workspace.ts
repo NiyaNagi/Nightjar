@@ -193,9 +193,11 @@ export interface AccessibleFolder extends Folder {
  * - markdown: Markdown document
  * - code: Code file
  * - sheet: Spreadsheet document
+ * - kanban: Kanban board
+ * - inventory: Inventory management system
  * - other: Unknown type
  */
-export type DocumentType = 'text' | 'markdown' | 'code' | 'sheet' | 'other';
+export type DocumentType = 'text' | 'markdown' | 'code' | 'sheet' | 'kanban' | 'inventory' | 'other';
 
 /**
  * Document - a collaborative editable file

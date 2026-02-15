@@ -81,6 +81,13 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const yKickedRef = useRef(null);
   const yDocFoldersRef = useRef(null); // Map docId -> folderId
   const yTrashedDocsRef = useRef(null); // Array of trashed documents
+  const yInventorySystemsRef = useRef(null); // Map of inventory systems
+  const yCatalogItemsRef = useRef(null); // Array of catalog items
+  const yInventoryRequestsRef = useRef(null); // Array of inventory requests
+  const yProducerCapacitiesRef = useRef(null); // Map of producer capacities
+  const yAddressRevealsRef = useRef(null); // Map of encrypted address reveals
+  const yPendingAddressesRef = useRef(null); // Map of pending addresses
+  const yInventoryAuditLogRef = useRef(null); // Array of audit log entries
   
   // Initialize Yjs sync when workspace changes
   useEffect(() => {
@@ -290,6 +297,16 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     const yMembers = ydoc.getMap('members');
     const yKicked = ydoc.getMap('kicked');
     
+    // Inventory shared types — live in workspace-level Y.Doc (NOT separate per-document rooms)
+    // See docs/INVENTORY_SYSTEM_SPEC.md §11.2.3
+    const yInventorySystems = ydoc.getMap('inventorySystems');
+    const yCatalogItems = ydoc.getArray('catalogItems');
+    const yInventoryRequests = ydoc.getArray('inventoryRequests');
+    const yProducerCapacities = ydoc.getMap('producerCapacities');
+    const yAddressReveals = ydoc.getMap('addressReveals');
+    const yPendingAddresses = ydoc.getMap('pendingAddresses');
+    const yInventoryAuditLog = ydoc.getArray('inventoryAuditLog');
+    
     // Add current user to members map if they have an identity
     if (userIdentity?.publicKeyBase62 && userProfile) {
       const myPublicKey = userIdentity.publicKeyBase62;
@@ -343,6 +360,13 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     yKickedRef.current = yKicked;
     yDocFoldersRef.current = yDocFolders;
     yTrashedDocsRef.current = yTrashedDocs;
+    yInventorySystemsRef.current = yInventorySystems;
+    yCatalogItemsRef.current = yCatalogItems;
+    yInventoryRequestsRef.current = yInventoryRequests;
+    yProducerCapacitiesRef.current = yProducerCapacities;
+    yAddressRevealsRef.current = yAddressReveals;
+    yPendingAddressesRef.current = yPendingAddresses;
+    yInventoryAuditLogRef.current = yInventoryAuditLog;
     
     // Sync documents from Yjs to React state (with deduplication)
     const syncDocuments = () => {
@@ -900,6 +924,22 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     });
   }, []);
   
+  // Add an inventory system to the workspace
+  const addInventorySystem = useCallback((inventorySystem) => {
+    if (!yInventorySystemsRef.current) return;
+    
+    // Check if already exists (Map is keyed by ID)
+    if (yInventorySystemsRef.current.has(inventorySystem.id)) return;
+    
+    yInventorySystemsRef.current.set(inventorySystem.id, inventorySystem);
+  }, []);
+  
+  // Remove an inventory system
+  const removeInventorySystem = useCallback((inventorySystemId) => {
+    if (!yInventorySystemsRef.current) return;
+    yInventorySystemsRef.current.delete(inventorySystemId);
+  }, []);
+  
   // Add a folder
   const addFolder = useCallback((folder) => {
     if (!yFoldersRef.current) return;
@@ -1148,6 +1188,17 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     checkIsKicked,
     getOwnerPublicKey,
     transferOwnership,
+    // Inventory Yjs shared types (refs for direct access by InventoryDashboard)
+    yInventorySystems: yInventorySystemsRef.current,
+    yCatalogItems: yCatalogItemsRef.current,
+    yInventoryRequests: yInventoryRequestsRef.current,
+    yProducerCapacities: yProducerCapacitiesRef.current,
+    yAddressReveals: yAddressRevealsRef.current,
+    yPendingAddresses: yPendingAddressesRef.current,
+    yInventoryAuditLog: yInventoryAuditLogRef.current,
+    // Inventory operations
+    addInventorySystem,
+    removeInventorySystem,
   };
 }
 

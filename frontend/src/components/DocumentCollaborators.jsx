@@ -90,13 +90,16 @@ const DocumentCollaborators = ({
     
     return (
         <>
-            <div className="doc-collaborators">
+            <div className="doc-collaborators" data-testid="doc-collaborators">
                 <span className="doc-collaborators__label">Collaborators:</span>
-                <div className="doc-collaborators__bubbles">
+                <div className="doc-collaborators__bubbles" data-testid="doc-collaborators-bubbles">
                     {visible.map((user, idx) => (
                         <div
                             key={user.clientId || idx}
                             className="doc-collaborators__bubble"
+                            data-testid={`doc-collaborator-${user.clientId || idx}`}
+                            data-collaborator-name={user.name || 'Anonymous'}
+                            data-collaborator-context={user.contextInfo || ''}
                             style={{ backgroundColor: user.color || '#6366f1' }}
                             title={`${user.name || 'Anonymous'}${user.contextInfo ? ` (${user.contextInfo})` : ''}`}
                             onClick={(e) => handleCollaboratorClick(user, e)}
@@ -105,12 +108,12 @@ const DocumentCollaborators = ({
                                 {user.icon || user.name?.charAt(0).toUpperCase() || '?'}
                             </span>
                             {user.contextInfo && (
-                                <span className="doc-collaborators__bubble-context">{user.contextInfo}</span>
+                                <span className="doc-collaborators__bubble-context" data-testid="collaborator-context">{user.contextInfo}</span>
                             )}
                         </div>
                     ))}
                     {overflow > 0 && (
-                        <div className="doc-collaborators__bubble doc-collaborators__bubble--more">
+                        <div className="doc-collaborators__bubble doc-collaborators__bubble--more" data-testid="doc-collaborators-overflow">
                             +{overflow}
                         </div>
                     )}

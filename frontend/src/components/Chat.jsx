@@ -1217,11 +1217,12 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             className={`chat-container ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''}`}
             style={chatStyle}
             onMouseDown={handleDragStart}
+            data-testid="chat-container"
         >
-            <div className="chat-header">
+            <div className="chat-header" data-testid="chat-header">
                 <h3>💬 Chat</h3>
                 <div className="chat-header-actions">
-                    <span className="online-count">
+                    <span className="online-count" data-testid="chat-online-count">
                         {onlineUsers.length + 1} online
                     </span>
                     {totalUnread > 0 && (
@@ -1528,6 +1529,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 role="log"
                 aria-live="polite"
                 aria-label="Chat messages"
+                data-testid="chat-messages"
             >
                 {Object.entries(groupedMessages).map(([date, msgs]) => (
                     <div key={date} className="message-group">
@@ -1660,7 +1662,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 </div>
             )}
 
-            <div className="chat-input-container" role="form" aria-label="Send message form">
+            <div className="chat-input-container" role="form" aria-label="Send message form" data-testid="chat-input-container">
                 <input
                     ref={inputRef}
                     type="text"
@@ -1670,6 +1672,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     placeholder={activeTab === 'general' ? "Type a message... (@ to mention)" : `Message ${chatTabs.find(t => t.id === activeTab)?.name || ''}...`}
                     className="chat-input"
                     aria-label={activeTab === 'general' ? "Type a message" : `Message ${chatTabs.find(t => t.id === activeTab)?.name || ''}`}
+                    data-testid="chat-input"
                 />
                 <button 
                     type="button"
@@ -1677,6 +1680,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     onClick={sendMessage}
                     disabled={!inputValue.trim()}
                     aria-label="Send message"
+                    data-testid="chat-send-btn"
                 >
                     ➤
                 </button>

@@ -1,6 +1,6 @@
 {
   "name": "nightjar",
-  "version": "1.5.13",
+  "version": "1.6.0",
   "description": "Nightjar - Secure P2P Collaboration",
   "main": "src/main.js",
   "author": {
@@ -194,6 +194,7 @@
     "b4a": "^1.6.4",
     "bip39": "^3.1.0",
     "buffer": "^6.0.3",
+    "ed2curve": "^0.3.0",
     "electron-is-dev": "^3.0.1",
     "hash-wasm": "^4.11.0",
     "html5-qrcode": "^2.3.8",
@@ -207,11 +208,16 @@
     "qrcode": "^1.5.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-simple-maps": "^3.0.0",
+    "react-window": "^2.2.7",
+    "recharts": "^3.7.0",
     "socks-proxy-agent": "^8.0.2",
+    "topojson-client": "^3.1.0",
     "tor-control": "^0.0.3",
     "tweetnacl": "^1.0.3",
     "uint8arrays": "^5.1.0",
     "ws": "^8.12.0",
+    "xlsx": "^0.18.5",
     "y-indexeddb": "^9.0.12",
     "y-protocols": "^1.0.6",
     "y-websocket": "^1.5.4",
@@ -241,6 +247,7 @@
     "jest-environment-jsdom": "^29.7.0",
     "png2icons": "^2.0.1",
     "sharp": "^0.34.5",
+    "us-atlas": "^3.0.1",
     "vite": "^5.0.8",
     "vite-plugin-top-level-await": "^1.4.1",
     "vite-plugin-wasm": "^3.3.0",
@@ -250,9 +257,4 @@
     "wrtc": "^0.4.7"
   }
 }
-
-
-
-
-
 

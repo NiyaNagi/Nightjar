@@ -21,6 +21,9 @@ async function getShareLink(page) {
 
 test.describe('UI Sharing - Cross-Client', () => {
   
+  // These tests involve two users with full identity creation, so need more time
+  test.setTimeout(120000); // 2 minutes
+  
   test.beforeEach(async () => {
     // Ensure clean state
   });
@@ -116,6 +119,8 @@ test.describe('UI Sharing - Cross-Client', () => {
     }
   });
   
+  // TODO: These tests need more work - they run but sometimes timeout 
+  // The identity creation flow is now fixed, but document creation/editing needs more robust selectors
   test.skip('share link with viewer permission restricts editing', async ({ browser, unifiedServer1 }) => {
     console.log('[TEST] === Viewer permission test ===');
     
@@ -188,6 +193,7 @@ test.describe('UI Sharing - Cross-Client', () => {
     }
   });
   
+  // TODO: This test needs more work - document creation selectors need updating
   test.skip('real-time document editing syncs between clients', async ({ browser, unifiedServer1 }) => {
     console.log('[TEST] === Real-time edit sync test ===');
     

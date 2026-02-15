@@ -370,6 +370,7 @@ describe('P2P Protocol: ID Generation', () => {
 
   describe('generateTopic', () => {
     // These tests require native crypto.subtle which isn't available in jsdom
+    // The mock in setup.js doesn't work because jsdom overwrites the global
     test.skip('generates 64-character hex topic', async () => {
       const topic = await generateTopic('workspace-123');
       expect(typeof topic).toBe('string');

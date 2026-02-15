@@ -1,0 +1,171 @@
+/* frontend/src/components/inventory/admin/InventorySettings.css */
+
+.inventory-settings {
+  padding: 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.inventory-settings h2 {
+  margin: 0 0 24px;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.is-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.is-section h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.is-section-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+}
+
+.is-section--danger {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.is-section--danger h3 {
+  color: var(--error-color);
+}
+
+/* Name row */
+.is-name-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.is-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.is-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* Toggles */
+.is-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+}
+
+.is-toggle:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.is-toggle-info {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.is-toggle-title {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.is-toggle-desc {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.is-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-color);
+}
+
+/* Result messages */
+.is-result {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.is-result--success {
+  background: var(--success-bg, rgba(34, 197, 94, 0.1));
+  color: var(--success-color);
+}
+
+.is-result--error {
+  background: var(--error-bg, rgba(239, 68, 68, 0.1));
+  color: var(--error-color);
+}
+
+.is-result-blocked {
+  color: var(--warning-color);
+}
+
+/* Shared btn styles */
+.inventory-settings .btn-sm {
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, filter 0.15s;
+}
+
+.inventory-settings .btn-primary {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.inventory-settings .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.inventory-settings .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inventory-settings .btn-danger {
+  background: var(--error-color);
+  color: #fff;
+}
+
+.inventory-settings .btn-danger:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.inventory-settings .btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.is-coming-soon {
+  margin-left: 10px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}

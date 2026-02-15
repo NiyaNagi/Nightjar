@@ -83,16 +83,57 @@ async function ensureIdentityExists(page, name = 'TestUser') {
     // Fill in the name
     await page.fill('[data-testid="identity-name-input"]', name);
     
-    // Click confirm
+    // Click Next (goes to PIN creation)
     await page.click('[data-testid="confirm-identity-btn"]');
+    
+    // Wait for PIN input step
+    await page.waitForSelector('[data-testid="pin-input-container"]', { timeout: 10000 });
+    console.log(`[TestHelper] PIN creation step`);
+    
+    // Enter 6-digit PIN (using simple PIN for testing)
+    const testPin = '123456';
+    for (let i = 0; i < 6; i++) {
+      await page.locator(`[data-testid="pin-digit-${i}"]`).fill(testPin[i]);
+    }
+    
+    // Wait for PIN confirm step (auto-advances after 6 digits)
+    await page.waitForTimeout(500);
+    
+    // Check if we're on confirm step (label changes)
+    const confirmLabel = page.locator('.pin-input-label:has-text("Confirm")');
+    if (await confirmLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.log(`[TestHelper] PIN confirmation step`);
+      // Enter PIN again to confirm
+      for (let i = 0; i < 6; i++) {
+        await page.locator(`[data-testid="pin-digit-${i}"]`).fill(testPin[i]);
+      }
+      await page.waitForTimeout(500);
+    }
     
     // Handle recovery phrase step
     await page.waitForSelector('[data-testid="recovery-phrase"], [data-testid="understood-checkbox"]', { timeout: 10000 });
+    console.log(`[TestHelper] Recovery phrase step visible`);
     await page.click('[data-testid="understood-checkbox"]');
+    await page.waitForTimeout(300);
     await page.click('[data-testid="continue-btn"]');
+    console.log(`[TestHelper] Clicked continue, waiting for main app...`);
     
-    // Wait for main app to load
-    await page.waitForSelector('.onboarding-welcome, .workspace-switcher, [data-testid="workspace-sidebar"], .sidebar', { timeout: 30000 });
+    // Take screenshot for debugging
+    await page.screenshot({ path: 'test-results/artifacts/identity-after-continue.png' });
+    
+    // Give app time to process identity creation
+    await page.waitForTimeout(2000);
+    
+    // Take another screenshot to see if anything changed
+    await page.screenshot({ path: 'test-results/artifacts/identity-after-wait.png' });
+    
+    // Log what's visible
+    const bodyContent = await page.evaluate(() => document.body.innerHTML.substring(0, 500));
+    console.log(`[TestHelper] Page body preview:`, bodyContent.substring(0, 200));
+    
+    // Wait for main app to load - the app might show "no workspace" welcome or workspace selector
+    // Look for multiple possible states after identity creation completes
+    await page.waitForSelector('.workspace-switcher, [data-testid="workspace-sidebar"], .sidebar, .empty-editor-state, button:has-text("Create Workspace"), .btn-create', { timeout: 30000 });
     console.log(`[TestHelper] Identity created: ${name}`);
   } else {
     console.log('[TestHelper] Identity already exists or app ready');
@@ -121,10 +162,24 @@ async function createIdentityViaUI(page, name) {
  * Handles both "no workspace" welcome screen and workspace switcher scenarios
  */
 async function createWorkspaceViaUI(page, workspaceName) {
-  // Check if we're on the "no workspace" welcome screen
-  const createBtn = page.locator('.btn-create.primary:has-text("Create Workspace"), button:has-text("Create Workspace")');
+  console.log('[TestHelper] createWorkspaceViaUI starting...');
   
-  if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+  // Wait a bit for page to settle after identity creation
+  await page.waitForTimeout(2000);
+  
+  // Take screenshot to see current state
+  await page.screenshot({ path: 'test-results/artifacts/before-create-workspace.png' });
+  
+  // Log what we see on the page
+  const pageText = await page.locator('body').innerText().catch(() => 'ERROR');
+  console.log('[TestHelper] Page text preview:', pageText.substring(0, 300));
+  
+  // Check if we're on the "no workspace" welcome screen with multiple selector options
+  const createBtn = page.locator('[data-testid="welcome-create-workspace-btn"], button:has-text("Create Workspace")').first();
+  const createBtnVisible = await createBtn.isVisible({ timeout: 10000 }).catch(() => false);
+  console.log('[TestHelper] Create Workspace button visible:', createBtnVisible);
+  
+  if (createBtnVisible) {
     console.log('[TestHelper] No workspace welcome screen detected');
     await createBtn.click();
   } else {
@@ -243,11 +298,20 @@ function parseNightjarLink(link) {
 // ============================================================================
 
 async function createDocumentViaUI(page, name, type = 'text') {
-  await page.click('[data-testid="new-document-btn"]');
-  await page.waitForSelector('[data-testid="doc-type-grid"]');
-  await page.click(`[data-testid="doc-type-${type}"]`);
+  console.log('[TestHelper] createDocumentViaUI starting...');
+  
+  // Wait for sidebar to be ready with the Add button
+  await page.waitForSelector('[data-testid="new-document-btn"], .add-dropdown__trigger', { timeout: 15000 });
+  
+  await page.click('[data-testid="new-document-btn"], .add-dropdown__trigger');
+  await page.waitForSelector('[data-testid="doc-type-grid"], .document-type-grid', { timeout: 10000 });
+  await page.click(`[data-testid="doc-type-${type}"], .document-type-option[data-type="${type}"]`);
   await page.fill('[data-testid="document-name-input"]', name);
   await page.click('[data-testid="create-document-confirm"]');
+  
+  // Wait for document to be created and editor to load
+  await page.waitForTimeout(2000);
+  console.log('[TestHelper] Document created:', name);
 }
 
 // ============================================================================

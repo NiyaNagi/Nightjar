@@ -46,6 +46,9 @@ tor/Data/
 ehthumbs.db
 Thumbs.db
 
+# Sensitive import data
+data/
+
 # Environment files
 .env
 .env.local

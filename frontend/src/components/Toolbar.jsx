@@ -68,10 +68,10 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
     ];
 
     return (
-        <div className={`toolbar ${isCollapsed ? 'collapsed' : ''}`}>
+        <div className={`toolbar ${isCollapsed ? 'collapsed' : ''}`} data-testid="editor-toolbar">
             <div className="toolbar-content">
                 {toolGroups.map((group, groupIndex) => (
-                    <div key={group.name} className="tool-group">
+                    <div key={group.name} className="tool-group" data-testid={`toolbar-group-${group.name}`}>
                         {group.tools.map((tool, toolIndex) => (
                             <button
                                 type="button"
@@ -82,6 +82,7 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
                                 title={tool.title}
                                 aria-label={tool.ariaLabel || tool.title}
                                 aria-pressed={tool.active}
+                                data-testid={`toolbar-btn-${tool.ariaLabel?.toLowerCase().replace(/\s+/g, '-') || tool.label}`}
                             >
                                 {tool.label}
                             </button>
@@ -96,6 +97,7 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 title={isCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
                 aria-label={isCollapsed ? 'Expand toolbar' : 'Collapse toolbar'}
+                data-testid="toolbar-collapse-btn"
             >
                 {isCollapsed ? '▼' : '▲'}
             </button>

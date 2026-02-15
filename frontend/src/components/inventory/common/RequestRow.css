@@ -1,0 +1,39 @@
+.request-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.request-row:hover {
+  background: var(--hover-bg);
+}
+.request-row--expanded {
+  background: var(--bg-tertiary);
+}
+.request-row--urgent {
+  border-left: 3px solid var(--warning-color);
+}
+
+.request-row td {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.request-row__urgent-col {
+  width: 28px;
+  text-align: center;
+}
+.request-row__id {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.request-row__item {
+  color: var(--text-primary);
+}
+.request-row__qty {
+  text-align: right;
+}
+.request-row__date {
+  color: var(--text-muted);
+  font-size: 13px;
+}

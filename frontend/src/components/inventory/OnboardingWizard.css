@@ -1,0 +1,228 @@
+.onboarding-wizard {
+  max-width: 650px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+/* ── Progress bar ── */
+.onboarding-wizard__progress {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  position: relative;
+}
+.onboarding-wizard__progress::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 32px;
+  right: 32px;
+  height: 2px;
+  background: var(--border-color);
+}
+
+.onboarding-step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
+}
+.onboarding-step-indicator__dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-color);
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+.onboarding-step-indicator.active .onboarding-step-indicator__dot {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #fff;
+}
+.onboarding-step-indicator.completed .onboarding-step-indicator__dot {
+  background: var(--success-color);
+  border-color: var(--success-color);
+  color: #fff;
+}
+.onboarding-step-indicator__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.onboarding-step-indicator.active .onboarding-step-indicator__label {
+  color: var(--text-primary);
+}
+
+/* ── Content ── */
+.onboarding-wizard__content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 28px;
+}
+
+.onboarding-wizard__step h2 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 20px;
+}
+
+.onboarding-wizard__hint {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.onboarding-wizard__step label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.onboarding-wizard__step input[type="text"],
+.onboarding-wizard__step input[type="number"] {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.onboarding-wizard__step input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* ── Toggles ── */
+.onboarding-wizard__toggle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.onboarding-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.15s;
+}
+.onboarding-toggle:hover {
+  border-color: var(--accent-color);
+}
+
+.onboarding-toggle input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--accent-color);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.onboarding-toggle__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.onboarding-toggle__info strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.onboarding-toggle__info span {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Item form rows (reuse catalog-form__row from CatalogManager) ── */
+.onboarding-wizard__item-form .catalog-form__row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.onboarding-wizard__item-form .catalog-form__row label {
+  flex: 1;
+}
+
+/* ── Invite cards ── */
+.onboarding-wizard__invite-info {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.onboarding-invite-card {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 16px;
+}
+.onboarding-invite-card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.onboarding-invite-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.onboarding-wizard__note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-color);
+  margin-bottom: 16px;
+}
+
+/* ── Done step ── */
+.onboarding-wizard__step--done {
+  text-align: center;
+}
+.onboarding-wizard__done-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+/* ── Actions ── */
+.onboarding-wizard__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@media (max-width: 600px) {
+  .onboarding-wizard__invite-info {
+    flex-direction: column;
+  }
+  .onboarding-wizard__item-form .catalog-form__row {
+    flex-direction: column;
+  }
+  .onboarding-step-indicator__label {
+    display: none;
+  }
+}

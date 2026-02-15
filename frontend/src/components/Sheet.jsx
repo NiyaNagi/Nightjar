@@ -788,9 +788,10 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
         <div 
             ref={containerRef}
             className={`sheet-container ${readOnly ? 'sheet-container--readonly' : ''}`}
+            data-testid="sheet-container"
         >
             {readOnly && (
-                <div className="sheet-readonly-banner">
+                <div className="sheet-readonly-banner" data-testid="sheet-readonly-banner">
                     <span>📖</span> View Only
                 </div>
             )}

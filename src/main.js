@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const { getTorManager } = require('./backend/tor-manager-enhanced');
 const identity = require('../sidecar/identity');
 const hyperswarm = require('../sidecar/hyperswarm');
+const inventoryStorage = require('../sidecar/inventoryStorage');
 const Y = require('yjs');
 const awarenessProtocol = require('y-protocols/awareness');
 const packageJson = require('../package.json');
@@ -111,6 +112,9 @@ global.SIDECAR_PORTS = {
 // and enables migration from the legacy ~/.Nightjar path
 identity.setBasePath(userDataPath);
 identity.migrateIdentityIfNeeded();
+
+// Initialize inventory address storage path
+inventoryStorage.setBasePath(userDataPath);
 
 // Add global error handlers to prevent unexpected exits
 process.on('uncaughtException', (error) => {
@@ -1303,6 +1307,82 @@ ipcMain.handle('tor:onionAddress', async () => {
         return torManager.onionAddress;
     }
     return null;
+});
+
+// --- Inventory Address Storage IPC Handlers ---
+// Encrypted blob storage — main process never sees plaintext addresses
+// See docs/INVENTORY_SYSTEM_SPEC.md §11.2.4
+
+ipcMain.handle('inventory:store-address', async (event, inventorySystemId, requestId, encryptedBlob) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        inventoryStorage.storeAddress(inventorySystemId, requestId, encryptedBlob);
+        return true;
+    } catch (err) {
+        console.error('[Inventory] Store address error:', err);
+        throw err;
+    }
+});
+
+ipcMain.handle('inventory:get-address', async (event, inventorySystemId, requestId) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        return inventoryStorage.getAddress(inventorySystemId, requestId);
+    } catch (err) {
+        console.error('[Inventory] Get address error:', err);
+        return null;
+    }
+});
+
+ipcMain.handle('inventory:delete-address', async (event, inventorySystemId, requestId) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        return inventoryStorage.deleteAddress(inventorySystemId, requestId);
+    } catch (err) {
+        console.error('[Inventory] Delete address error:', err);
+        return false;
+    }
+});
+
+ipcMain.handle('inventory:list-addresses', async (event, inventorySystemId) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        return inventoryStorage.listAddresses(inventorySystemId);
+    } catch (err) {
+        console.error('[Inventory] List addresses error:', err);
+        return [];
+    }
+});
+
+ipcMain.handle('inventory:store-saved-address', async (event, addressId, encryptedBlob) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        inventoryStorage.storeSavedAddress(addressId, encryptedBlob);
+        return true;
+    } catch (err) {
+        console.error('[Inventory] Store saved address error:', err);
+        throw err;
+    }
+});
+
+ipcMain.handle('inventory:get-saved-addresses', async (event) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        return inventoryStorage.getSavedAddresses();
+    } catch (err) {
+        console.error('[Inventory] Get saved addresses error:', err);
+        return [];
+    }
+});
+
+ipcMain.handle('inventory:delete-saved-address', async (event, addressId) => {
+    if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
+    try {
+        return inventoryStorage.deleteSavedAddress(addressId);
+    } catch (err) {
+        console.error('[Inventory] Delete saved address error:', err);
+        return false;
+    }
 });
 
 // Diagnostic data collection for issue reporting

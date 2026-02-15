@@ -14,6 +14,7 @@ import DocumentCollaborators from './components/DocumentCollaborators';
 import EditorPane from './EditorPane';
 import Kanban from './components/Kanban';
 import Sheet from './components/Sheet';
+import InventoryDashboard from './components/inventory/InventoryDashboard';
 import Chat from './components/Chat';
 import Comments from './components/Comments';
 import SplitPane from './components/SplitPane';
@@ -38,6 +39,7 @@ import { useFolders } from './contexts/FolderContext';
 import { usePermissions } from './contexts/PermissionContext';
 import { useIdentity } from './contexts/IdentityContext';
 import { PresenceProvider, usePresence } from './contexts/PresenceContext';
+import { useToast } from './contexts/ToastContext';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
 import { getYjsWebSocketUrl } from './utils/websocket';
@@ -110,7 +112,8 @@ function generateDocId() {
 const DOC_TYPES = {
     TEXT: 'text',
     SHEET: 'sheet',
-    KANBAN: 'kanban'
+    KANBAN: 'kanban',
+    INVENTORY: 'inventory',
 };
 
 // Helper to convert column index to letter (0 -> A, 25 -> Z, 26 -> AA)
@@ -253,6 +256,17 @@ function App() {
         isKicked: isUserKicked,
         kickMember: syncKickMember,
         transferOwnership: syncTransferOwnership,
+        // Inventory Yjs shared types
+        yInventorySystems,
+        yCatalogItems,
+        yInventoryRequests,
+        yProducerCapacities,
+        yAddressReveals,
+        yPendingAddresses,
+        yInventoryAuditLog,
+        // Inventory operations
+        addInventorySystem: syncAddInventorySystem,
+        removeInventorySystem: syncRemoveInventorySystem,
     } = useWorkspaceSync(currentWorkspaceId, initialWorkspaceInfo, workspaceUserProfile, workspaceServerUrl, publicIdentity, currentWorkspace?.myPermission);
     
     // --- P2P Peer Status (Electron only) ---
@@ -285,7 +299,6 @@ function App() {
     const [showCreateWorkspaceDialog, setShowCreateWorkspaceDialog] = useState(false);
     const [createWorkspaceMode, setCreateWorkspaceMode] = useState('create'); // 'create' or 'join'
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [toast, setToast] = useState(null);
     const [stats, setStats] = useState({ wordCount: 0, characterCount: 0 });
     const [showChangelog, setShowChangelog] = useState(false);
     const [chatTargetUser, setChatTargetUser] = useState(null); // User to open DM with
@@ -308,26 +321,9 @@ function App() {
 
     // --- Refs ---
     const metaSocketRef = useRef(null);
-    const toastTimeoutRef = useRef(null);
 
-    // --- UI Helpers (defined early so callbacks can use them) ---
-    const showToast = useCallback((message, type = 'info') => {
-        // Clear any existing timeout to prevent stale updates
-        if (toastTimeoutRef.current) {
-            clearTimeout(toastTimeoutRef.current);
-        }
-        setToast({ message, type });
-        toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
-    }, []);
-    
-    // Cleanup toast timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (toastTimeoutRef.current) {
-                clearTimeout(toastTimeoutRef.current);
-            }
-        };
-    }, []);
+    // --- Toast (from context, available to all components) ---
+    const { showToast } = useToast();
 
     // --- Onboarding Handler ---
     const handleOnboardingComplete = useCallback(async (identity, hadLocalData = false) => {
@@ -979,9 +975,52 @@ function App() {
         return docId;
     }, [currentWorkspaceId, showToast]);
 
+    // Create an Inventory System — does NOT create a separate Y.Doc
+    // Inventory data lives in the workspace-level Y.Doc (see spec §11.2.5)
+    const createInventorySystem = useCallback((name) => {
+        if (!currentWorkspaceId) {
+            showToast('Please create a workspace first', 'error');
+            return null;
+        }
+        const invId = 'inv-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+        const inventorySystem = {
+            id: invId,
+            workspaceId: currentWorkspaceId,
+            name: name || 'Inventory System',
+            icon: '📦',
+            createdAt: Date.now(),
+            createdBy: publicIdentity?.publicKeyBase62,
+            settings: {
+                requireApproval: true,
+                autoAssignEnabled: true,
+                allowProducerClaims: true,
+                defaultUrgency: false,
+            },
+        };
+        // Add to workspace-level Yjs map (syncs to all peers)
+        syncAddInventorySystem(inventorySystem);
+        // Open tab immediately
+        setOpenTabs(prev => [...prev, {
+            id: invId,
+            name: name || 'Inventory System',
+            docType: DOC_TYPES.INVENTORY,
+            hasUnsavedChanges: false,
+        }]);
+        setActiveDocId(invId);
+        showToast('Inventory System created', 'success');
+        return invId;
+    }, [currentWorkspaceId, showToast, publicIdentity, syncAddInventorySystem]);
+
     const openDocument = useCallback((docId, name, docType = DOC_TYPES.TEXT) => {
         // Check if already open
         if (openTabs.find(t => t.id === docId)) {
+            setActiveDocId(docId);
+            return;
+        }
+
+        // Inventory systems don't get their own Y.Doc — data lives in workspace-level doc
+        if (docType === DOC_TYPES.INVENTORY) {
+            setOpenTabs(prev => [...prev, { id: docId, name, docType, hasUnsavedChanges: false }]);
             setActiveDocId(docId);
             return;
         }
@@ -1515,6 +1554,7 @@ function App() {
                     onCreateDocument={(name, folderId, icon, color) => createDocument(name, folderId, DOC_TYPES.TEXT, icon, color)}
                     onCreateSheet={(name, folderId, icon, color) => createDocument(name || 'Spreadsheet', folderId, DOC_TYPES.SHEET, icon, color)}
                     onCreateKanban={(name, folderId, icon, color) => createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN, icon, color)}
+                    onCreateInventory={(name) => createInventorySystem(name || 'Inventory')}
                     onDeleteDocument={deleteDocument}
                     onMoveDocument={handleMoveDocument}
                     onRenameDocument={renameDocument}
@@ -1601,7 +1641,23 @@ function App() {
                 </div>
 
                 <div className="editor-with-comments">
-                    {activeDoc ? (
+                    {activeDocType === DOC_TYPES.INVENTORY ? (
+                        <InventoryDashboard
+                            key={activeDocId}
+                            inventorySystemId={activeDocId}
+                            workspaceId={currentWorkspaceId}
+                            currentWorkspace={currentWorkspace}
+                            userIdentity={publicIdentity}
+                            collaborators={workspaceCollaborators}
+                            yInventorySystems={yInventorySystems}
+                            yCatalogItems={yCatalogItems}
+                            yInventoryRequests={yInventoryRequests}
+                            yProducerCapacities={yProducerCapacities}
+                            yAddressReveals={yAddressReveals}
+                            yPendingAddresses={yPendingAddresses}
+                            yInventoryAuditLog={yInventoryAuditLog}
+                        />
+                    ) : activeDoc ? (
                         activeDocType === DOC_TYPES.KANBAN ? (
                             <Kanban
                                 key={activeDocId}
@@ -1676,13 +1732,13 @@ function App() {
                         <h2>Welcome to Nightjar</h2>
                         <p>Secure P2P Collaboration. Create a workspace or join an existing one.</p>
                         <div className="create-buttons">
-                            <button className="btn-create primary" onClick={() => {
+                            <button className="btn-create primary" data-testid="welcome-create-workspace-btn" onClick={() => {
                                 setCreateWorkspaceMode('create');
                                 setShowCreateWorkspaceDialog(true);
                             }}>
                                 📁 Create Workspace
                             </button>
-                            <button className="btn-create secondary" onClick={() => {
+                            <button className="btn-create secondary" data-testid="welcome-join-workspace-btn" onClick={() => {
                                 setCreateWorkspaceMode('join');
                                 setShowCreateWorkspaceDialog(true);
                             }}>
@@ -1759,6 +1815,7 @@ function App() {
                     onStartChatWith={(user) => setChatTargetUser(user)}
                     syncPhase={syncPhase}
                     workspaceSynced={workspaceSyncSynced}
+                    workspaceConnected={workspaceSyncConnected}
                     syncStatus={syncStatus}
                     syncDetails={syncDetails}
                     onVerifySyncState={verifySyncState}
@@ -1780,28 +1837,7 @@ function App() {
                 />
             )}
 
-            {toast && (
-                <div 
-                    className={`toast ${toast.type}`}
-                    role="alert"
-                    aria-live="polite"
-                >
-                    <span className="toast__icon">
-                        {toast.type === 'success' && '✓'}
-                        {toast.type === 'error' && '✕'}
-                        {toast.type === 'warning' && '⚠'}
-                        {toast.type === 'info' && 'ℹ'}
-                    </span>
-                    <span className="toast__message">{toast.message}</span>
-                    <button 
-                        className="toast__close" 
-                        onClick={() => setToast(null)}
-                        aria-label="Dismiss notification"
-                    >
-                        ×
-                    </button>
-                </div>
-            )}
+            {/* Toast notifications now rendered by ToastProvider in main.jsx */}
 
             {/* Global Chat for collaboration - show when workspace exists */}
             {hasWorkspaces && workspaceProvider && (

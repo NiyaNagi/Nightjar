@@ -1,0 +1,155 @@
+/* frontend/src/components/inventory/admin/AuditLog.css */
+
+.audit-log {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.al-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.al-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.al-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.al-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Filters */
+.al-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.al-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.al-search::placeholder {
+  color: var(--text-muted);
+}
+
+.al-filter-select {
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 140px;
+}
+
+/* Entries */
+.al-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.al-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.al-entry:hover {
+  background: var(--hover-bg);
+}
+
+.al-entry-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.al-entry-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.al-entry-summary {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.al-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.al-entry-actor {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.al-entry-action {
+  padding: 1px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+}
+
+.al-entry-target {
+  padding: 1px 8px;
+  background: rgba(99, 102, 241, 0.12);
+  border-radius: 10px;
+  color: var(--accent-color);
+}
+
+.al-entry-time {
+  margin-left: auto;
+}
+
+/* Empty state */
+.al-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* Pagination */
+.al-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}

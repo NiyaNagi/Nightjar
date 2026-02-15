@@ -1,0 +1,116 @@
+.saved-addresses {
+  padding: 20px;
+  max-width: 720px;
+}
+.saved-addresses__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.saved-addresses__header h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+.saved-addresses__loading,
+.saved-addresses__empty {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 24px 0;
+}
+
+/* Form */
+.saved-addresses__form {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.saved-addresses__form h3 {
+  margin: 0 0 14px;
+  color: var(--text-primary);
+}
+.saved-addresses__form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.address-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.address-form input,
+.address-form select {
+  padding: 8px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.address-form input:focus,
+.address-form select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+.address-form__row {
+  display: flex;
+  gap: 12px;
+}
+.address-form__row label {
+  flex: 1;
+}
+
+/* Card */
+.saved-address-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: border-color 0.15s;
+}
+.saved-address-card:hover {
+  border-color: var(--accent-color);
+}
+.saved-address-card__header strong {
+  font-size: 15px;
+  color: var(--text-primary);
+}
+.saved-address-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.saved-address-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-sm--danger {
+  color: var(--error-color);
+}
+.btn-sm--danger:hover {
+  background: var(--error-bg);
+}
+
+/* Editing */
+.saved-address-card__editing {
+  padding: 4px 0;
+}
+
+@media (max-width: 600px) {
+  .address-form__row {
+    flex-direction: column;
+  }
+}

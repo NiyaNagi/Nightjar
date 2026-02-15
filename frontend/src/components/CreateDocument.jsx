@@ -16,7 +16,8 @@ const DOCUMENT_ICONS = ['📄', '📝', '📋', '📊', '📈', '📉', '📑', 
 const DOC_TYPES = {
     TEXT: 'text',
     SHEET: 'sheet', 
-    KANBAN: 'kanban'
+    KANBAN: 'kanban',
+    INVENTORY: 'inventory',
 };
 
 const DOCUMENT_TYPES = [
@@ -37,6 +38,12 @@ const DOCUMENT_TYPES = [
         icon: '📋', 
         label: 'Kanban Board', 
         description: 'Visual task management and workflow board'
+    },
+    { 
+        type: DOC_TYPES.INVENTORY, 
+        icon: '📦', 
+        label: 'Inventory System', 
+        description: 'Manage inventory requests and fulfillment'
     }
 ];
 
@@ -61,7 +68,8 @@ export default function CreateDocumentDialog({
   defaultType = DOC_TYPES.TEXT,
   onCreateDocument,
   onCreateSheet,
-  onCreateKanban
+  onCreateKanban,
+  onCreateInventory,
 }) {
   const { folders } = useFolders();
   const { currentWorkspace, currentWorkspaceId } = useWorkspaces();
@@ -129,6 +137,8 @@ export default function CreateDocumentDialog({
       // Call the appropriate creation function based on type
       if (documentType === DOC_TYPES.KANBAN && onCreateKanban) {
         await onCreateKanban(docName, selectedFolder, icon, color);
+      } else if (documentType === DOC_TYPES.INVENTORY && onCreateInventory) {
+        await onCreateInventory(docName, selectedFolder, icon, color);
       } else if (documentType === DOC_TYPES.SHEET && onCreateSheet) {
         await onCreateSheet(docName, selectedFolder, icon, color);
       } else if (onCreateDocument) {

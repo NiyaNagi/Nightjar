@@ -1,0 +1,98 @@
+/* frontend/src/components/inventory/common/CapacityInput.css */
+
+.capacity-input {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 240px;
+}
+
+.ci-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ci-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ci-sku {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.ci-fields {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.ci-field {
+  flex: 1;
+}
+
+.ci-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.ci-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ci-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.ci-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.ci-unit {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.ci-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.ci-save {
+  width: 100%;
+  padding: 8px;
+  background: var(--accent-color);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.ci-save:hover {
+  filter: brightness(1.15);
+}

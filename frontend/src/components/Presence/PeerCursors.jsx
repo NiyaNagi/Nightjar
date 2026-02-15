@@ -13,7 +13,7 @@ export default function PeerCursors({ editorRef }) {
     const peerList = Array.from(peers.values()).filter(p => p.cursor);
     
     return (
-        <div className="peer-cursors-container">
+        <div className="peer-cursors-container" data-testid="peer-cursors-container">
             {peerList.map((peer) => (
                 <PeerCursor 
                     key={peer.clientId}
@@ -39,15 +39,18 @@ function PeerCursor({ peer, editorRef }) {
     return (
         <div 
             className="peer-cursor"
+            data-testid={`peer-cursor-${peer.clientId}`}
+            data-peer-name={user.name}
+            data-peer-typing={isTyping ? 'true' : 'false'}
             style={{ 
                 '--cursor-color': user.color,
                 // Position would be calculated from cursor data
             }}
         >
-            <div className="cursor-caret" style={{ backgroundColor: user.color }}></div>
-            <div className="cursor-label" style={{ backgroundColor: user.color }}>
+            <div className="cursor-caret" data-testid="peer-cursor-caret" style={{ backgroundColor: user.color }}></div>
+            <div className="cursor-label" data-testid="peer-cursor-label" style={{ backgroundColor: user.color }}>
                 {user.icon} {user.name}
-                {isTyping && <span className="cursor-typing">...</span>}
+                {isTyping && <span className="cursor-typing" data-testid="peer-cursor-typing">...</span>}
             </div>
         </div>
     );

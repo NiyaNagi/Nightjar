@@ -1,0 +1,79 @@
+/* frontend/src/components/inventory/requestor/RequestFAQ.css */
+
+.request-faq {
+  padding: 24px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.request-faq h2 {
+  margin: 0 0 6px;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.faq-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0 0 24px;
+}
+
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.faq-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.faq-item.open {
+  border-color: var(--accent-color);
+}
+
+.faq-question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 18px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.faq-question:hover {
+  background: var(--hover-bg);
+}
+
+.faq-chevron {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.faq-answer {
+  padding: 0 18px 14px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.faq-answer p {
+  margin: 0 0 6px;
+}
+
+.faq-answer p:last-child {
+  margin-bottom: 0;
+}

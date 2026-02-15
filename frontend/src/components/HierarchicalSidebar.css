@@ -549,6 +549,29 @@
     font-size: 0.6rem;
     color: white;
     font-weight: 600;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Focused state - shows which document the user is actively viewing */
+.tree-item__pip--focused {
+    box-shadow: 0 0 0 2px var(--bg-primary, #1a1a2e), 
+                0 0 0 4px currentColor,
+                0 0 8px rgba(255, 255, 255, 0.4);
+    transform: scale(1.1);
+    animation: pip-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pip-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 2px var(--bg-primary, #1a1a2e), 
+                    0 0 0 4px currentColor,
+                    0 0 8px rgba(255, 255, 255, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 0 2px var(--bg-primary, #1a1a2e), 
+                    0 0 0 4px currentColor,
+                    0 0 12px rgba(255, 255, 255, 0.6);
+    }
 }
 
 .tree-item__pip--more {

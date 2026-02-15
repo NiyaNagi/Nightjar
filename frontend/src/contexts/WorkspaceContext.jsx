@@ -516,6 +516,7 @@ export function WorkspaceProvider({ children }) {
       setCurrentWorkspaceId(null);
       setLoading(true);
       
+      // Check if we're in Electron mode with sidecar
       if (metaSocket.current?.readyState === WebSocket.OPEN) {
         // Reinitialize P2P with new identity
         metaSocket.current.send(JSON.stringify({ type: 'reinitialize-p2p' }));
@@ -524,6 +525,25 @@ export function WorkspaceProvider({ children }) {
         // The sidecar uses identity.loadIdentity().publicKeyBase62 to filter workspaces
         metaSocket.current.send(JSON.stringify({ type: 'list-workspaces' }));
         secureLog('[WorkspaceContext] Requested workspace list refresh after identity switch');
+      } else {
+        // Web mode: load workspaces from identity-scoped localStorage
+        secureLog('[WorkspaceContext] Web mode - loading workspaces from localStorage for new identity');
+        try {
+          const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
+          const stored = localStorage.getItem(storageKey);
+          const storedWorkspaces = stored ? JSON.parse(stored) : [];
+          setWorkspaces(storedWorkspaces);
+          
+          if (storedWorkspaces.length > 0) {
+            const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
+            const lastWorkspaceId = localStorage.getItem(currentWsKey);
+            setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
+          }
+        } catch (e) {
+          secureError('[WorkspaceContext] Failed to load workspaces for new identity:', e);
+        }
+        setLoading(false);
+        secureLog('[WorkspaceContext] Finished loading workspaces for new identity');
       }
     };
     

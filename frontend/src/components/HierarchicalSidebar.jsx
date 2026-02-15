@@ -97,6 +97,7 @@ const TreeItem = React.memo(function TreeItem({
         }
         if (item.type === 'kanban') return '📋';
         if (item.type === 'sheet') return '📊';
+        if (item.type === 'inventory') return '📦';
         return '📄';
     };
     
@@ -268,9 +269,10 @@ const TreeItem = React.memo(function TreeItem({
                         {collaborators.slice(0, 3).map((collab, idx) => (
                             <span 
                                 key={idx}
-                                className="tree-item__pip"
+                                className={`tree-item__pip ${collab.isFocused ? 'tree-item__pip--focused' : ''}`}
                                 style={{ backgroundColor: collab.color }}
-                                title={collab.name}
+                                title={`${collab.name}${collab.isFocused ? ' (active)' : ''}`}
+                                data-focused={collab.isFocused ? 'true' : 'false'}
                             >
                                 {collab.icon || collab.name?.charAt(0).toUpperCase()}
                             </span>
@@ -388,6 +390,7 @@ const HierarchicalSidebar = ({
     onCreateDocument,
     onCreateSheet,
     onCreateKanban,
+    onCreateInventory,
     onDeleteDocument,
     onRenameDocument,
     onMoveDocument,
@@ -767,6 +770,7 @@ const HierarchicalSidebar = ({
                         onClick={() => startCreatingDocument(null)}
                         title="New Document"
                         aria-label="Create new document"
+                        data-testid="new-document-btn"
                     >
                         <span className="action-btn__icon">📄+</span>
                         <span className="action-btn__label">Doc</span>
@@ -777,6 +781,7 @@ const HierarchicalSidebar = ({
                         onClick={() => setShowCreateFolder(true)}
                         title="New Folder"
                         aria-label="Create new folder"
+                        data-testid="new-folder-btn"
                     >
                         <span className="action-btn__icon">📁+</span>
                         <span className="action-btn__label">Folder</span>
@@ -1007,6 +1012,7 @@ const HierarchicalSidebar = ({
                 onCreateDocument={onCreateDocument}
                 onCreateSheet={onCreateSheet}
                 onCreateKanban={onCreateKanban}
+                onCreateInventory={onCreateInventory}
             />
         </div>
     );

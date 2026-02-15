@@ -85,6 +85,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
         onError: (callback) => ipcRenderer.on('tor:error', (_e, err) => callback(err))
     },
 
+    // --- Inventory Address Storage ---
+    // Encrypted blob storage for inventory addresses (admin + requestor local storage)
+    // Blobs are pre-encrypted by the frontend — the main process treats them as opaque data
+    inventory: {
+        // Admin address store (linked to requests)
+        storeAddress: (inventorySystemId, requestId, encryptedAddressBlob) =>
+            ipcRenderer.invoke('inventory:store-address', inventorySystemId, requestId, encryptedAddressBlob),
+        getAddress: (inventorySystemId, requestId) =>
+            ipcRenderer.invoke('inventory:get-address', inventorySystemId, requestId),
+        deleteAddress: (inventorySystemId, requestId) =>
+            ipcRenderer.invoke('inventory:delete-address', inventorySystemId, requestId),
+        listAddresses: (inventorySystemId) =>
+            ipcRenderer.invoke('inventory:list-addresses', inventorySystemId),
+        // Saved addresses (requestor-local)
+        storeSavedAddress: (addressId, encryptedBlob) =>
+            ipcRenderer.invoke('inventory:store-saved-address', addressId, encryptedBlob),
+        getSavedAddresses: () =>
+            ipcRenderer.invoke('inventory:get-saved-addresses'),
+        deleteSavedAddress: (addressId) =>
+            ipcRenderer.invoke('inventory:delete-saved-address', addressId),
+    },
+
     // --- Protocol Link Handling ---
     onProtocolLink: (callback) => ipcRenderer.on('protocol-link', (_e, url) => callback(url)),
 

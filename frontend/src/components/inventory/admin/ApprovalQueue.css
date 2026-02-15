@@ -1,0 +1,202 @@
+/* frontend/src/components/inventory/admin/ApprovalQueue.css */
+
+.approval-queue {
+  padding: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.aq-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.aq-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.aq-badge {
+  background: var(--warning-bg, rgba(245, 158, 11, 0.15));
+  color: var(--warning-color);
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.aq-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.aq-select-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-right: auto;
+}
+
+.aq-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.aq-empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Cards */
+.aq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aq-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.aq-card:hover {
+  border-color: var(--accent-color);
+}
+
+.aq-card--urgent {
+  border-left: 3px solid var(--error-color);
+}
+
+.aq-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.aq-card-header input[type="checkbox"] {
+  accent-color: var(--accent-color);
+}
+
+.aq-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.aq-urgent {
+  color: var(--error-color);
+}
+
+.aq-req-id {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.aq-expand-icon {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.aq-card-body {
+  padding: 0 16px 14px;
+}
+
+.aq-card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.aq-assignment {
+  background: var(--bg-tertiary);
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.aq-assignment-label {
+  color: var(--text-muted);
+}
+
+.aq-producer-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.aq-producer-detail {
+  color: var(--text-secondary);
+}
+
+.aq-no-capacity {
+  color: var(--warning-color);
+  font-size: 0.8rem;
+}
+
+.aq-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.aq-detail-wrapper {
+  border-top: 1px solid var(--border-color);
+  padding: 16px;
+}
+
+/* Shared btn styles (consistent with CatalogManager) */
+.approval-queue .btn-sm {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.approval-queue .btn-primary {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.approval-queue .btn-primary:hover {
+  filter: brightness(1.15);
+}
+
+.approval-queue .btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.approval-queue .btn-secondary:hover {
+  background: var(--hover-bg);
+}

@@ -260,13 +260,13 @@ const Comments = ({
     if (!isVisible) return null;
 
     return (
-        <div className="comments-panel">
-            <div className="comments-header">
+        <div className="comments-panel" data-testid="comments-panel">
+            <div className="comments-header" data-testid="comments-header">
                 <h3>💬 Comments</h3>
                 <div className="comments-header-actions">
-                    <span className="comment-count">{unresolvedComments.length} open</span>
+                    <span className="comment-count" data-testid="comment-count">{unresolvedComments.length} open</span>
                     {onClose && (
-                        <button className="btn-close-comments" onClick={onClose} aria-label="Close comments panel">×</button>
+                        <button className="btn-close-comments" onClick={onClose} aria-label="Close comments panel" data-testid="close-comments-btn">×</button>
                     )}
                 </div>
             </div>
@@ -304,7 +304,7 @@ const Comments = ({
                         💡 Edit a card and click the comment button to comment on specific cards
                     </div>
                 )}
-                <div className="new-comment-input-row" role="form" aria-label="Add comment form">
+                <div className="new-comment-input-row" role="form" aria-label="Add comment form" data-testid="comment-input-row">
                     <input
                         ref={inputRef}
                         type="text"
@@ -314,6 +314,7 @@ const Comments = ({
                         placeholder={currentSelection ? "Add your comment..." : "Add a general comment..."}
                         className="comment-input"
                         aria-label={currentSelection ? "Add comment on selection" : "Add general comment"}
+                        data-testid="comment-input"
                     />
                     <button 
                         type="button"
@@ -321,6 +322,7 @@ const Comments = ({
                         onClick={addComment}
                         disabled={!newComment.trim()}
                         aria-label="Add comment"
+                        data-testid="add-comment-btn"
                     >
                         +
                     </button>
