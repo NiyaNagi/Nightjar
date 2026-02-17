@@ -205,8 +205,16 @@ class MobileP2PService {
    * Broadcast sync data
    */
   broadcastSync(topicHex, data) {
-    const dataStr = data instanceof Uint8Array ? 
-      btoa(String.fromCharCode(...data)) : data;
+    let dataStr;
+    if (data instanceof Uint8Array) {
+      let binary = '';
+      for (let i = 0; i < data.length; i++) {
+        binary += String.fromCharCode(data[i]);
+      }
+      dataStr = btoa(binary);
+    } else {
+      dataStr = data;
+    }
     
     this.send({
       type: 'sync',

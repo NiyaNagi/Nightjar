@@ -146,7 +146,6 @@ const renderTextWithMentions = (text, currentUserPublicKey) => {
 const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, onTargetUserHandled, userPublicKey, workspaceMembers = [] }) => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
-    const [unreadCount, setUnreadCount] = useState(0);
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
     const ymessagesRef = useRef(null);
@@ -613,18 +612,9 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         const ymessages = ydoc.getArray('chat-messages');
         ymessagesRef.current = ymessages;
         
-        // Track message count in ref to avoid stale closure issues
-        let lastKnownCount = 0;
-
         const updateFromYjs = () => {
             const msgs = ymessages.toArray();
             setMessages(msgs);
-            
-            // Count unread if minimized using local tracking (not stale closure)
-            if (chatState.isMinimized && msgs.length > lastKnownCount) {
-                setUnreadCount(prev => prev + (msgs.length - lastKnownCount));
-            }
-            lastKnownCount = msgs.length;
         };
 
         ymessages.observe(updateFromYjs);
@@ -633,7 +623,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         return () => {
             ymessages.unobserve(updateFromYjs);
         };
-    }, [ydoc, chatState.isMinimized]);
+    }, [ydoc]);
     
     // Watch for new messages and send notifications
     useEffect(() => {
@@ -783,68 +773,6 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [messages, chatState.isMinimized]);
-    
-    // Play notification sounds for new messages
-    useEffect(() => {
-        // Skip if no messages or this is the initial load
-        if (!messages.length) {
-            lastMessageCountRef.current = 0;
-            return;
-        }
-        
-        // Skip if this is initial load (count was 0)
-        if (lastMessageCountRef.current === 0) {
-            lastMessageCountRef.current = messages.length;
-            return;
-        }
-        
-        // Check if we have new messages
-        const newCount = messages.length - lastMessageCountRef.current;
-        if (newCount <= 0) {
-            lastMessageCountRef.current = messages.length;
-            return;
-        }
-        
-        // Get the newest messages
-        const newMessages = messages.slice(-newCount);
-        
-        // Process each new message for notifications
-        newMessages.forEach(message => {
-            // Skip our own messages
-            if (message.senderPublicKey === userPublicKey) return;
-            
-            // Skip system messages
-            if (message.type === 'system') return;
-            
-            // Determine message type for notification
-            let messageType = MESSAGE_TYPES.GENERAL_MESSAGE;
-            
-            // Check if it's a mention (mentions array contains our publicKey)
-            if (message.mentions?.some(m => m.publicKey === userPublicKey)) {
-                messageType = MESSAGE_TYPES.MENTION;
-            }
-            // Check if it's a DM
-            else if (message.channel?.startsWith('dm-')) {
-                messageType = MESSAGE_TYPES.DIRECT_MESSAGE;
-            }
-            // Check if it's a group message
-            else if (message.channel?.startsWith('group-')) {
-                messageType = MESSAGE_TYPES.GROUP_MESSAGE;
-            }
-            
-            // Play the appropriate sound
-            playForMessageType(messageType);
-        });
-        
-        lastMessageCountRef.current = messages.length;
-    }, [messages, userPublicKey, playForMessageType]);
-
-    // Clear unread when opening chat
-    useEffect(() => {
-        if (!chatState.isMinimized) {
-            setUnreadCount(0);
-        }
-    }, [chatState.isMinimized]);
 
     const sendMessage = useCallback(() => {
         if (!inputValue.trim()) return;
@@ -967,6 +895,17 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         ).length;
     }, [messages, unreadCounts, myClientId]);
     
+    // Check if a channel has unread mentions for current user
+    const getChannelMentionCount = useCallback((channelId) => {
+        const lastRead = unreadCounts[channelId]?.lastRead || 0;
+        return messages.filter(m => 
+            (m.channel || 'general') === channelId && 
+            m.timestamp > lastRead &&
+            m.senderClientId !== myClientId &&
+            m.mentions?.some(mention => mention.publicKey === userPublicKey)
+        ).length;
+    }, [messages, unreadCounts, myClientId, userPublicKey]);
+    
     // Total unread across all channels
     const totalUnread = useMemo(() => {
         const channels = new Set(['general', ...chatTabs.map(t => t.id === 'general' ? 'general' : t.id)]);
@@ -976,6 +915,16 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         });
         return total;
     }, [chatTabs, getChannelUnreadCount]);
+    
+    // Total unread mentions across all channels
+    const totalMentions = useMemo(() => {
+        const channels = new Set(['general', ...chatTabs.map(t => t.id === 'general' ? 'general' : t.id)]);
+        let total = 0;
+        channels.forEach(channelId => {
+            total += getChannelMentionCount(channelId);
+        });
+        return total;
+    }, [chatTabs, getChannelMentionCount]);
 
     const handleKeyDown = (e) => {
         // Handle mention popup navigation
@@ -1056,8 +1005,9 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             }
         });
         
-        // Add workspace members who aren't online
+        // Add workspace members who aren't online (skip self)
         workspaceMembers.forEach(member => {
+            if (member.publicKey === userPublicKey) return; // Don't show self in mentions
             if (!seenKeys.has(member.publicKey) && member.displayName?.toLowerCase().includes(mentionQuery)) {
                 seenKeys.add(member.publicKey);
                 allUsers.push({
@@ -1200,12 +1150,15 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 } : {}}
                 role="button"
                 tabIndex={0}
-                aria-label={`Expand chat${unreadCount > 0 ? `, ${unreadCount} unread messages` : ''}`}
+                aria-label={`Expand chat${totalUnread > 0 ? `, ${totalUnread} unread messages` : ''}${totalMentions > 0 ? `, ${totalMentions} mentions` : ''}`}
             >
                 <span className="chat-icon" aria-hidden="true">💬</span>
                 <span>Chat</span>
-                {unreadCount > 0 && (
-                    <span className="unread-badge" aria-label={`${unreadCount} unread`}>{unreadCount}</span>
+                {totalMentions > 0 && (
+                    <span className="unread-badge mention-badge" aria-label={`${totalMentions} mentions`}>@{totalMentions > 99 ? '99+' : totalMentions}</span>
+                )}
+                {totalUnread > 0 && totalMentions === 0 && (
+                    <span className="unread-badge" aria-label={`${totalUnread} unread`}>{totalUnread > 99 ? '99+' : totalUnread}</span>
                 )}
             </div>
         );
@@ -1252,6 +1205,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             <div className="chat-tabs" role="tablist" aria-label="Chat channels">
                 {chatTabs.filter(tab => !channelState[tab.id]?.archived).map(tab => {
                     const tabUnread = getChannelUnreadCount(tab.id === 'general' ? 'general' : tab.id);
+                    const tabMentions = getChannelMentionCount(tab.id === 'general' ? 'general' : tab.id);
                     return (
                         <div 
                             key={tab.id}
@@ -1281,7 +1235,12 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                 </span>
                             )}
                             <span className="tab-name">{tab.name}</span>
-                            {tabUnread > 0 && (
+                            {tabMentions > 0 && (
+                                <span className="tab-unread-badge mention-badge" aria-label={`${tabMentions} mentions`}>
+                                    @{tabMentions > 99 ? '99+' : tabMentions}
+                                </span>
+                            )}
+                            {tabUnread > 0 && tabMentions === 0 && (
                                 <span className="tab-unread-badge" aria-label={`${tabUnread} unread`}>
                                     {tabUnread > 99 ? '99+' : tabUnread}
                                 </span>

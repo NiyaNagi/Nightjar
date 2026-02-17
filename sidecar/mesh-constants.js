@@ -216,7 +216,14 @@ function verifyAnnouncementToken(token, ip, secret, issuedAt) {
   
   const expectedData = `${ip}:${secret}:${issuedAt}`;
   const expectedToken = crypto.createHash('sha256').update(expectedData).digest('hex');
-  return token === expectedToken;
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(token, 'hex'),
+      Buffer.from(expectedToken, 'hex')
+    );
+  } catch (e) {
+    return false; // Length mismatch or invalid hex
+  }
 }
 
 /**

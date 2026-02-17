@@ -104,6 +104,7 @@ beforeEach(() => {
     yPendingAddresses,
     inventorySystemId: 'sys-1',
     workspaceId: 'ws-1',
+    currentWorkspace: { password: 'test-pwd' },
     userIdentity: identity,
     collaborators: [
       { publicKey: 'collab-1', displayName: 'Alice', permission: 'owner' },

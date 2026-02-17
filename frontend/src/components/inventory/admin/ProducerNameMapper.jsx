@@ -11,6 +11,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { generateId } from '../../../utils/inventoryValidation';
+import { resolveUserName } from '../../../utils/resolveUserName';
 import './ProducerNameMapper.css';
 
 export default function ProducerNameMapper() {
@@ -23,16 +24,17 @@ export default function ProducerNameMapper() {
   const requests = sync.requests || [];
   const collaborators = ctx.collaborators || [];
 
-  // Get all collaborators who can be producers (editors + owners)
+  // Get all collaborators as potential assignment targets
+  // Show ALL members (not just editors/owners) so admin can map
+  // imported names to any workspace collaborator
   const producers = useMemo(() => {
-    const result = collaborators.filter(c =>
-      c.permission === 'editor' || c.permission === 'owner'
-    );
+    const result = [...collaborators];
     // Ensure current user (admin) is in the list
     const myKey = ctx.userIdentity?.publicKeyBase62;
-    if (myKey && !result.find(c => c.publicKey === myKey)) {
+    if (myKey && !result.find(c => c.publicKey === myKey || c.publicKeyBase62 === myKey)) {
       result.unshift({
         publicKey: myKey,
+        publicKeyBase62: myKey,
         displayName: ctx.userIdentity?.displayName || ctx.userIdentity?.name || 'Me',
         permission: 'owner',
       });
@@ -76,7 +78,7 @@ export default function ProducerNameMapper() {
       const arr = yArr.toArray();
       for (const [importedName, collabKey] of Object.entries(assignments)) {
         if (!collabKey) continue;
-        const collab = producers.find(c => c.publicKey === collabKey);
+        const collab = producers.find(c => (c.publicKeyBase62 || c.publicKey) === collabKey);
         if (!collab) continue;
 
         // Find all requests with this importedProducerName
@@ -176,9 +178,9 @@ export default function ProducerNameMapper() {
                     >
                       <option value="">— Select Collaborator —</option>
                       {producers.map(p => (
-                        <option key={p.publicKey} value={p.publicKey}>
-                          {p.displayName || p.name || p.publicKey.slice(0, 8)}
-                          {p.permission === 'owner' ? ' (admin)' : ''}
+                        <option key={p.publicKeyBase62 || p.publicKey} value={p.publicKeyBase62 || p.publicKey}>
+                          {resolveUserName(collaborators, p.publicKeyBase62 || p.publicKey, p.displayName || p.name)}
+                          {p.permission === 'owner' ? ' (admin)' : p.permission === 'editor' ? ' (producer)' : ' (viewer)'}
                         </option>
                       ))}
                     </select>

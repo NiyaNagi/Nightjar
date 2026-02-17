@@ -289,7 +289,9 @@ async function getPublicIP(retries = 1) {
  * @returns {Object} Message with signature
  */
 function signMessage(message, secretKeyHex) {
-  const messageBytes = Buffer.from(JSON.stringify(message), 'utf8');
+  // Use sorted keys for deterministic serialization across engines
+  const canonical = JSON.stringify(message, Object.keys(message).sort());
+  const messageBytes = Buffer.from(canonical, 'utf8');
   const secretKey = Buffer.from(secretKeyHex, 'hex');
   const signature = nacl.sign.detached(messageBytes, secretKey);
   return {
@@ -309,7 +311,8 @@ function verifyMessage(signedMessage, publicKeyHex) {
     const { signature, ...message } = signedMessage;
     if (!signature) return false;
     
-    const messageBytes = Buffer.from(JSON.stringify(message), 'utf8');
+    const canonical = JSON.stringify(message, Object.keys(message).sort());
+    const messageBytes = Buffer.from(canonical, 'utf8');
     const signatureBytes = Buffer.from(signature, 'hex');
     const publicKey = Buffer.from(publicKeyHex, 'hex');
     
@@ -429,7 +432,7 @@ class HyperswarmManager extends EventEmitter {
         }
         
         // Check for heartbeat timeout
-        if (conn.lastPingSent && !conn.lastPongReceived) {
+        if (conn.lastPingSent && (!conn.lastPongReceived || conn.lastPongReceived < conn.lastPingSent)) {
           const pingAge = now - conn.lastPingSent;
           if (pingAge > HEARTBEAT_TIMEOUT) {
             console.warn(`[Hyperswarm] Heartbeat timeout for peer: ${peerId.slice(0, 16)}`);
@@ -705,7 +708,11 @@ class HyperswarmManager extends EventEmitter {
           break;
 
         default:
-          this.emit('message', { peerId, message });
+          // Forward ALL unhandled message types (chunk-request, chunk-response,
+          // chunk-seed, and any future custom types) as direct-message events
+          // so p2p-bridge can relay them to the frontend.
+          this.emit('direct-message', { peerId, message });
+          break;
       }
     } catch (err) {
       console.error('[Hyperswarm] Failed to parse message:', err.message);

@@ -251,7 +251,7 @@ describe('Onboarding Wizard Workflow', () => {
 
     const updated = ySystems.get('sys-1');
     expect(updated.settings.requireApproval).toBe(true);
-    expect(updated.settings.autoAssign).toBe(true);
+    expect(updated.settings.autoAssignEnabled).toBe(true);
   });
 
   test('Step 2: add first catalog item and advance', () => {

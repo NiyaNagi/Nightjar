@@ -481,6 +481,16 @@ class SignalingServer {
       case 'ping':
         this.send(ws, { type: 'pong', timestamp: Date.now() });
         break;
+
+      // P2P Protocol: Relay a message to a specific peer
+      case 'relay-message':
+        this.handleRelayMessage(ws, info, msg);
+        break;
+
+      // P2P Protocol: Broadcast a message to all peers in the same topics
+      case 'relay-broadcast':
+        this.handleRelayBroadcast(ws, info, msg);
+        break;
         
       default:
         this.send(ws, { type: 'error', error: 'unknown_type' });
@@ -737,6 +747,77 @@ class SignalingServer {
           return;
         }
       }
+    }
+  }
+
+  /**
+   * Handle relay-message: forward an arbitrary message to a specific peer.
+   * Used by clients for P2P chunk-request/chunk-response/chunk-seed etc.
+   * The server is opaque to the payload — it just routes it.
+   */
+  handleRelayMessage(ws, info, msg) {
+    const { targetPeerId, payload } = msg;
+    if (!targetPeerId || !payload) {
+      this.send(ws, { type: 'error', error: 'relay_missing_target_or_payload' });
+      return;
+    }
+
+    // Verify sender is in at least one topic (authenticated participation)
+    if (!info.topics || info.topics.size === 0) {
+      this.send(ws, { type: 'error', error: 'not_in_topic' });
+      return;
+    }
+
+    // Find target peer — must share at least one topic with sender
+    for (const topic of info.topics) {
+      const roomId = `p2p:${topic}`;
+      const room = this.rooms.get(roomId);
+      if (!room) continue;
+
+      for (const peer of room) {
+        const pInfo = this.peerInfo.get(peer);
+        if (pInfo && pInfo.peerId === targetPeerId) {
+          // Forward the payload with sender info
+          this.send(peer, {
+            ...payload,
+            _fromPeerId: info.peerId,
+            _relayed: true,
+          });
+          return;
+        }
+      }
+    }
+
+    // Target not found in any shared topic
+    this.send(ws, { type: 'error', error: 'relay_target_not_found' });
+  }
+
+  /**
+   * Handle relay-broadcast: broadcast an arbitrary message to all peers
+   * in the sender's topics. Used for chunk-seed announcements etc.
+   */
+  handleRelayBroadcast(ws, info, msg) {
+    const { payload } = msg;
+    if (!payload) {
+      this.send(ws, { type: 'error', error: 'broadcast_missing_payload' });
+      return;
+    }
+
+    if (!info.topics || info.topics.size === 0) {
+      this.send(ws, { type: 'error', error: 'not_in_topic' });
+      return;
+    }
+
+    const broadcastPayload = {
+      ...payload,
+      _fromPeerId: info.peerId,
+      _relayed: true,
+    };
+
+    // Broadcast to all topics this peer is in
+    for (const topic of info.topics) {
+      const roomId = `p2p:${topic}`;
+      this.broadcast(roomId, broadcastPayload, ws);
     }
   }
 

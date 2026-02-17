@@ -15,7 +15,10 @@ jest.mock('../../../frontend/src/contexts/InventoryContext', () => ({
     yInventoryRequests: { toArray: () => [], delete: jest.fn(), insert: jest.fn() },
     yInventoryAuditLog: { push: jest.fn() },
     inventorySystemId: 'sys1',
+    workspaceId: 'ws1',
+    currentWorkspace: { password: 'test-pwd' },
     collaborators: [],
+    addressReveals: {},
   })),
 }));
 
@@ -25,6 +28,26 @@ jest.mock('../../../frontend/src/contexts/ToastContext', () => ({
 
 jest.mock('../../../frontend/src/utils/inventoryAddressStore', () => ({
   getAddress: jest.fn(() => Promise.resolve(null)),
+  getWorkspaceKeyMaterial: jest.fn(() => 'mock-key-material'),
+  storeAddress: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('../../../frontend/src/utils/addressCrypto', () => ({
+  decryptAddressReveal: jest.fn(() => Promise.resolve({ fullName: 'Test User', street1: '1 Main', city: 'NYC', state: 'NY', zipCode: '10001', country: 'US' })),
+}));
+
+jest.mock('../../../frontend/src/utils/shippingProviders', () => ({
+  formatAddressForCopy: jest.fn(() => 'Test Address'),
+  getEnabledProviders: jest.fn(() => []),
+}));
+
+jest.mock('../../../frontend/src/hooks/useCopyFeedback', () => ({
+  useCopyFeedback: () => ({ copied: false, copyToClipboard: jest.fn() }),
+}));
+
+jest.mock('../../../frontend/src/utils/trackingLinks', () => ({
+  parseTrackingNumber: jest.fn(() => null),
+  genericTrackingUrl: jest.fn(() => ''),
 }));
 
 // ======================================================================
@@ -149,9 +172,11 @@ describe('RequestCard', () => {
     expect(container.querySelector('.request-card--compact')).toBeInTheDocument();
   });
 
-  it('has button role and tabIndex when onClick is provided', () => {
+  it('has tabIndex and cursor pointer when onClick is provided', () => {
     const { container } = render(<RequestCard request={baseReq} onClick={jest.fn()} />);
-    expect(container.querySelector('[role="button"]')).toBeInTheDocument();
+    const card = container.querySelector('.request-card');
+    expect(card).toHaveAttribute('tabindex', '0');
+    expect(card.style.cursor).toBe('pointer');
   });
 });
 

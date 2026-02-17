@@ -280,7 +280,7 @@ export function IdentityProvider({ children }) {
                 // Return versioned export format
                 return JSON.stringify({
                     version: 2,
-                    data: btoa(String.fromCharCode(...combined))
+                    data: (() => { let b = ''; for (let i = 0; i < combined.length; i++) b += String.fromCharCode(combined[i]); return btoa(b); })()
                 });
             }
         } catch (e) {

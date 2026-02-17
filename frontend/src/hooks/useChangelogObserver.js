@@ -221,7 +221,7 @@ export function useChangelogObserver(ydoc, docId, currentUser, documentType = 't
                     const entry = {
                         id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
                         timestamp: Date.now(),
-                        author: currentUserRef.current || { name: 'Anonymous', color: '#888888' },
+                        author: currentUserRef.current || { name: 'Anonymous', color: '#888888', publicKey: '' },
                         documentType: currentDocType,
                         type: newContent.length > lastContentRef.current.length ? 'add' :
                               newContent.length < lastContentRef.current.length ? 'delete' : 'edit',

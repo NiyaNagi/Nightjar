@@ -123,7 +123,6 @@ const Sidebar = ({
     }, [onJoinWorkspace]);
 
     // Filter documents for current folder
-    console.log('[Sidebar] Received documents:', documents?.length, documents);
     const filteredDocuments = useMemo(() => (documents || []).filter(doc => {
         if (activeFolderId === 'all' || !activeFolderId) return true;
         if (activeFolderId === 'recent') {

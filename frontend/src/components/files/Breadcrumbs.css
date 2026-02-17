@@ -1,0 +1,50 @@
+/* Breadcrumbs.css */
+
+.fs-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  padding: 0;
+  min-height: 24px;
+}
+
+.fs-breadcrumb-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.fs-breadcrumb-separator {
+  color: var(--text-tertiary, #6c7086);
+  font-size: 14px;
+  margin: 0 4px;
+  user-select: none;
+}
+
+.fs-breadcrumb-item {
+  background: none;
+  border: none;
+  color: var(--accent-color, #89b4fa);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.fs-breadcrumb-item:hover:not(:disabled) {
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.fs-breadcrumb-item:disabled,
+.fs-breadcrumb-current {
+  color: var(--text-primary, #cdd6f4);
+  cursor: default;
+  font-weight: 600;
+}
+
+.fs-breadcrumb-current:hover {
+  background: transparent !important;
+}

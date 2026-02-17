@@ -25,6 +25,9 @@ const DEFAULT_SETTINGS = {
   
   // P2P / Network
   peerStatusPollIntervalMs: 10000, // How often to check peer status (ms)
+
+  // Downloads
+  downloadLocation: '', // User-chosen download folder (set on first download)
 };
 
 // Font options
@@ -904,6 +907,39 @@ export default function AppSettings({ isOpen, onClose }) {
                   <div>
                     <strong>Relay Fallback</strong>
                     <p>When no direct P2P peers are available, Nightjar will automatically attempt to connect via relay servers for sync.</p>
+                  </div>
+                </div>
+
+                <div className="app-settings__control">
+                  <div className="app-settings__control-header">
+                    <label htmlFor="download-location">Download Location</label>
+                    <span className="app-settings__control-hint">Where downloaded files are saved on this device</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      id="download-location"
+                      type="text"
+                      readOnly
+                      value={localStorage.getItem('nightjar_download_location') || 'Not set (will ask on first download)'}
+                      style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-primary, #11111b)', color: 'var(--text-secondary, #a6adc8)', border: '1px solid var(--border-color, #313244)', borderRadius: '6px', fontSize: '13px' }}
+                    />
+                    <button
+                      onClick={async () => {
+                        if (window.electronAPI?.fileSystem) {
+                          const folder = await window.electronAPI.fileSystem.selectFolder({
+                            title: 'Choose Download Location',
+                          });
+                          if (folder) {
+                            localStorage.setItem('nightjar_download_location', folder);
+                            setHasChanges(true);
+                            setSettings(s => ({ ...s, downloadLocation: folder }));
+                          }
+                        }
+                      }}
+                      style={{ padding: '6px 14px', background: 'var(--accent-color, #89b4fa)', color: '#11111b', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}
+                    >
+                      Change…
+                    </button>
                   </div>
                 </div>
               </div>

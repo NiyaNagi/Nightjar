@@ -36,35 +36,48 @@ export function updateCollaborator(collaborators, collaborator) {
 
   const now = Date.now();
   
-  // Find existing entry
-  let found = false;
-  collaborators.forEach((item, index) => {
-    if (item && item.peerId === peerId) {
-      // Update existing entry
-      collaborators.delete(index, 1);
-      collaborators.insert(index, [{
+  // Wrap in Yjs transaction to prevent interleaved operations from other peers
+  const doc = collaborators.doc;
+  const doUpdate = () => {
+    // Find existing entry — iterate snapshot in reverse to avoid index corruption
+    let found = false;
+    const arr = collaborators.toArray();
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const item = arr[i];
+      if (item && item.peerId === peerId) {
+        if (!found) {
+          collaborators.delete(i, 1);
+          collaborators.insert(i, [{
+            peerId,
+            name,
+            color: color || item.color,
+            icon: icon || item.icon,
+            lastSeen: now,
+            firstSeen: item.firstSeen || now,
+          }]);
+          found = true;
+        } else {
+          // Remove duplicate peerId entries
+          collaborators.delete(i, 1);
+        }
+      }
+    }
+
+    // Add new entry if not found
+    if (!found) {
+      collaborators.push([{
         peerId,
         name,
-        color: color || item.color,
-        icon: icon || item.icon,
+        color,
+        icon,
         lastSeen: now,
-        firstSeen: item.firstSeen || now,
+        firstSeen: now,
       }]);
-      found = true;
     }
-  });
+  };
 
-  // Add new entry if not found
-  if (!found) {
-    collaborators.push([{
-      peerId,
-      name,
-      color,
-      icon,
-      lastSeen: now,
-      firstSeen: now,
-    }]);
-  }
+  if (doc) doc.transact(doUpdate);
+  else doUpdate();
 }
 
 /**

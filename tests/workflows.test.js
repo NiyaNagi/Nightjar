@@ -22,7 +22,7 @@ import {
 } from '../frontend/src/utils/backup';
 
 describe('Integration: New User Onboarding Flow', () => {
-  test('complete new user flow: generate → backup → restore', () => {
+  test('complete new user flow: generate → backup → restore', async () => {
     // Step 1: User generates a new identity
     const identity = generateIdentity();
     expect(identity.mnemonic).toBeDefined();
@@ -38,12 +38,12 @@ describe('Integration: New User Onboarding Flow', () => {
     }];
     
     // Step 3: User backs up their data
-    const backup = createBackup(identity, workspaces);
+    const backup = await createBackup(identity, workspaces);
     expect(backup.version).toBe(1);
     expect(backup.identity.publicKey).toBe(identity.publicKeyBase62);
     
     // Step 4: Simulate device loss - user restores on new device
-    const restoredData = restoreBackup(backup, identity.mnemonic);
+    const restoredData = await restoreBackup(backup, identity.mnemonic);
     
     // Compare as base62 strings since restoreBackup returns Uint8Array
     const restoredPublicKey = restoredData.identity.publicKey instanceof Uint8Array 
@@ -151,7 +151,7 @@ describe('Integration: Workspace Collaboration Flow', () => {
 // Note: Invite security tests are covered in invites.test.js
 
 describe('Integration: Multi-Workspace Flow', () => {
-  test('user can manage multiple workspaces with different permissions', () => {
+  test('user can manage multiple workspaces with different permissions', async () => {
     const user = generateIdentity();
     const otherOwner = generateIdentity();
     
@@ -180,13 +180,13 @@ describe('Integration: Multi-Workspace Flow', () => {
     ];
     
     // Create backup with all workspaces
-    const backup = createBackup(user, workspaces);
+    const backup = await createBackup(user, workspaces);
     
     expect(backup.workspaces).toHaveLength(3);
     expect(backup.workspaces.filter(w => w.isOwner)).toHaveLength(1);
     
     // Restore and verify permissions preserved
-    const restored = restoreBackup(backup, user.mnemonic);
+    const restored = await restoreBackup(backup, user.mnemonic);
     
     expect(restored.workspaces.find(w => w.id === 'ws-owned').isOwner).toBe(true);
     expect(restored.workspaces.find(w => w.id === 'ws-editor').isOwner).toBe(false);
@@ -195,7 +195,7 @@ describe('Integration: Multi-Workspace Flow', () => {
 });
 
 describe('Integration: Identity Recovery Flow', () => {
-  test('complete recovery flow with mnemonic phrase', () => {
+  test('complete recovery flow with mnemonic phrase', async () => {
     // Step 1: Original user creates identity and workspaces
     const originalIdentity = generateIdentity();
     const mnemonic = originalIdentity.mnemonic;
@@ -210,7 +210,7 @@ describe('Integration: Identity Recovery Flow', () => {
     ];
     
     // Step 2: Create and "save" backup
-    const backup = createBackup(originalIdentity, workspaces);
+    const backup = await createBackup(originalIdentity, workspaces);
     
     // Step 3: Simulate complete data loss - only mnemonic saved
     const savedMnemonic = mnemonic;
@@ -223,7 +223,7 @@ describe('Integration: Identity Recovery Flow', () => {
     expect(recoveredIdentity.publicKeyBase62).toBe(originalIdentity.publicKeyBase62);
     
     // Step 6: User can restore full backup
-    const restoredData = restoreBackup(backup, savedMnemonic);
+    const restoredData = await restoreBackup(backup, savedMnemonic);
     
     expect(restoredData.workspaces[0].name).toBe('Important Documents');
     

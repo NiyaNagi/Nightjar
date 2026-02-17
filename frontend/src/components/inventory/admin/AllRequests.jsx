@@ -15,6 +15,9 @@ import RequestDetail from '../common/RequestDetail';
 import { generateId, US_STATES } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
 import { exportRequests } from '../../../utils/inventoryExport';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import { getPublicKeyHex, base62ToPublicKeyHex, createAddressReveal, decryptPendingAddress } from '../../../utils/addressCrypto';
+import { getAddress, getWorkspaceKeyMaterial, storeAddress } from '../../../utils/inventoryAddressStore';
 import './AllRequests.css';
 
 const PAGE_SIZE = 50;
@@ -88,7 +91,7 @@ export default function AllRequests() {
     });
 
     return result;
-  }, [requests, statusFilter, itemFilter, stateFilter, urgencyFilter, search, sortField, sortDir]);
+  }, [requests, statusFilter, itemFilter, stateFilter, urgencyFilter, search, producerFilter, dateFrom, dateTo, sortField, sortDir]);
 
   // Paginate
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -108,13 +111,57 @@ export default function AllRequests() {
   };
 
   // Admin actions on detail panel
-  const handleApprove = useCallback((req) => {
+  const handleApprove = useCallback(async (req) => {
     const items = yInventoryRequests.toArray();
     const idx = items.findIndex(r => r.id === req.id);
     if (idx === -1) return;
+    const updated = { ...items[idx], status: 'approved', approvedAt: Date.now(), approvedBy: ctx.userIdentity?.publicKeyBase62, updatedAt: Date.now() };
     yInventoryRequests.delete(idx, 1);
-    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'approved', approvedAt: Date.now(), updatedAt: Date.now() }]);
-    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_approved', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} approved`, timestamp: Date.now() }]);
+    yInventoryRequests.insert(idx, [updated]);
+
+    // Create address reveal for the assigned producer (mirrors ApprovalQueue logic)
+    if (updated.assignedTo) {
+      try {
+        const adminHex = getPublicKeyHex(ctx.userIdentity);
+        const producerHex = base62ToPublicKeyHex(updated.assignedTo);
+
+        // 1. Try local encrypted store (owner-submitted addresses)
+        let addr = null;
+        try {
+          const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+          addr = await getAddress(km, inventorySystemId, req.id);
+        } catch {
+          // Key material or local address not available
+        }
+
+        // 2. Fallback: decrypt pending address from non-owner requestor
+        if (!addr && ctx.yPendingAddresses) {
+          const pendingEntries = ctx.yPendingAddresses.get(req.id);
+          if (pendingEntries && ctx.userIdentity?.privateKey) {
+            addr = await decryptPendingAddress(pendingEntries, adminHex, ctx.userIdentity.privateKey);
+            // Store locally for future reference, then clean up pending entry
+            if (addr) {
+              try {
+                const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+                await storeAddress(km, inventorySystemId, req.id, addr);
+              } catch {
+                // Non-critical: local caching failed
+              }
+              ctx.yPendingAddresses.delete(req.id);
+            }
+          }
+        }
+
+        if (addr && ctx.userIdentity?.privateKey) {
+          const reveal = await createAddressReveal(addr, producerHex, ctx.userIdentity.privateKey, adminHex);
+          ctx.yAddressReveals?.set(req.id, { ...reveal, inventorySystemId });
+        }
+      } catch (err) {
+        console.warn('[AllRequests] Could not create address reveal:', err);
+      }
+    }
+
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_approved', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} approved`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
     pushNotification(yInventoryNotifications, {
       inventorySystemId,
       recipientId: req.requestedBy,
@@ -123,15 +170,15 @@ export default function AllRequests() {
       relatedId: req.id,
     });
     showToast(`#${req.id?.slice(4, 10)} approved`, 'success');
-  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications]);
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx]);
 
   const handleReject = useCallback((req) => {
     const items = yInventoryRequests.toArray();
     const idx = items.findIndex(r => r.id === req.id);
     if (idx === -1) return;
     yInventoryRequests.delete(idx, 1);
-    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'open', assignedTo: null, updatedAt: Date.now() }]);
-    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_rejected', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} rejected`, timestamp: Date.now() }]);
+    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'open', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_rejected', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} rejected`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
     pushNotification(yInventoryNotifications, {
       inventorySystemId,
       recipientId: req.requestedBy,
@@ -140,15 +187,15 @@ export default function AllRequests() {
       relatedId: req.id,
     });
     showToast(`#${req.id?.slice(4, 10)} returned to Open`, 'success');
-  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications]);
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
 
   const handleCancel = useCallback((req) => {
     const items = yInventoryRequests.toArray();
     const idx = items.findIndex(r => r.id === req.id);
     if (idx === -1) return;
     yInventoryRequests.delete(idx, 1);
-    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'cancelled', updatedAt: Date.now() }]);
-    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_cancelled', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} cancelled`, timestamp: Date.now() }]);
+    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'cancelled', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_cancelled', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} cancelled`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
     pushNotification(yInventoryNotifications, {
       inventorySystemId,
       recipientId: req.requestedBy,
@@ -157,7 +204,7 @@ export default function AllRequests() {
       relatedId: req.id,
     });
     showToast(`#${req.id?.slice(4, 10)} cancelled`, 'success');
-  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications]);
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
 
   // Unique states appearing in requests
   const usedStates = [...new Set(requests.map(r => r.state).filter(Boolean))].sort();
@@ -192,7 +239,7 @@ export default function AllRequests() {
           <option value="all">All Producers</option>
           {(collaborators || []).filter(c => c.permission === 'owner' || c.permission === 'editor').map(c => (
             <option key={c.publicKeyBase62 || c.publicKey} value={c.publicKeyBase62 || c.publicKey}>
-              {c.displayName || c.name || (c.publicKeyBase62 || c.publicKey || '').slice(0, 8)}
+              {resolveUserName(collaborators, c.publicKeyBase62 || c.publicKey)}
             </option>
           ))}
         </select>

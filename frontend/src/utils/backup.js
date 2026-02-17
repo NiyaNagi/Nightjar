@@ -22,7 +22,11 @@ const BACKUP_VERSION = 1;
  * Convert Uint8Array to base64 string
  */
 function uint8ToBase64(bytes) {
-  return btoa(String.fromCharCode(...bytes));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 /**
@@ -110,7 +114,7 @@ export function decryptData(encryptedBase64, key) {
  * @param {string} passphrase - Optional additional passphrase for extra security
  * @returns {Object} Backup object ready for download
  */
-export function createBackup(identity, workspaces = [], passphrase = null) {
+export async function createBackup(identity, workspaces = [], passphrase = null) {
   if (!identity?.mnemonic) {
     throw new Error('Identity with mnemonic is required');
   }
@@ -120,7 +124,7 @@ export function createBackup(identity, workspaces = [], passphrase = null) {
   
   // If passphrase provided, XOR with passphrase-derived key for extra security
   if (passphrase) {
-    const passphraseKey = deriveKeyFromPassphrase(passphrase);
+    const passphraseKey = await deriveKeyFromPassphrase(passphrase);
     backupKey = xorBytes(backupKey, passphraseKey);
   }
   
@@ -153,30 +157,51 @@ export function createBackup(identity, workspaces = [], passphrase = null) {
 }
 
 /**
- * Derive a key from a passphrase using simple stretching
- * (For production, use PBKDF2 or similar)
+ * Derive a key from a passphrase using PBKDF2
  * 
  * @param {string} passphrase - User passphrase
- * @returns {Uint8Array} 32-byte key
+ * @returns {Promise<Uint8Array>} 32-byte key
  */
-function deriveKeyFromPassphrase(passphrase) {
+async function deriveKeyFromPassphrase(passphrase) {
   const encoder = new TextEncoder();
-  const data = encoder.encode(passphrase + 'nightjar-backup-salt-v1');
+  const salt = encoder.encode('nightjar-backup-salt-v1');
   
-  // Simple key stretching - hash multiple times
-  let key = new Uint8Array(32);
-  for (let i = 0; i < data.length && i < 32; i++) {
-    key[i] = data[i];
+  // Use Web Crypto API when available, fall back to Node.js crypto
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(passphrase),
+      'PBKDF2',
+      false,
+      ['deriveBits']
+    );
+    const derived = await crypto.subtle.deriveBits(
+      {
+        name: 'PBKDF2',
+        salt,
+        iterations: 100000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      256
+    );
+    return new Uint8Array(derived);
   }
   
-  // XOR with shifted values for basic mixing
-  for (let round = 0; round < 1000; round++) {
-    for (let i = 0; i < 32; i++) {
-      key[i] = key[i] ^ ((key[(i + 1) % 32] * round) & 0xff);
-    }
+  // Node.js fallback (for testing and sidecar environments)
+  try {
+    const nodeCrypto = require('crypto');
+    const derived = nodeCrypto.pbkdf2Sync(
+      passphrase,
+      salt,
+      100000,
+      32,
+      'sha256'
+    );
+    return new Uint8Array(derived);
+  } catch {
+    throw new Error('No suitable crypto implementation available for PBKDF2');
   }
-  
-  return key;
 }
 
 /**
@@ -203,15 +228,17 @@ export function downloadBackup(backup, filename = null) {
   );
   
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename || `nightjar-backup-${new Date().toISOString().split('T')[0]}.json`;
-  
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  URL.revokeObjectURL(url);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `nightjar-backup-${new Date().toISOString().split('T')[0]}.json`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 /**
@@ -222,7 +249,7 @@ export function downloadBackup(backup, filename = null) {
  * @param {string} passphrase - Optional passphrase if backup was created with one
  * @returns {Object} { identity, workspaces }
  */
-export function restoreBackup(backup, mnemonic, passphrase = null) {
+export async function restoreBackup(backup, mnemonic, passphrase = null) {
   if (!backup || backup.version !== BACKUP_VERSION) {
     throw new Error('Invalid or unsupported backup version');
   }
@@ -238,7 +265,7 @@ export function restoreBackup(backup, mnemonic, passphrase = null) {
     if (!passphrase) {
       throw new Error('This backup requires a passphrase');
     }
-    const passphraseKey = deriveKeyFromPassphrase(passphrase);
+    const passphraseKey = await deriveKeyFromPassphrase(passphrase);
     backupKey = xorBytes(backupKey, passphraseKey);
   }
   

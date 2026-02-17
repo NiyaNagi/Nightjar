@@ -1,0 +1,198 @@
+/* TrashView.css */
+
+.trash-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #313244);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trash-header-right {
+  display: flex;
+  gap: 8px;
+}
+
+.trash-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.trash-count {
+  font-size: 12px;
+  color: var(--text-tertiary, #6c7086);
+}
+
+.trash-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border-color, #313244);
+  background: var(--bg-primary, #11111b);
+  color: var(--text-primary, #cdd6f4);
+  transition: all 0.15s ease;
+}
+
+.trash-btn--restore:hover {
+  border-color: #a6e3a1;
+  color: #a6e3a1;
+}
+
+.trash-btn--delete:hover,
+.trash-btn--danger:hover {
+  border-color: #f38ba8;
+  color: #f38ba8;
+}
+
+.trash-btn--danger {
+  border-color: #f38ba8;
+  color: #f38ba8;
+}
+
+.trash-info-bar {
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--text-tertiary, #6c7086);
+  background: rgba(137, 180, 250, 0.05);
+  border-bottom: 1px solid var(--border-color, #313244);
+}
+
+.trash-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.trash-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(49, 50, 68, 0.5);
+  transition: background 0.1s ease;
+}
+
+.trash-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.trash-row--selected {
+  background: rgba(137, 180, 250, 0.05);
+}
+
+.trash-checkbox {
+  accent-color: var(--accent-color, #89b4fa);
+  cursor: pointer;
+}
+
+.trash-folder-icon {
+  font-size: 16px;
+  opacity: 0.5;
+}
+
+.trash-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary, #a6adc8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.7;
+}
+
+.trash-size {
+  font-size: 12px;
+  color: var(--text-tertiary, #6c7086);
+  white-space: nowrap;
+}
+
+.trash-deleted {
+  font-size: 11px;
+  color: var(--text-tertiary, #6c7086);
+  white-space: nowrap;
+}
+
+.trash-days {
+  font-size: 11px;
+  color: var(--text-tertiary, #6c7086);
+  white-space: nowrap;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.trash-days--urgent {
+  color: #f38ba8;
+  background: rgba(243, 139, 168, 0.1);
+}
+
+.trash-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.trash-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.trash-action-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.trash-action-btn--danger:hover {
+  background: rgba(243, 139, 168, 0.1);
+}
+
+.trash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.trash-empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.trash-empty p {
+  color: var(--text-secondary, #a6adc8);
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .trash-deleted,
+  .trash-days { display: none; }
+  .trash-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

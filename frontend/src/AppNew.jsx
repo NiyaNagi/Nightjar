@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { IndexeddbPersistence } from 'y-indexeddb';
@@ -16,6 +16,7 @@ import Kanban from './components/Kanban';
 import Sheet from './components/Sheet';
 import InventoryDashboard from './components/inventory/InventoryDashboard';
 import FileStorageDashboard from './components/files/FileStorageDashboard';
+import { FileTransferProvider } from './contexts/FileTransferContext';
 import Chat from './components/Chat';
 import Comments from './components/Comments';
 import SplitPane from './components/SplitPane';
@@ -45,7 +46,7 @@ import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
 import { getYjsWebSocketUrl } from './utils/websocket';
 import { parseShareLink, clearUrlFragment } from './utils/sharing';
-import { META_WS_PORT } from './config/constants';
+import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
 
 import './styles/global.css';
@@ -266,6 +267,7 @@ function App() {
         yAddressReveals,
         yPendingAddresses,
         yInventoryAuditLog,
+        yInventoryNotifications,
         // Inventory operations
         addInventorySystem: syncAddInventorySystem,
         removeInventorySystem: syncRemoveInventorySystem,
@@ -988,112 +990,6 @@ function App() {
         return docId;
     }, [currentWorkspaceId, showToast]);
 
-    // Create an Inventory System — does NOT create a separate Y.Doc
-    // Inventory data lives in the workspace-level Y.Doc (see spec §11.2.5)
-    const createInventorySystem = useCallback((name, folderId = null, icon = null, color = null) => {
-        if (!currentWorkspaceId) {
-            showToast('Please create a workspace first', 'error');
-            return null;
-        }
-        const invId = 'inv-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
-        const resolvedIcon = icon || '📦';
-        const inventorySystem = {
-            id: invId,
-            workspaceId: currentWorkspaceId,
-            name: name || 'Inventory System',
-            icon: resolvedIcon,
-            createdAt: Date.now(),
-            createdBy: publicIdentity?.publicKeyBase62,
-            settings: {
-                requireApproval: true,
-                autoAssignEnabled: true,
-                allowProducerClaims: true,
-                defaultUrgency: false,
-            },
-        };
-        // Add to workspace-level Yjs map (syncs to all peers)
-        syncAddInventorySystem(inventorySystem);
-
-        // Also add to shared document list so it appears in the sidebar
-        const document = {
-            id: invId,
-            name: name || 'Inventory System',
-            type: DOC_TYPES.INVENTORY,
-            icon: resolvedIcon,
-            color: color || null,
-            workspaceId: currentWorkspaceId,
-            folderId: folderId || null,
-            createdAt: Date.now(),
-            lastEdited: Date.now(),
-            authorCount: 1,
-        };
-        syncAddDocument(document);
-
-        // Open tab immediately
-        setOpenTabs(prev => [...prev, {
-            id: invId,
-            name: name || 'Inventory System',
-            docType: DOC_TYPES.INVENTORY,
-            hasUnsavedChanges: false,
-        }]);
-        setActiveDocId(invId);
-        showToast('Inventory System created', 'success');
-        return invId;
-    }, [currentWorkspaceId, showToast, publicIdentity, syncAddInventorySystem, syncAddDocument]);
-
-    // Create a File Storage system — does NOT create a separate Y.Doc
-    // File storage data lives in the workspace-level Y.Doc (see FILE_STORAGE_SPEC.md §15.2)
-    const createFileStorage = useCallback((name, folderId = null, icon = null, color = null) => {
-        if (!currentWorkspaceId) {
-            showToast('Please create a workspace first', 'error');
-            return null;
-        }
-        const fsId = 'fs-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
-        const resolvedIcon = icon || '📂';
-        const fileStorageSystem = {
-            id: fsId,
-            workspaceId: currentWorkspaceId,
-            name: name || 'File Storage',
-            icon: resolvedIcon,
-            createdAt: Date.now(),
-            createdBy: publicIdentity?.publicKeyBase62,
-            settings: {
-                maxFileSizeMB: 100,
-                allowedExtensions: [], // empty = allow all
-                autoSeedEnabled: true,
-                minSeeders: 2,
-            },
-        };
-        // Add to workspace-level Yjs map
-        syncAddFileStorageSystem(fileStorageSystem);
-
-        // Also add to shared document list so it appears in the sidebar
-        const document = {
-            id: fsId,
-            name: name || 'File Storage',
-            type: DOC_TYPES.FILE_STORAGE,
-            icon: resolvedIcon,
-            color: color || null,
-            workspaceId: currentWorkspaceId,
-            folderId: folderId || null,
-            createdAt: Date.now(),
-            lastEdited: Date.now(),
-            authorCount: 1,
-        };
-        syncAddDocument(document);
-
-        // Open tab immediately
-        setOpenTabs(prev => [...prev, {
-            id: fsId,
-            name: name || 'File Storage',
-            docType: DOC_TYPES.FILE_STORAGE,
-            hasUnsavedChanges: false,
-        }]);
-        setActiveDocId(fsId);
-        showToast('File Storage created', 'success');
-        return fsId;
-    }, [currentWorkspaceId, showToast, publicIdentity, syncAddFileStorageSystem, syncAddDocument]);
-
     const openDocument = useCallback((docId, name, docType = DOC_TYPES.TEXT) => {
         // Check if already open
         if (openTabs.find(t => t.id === docId)) {
@@ -1165,6 +1061,132 @@ function App() {
         setActiveDocId(docId);
     }, [openTabs, workspaceServerUrl]);
 
+    // Create an Inventory System — does NOT create a separate Y.Doc
+    // Inventory data lives in the workspace-level Y.Doc (see spec §11.2.5)
+    // Only ONE inventory system per workspace is allowed.
+    const createInventorySystem = useCallback((name, folderId = null, icon = null, color = null) => {
+        if (!currentWorkspaceId) {
+            showToast('Please create a workspace first', 'error');
+            return null;
+        }
+        // One-per-workspace guard: if an inventory system already exists, open it instead
+        const existingInventory = syncedDocuments.find(
+            d => d.type === DOC_TYPES.INVENTORY && d.workspaceId === currentWorkspaceId && !d.deletedAt
+        );
+        if (existingInventory) {
+            openDocument(existingInventory.id, existingInventory.name, DOC_TYPES.INVENTORY);
+            showToast('Opened existing inventory system — only one per workspace is allowed', 'info');
+            return existingInventory.id;
+        }
+        const invId = 'inv-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+        const resolvedIcon = icon || '📦';
+        const inventorySystem = {
+            id: invId,
+            workspaceId: currentWorkspaceId,
+            name: name || 'Inventory System',
+            icon: resolvedIcon,
+            createdAt: Date.now(),
+            createdBy: publicIdentity?.publicKeyBase62,
+            settings: {
+                requireApproval: true,
+                autoAssignEnabled: true,
+                allowProducerClaims: true,
+                defaultUrgency: false,
+            },
+        };
+        // Add to workspace-level Yjs map (syncs to all peers)
+        syncAddInventorySystem(inventorySystem);
+
+        // Also add to shared document list so it appears in the sidebar
+        const document = {
+            id: invId,
+            name: name || 'Inventory System',
+            type: DOC_TYPES.INVENTORY,
+            icon: resolvedIcon,
+            color: color || null,
+            workspaceId: currentWorkspaceId,
+            folderId: folderId || null,
+            createdAt: Date.now(),
+            lastEdited: Date.now(),
+            authorCount: 1,
+        };
+        syncAddDocument(document);
+
+        // Open tab immediately
+        setOpenTabs(prev => [...prev, {
+            id: invId,
+            name: name || 'Inventory System',
+            docType: DOC_TYPES.INVENTORY,
+            hasUnsavedChanges: false,
+        }]);
+        setActiveDocId(invId);
+        showToast('Inventory System created', 'success');
+        return invId;
+    }, [currentWorkspaceId, showToast, publicIdentity, syncAddInventorySystem, syncAddDocument, syncedDocuments, openDocument]);
+
+    // Create a File Storage system — does NOT create a separate Y.Doc
+    // File storage data lives in the workspace-level Y.Doc (see FILE_STORAGE_SPEC.md §15.2)
+    // Only ONE file storage system per workspace is allowed.
+    const createFileStorage = useCallback((name, folderId = null, icon = null, color = null) => {
+        if (!currentWorkspaceId) {
+            showToast('Please create a workspace first', 'error');
+            return null;
+        }
+        // One-per-workspace guard: if a file storage system already exists, open it instead
+        const existingFileStorage = syncedDocuments.find(
+            d => d.type === DOC_TYPES.FILE_STORAGE && d.workspaceId === currentWorkspaceId && !d.deletedAt
+        );
+        if (existingFileStorage) {
+            openDocument(existingFileStorage.id, existingFileStorage.name, DOC_TYPES.FILE_STORAGE);
+            showToast('Opened existing file storage — only one per workspace is allowed', 'info');
+            return existingFileStorage.id;
+        }
+        const fsId = 'fs-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+        const resolvedIcon = icon || '�';
+        const fileStorageSystem = {
+            id: fsId,
+            workspaceId: currentWorkspaceId,
+            name: name || 'File Storage',
+            icon: resolvedIcon,
+            createdAt: Date.now(),
+            createdBy: publicIdentity?.publicKeyBase62,
+            settings: {
+                maxFileSize: 100 * 1024 * 1024, // 100 MB in bytes (spec §3.2)
+                autoDeleteDays: 30,              // days before trashed files are permanently deleted
+                chunkRedundancyTarget: 3,        // min peers per chunk for seeding
+                storageQuota: 0,                 // 0 = unlimited
+            },
+        };
+        // Add to workspace-level Yjs map
+        syncAddFileStorageSystem(fileStorageSystem);
+
+        // Also add to shared document list so it appears in the sidebar
+        const document = {
+            id: fsId,
+            name: name || 'File Storage',
+            type: DOC_TYPES.FILE_STORAGE,
+            icon: resolvedIcon || '📁',
+            color: color || null,
+            workspaceId: currentWorkspaceId,
+            folderId: folderId || null,
+            createdAt: Date.now(),
+            lastEdited: Date.now(),
+            authorCount: 1,
+        };
+        syncAddDocument(document);
+
+        // Open tab immediately
+        setOpenTabs(prev => [...prev, {
+            id: fsId,
+            name: name || 'File Storage',
+            docType: DOC_TYPES.FILE_STORAGE,
+            hasUnsavedChanges: false,
+        }]);
+        setActiveDocId(fsId);
+        showToast('File Storage created', 'success');
+        return fsId;
+    }, [currentWorkspaceId, showToast, publicIdentity, syncAddFileStorageSystem, syncAddDocument, syncedDocuments, openDocument]);
+
     const closeDocument = useCallback((docId) => {
         const tabIndex = openTabs.findIndex(t => t.id === docId);
         if (tabIndex === -1) return;
@@ -1204,6 +1226,10 @@ function App() {
         // (safe no-op if docId doesn't exist in the map)
         syncRemoveInventorySystem(docId);
 
+        // Also remove from file storage Y.Map if this was a file storage system
+        // (safe no-op if docId doesn't exist in the map)
+        syncRemoveFileStorageSystem(docId);
+
         // Notify sidecar - Electron mode only
         if (isElectronMode && metaSocketRef.current?.readyState === WebSocket.OPEN) {
             metaSocketRef.current.send(JSON.stringify({ 
@@ -1212,7 +1238,7 @@ function App() {
             }));
         }
         showToast('Document deleted', 'success');
-    }, [closeDocument, isElectronMode, syncRemoveDocument, syncRemoveInventorySystem, showToast]);
+    }, [closeDocument, isElectronMode, syncRemoveDocument, syncRemoveInventorySystem, syncRemoveFileStorageSystem, showToast]);
 
     // Move document to a folder (or to root if folderId is null)
     const handleMoveDocument = useCallback((documentId, folderId) => {
@@ -1365,13 +1391,21 @@ function App() {
     const activeDocType = openTabs.find(t => t.id === activeDocId)?.docType || DOC_TYPES.TEXT;
 
     // Observe changelog changes at the App level (runs even when panel is closed)
-    const currentUser = { name: userHandle, color: userColor, icon: userIcon };
+    const currentUser = { name: userHandle, color: userColor, icon: userIcon, publicKey: userIdentity?.publicKeyBase62 || '' };
     useChangelogObserver(
         activeDoc?.ydoc, 
         activeDocId, 
         currentUser,
         activeDocType // Pass document type for proper changelog handling
     );
+
+    // Auto-close Comments/Changelog panels when switching to non-content views
+    useEffect(() => {
+        if (!CONTENT_DOC_TYPES.has(activeDocType)) {
+            setShowComments(false);
+            setShowChangelog(false);
+        }
+    }, [activeDocType]);
 
     // Track collaborators for all documents (for sidebar pips)
     const [documentCollaborators, setDocumentCollaborators] = useState({});
@@ -1551,6 +1585,15 @@ function App() {
         setStartupComplete(true);
     }, [identityLoading, handleNeedsMigration, userIdentity, userProfile, syncFromIdentityManager]);
     
+    // Compute which singleton doc types already exist in this workspace
+    // NOTE: This must be above all early returns to satisfy React's Rules of Hooks
+    const disabledDocTypes = useMemo(() => {
+        const types = [];
+        if (documents.some(d => d.type === DOC_TYPES.INVENTORY && !d.deletedAt)) types.push(DOC_TYPES.INVENTORY);
+        if (documents.some(d => d.type === DOC_TYPES.FILE_STORAGE && !d.deletedAt)) types.push(DOC_TYPES.FILE_STORAGE);
+        return types;
+    }, [documents]);
+    
     // Show loading screen while checking identity status
     if (identityLoading || !startupComplete) {
         return (
@@ -1629,6 +1672,12 @@ function App() {
     
     return (
         <PresenceProvider awareness={workspaceAwareness}>
+        <FileTransferProvider
+            workspaceId={currentWorkspaceId}
+            userPublicKey={publicIdentity?.publicKeyBase62}
+            yChunkAvailability={yChunkAvailability}
+            yStorageFiles={yStorageFiles}
+        >
         {/* Track which document user has open for presence */}
         <PresenceDocumentTracker activeDocId={activeDocId} />
         <div className={`app-container ${isFullscreen ? 'fullscreen' : ''} ${!hasWorkspaces && !workspacesLoading ? 'onboarding' : ''}`}>
@@ -1662,6 +1711,7 @@ function App() {
                     onCreateKanban={(name, folderId, icon, color) => createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN, icon, color)}
                     onCreateInventory={(name, folderId, icon, color) => createInventorySystem(name || 'Inventory', folderId, icon, color)}
                     onCreateFileStorage={(name, folderId, icon, color) => createFileStorage(name || 'File Storage', folderId, icon, color)}
+                    disabledTypes={disabledDocTypes}
                     onDeleteDocument={deleteDocument}
                     onMoveDocument={handleMoveDocument}
                     onRenameDocument={renameDocument}
@@ -1719,6 +1769,7 @@ function App() {
                             onShowChangelog={() => setShowChangelog(true)}
                             onShowComments={() => setShowComments(!showComments)}
                             showComments={showComments}
+                            activeDocType={activeDocType}
                             userProfile={userProfile}
                             onProfileChange={setUserProfile}
                             isFullscreen={isFullscreen}
@@ -1760,10 +1811,12 @@ function App() {
                             yFileAuditLog={yFileAuditLog}
                             userIdentity={publicIdentity}
                             collaborators={workspaceCollaborators}
+                            workspaceProvider={workspaceProvider}
+                            onStartChatWith={(user) => setChatTargetUser(user)}
                         />
                     ) : activeDocType === DOC_TYPES.INVENTORY ? (
                         <InventoryDashboard
-                            key={activeDocId}
+                            key={currentWorkspaceId}
                             inventorySystemId={activeDocId}
                             workspaceId={currentWorkspaceId}
                             currentWorkspace={currentWorkspace}
@@ -1776,6 +1829,8 @@ function App() {
                             yAddressReveals={yAddressReveals}
                             yPendingAddresses={yPendingAddresses}
                             yInventoryAuditLog={yInventoryAuditLog}
+                            yInventoryNotifications={yInventoryNotifications}
+                            onStartChatWith={(user) => setChatTargetUser(user)}
                         />
                     ) : activeDoc ? (
                         activeDocType === DOC_TYPES.KANBAN ? (
@@ -1906,6 +1961,9 @@ function App() {
                             onClose={() => setShowComments(false)}
                             pendingSelection={pendingComment}
                             onPendingSelectionHandled={() => setPendingComment(null)}
+                            userPublicKey={userIdentity?.publicKeyBase62}
+                            collaborators={workspaceCollaborators}
+                            onStartChatWith={(user) => setChatTargetUser(user)}
                         />
                     )}
                 </div>
@@ -1988,6 +2046,9 @@ function App() {
                     documentType={activeDocType}
                     isOpen={showChangelog}
                     onClose={() => setShowChangelog(false)}
+                    userPublicKey={userIdentity?.publicKeyBase62}
+                    collaborators={workspaceCollaborators}
+                    onStartChatWith={(user) => setChatTargetUser(user)}
                     onRollback={activeDocType === DOC_TYPES.TEXT ? (stateData) => {
                         // Rollback: apply the state snapshot (text documents only)
                         if (stateData instanceof Uint8Array) {
@@ -2008,7 +2069,7 @@ function App() {
                             console.log('Rollback to text not supported for ProseMirror');
                         }
                         setShowChangelog(false);
-                        setToast({ message: 'Document rolled back successfully', type: 'success' });
+                        showToast('Document rolled back successfully', 'success');
                     } : null}
                     currentUser={{ name: userHandle, color: userColor, icon: userIcon }}
                 />
@@ -2037,6 +2098,7 @@ function App() {
                     isOpen={showCreateDocumentDialog}
                     onClose={() => setShowCreateDocumentDialog(false)}
                     defaultType={createDocumentType}
+                    disabledTypes={disabledDocTypes}
                     onCreateDocument={(name, folderId, icon, color) => {
                         createDocument(name, folderId, DOC_TYPES.TEXT, icon, color);
                         setShowCreateDocumentDialog(false);
@@ -2108,6 +2170,7 @@ function App() {
                 />
             )}
         </div>
+        </FileTransferProvider>
         </PresenceProvider>
     );
 }

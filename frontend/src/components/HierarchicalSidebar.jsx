@@ -393,6 +393,7 @@ const HierarchicalSidebar = ({
     onCreateKanban,
     onCreateInventory,
     onCreateFileStorage,
+    disabledTypes = [],
     onDeleteDocument,
     onRenameDocument,
     onMoveDocument,
@@ -1010,6 +1011,7 @@ const HierarchicalSidebar = ({
                 onClose={() => setShowCreateDocument(false)}
                 parentFolderId={createInFolderId}
                 defaultType={createDocumentType}
+                disabledTypes={disabledTypes}
                 onSuccess={handleCreateDocumentSuccess}
                 onCreateDocument={onCreateDocument}
                 onCreateSheet={onCreateSheet}

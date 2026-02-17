@@ -133,13 +133,32 @@ The version is automatically read by:
     <FolderProvider>    // 3. Folders (needs workspace)
       <PermissionProvider>  // 4. Permissions
         <PresenceProvider>  // 5. Collaboration presence
-          <App />
+          <FileTransferProvider>  // 6. P2P chunk transfer (workspace-level)
+            <App />
+          </FileTransferProvider>
         </PresenceProvider>
       </PermissionProvider>
     </FolderProvider>
   </WorkspaceProvider>
 </IdentityProvider>
 ```
+
+## File Transfer Architecture
+
+P2P chunk transfer handlers (chunk-request, chunk-response, chunk-seed) and the
+seeding loop live in `FileTransferContext` — a **workspace-level** provider that
+stays mounted whenever a workspace is open.  This ensures:
+- Incoming chunk requests are always served, even when the user is on a different view
+- The seeding loop maintains chunk replication continuously
+- Bandwidth sampling produces uninterrupted history for the Mesh dashboard
+- `PeerManager` readiness is gated (event + poll fallback) to avoid race conditions
+
+The old hooks (`useFileTransfer`, `useChunkSeeding`) are now thin compatibility
+wrappers that delegate to `useFileTransferContext()`.
+
+`useFileDownload` passes chunk holder hints from `chunkAvailability` to
+`requestChunkFromPeer(fileId, chunkIndex, holders)` so downloads target peers
+that actually have the chunk.
 
 ## AI Assistant Commands
 

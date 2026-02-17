@@ -155,8 +155,7 @@ export function getMimeType(extension) {
  * @returns {string}
  */
 export function formatFileSize(bytes) {
-  if (bytes === 0) return '0 B';
-  if (bytes < 0) return '0 B';
+  if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / Math.pow(1024, i);
@@ -169,7 +168,9 @@ export function formatFileSize(bytes) {
  * @returns {string}
  */
 export function getRelativeTime(timestamp) {
+  if (!timestamp || !Number.isFinite(timestamp)) return 'just now';
   const diff = Date.now() - timestamp;
+  if (!Number.isFinite(diff) || diff < 0) return 'just now';
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);

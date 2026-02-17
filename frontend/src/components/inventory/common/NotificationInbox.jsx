@@ -22,6 +22,7 @@ const NOTIFICATION_ICONS = {
   request_delivered: '📬',
   request_in_progress: '🔨',
   blocked_request: '⚠️',
+  request_submitted: '📋',
 };
 
 export default function NotificationInbox() {

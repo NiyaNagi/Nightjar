@@ -113,6 +113,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // --- Diagnostics ---
     getDiagnosticData: () => ipcRenderer.invoke('get-diagnostic-data'),
 
+    // --- File System Operations ---
+    fileSystem: {
+        selectFolder: (options) => ipcRenderer.invoke('dialog:selectFolder', options),
+        saveDownload: (filePath, data) => ipcRenderer.invoke('file:saveDownload', { filePath, data }),
+        openFile: (filePath) => ipcRenderer.invoke('file:open', filePath),
+        showInFolder: (filePath) => ipcRenderer.invoke('file:showInFolder', filePath),
+    },
+
     // Function to remove all listeners, useful for component cleanup
     removeAllListeners: () => {
         ipcRenderer.removeAllListeners('connection-info');

@@ -1,0 +1,217 @@
+/* FileCard.css */
+
+/* ===== Grid View ===== */
+.file-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  min-width: 0;
+}
+
+.file-card:hover {
+  border-color: var(--accent-color, #89b4fa);
+  background: rgba(137, 180, 250, 0.04);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.file-card--selected {
+  border-color: var(--accent-color, #89b4fa);
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.file-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-card-checkbox {
+  accent-color: var(--accent-color, #89b4fa);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.file-card:hover .file-card-checkbox,
+.file-card--selected .file-card-checkbox {
+  opacity: 1;
+}
+
+.file-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #cdd6f4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-card-meta {
+  font-size: 11px;
+  color: var(--text-secondary, #a6adc8);
+}
+
+.file-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary, #6c7086);
+}
+
+.file-card-uploader {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.file-card-dot {
+  flex-shrink: 0;
+}
+
+.file-card-date {
+  white-space: nowrap;
+}
+
+.file-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+/* ===== Table View ===== */
+.file-table-row {
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.file-table-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.file-table-row--selected {
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.file-table-cell {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary, #cdd6f4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+
+.file-table-check {
+  width: 32px;
+  text-align: center;
+}
+
+.file-table-checkbox {
+  accent-color: var(--accent-color, #89b4fa);
+  cursor: pointer;
+}
+
+.file-table-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-table-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-table-size,
+.file-table-type,
+.file-table-date {
+  color: var(--text-secondary, #a6adc8);
+}
+
+.file-table-uploader {
+  color: var(--text-secondary, #a6adc8);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-table-fav {
+  width: 40px;
+  text-align: center;
+}
+
+/* ===== Compact View ===== */
+.file-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  border-radius: 4px;
+}
+
+.file-compact-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.file-compact-row--selected {
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.file-compact-checkbox {
+  accent-color: var(--accent-color, #89b4fa);
+  cursor: pointer;
+}
+
+.file-compact-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary, #cdd6f4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.file-compact-size {
+  font-size: 11px;
+  color: var(--text-secondary, #a6adc8);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.file-compact-date {
+  font-size: 11px;
+  color: var(--text-tertiary, #6c7086);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ===== Shared ===== */
+.file-fav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: transform 0.15s ease;
+  line-height: 1;
+}
+
+.file-fav-btn:hover {
+  transform: scale(1.2);
+}

@@ -798,7 +798,11 @@ async function sha256Async(data) {
  * Helper: Convert bytes to base64url string (URL-safe base64 without padding)
  */
 function bytesToBase64Url(bytes) {
-  const base64 = btoa(String.fromCharCode(...bytes));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const base64 = btoa(binary);
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -1050,7 +1054,10 @@ export function validateSignedInvite(link) {
     
     const params = {};
     fragment.split('&').forEach(part => {
-      const [key, value] = part.split(':');
+      const colonIdx = part.indexOf(':');
+      if (colonIdx === -1) return;
+      const key = part.slice(0, colonIdx);
+      const value = part.slice(colonIdx + 1);
       if (key && value) params[key] = value;
     });
     

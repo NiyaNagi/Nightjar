@@ -25,7 +25,7 @@ function HookConsumer({ yTypes, inventorySystemId }) {
       <span data-testid="catalogCount">{result.catalogItems.length}</span>
       <span data-testid="requestCount">{result.requests.length}</span>
       <span data-testid="auditCount">{result.auditLog.length}</span>
-      <span data-testid="capacityCount">{result.producerCapacities.length}</span>
+      <span data-testid="capacityCount">{Object.keys(result.producerCapacities).length}</span>
       <span data-testid="openRequestCount">{result.openRequestCount}</span>
       <span data-testid="pendingApprovalCount">{result.pendingApprovalCount}</span>
       <span data-testid="activeRequestCount">{result.activeRequestCount}</span>

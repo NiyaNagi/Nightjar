@@ -12,8 +12,11 @@ import StatusBadge from './StatusBadge';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { formatDate, generateId } from '../../../utils/inventoryValidation';
-import { getAddress } from '../../../utils/inventoryAddressStore';
+import { getAddress, getWorkspaceKeyMaterial } from '../../../utils/inventoryAddressStore';
 import { parseTrackingNumber, genericTrackingUrl } from '../../../utils/trackingLinks';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import ChatButton from '../../common/ChatButton';
+import AddressReveal from '../producer/AddressReveal';
 import './RequestDetail.css';
 
 const TIMELINE_STEPS = [
@@ -35,12 +38,20 @@ export default function RequestDetail({
   onReassign,
   onCancel,
   onMarkShipped,
+  onMarkInProgress,
 }) {
-  const { yInventoryRequests, yInventoryAuditLog, inventorySystemId } = useInventory();
+  const { yInventoryRequests, yInventoryAuditLog, inventorySystemId, currentWorkspace, workspaceId, addressReveals, onStartChatWith, userIdentity: ctxIdentity } = useInventory();
   const { showToast } = useToast();
   const [adminNotes, setAdminNotes] = useState(request.adminNotes || '');
   const [trackingNumber, setTrackingNumber] = useState(request.trackingNumber || '');
   const [fullAddress, setFullAddress] = useState(null);
+
+  // Re-sync local state when request prop changes (e.g., navigating between requests)
+  useEffect(() => {
+    setAdminNotes(request.adminNotes || '');
+    setTrackingNumber(request.trackingNumber || '');
+  }, [request.id, request.adminNotes, request.trackingNumber]);
+  const currentUserKey = ctxIdentity?.publicKeyBase62;
 
   // Admin: attempt to load the full address from local encrypted store
   useEffect(() => {
@@ -48,21 +59,22 @@ export default function RequestDetail({
     let cancelled = false;
     (async () => {
       try {
-        const addr = await getAddress(request.id, inventorySystemId);
+        const km = getWorkspaceKeyMaterial(currentWorkspace, workspaceId);
+        const addr = await getAddress(km, inventorySystemId, request.id);
         if (!cancelled && addr) setFullAddress(addr);
       } catch {
         // Address may not exist locally for this admin
       }
     })();
     return () => { cancelled = true; };
-  }, [isAdmin, request.id, inventorySystemId]);
+  }, [isAdmin, request.id, inventorySystemId, currentWorkspace, workspaceId]);
 
   const assignedName = request.assignedTo
-    ? collaborators.find(c => c.publicKeyBase62 === request.assignedTo)?.name || request.assignedTo?.slice(0, 8) + '…'
+    ? resolveUserName(collaborators, request.assignedTo)
     : null;
 
   const requestedByName = request.requestedBy
-    ? collaborators.find(c => c.publicKeyBase62 === request.requestedBy)?.name || request.requestedBy?.slice(0, 8) + '…'
+    ? resolveUserName(collaborators, request.requestedBy)
     : 'Unknown';
 
   const handleSaveNotes = useCallback(() => {
@@ -122,12 +134,30 @@ export default function RequestDetail({
         )}
         <div className="request-detail__field">
           <span className="request-detail__label">Requested by</span>
-          <span>{requestedByName}</span>
+          <span>
+            {requestedByName}
+            <ChatButton
+              publicKey={request.requestedBy}
+              name={requestedByName}
+              collaborators={collaborators}
+              onStartChatWith={onStartChatWith}
+              currentUserKey={currentUserKey}
+            />
+          </span>
         </div>
         {assignedName && (
           <div className="request-detail__field">
             <span className="request-detail__label">Assigned to</span>
-            <span>{assignedName}</span>
+            <span>
+              {assignedName}
+              <ChatButton
+                publicKey={request.assignedTo}
+                name={assignedName}
+                collaborators={collaborators}
+                onStartChatWith={onStartChatWith}
+                currentUserKey={currentUserKey}
+              />
+            </span>
           </div>
         )}
         {request.estimatedFulfillmentDate && (
@@ -202,19 +232,40 @@ export default function RequestDetail({
             <button className="btn-secondary" onClick={() => onReassign?.(request)}>→ Reassign</button>
           </>
         )}
-        {isProducer && request.status === 'approved' && (
-          <div className="request-detail__ship-form">
-            <label>
-              Tracking # (optional)
-              <input
-                type="text"
-                value={trackingNumber}
-                onChange={e => setTrackingNumber(e.target.value)}
-                placeholder="1Z999AA10123456784"
-              />
-            </label>
-            <button className="btn-primary" onClick={() => onMarkShipped?.(request, trackingNumber)}>📦 Mark as Shipped</button>
-          </div>
+        {isProducer && request.status === 'approved' && onMarkInProgress && (
+          <button className="btn-secondary" onClick={() => onMarkInProgress?.(request)}>🔨 Mark In Progress</button>
+        )}
+        {isProducer && (request.status === 'approved' || request.status === 'in_progress') && (
+          <>
+            {/* Inline AddressReveal with shipping providers — spec §4.4 */}
+            {addressReveals?.[request.id] ? (
+              <div className="request-detail__address-reveal-inline">
+                <AddressReveal
+                  requestId={request.id}
+                  reveal={addressReveals[request.id]}
+                  identity={ctxIdentity}
+                  onShipped={() => onMarkShipped?.(request, trackingNumber)}
+                  onClose={onClose}
+                />
+              </div>
+            ) : (
+              <div className="request-detail__ship-form">
+                <p className="request-detail__no-reveal">
+                  ⏳ Address reveal pending — the reveal hasn't synced yet.
+                </p>
+                <label>
+                  Tracking # (optional)
+                  <input
+                    type="text"
+                    value={trackingNumber}
+                    onChange={e => setTrackingNumber(e.target.value)}
+                    placeholder="1Z999AA10123456784"
+                  />
+                </label>
+                <button className="btn-primary" onClick={() => onMarkShipped?.(request, trackingNumber)}>📦 Mark as Shipped</button>
+              </div>
+            )}
+          </>
         )}
         {canCancel && (
           <button className="btn-secondary btn-danger" onClick={() => onCancel?.(request)}>Cancel Request</button>

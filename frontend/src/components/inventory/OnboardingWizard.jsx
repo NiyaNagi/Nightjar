@@ -21,7 +21,7 @@ const STEPS = [
 ];
 
 export default function OnboardingWizard({ onComplete }) {
-  const { yInventorySystems, yCatalogItems, yInventoryAuditLog, inventorySystemId } = useInventory();
+  const { yInventorySystems, yCatalogItems, yInventoryAuditLog, inventorySystemId, userIdentity } = useInventory();
   const { showToast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -61,7 +61,7 @@ export default function OnboardingWizard({ onComplete }) {
         settings: {
           ...(existing.settings || {}),
           requireApproval,
-          autoAssign,
+          autoAssignEnabled: autoAssign,
         },
         updatedAt: Date.now(),
       });
@@ -74,13 +74,13 @@ export default function OnboardingWizard({ onComplete }) {
       targetId: inventorySystemId,
       targetType: 'system',
       summary: `System configured: "${name}" (approval=${requireApproval}, autoAssign=${autoAssign})`,
-      actorId: '',
+      actorId: userIdentity?.publicKeyBase62 || 'unknown',
       actorRole: 'owner',
       timestamp: Date.now(),
     }]);
 
     setStep(2);
-  }, [systemName, requireApproval, autoAssign, yInventorySystems, yInventoryAuditLog, inventorySystemId, showToast]);
+  }, [systemName, requireApproval, autoAssign, yInventorySystems, yInventoryAuditLog, inventorySystemId, showToast, userIdentity, systemIcon]);
 
   const handleAddFirstItem = useCallback(() => {
     const validation = validateCatalogItem(firstItem);
@@ -112,14 +112,14 @@ export default function OnboardingWizard({ onComplete }) {
       targetId: item.id,
       targetType: 'catalog_item',
       summary: `Catalog item added: "${item.name}"`,
-      actorId: '',
+      actorId: userIdentity?.publicKeyBase62 || 'unknown',
       actorRole: 'owner',
       timestamp: Date.now(),
     }]);
 
     showToast(`Added "${item.name}" to catalog`, 'success');
     setStep(3);
-  }, [firstItem, noMax, yCatalogItems, yInventoryAuditLog, inventorySystemId, showToast]);
+  }, [firstItem, noMax, yCatalogItems, yInventoryAuditLog, inventorySystemId, showToast, userIdentity]);
 
   const handleSkipItem = () => setStep(3);
 

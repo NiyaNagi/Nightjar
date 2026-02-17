@@ -20,18 +20,16 @@ export function timingSafeEqual(a, b) {
     return false;
   }
   
-  if (a.length !== b.length) {
-    // Still do comparison to maintain constant time
-    // Use a dummy array of same length as `a`
-    b = new Uint8Array(a.length);
-  }
+  const lengthsMatch = a.length === b.length;
+  // Compare against b or a zero-filled dummy to maintain constant time
+  const compareTo = lengthsMatch ? b : new Uint8Array(a.length);
   
   let result = 0;
   for (let i = 0; i < a.length; i++) {
-    result |= a[i] ^ b[i];
+    result |= a[i] ^ compareTo[i];
   }
   
-  return result === 0 && a.length === b.length;
+  return result === 0 && lengthsMatch;
 }
 
 /**

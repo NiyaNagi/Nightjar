@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -1382,6 +1382,65 @@ ipcMain.handle('inventory:delete-saved-address', async (event, addressId) => {
     } catch (err) {
         console.error('[Inventory] Delete saved address error:', err);
         return false;
+    }
+});
+
+// --- File System IPC Handlers ---
+
+// Select a folder via native OS dialog
+ipcMain.handle('dialog:selectFolder', async (_event, options = {}) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: options.title || 'Select Download Location',
+        properties: ['openDirectory', 'createDirectory'],
+        defaultPath: options.defaultPath || app.getPath('downloads'),
+    });
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return null;
+    }
+    return result.filePaths[0];
+});
+
+// Save a downloaded file to disk
+ipcMain.handle('file:saveDownload', async (_event, { filePath, data }) => {
+    try {
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        // data comes as a base64 string or an array — convert to Buffer
+        const buffer = Buffer.isBuffer(data)
+            ? data
+            : typeof data === 'string'
+                ? Buffer.from(data, 'base64')
+                : Buffer.from(data);
+        fs.writeFileSync(filePath, buffer);
+        return { success: true, filePath };
+    } catch (err) {
+        console.error('[Main] file:saveDownload error:', err);
+        return { success: false, error: err.message };
+    }
+});
+
+// Open a file with the system default application
+ipcMain.handle('file:open', async (_event, filePath) => {
+    try {
+        const result = await shell.openPath(filePath);
+        if (result) {
+            return { success: false, error: result };
+        }
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+});
+
+// Show a file in the OS file explorer
+ipcMain.handle('file:showInFolder', async (_event, filePath) => {
+    try {
+        shell.showItemInFolder(filePath);
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.message };
     }
 });
 

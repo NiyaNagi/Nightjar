@@ -11,6 +11,8 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { formatRelativeDate } from '../../../utils/inventoryValidation';
 import { exportAuditLog } from '../../../utils/inventoryExport';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import ChatButton from '../../common/ChatButton';
 import './AuditLog.css';
 
 const PAGE_SIZE = 50;
@@ -34,6 +36,12 @@ const ACTION_LABELS = {
   catalog_item_deactivated: 'Item Deactivated',
   settings_changed: 'Settings Changed',
   data_imported: 'Data Imported',
+  request_submitted: 'Request Submitted',
+  request_edited: 'Request Edited',
+  request_reassigned: 'Request Reassigned',
+  producer_names_mapped: 'Producer Names Mapped',
+  bulk_claim_imported: 'Bulk Claim Imported',
+  system_configured: 'System Configured',
 };
 
 const ACTION_ICONS = {
@@ -55,6 +63,12 @@ const ACTION_ICONS = {
   catalog_item_deactivated: '🔴',
   settings_changed: '⚙️',
   data_imported: '📥',
+  request_submitted: '📋',
+  request_edited: '✏️',
+  request_reassigned: '🔀',
+  producer_names_mapped: '🔗',
+  bulk_claim_imported: '📎',
+  system_configured: '🛠️',
 };
 
 export default function AuditLog() {
@@ -101,8 +115,7 @@ export default function AuditLog() {
   const getActorName = useCallback((entry) => {
     if (entry.actorName) return entry.actorName;
     if (!entry.actorId) return 'System';
-    const collab = ctx.collaborators?.find(c => c.publicKey === entry.actorId);
-    return collab?.displayName || entry.actorId.slice(0, 8);
+    return resolveUserName(ctx.collaborators, entry.actorId);
   }, [ctx.collaborators]);
 
   // Unique actions for filter
@@ -172,7 +185,16 @@ export default function AuditLog() {
               <div className="al-entry-content">
                 <div className="al-entry-summary">{entry.summary}</div>
                 <div className="al-entry-meta">
-                  <span className="al-entry-actor">{getActorName(entry)}</span>
+                  <span className="al-entry-actor">
+                    {getActorName(entry)}
+                    <ChatButton
+                      publicKey={entry.actorId}
+                      name={getActorName(entry)}
+                      collaborators={ctx.collaborators}
+                      onStartChatWith={ctx.onStartChatWith}
+                      currentUserKey={ctx.userIdentity?.publicKeyBase62}
+                    />
+                  </span>
                   <span className="al-entry-action">{ACTION_LABELS[entry.action] || entry.action}</span>
                   {entry.targetType && (
                     <span className="al-entry-target">{entry.targetType}</span>

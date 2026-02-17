@@ -15,6 +15,7 @@ import { getSavedAddresses, storeSavedAddress } from '../../../utils/inventorySa
 import { storeAddress, getWorkspaceKeyMaterial } from '../../../utils/inventoryAddressStore';
 import { encryptAddressForAdmins, getPublicKeyHex } from '../../../utils/addressCrypto';
 import { assignRequests } from '../../../utils/inventoryAssignment';
+import { pushNotification } from '../../../utils/inventoryNotifications';
 import './SubmitRequest.css';
 
 const EMPTY_ADDRESS = {
@@ -30,7 +31,7 @@ const EMPTY_ADDRESS = {
 
 export default function SubmitRequest({ currentWorkspace, isOwner }) {
   const ctx = useInventory();
-  const { yInventoryRequests, yInventoryAuditLog, yPendingAddresses,
+  const { yInventoryRequests, yInventoryAuditLog, yPendingAddresses, yInventoryNotifications,
     inventorySystemId, workspaceId, userIdentity, collaborators,
     catalogItems, currentSystem, producerCapacities, requests: existingRequests } = ctx;
   const { showToast } = useToast();
@@ -203,12 +204,24 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
 
         // Address encryption per request
         if (isOwner) {
+          // Store locally for fast retrieval on this device
           if (km) {
             await storeAddress(km, inventorySystemId, requestId, address);
           }
+          // Also encrypt to yPendingAddresses so admins on other devices can decrypt
+          const admins = (collaborators || []).filter(
+            c => c.permission === 'owner'
+          );
+          if (admins.length > 0 && userIdentity?.privateKey) {
+            const senderPubHex = getPublicKeyHex(userIdentity);
+            const entries = await encryptAddressForAdmins(
+              address, admins, userIdentity.privateKey, senderPubHex
+            );
+            yPendingAddresses.set(requestId, entries);
+          }
         } else {
           const admins = (collaborators || []).filter(
-            c => c.permission === 'owner' || c.permission === 'admin'
+            c => c.permission === 'owner'
           );
           if (admins.length > 0 && userIdentity?.privateKey) {
             const senderPubHex = getPublicKeyHex(userIdentity);
@@ -279,7 +292,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
                 yInventoryRequests.delete(idx, 1);
                 yInventoryRequests.insert(idx, [{
                   ...arr[idx],
-                  status: 'claimed',
+                  status: settings.requireApproval ? 'pending_approval' : 'claimed',
                   assignedTo: myAssignment.producerId,
                   assignedAt: now,
                   estimatedFulfillmentDate: myAssignment.estimatedDate,
@@ -294,6 +307,24 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
 
       const count = itemsToSubmit.length;
       showToast(`${count} request${count > 1 ? 's' : ''} submitted!`, 'success');
+
+      // Notify admins (owners only) about new request(s)
+      if (yInventoryNotifications) {
+        const admins = (collaborators || []).filter(c => c.permission === 'owner');
+        const myKey = userIdentity?.publicKeyBase62;
+        for (const admin of admins) {
+          const adminKey = admin.publicKeyBase62 || admin.publicKey;
+          if (adminKey && adminKey !== myKey) {
+            pushNotification(yInventoryNotifications, {
+              inventorySystemId,
+              recipientId: adminKey,
+              type: 'request_submitted',
+              message: `New request${count > 1 ? 's' : ''} submitted: ${itemsToSubmit.map(i => i.itemName).join(', ')}`,
+              relatedId: requestIds[0],
+            });
+          }
+        }
+      }
 
       // Reset form
       setCart([]);
@@ -311,7 +342,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
     }
   }, [selectedItem, qtyNum, qtyValidation, urgent, notes, showNewAddress, newAddress,
     saveNewAddress, newAddressLabel, submitting, currentWorkspace, workspaceId,
-    inventorySystemId, userIdentity, yInventoryRequests, yInventoryAuditLog, showToast, cart,
+    inventorySystemId, userIdentity, yInventoryRequests, yInventoryAuditLog, yInventoryNotifications, showToast, cart,
     currentSystem, ctx, collaborators, isOwner, yPendingAddresses]);
 
   return (

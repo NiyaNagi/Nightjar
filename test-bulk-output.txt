@@ -1,0 +1,1085 @@
+﻿node.exe : (node:17100) [DEP0040] DeprecationWarning: The `punycode` module is 
+deprecated. Please use a userland alternative instead.
+At C:\Program Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:17100) [D...native instead. 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-deprecation ...` to show where the warning was created)
+FAIL tests/components/files/bulk-actions.test.jsx
+  ConfirmDialog
+    ΓêÜ should not render when closed (14 ms)
+    ΓêÜ should render when open (10 ms)
+    ΓêÜ should call onConfirm when confirm button clicked (6 ms)
+    ΓêÜ should call onCancel when cancel button clicked (2 ms)
+    ΓêÜ should call onCancel on Escape key (3 ms)
+    ΓêÜ should call onCancel when overlay clicked (2 ms)
+    ΓêÜ should show custom labels (2 ms)
+  BulkActionBar
+    ΓêÜ should not render when no items selected (1 ms)
+    ΓêÜ should render with count when items selected (3 ms)
+    ΓêÜ should show singular when 1 item selected (2 ms)
+    ΓêÜ should show download button when files are selected (2 ms)
+    ΓêÜ should hide download button when only folders are selected (1 ms)
+    ΓêÜ should call onDelete when delete clicked (4 ms)
+    ΓêÜ should call onMove when move clicked (2 ms)
+    ΓêÜ should call onEditTags when tags clicked (1 ms)
+    ΓêÜ should call onClear when deselect clicked (2 ms)
+    ΓêÜ should show favorite button when files selected (1 ms)
+  BulkTagDialog
+    ΓêÜ should not render when closed (1 ms)
+    ├ù should render when open (10 ms)
+    ΓêÜ should add tags on Enter key (6 ms)
+    ΓêÜ should add tags on + button click (5 ms)
+    ΓêÜ should remove tags on Γ£ò click (6 ms)
+    ΓêÜ should prevent duplicate tags (5 ms)
+    ΓêÜ should have add and replace modes (4 ms)
+    ΓêÜ should show warning in replace mode (3 ms)
+    ΓêÜ should call onApply in add mode (union) (6 ms)
+    ΓêÜ should call onApply in replace mode (overwrite) (4 ms)
+    ΓêÜ should disable apply when no tags entered (2 ms)
+    ΓêÜ should call onClose when cancel clicked (2 ms)
+  FileContextMenu ΓÇö bulk-aware
+    ΓêÜ should show single-item menu by default (3 ms)
+    ΓêÜ should hide rename and properties in bulk mode (2 ms)
+    ΓêÜ should show counts in bulk labels (1 ms)
+    ΓêÜ should show favorite option in bulk mode (2 ms)
+    ΓêÜ should call onAction for download in bulk mode (1 ms)
+  FileMoveDialog ΓÇö bulk mode
+    ΓêÜ should render with single item (legacy) (3 ms)
+    ΓêÜ should render with bulk items (1 ms)
+    ΓêÜ should call onMove for each item on submit (3 ms)
+  FileCard selection
+    ΓêÜ should pass { ctrl: true } on checkbox click (19 ms)
+    ΓêÜ should pass { ctrl: true } on ctrl-click (3 ms)
+    ΓêÜ should pass { shift: true } on shift-click (3 ms)
+    ΓêÜ should pass { ctrl: false, shift: false } on plain click (2 ms)
+  FolderCard selection
+    ΓêÜ should pass { ctrl: true } on checkbox click (5 ms)
+    ΓêÜ should pass { ctrl: true } on ctrl-click (1 ms)
+    ΓêÜ should pass { shift: true } on shift-click (2 ms)
+    ΓêÜ should navigate on plain click (no onSelect) (1 ms)
+  BrowseView ΓÇö bulk selection & actions
+    ΓêÜ should render select-all checkbox (9 ms)
+    ΓêÜ should select all items via select-all checkbox (10 ms)
+    ΓêÜ should deselect all when all selected and select-all clicked again (11 
+ms)
+    ├ù should show bulk action bar when items are selected via checkbox (25 ms)
+    ΓêÜ should ctrl-click to toggle multiple file selections (13 ms)
+    ├ù should shift-click to select a range (12 ms)
+    ΓêÜ should deselect all on Escape key (13 ms)
+    ΓêÜ should select all on Ctrl+A (8 ms)
+    ΓêÜ should trigger bulk download on Ctrl+D (6 ms)
+    ΓêÜ should show confirm dialog on Delete key (10 ms)
+    ΓêÜ should execute bulk delete on confirm (11 ms)
+    ΓêÜ should cancel bulk delete on confirm dialog cancel (16 ms)
+    ΓêÜ should open bulk tag dialog from action bar (10 ms)
+    ΓêÜ should trigger bulk move from action bar (12 ms)
+    ΓêÜ should show single-item move dialog when one item selected (13 ms)
+    ΓêÜ should clear selection on deselect button (9 ms)
+    ΓêÜ should call onToggleFavorite for selected files on favorite click (7 
+ms)
+  BrowseView ΓÇö bulk context menu
+    ΓêÜ should show bulk context menu when right-clicking a selected item with 
+multiple selected (8 ms)
+    ├ù should show single context menu when right-clicking an unselected item 
+(9 ms)
+  BrowseView ΓÇö end-to-end scenarios
+    ΓêÜ scenario: select-all ΓåÆ delete all ΓåÆ confirm ΓåÆ files removed (11 
+ms)
+    ├ù scenario: shift-select range ΓåÆ bulk download (10 ms)
+    ΓêÜ scenario: ctrl-select ΓåÆ right-click ΓåÆ bulk move (10 ms)
+    ΓêÜ scenario: select files ΓåÆ bulk tag ΓåÆ add mode ΓåÆ apply (11 ms)
+    ΓêÜ scenario: select mixed files + folders ΓåÆ bulk delete respects types 
+(7 ms)
+
+  ΓùÅ BulkTagDialog ΓÇ║ should render when open
+
+    TestingLibraryElementError: Found multiple elements with the text: /2 
+files/
+
+    Here are the matching elements:
+
+    Ignored nodes: comments, script, style
+    [36m<h3[39m
+      [33mclass[39m=[32m"bulk-tag-title"[39m
+    [36m>[39m
+      [0mEdit Tags ΓÇö [0m
+      [0m2[0m
+      [0m file[0m
+      [0ms[0m
+    [36m</h3>[39m
+
+    Ignored nodes: comments, script, style
+    [36m<button[39m
+      [33mclass[39m=[32m"bulk-tag-apply"[39m
+      [33mdata-testid[39m=[32m"bulk-tag-apply"[39m
+      [33mdisabled[39m=[32m""[39m
+    [36m>[39m
+      [0mApply to [0m
+      [0m2[0m
+      [0m file[0m
+      [0ms[0m
+    [36m</button>[39m
+
+    (If this is intentional, then use the `*AllBy*` variant of the query (like 
+`queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+    Ignored nodes: comments, script, style
+    [36m<body>[39m
+      [36m<div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"bulk-tag-overlay"[39m
+          [33mdata-testid[39m=[32m"bulk-tag-overlay"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"bulk-tag-dialog"[39m
+            [33mdata-testid[39m=[32m"bulk-tag-dialog"[39m
+          [36m>[39m
+            [36m<h3[39m
+              [33mclass[39m=[32m"bulk-tag-title"[39m
+            [36m>[39m
+              [0mEdit Tags ΓÇö [0m
+              [0m2[0m
+              [0m file[0m
+              [0ms[0m
+            [36m</h3>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"bulk-tag-mode"[39m
+            [36m>[39m
+              [36m<label[39m
+                [33mclass[39m=[32m"bulk-tag-mode-option"[39m
+              [36m>[39m
+                [36m<input[39m
+                  [33mchecked[39m=[32m""[39m
+                  [33mdata-testid[39m=[32m"bulk-tag-mode-add"[39m
+                  [33mname[39m=[32m"tagMode"[39m
+                  [33mtype[39m=[32m"radio"[39m
+                  [33mvalue[39m=[32m"add"[39m
+                [36m/>[39m
+                [36m<span>[39m
+                  [0mAdd to existing tags[0m
+                [36m</span>[39m
+              [36m</label>[39m
+              [36m<label[39m
+                [33mclass[39m=[32m"bulk-tag-mode-option"[39m
+              [36m>[39m
+                [36m<input[39m
+                  [33mdata-testid[39m=[32m"bulk-tag-mode-replace"[39m
+                  [33mname[39m=[32m"tagMode"[39m
+                  [33mtype[39m=[32m"radio"[39m
+                  [33mvalue[39m=[32m"replace"[39m
+                [36m/>[39m
+                [36m<span>[39m
+                  [0mReplace all tags[0m
+                [36m</span>[39m
+              [36m</label>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"bulk-tag-input-row"[39m
+            [36m>[39m
+              [36m<input[39m
+                [33mclass[39m=[32m"bulk-tag-input"[39m
+                [33mdata-testid[39m=[32m"bulk-tag-input"[39m
+                [33mplaceholder[39m=[32m"Type a tag and press Enter"[39m
+                [33mtype[39m=[32m"text"[39m
+                [33mvalue[39m=[32m""[39m
+              [36m/>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-tag-add-btn"[39m
+                [33mdata-testid[39m=[32m"bulk-tag-add-btn"[39m
+                [33mdisabled[39m=[32m""[39m
+              [36m>[39m
+                [0m+[0m
+              [36m</button>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"bulk-tag-actions"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-tag-cancel"[39m
+                [33mdata-testid[39m=[32m"bulk-tag-cancel"[39m
+              [36m>[39m
+                [0mCancel[0m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-tag-apply"[39m
+                [33mdata-testid[39m=[32m"bulk-tag-apply"[39m
+                [33mdisabled[39m=[32m""[39m
+              [36m>[39m
+                [0mApply to [0m
+                [0m2[0m
+                [0m file[0m
+                [0ms[0m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</body>[39m
+
+    [0m [90m 220 |[39m     render([33m<[39m[33mBulkTagDialog[39m 
+isOpen[33m=[39m{[36mtrue[39m} selectedFiles[33m=[39m{selectedFiles} 
+onApply[33m=[39m{jest[33m.[39mfn()} 
+onClose[33m=[39m{jest[33m.[39mfn()} [33m/[39m[33m>[39m)[33m;[39m
+     [90m 221 |[39m     expect(screen[33m.[39mgetByTestId([32m'bulk-tag-di
+alog'[39m))[33m.[39mtoBeInTheDocument()[33m;[39m
+    [31m[1m>[22m[39m[90m 222 |[39m     
+expect(screen[33m.[39mgetByText([35m/2 
+files/[39m))[33m.[39mtoBeInTheDocument()[33m;[39m
+     [90m     |[39m                   [31m[1m^[22m[39m
+     [90m 223 |[39m   })[33m;[39m
+     [90m 224 |[39m
+     [90m 225 |[39m   it([32m'should add tags on Enter key'[39m[33m,[39m 
+() [33m=>[39m {[0m
+
+      at Object.getElementError 
+(node_modules/@testing-library/dom/dist/config.js:37:19)
+      at getElementError 
+(node_modules/@testing-library/dom/dist/query-helpers.js:20:35)
+      at getMultipleElementsFoundError 
+(node_modules/@testing-library/dom/dist/query-helpers.js:23:10)
+      at node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+      at node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+      at Object.getByText (tests/components/files/bulk-actions.test.jsx:222:19)
+
+  ΓùÅ BrowseView ΓÇö bulk selection & actions ΓÇ║ should show bulk action bar 
+when items are selected via checkbox
+
+    TestingLibraryElementError: Unable to find an element by: 
+[data-testid="bulk-action-bar"]
+
+    Ignored nodes: comments, script, style
+    [36m<body>[39m
+      [36m<div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"browse-view"[39m
+          [33mdata-testid[39m=[32m"browse-view"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"browse-toolbar"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"browse-toolbar-left"[39m
+            [36m>[39m
+              [36m<input[39m
+                [33maria-label[39m=[32m"Select all items"[39m
+                [33mclass[39m=[32m"browse-select-all"[39m
+                [33mdata-testid[39m=[32m"browse-select-all"[39m
+                [33mtitle[39m=[32m"Select all"[39m
+                [33mtype[39m=[32m"checkbox"[39m
+              [36m/>[39m
+              [36m<nav[39m
+                [33mclass[39m=[32m"fs-breadcrumbs"[39m
+                [33mdata-testid[39m=[32m"fs-breadcrumbs"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33mclass[39m=[32m"fs-breadcrumb-item 
+fs-breadcrumb-current"[39m
+                  [33mdata-testid[39m=[32m"fs-breadcrumb-root"[39m
+                  [33mdisabled[39m=[32m""[39m
+                [36m>[39m
+                  [0m≡ƒôü Root[0m
+                [36m</button>[39m
+              [36m</nav>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"browse-toolbar-right"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fs-search-bar"[39m
+                [33mdata-testid[39m=[32m"fs-search-bar"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fs-search-input-wrap"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"fs-search-icon"[39m
+                  [36m>[39m
+                    [0m≡ƒöì[0m
+                  [36m</span>[39m
+                  [36m<input[39m
+                    [33mclass[39m=[32m"fs-search-input"[39m
+                    [33mdata-testid[39m=[32m"fs-search-input"[39m
+                    [33mplaceholder[39m=[32m"Search files..."[39m
+                    [33mtype[39m=[32m"text"[39m
+                    [33mvalue[39m=[32m""[39m
+                  [36m/>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33maria-label[39m=[32m"View mode"[39m
+                [33mclass[39m=[32m"view-mode-toggle"[39m
+                [33mdata-testid[39m=[32m"view-mode-toggle"[39m
+                [33mrole[39m=[32m"group"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33maria-pressed[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"view-mode-btn 
+view-mode-btn--active"[39m
+                  [33mdata-testid[39m=[32m"view-mode-grid"[39m
+                  [33mtitle[39m=[32m"Grid"[39m
+                [36m>[39m
+                  [0mΓûª[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-pressed[39m=[32m"false"[39m
+                  [33mclass[39m=[32m"view-mode-btn "[39m
+                  [33mdata-testid[39m=[32m"view-mode-table"[39m
+                  [33mtitle[39m=[32m"Table"[39m
+                [36m>[39m
+                  [0mΓÿ░[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-pressed[39m=[32m"false"[39m
+                  [33mclass[39m=[32m"view-mode-btn "[39m
+                  [33mdata-testid[39m=[32m"view-mode-compact"[39m
+                  [33mtitle[39m=[32m"Compact"[39m
+                [36m>[39m
+                  [0mΓëí[0m
+                [36m</button>[39m
+              [36m</div>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"browse-btn"[39m
+                [33mdata-testid[39m=[32m"btn-new-folder"[39m
+                [33mtitle[39m=[32m"New Folder"[39m
+              [36m>[39m
+                [0m≡ƒôü+[0m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"upload-trigger-btn "[39m
+              [36m>[39m
+                [0m≡ƒôñ Upload[0m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fs-search-filters"[39m
+            [33mdata-testid[39m=[32m"fs-search-filters"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"fs-filter-toggle "[39m
+              [33mdata-testid[39m=[32m"fs-filter-toggle"[39m
+            [36m>[39m
+              [0m≡ƒö╜ Filter[0m
+            [36m</button>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fs-filter-chips"[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"upload-zone   browse-content"[39m
+            [33mdata-testid[39m=[32m"upload-zone"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"browse-items browse-items--grid"[39m
+              [33mdata-testid[39m=[32m"browse-items"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"file-card "[39m
+                [33mdata-testid[39m=[32m"fs-file-f1"[39m
+                [33mdraggable[39m=[32m"true"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-header"[39m
+                [36m>[39m
+                  [36m<input[39m
+                    [33mclass[39m=[32m"file-card-checkbox"[39m
+                    [33mtype[39m=[32m"checkbox"[39m
+                  [36m/>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-type-icon "[39m
+                    [33mdata-testid[39m=[32m"file-type-icon-document"[39m
+                    [33mstyle[39m=[32m"display: inline-flex; align-items: 
+center; justify-content: center; width: 40px; height: 40px; border-radius: 
+6px; background-color: rgba(232, 240, 254, 0.133); color: rgb(66, 133, 244); 
+font-size: 24px; flex-shrink: 0;"[39m
+                  [36m>[39m
+                    [0m≡ƒôä[0m
+                  [36m</span>[39m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-name"[39m
+                  [33mtitle[39m=[32m"alpha.pdf"[39m
+                [36m>[39m
+                  [0malpha.pdf[0m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-meta"[39m
+                [36m>[39m
+                  [0m1.0 KB[0m
+                  [0m ┬╖ [0m
+                  [0mPDF[0m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-footer"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-uploader"[39m
+                  [36m>[39m
+                    [0mAlice[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-dot"[39m
+                  [36m>[39m
+                    [0m┬╖[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-date"[39m
+                  [36m>[39m
+                    [0mjust now[0m
+                  [36m</span>[39m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file...
+
+    [0m [90m 551 |[39m     [90m// First checkbox is select-all, next ones 
+are file checkboxes[39m
+     [90m 552 |[39m     
+fireEvent[33m.[39mclick(checkboxes[[35m1[39m])[33m;[39m [90m// first 
+file[39m
+    [31m[1m>[22m[39m[90m 553 |[39m     expect(screen[33m.[39mgetByTestI
+d([32m'bulk-action-bar'[39m))[33m.[39mtoBeInTheDocument()[33m;[39m
+     [90m     |[39m                   [31m[1m^[22m[39m
+     [90m 554 |[39m     expect(screen[33m.[39mgetByTestId([32m'bulk-action
+-count'[39m))[33m.[39mtoHaveTextContent([32m'1 item 
+selected'[39m)[33m;[39m
+     [90m 555 |[39m   })[33m;[39m
+     [90m 556 |[39m[0m
+
+      at Object.getElementError 
+(node_modules/@testing-library/dom/dist/config.js:37:19)
+      at node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+      at node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+      at node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+      at Object.getByTestId 
+(tests/components/files/bulk-actions.test.jsx:553:19)
+
+  ΓùÅ BrowseView ΓÇö bulk selection & actions ΓÇ║ should shift-click to select 
+a range
+
+    expect(element).toHaveTextContent()
+
+    Expected element to have text content:
+      3 items selected
+    Received:
+      2 items selected
+
+    [0m [90m 574 |[39m     [90m// Shift-click third file ΓåÆ should select 
+f1, f2, f3[39m
+     [90m 575 |[39m     fireEvent[33m.[39mclick(screen[33m.[39mgetByTestI
+d([32m'fs-file-f3'[39m)[33m,[39m { shiftKey[33m:[39m [36mtrue[39m 
+})[33m;[39m
+    [31m[1m>[22m[39m[90m 576 |[39m     expect(screen[33m.[39mgetByTestI
+d([32m'bulk-action-count'[39m))[33m.[39mtoHaveTextContent([32m'3 items 
+selected'[39m)[33m;[39m
+     [90m     |[39m                                                     
+[31m[1m^[22m[39m
+     [90m 577 |[39m   })[33m;[39m
+     [90m 578 |[39m
+     [90m 579 |[39m   it([32m'should deselect all on Escape 
+key'[39m[33m,[39m () [33m=>[39m {[0m
+
+      at Object.toHaveTextContent 
+(tests/components/files/bulk-actions.test.jsx:576:53)
+
+  ΓùÅ BrowseView ΓÇö bulk context menu ΓÇ║ should show single context menu 
+when right-clicking an unselected item
+
+    TestingLibraryElementError: Found multiple elements with the text: Delete
+
+    Here are the matching elements:
+
+    Ignored nodes: comments, script, style
+    [36m<span[39m
+      [33mclass[39m=[32m"bulk-action-btn-label"[39m
+    [36m>[39m
+      [0mDelete[0m
+    [36m</span>[39m
+
+    Ignored nodes: comments, script, style
+    [36m<button[39m
+      [33mclass[39m=[32m"file-context-item file-context-item--danger"[39m
+      [33mdata-testid[39m=[32m"ctx-delete"[39m
+      [33mrole[39m=[32m"menuitem"[39m
+    [36m>[39m
+      [36m<span[39m
+        [33mclass[39m=[32m"file-context-icon"[39m
+      [36m>[39m
+        [0m≡ƒùæ∩╕Å[0m
+      [36m</span>[39m
+      [0mDelete[0m
+    [36m</button>[39m
+
+    (If this is intentional, then use the `*AllBy*` variant of the query (like 
+`queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+    Ignored nodes: comments, script, style
+    [36m<body>[39m
+      [36m<div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"browse-view"[39m
+          [33mdata-testid[39m=[32m"browse-view"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"browse-toolbar"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"browse-toolbar-left"[39m
+            [36m>[39m
+              [36m<input[39m
+                [33maria-label[39m=[32m"Select all items"[39m
+                [33mclass[39m=[32m"browse-select-all"[39m
+                [33mdata-testid[39m=[32m"browse-select-all"[39m
+                [33mtitle[39m=[32m"Select all"[39m
+                [33mtype[39m=[32m"checkbox"[39m
+              [36m/>[39m
+              [36m<nav[39m
+                [33mclass[39m=[32m"fs-breadcrumbs"[39m
+                [33mdata-testid[39m=[32m"fs-breadcrumbs"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33mclass[39m=[32m"fs-breadcrumb-item 
+fs-breadcrumb-current"[39m
+                  [33mdata-testid[39m=[32m"fs-breadcrumb-root"[39m
+                  [33mdisabled[39m=[32m""[39m
+                [36m>[39m
+                  [0m≡ƒôü Root[0m
+                [36m</button>[39m
+              [36m</nav>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"browse-toolbar-right"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"fs-search-bar"[39m
+                [33mdata-testid[39m=[32m"fs-search-bar"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"fs-search-input-wrap"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"fs-search-icon"[39m
+                  [36m>[39m
+                    [0m≡ƒöì[0m
+                  [36m</span>[39m
+                  [36m<input[39m
+                    [33mclass[39m=[32m"fs-search-input"[39m
+                    [33mdata-testid[39m=[32m"fs-search-input"[39m
+                    [33mplaceholder[39m=[32m"Search files..."[39m
+                    [33mtype[39m=[32m"text"[39m
+                    [33mvalue[39m=[32m""[39m
+                  [36m/>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33maria-label[39m=[32m"View mode"[39m
+                [33mclass[39m=[32m"view-mode-toggle"[39m
+                [33mdata-testid[39m=[32m"view-mode-toggle"[39m
+                [33mrole[39m=[32m"group"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33maria-pressed[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"view-mode-btn 
+view-mode-btn--active"[39m
+                  [33mdata-testid[39m=[32m"view-mode-grid"[39m
+                  [33mtitle[39m=[32m"Grid"[39m
+                [36m>[39m
+                  [0mΓûª[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-pressed[39m=[32m"false"[39m
+                  [33mclass[39m=[32m"view-mode-btn "[39m
+                  [33mdata-testid[39m=[32m"view-mode-table"[39m
+                  [33mtitle[39m=[32m"Table"[39m
+                [36m>[39m
+                  [0mΓÿ░[0m
+                [36m</button>[39m
+                [36m<button[39m
+                  [33maria-pressed[39m=[32m"false"[39m
+                  [33mclass[39m=[32m"view-mode-btn "[39m
+                  [33mdata-testid[39m=[32m"view-mode-compact"[39m
+                  [33mtitle[39m=[32m"Compact"[39m
+                [36m>[39m
+                  [0mΓëí[0m
+                [36m</button>[39m
+              [36m</div>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"browse-btn"[39m
+                [33mdata-testid[39m=[32m"btn-new-folder"[39m
+                [33mtitle[39m=[32m"New Folder"[39m
+              [36m>[39m
+                [0m≡ƒôü+[0m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"upload-trigger-btn "[39m
+              [36m>[39m
+                [0m≡ƒôñ Upload[0m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"fs-search-filters"[39m
+            [33mdata-testid[39m=[32m"fs-search-filters"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"fs-filter-toggle "[39m
+              [33mdata-testid[39m=[32m"fs-filter-toggle"[39m
+            [36m>[39m
+              [0m≡ƒö╜ Filter[0m
+            [36m</button>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"fs-filter-chips"[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"upload-zone   browse-content"[39m
+            [33mdata-testid[39m=[32m"upload-zone"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"browse-items browse-items--grid"[39m
+              [33mdata-testid[39m=[32m"browse-items"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"file-card "[39m
+                [33mdata-testid[39m=[32m"fs-file-f1"[39m
+                [33mdraggable[39m=[32m"true"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-header"[39m
+                [36m>[39m
+                  [36m<input[39m
+                    [33mclass[39m=[32m"file-card-checkbox"[39m
+                    [33mtype[39m=[32m"checkbox"[39m
+                  [36m/>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-type-icon "[39m
+                    [33mdata-testid[39m=[32m"file-type-icon-document"[39m
+                    [33mstyle[39m=[32m"display: inline-flex; align-items: 
+center; justify-content: center; width: 40px; height: 40px; border-radius: 
+6px; background-color: rgba(232, 240, 254, 0.133); color: rgb(66, 133, 244); 
+font-size: 24px; flex-shrink: 0;"[39m
+                  [36m>[39m
+                    [0m≡ƒôä[0m
+                  [36m</span>[39m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-name"[39m
+                  [33mtitle[39m=[32m"alpha.pdf"[39m
+                [36m>[39m
+                  [0malpha.pdf[0m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-meta"[39m
+                [36m>[39m
+                  [0m1.0 KB[0m
+                  [0m ┬╖ [0m
+                  [0mPDF[0m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-footer"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-uploader"[39m
+                  [36m>[39m
+                    [0mAlice[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-dot"[39m
+                  [36m>[39m
+                    [0m┬╖[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-date"[39m
+                  [36m>[39m
+                    [0mjust now[0m
+                  [36m</span>[39m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-actions"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"distribution-badge 
+distribution-badge--local-only"[39m
+                    [33mdata-testid[39m=[32m"distribution-badge-f1"[39m
+                    [33mstyle[39m=[32m"color: rgb(250, 179, 135);"[39m
+                    [33mtitle[39m=[32m"Only on this device"[39m
+                  [36m>[39m
+                    [36m<span[39m
+                      [33mclass[39m=[32m""[39m
+                    [36m>[39m
+                      [0mΓÜá∩╕Å[0m
+                    [36m</span>[39m
+                  [36m</span>[39m
+                  [36m<button[39m
+                    [33mclass[39m=[32m"file-fav-btn"[39m
+                    [33mtitle[39m=[32m"Add to favorites"[39m
+                  [36m>[39m
+                    [0mΓÿå[0m
+                  [36m</button>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"file-card file-card--selected"[39m
+                [33mdata-testid[39m=[32m"fs-file-f2"[39m
+                [33mdraggable[39m=[32m"true"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-header"[39m
+                [36m>[39m
+                  [36m<input[39m
+                    [33mclass[39m=[32m"file-card-checkbox"[39m
+                    [33mtype[39m=[32m"checkbox"[39m
+                  [36m/>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-type-icon "[39m
+                    [33mdata-testid[39m=[32m"file-type-icon-document"[39m
+                    [33mstyle[39m=[32m"display: inline-flex; align-items: 
+center; justify-content: center; width: 40px; height: 40px; border-radius: 
+6px; background-color: rgba(232, 240, 254, 0.133); color: rgb(66, 133, 244); 
+font-size: 24px; flex-shrink: 0;"[39m
+                  [36m>[39m
+                    [0m≡ƒôä[0m
+                  [36m</span>[39m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-name"[39m
+                  [33mtitle[39m=[32m"beta.txt"[39m
+                [36m>[39m
+                  [0mbeta.txt[0m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-meta"[39m
+                [36m>[39m
+                  [0m1.0 KB[0m
+                  [0m ┬╖ [0m
+                  [0mTXT[0m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-footer"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-uploader"[39m
+                  [36m>[39m
+                    [0mAlice[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-dot"[39m
+                  [36m>[39m
+                    [0m┬╖[0m
+                  [36m</span>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"file-card-date"[39m
+                  [36m>[39m
+                    [0mjust now[0m
+                  [36m</span>[39m
+                [36m</div>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"file-card-actions"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"distribution-badge 
+distribution-badge--local-only"[39m
+                    [33mdata-testid[39m=[32m"distribution-badge-f2"[39m
+                    [33mstyle[39m=[32m"color: rgb(250, 179, 135);"[39m
+                    [33mtitle[39m=[32m"Only on this device"[39m
+                  [36m>[39m
+                    [36m<span[39m
+                      [33mclass[39m=[32m""[39m
+                    [36m>[39m
+                      [0mΓÜá∩╕Å[0m
+                    [36m</span>[39m
+                  [36m</span>[39m
+                  [36m<button[39m
+                    [33mclass[39m=[32m"file-fav-btn"[39m
+                    [33mtitle[39m=[32m"Add to favorites"[39m
+                  [36m>[39m
+                    [0mΓÿå[0m
+                  [36m</button>[39m
+                [36m</div>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"drag-select-overlay"[39m
+                [33mstyle[39m=[32m"position: absolute; background: 
+rgba(137, 180, 250, 0.15); border: 1px solid rgba(137, 180, 250, 0.5); 
+border-radius: 2px; pointer-events: none; z-index: 50; display: none;"[39m
+              [36m/>[39m
+            [36m</div>[39m
+            [36m<input[39m
+              [33mclass[39m=[32m"upload-zone-input"[39m
+              [33mdata-testid[39m=[32m"upload-zone-input"[39m
+              [33mmultiple[39m=[32m""[39m
+              [33mtabindex[39m=[32m"-1"[39m
+              [33mtype[39m=[32m"file"[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33maria-label[39m=[32m"Bulk actions for 1 selected items"[39m
+            [33mclass[39m=[32m"bulk-action-bar"[39m
+            [33mdata-testid[39m=[32m"bulk-action-bar"[39m
+            [33mrole[39m=[32m"toolbar"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"bulk-action-info"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"bulk-action-count"[39m
+                [33mdata-testid[39m=[32m"bulk-action-count"[39m
+              [36m>[39m
+                [0m1[0m
+                [0m item[0m
+                [0m selected[0m
+              [36m</span>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-action-deselect"[39m
+                [33mdata-testid[39m=[32m"bulk-action-deselect"[39m
+                [33mtitle[39m=[32m"Deselect all"[39m
+              [36m>[39m
+                [0mΓ£ò Deselect[0m
+              [36m</button>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"bulk-action-buttons"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-action-btn"[39m
+                [33mdata-testid[39m=[32m"bulk-action-download"[39m
+                [33mtitle[39m=[32m"Download selected files"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-icon"[39m
+                [36m>[39m
+                  [0mΓ¼ç∩╕Å[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-label"[39m
+                [36m>[39m
+                  [0mDownload[0m
+                [36m</span>[39m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-action-btn"[39m
+                [33mdata-testid[39m=[32m"bulk-action-move"[39m
+                [33mtitle[39m=[32m"Move selected items"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-icon"[39m
+                [36m>[39m
+                  [0m≡ƒôª[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-label"[39m
+                [36m>[39m
+                  [0mMove[0m
+                [36m</span>[39m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-action-btn"[39m
+                [33mdata-testid[39m=[32m"bulk-action-tags"[39m
+                [33mtitle[39m=[32m"Edit tags on selected files"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-icon"[39m
+                [36m>[39m
+                  [0m≡ƒÅ╖∩╕Å[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-label"[39m
+                [36m>[39m
+                  [0mTags[0m
+                [36m</span>[39m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-action-btn"[39m
+                [33mdata-testid[39m=[32m"bulk-action-favorite"[39m
+                [33mtitle[39m=[32m"Toggle favorite on selected files"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-icon"[39m
+                [36m>[39m
+                  [0mΓ¡É[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-label"[39m
+                [36m>[39m
+                  [0mFavorite[0m
+                [36m</span>[39m
+              [36m</button>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"bulk-action-btn 
+bulk-action-btn--danger"[39m
+                [33mdata-testid[39m=[32m"bulk-action-delete"[39m
+                [33mtitle[39m=[32m"Delete selected items"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-icon"[39m
+                [36m>[39m
+                  [0m≡ƒùæ∩╕Å[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"bulk-action-btn-label"[39m
+                [36m>[39m
+                  [0mDelete[0m
+                [36m</span>[39m
+              [36m</button>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"file-context-menu"[39m
+            [33mdata-testid[39m=[32m"file-context-menu"[39m
+            [33mrole[39m=[32m"menu"[39m
+            [33mstyle[39m=[32m"left: 0px; top: 0px;"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item"[39m
+              [33mdata-testid[39m=[32m"ctx-download"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0mΓ¼ç∩╕Å[0m
+              [36m</span>[39m
+              [0mDownload[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item"[39m
+              [33mdata-testid[39m=[32m"ctx-rename"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0mΓ£Å∩╕Å[0m
+              [36m</span>[39m
+              [0m Rename[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item"[39m
+              [33mdata-testid[39m=[32m"ctx-move"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0m≡ƒôª[0m
+              [36m</span>[39m
+              [0mMove toΓÇª[0m
+            [36m</button>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"file-context-divider"[39m
+            [36m/>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item"[39m
+              [33mdata-testid[39m=[32m"ctx-tags"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0m≡ƒÅ╖∩╕Å[0m
+              [36m</span>[39m
+              [0mEdit Tags[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item"[39m
+              [33mdata-testid[39m=[32m"ctx-favorite"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0mΓ¡É[0m
+              [36m</span>[39m
+              [0mToggle Favorite[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item"[39m
+              [33mdata-testid[39m=[32m"ctx-details"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0mΓä╣∩╕Å[0m
+              [36m</span>[39m
+              [0m Properties[0m
+            [36m</button>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"file-context-divider"[39m
+            [36m/>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"file-context-item 
+file-context-item--danger"[39m
+              [33mdata-testid[39m=[32m"ctx-delete"[39m
+              [33mrole[39m=[32m"menuitem"[39m
+            [36m>[39m
+              [36m<span[39m
+                [33mclass[39m=[32m"file-context-icon"[39m
+              [36m>[39m
+                [0m≡ƒùæ∩╕Å[0m
+              [36m</span>[39m
+              [0mDelete[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</body>[39m
+
+    [0m [90m 711 |[39m     [90m// Should be single mode ΓÇö rename should 
+be visible[39m
+     [90m 712 |[39m     expect(screen[33m.[39mgetByTestId([32m'ctx-rename'
+[39m))[33m.[39mtoBeInTheDocument()[33m;[39m
+    [31m[1m>[22m[39m[90m 713 |[39m     expect(screen[33m.[39mgetByText(
+[32m'Delete'[39m))[33m.[39mtoBeInTheDocument()[33m;[39m
+     [90m     |[39m                   [31m[1m^[22m[39m
+     [90m 714 |[39m   })[33m;[39m
+     [90m 715 |[39m })[33m;[39m
+     [90m 716 |[39m[0m
+
+      at Object.getElementError 
+(node_modules/@testing-library/dom/dist/config.js:37:19)
+      at getElementError 
+(node_modules/@testing-library/dom/dist/query-helpers.js:20:35)
+      at getMultipleElementsFoundError 
+(node_modules/@testing-library/dom/dist/query-helpers.js:23:10)
+      at node_modules/@testing-library/dom/dist/query-helpers.js:55:13
+      at node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+      at Object.getByText (tests/components/files/bulk-actions.test.jsx:713:19)
+
+  ΓùÅ BrowseView ΓÇö end-to-end scenarios ΓÇ║ scenario: shift-select range ΓåÆ 
+bulk download
+
+    expect(element).toHaveTextContent()
+
+    Expected element to have text content:
+      3 items selected
+    Received:
+      2 items selected
+
+    [0m [90m 763 |[39m     [90m// Shift-click f4 ΓåÆ selects f2, f3, 
+f4[39m
+     [90m 764 |[39m     fireEvent[33m.[39mclick(screen[33m.[39mgetByTestI
+d([32m'fs-file-f4'[39m)[33m,[39m { shiftKey[33m:[39m [36mtrue[39m 
+})[33m;[39m
+    [31m[1m>[22m[39m[90m 765 |[39m     expect(screen[33m.[39mgetByTestI
+d([32m'bulk-action-count'[39m))[33m.[39mtoHaveTextContent([32m'3 items 
+selected'[39m)[33m;[39m
+     [90m     |[39m                                                     
+[31m[1m^[22m[39m
+     [90m 766 |[39m
+     [90m 767 |[39m     [90m// Click download[39m
+     [90m 768 |[39m     fireEvent[33m.[39mclick(screen[33m.[39mgetByTestI
+d([32m'bulk-action-download'[39m))[33m;[39m[0m
+
+      at Object.toHaveTextContent 
+(tests/components/files/bulk-actions.test.jsx:765:53)
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 64 passed, 69 total
+Snapshots:   0 total
+Time:        3.41 s
+Ran all test suites matching 
+/tests\\components\\files\\bulk-actions.test.jsx/i.

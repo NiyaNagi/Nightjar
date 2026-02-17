@@ -1,0 +1,88 @@
+/* ReplaceDialog.css */
+
+.replace-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.replace-dialog {
+  width: 380px;
+  max-width: 90vw;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.replace-dialog-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.replace-dialog-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.replace-dialog-message {
+  font-size: 13px;
+  color: var(--text-secondary, #a6adc8);
+  margin: 0 0 20px;
+  line-height: 1.5;
+}
+
+.replace-dialog-message strong {
+  color: var(--text-primary, #cdd6f4);
+}
+
+.replace-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.replace-dialog-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.replace-dialog-btn--danger {
+  background: #f38ba8;
+  color: var(--bg-primary, #11111b);
+}
+
+.replace-dialog-btn--danger:hover {
+  background: #e67a96;
+}
+
+.replace-dialog-btn--secondary {
+  background: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+}
+
+.replace-dialog-btn--secondary:hover {
+  background: #7ba7f0;
+}
+
+.replace-dialog-btn--cancel {
+  background: var(--border-color, #313244);
+  color: var(--text-secondary, #a6adc8);
+}
+
+.replace-dialog-btn--cancel:hover {
+  background: #3b3b52;
+}

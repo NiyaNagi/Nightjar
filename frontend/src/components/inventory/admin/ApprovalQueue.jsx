@@ -6,8 +6,11 @@ import { useInventory } from '../../../contexts/InventoryContext';
 import StatusBadge from '../common/StatusBadge';
 import RequestDetail from '../common/RequestDetail';
 import { generateId, formatRelativeDate } from '../../../utils/inventoryValidation';
-import { getPublicKeyHex, base62ToPublicKeyHex, createAddressReveal } from '../../../utils/addressCrypto';
-import { getAddress } from '../../../utils/inventoryAddressStore';
+import { pushNotification } from '../../../utils/inventoryNotifications';
+import { getPublicKeyHex, base62ToPublicKeyHex, createAddressReveal, decryptPendingAddress } from '../../../utils/addressCrypto';
+import { getAddress, getWorkspaceKeyMaterial, storeAddress } from '../../../utils/inventoryAddressStore';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import ChatButton from '../../common/ChatButton';
 import './ApprovalQueue.css';
 
 export default function ApprovalQueue() {
@@ -75,7 +78,7 @@ export default function ApprovalQueue() {
       targetId,
       summary,
     }]);
-  }, [ctx]);
+  }, [ctx.yInventoryAuditLog, ctx.inventorySystemId, ctx.userIdentity]);
 
   const handleApprove = useCallback(async (requestId) => {
     const notes = adminNotes[requestId] || '';
@@ -92,10 +95,38 @@ export default function ApprovalQueue() {
       try {
         const adminHex = getPublicKeyHex(ctx.userIdentity);
         const producerHex = base62ToPublicKeyHex(updated.assignedTo);
-        const addr = await getAddress(requestId, ctx.inventorySystemId);
+
+        // 1. Try local encrypted store (owner-submitted addresses)
+        let addr = null;
+        try {
+          const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+          addr = await getAddress(km, ctx.inventorySystemId, requestId);
+        } catch {
+          // Key material or local address not available
+        }
+
+        // 2. Fallback: decrypt pending address from non-owner requestor
+        if (!addr && ctx.yPendingAddresses) {
+          const pendingEntries = ctx.yPendingAddresses.get(requestId);
+          if (pendingEntries && ctx.userIdentity?.privateKey) {
+            addr = await decryptPendingAddress(pendingEntries, adminHex, ctx.userIdentity.privateKey);
+            // Store locally for future reference, then clean up pending entry
+            if (addr) {
+              try {
+                const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+                await storeAddress(km, ctx.inventorySystemId, requestId, addr);
+              } catch {
+                // Non-critical: local caching failed
+              }
+              ctx.yPendingAddresses.delete(requestId);
+            }
+          }
+        }
+
         if (addr && ctx.userIdentity?.privateKey) {
           const reveal = await createAddressReveal(addr, producerHex, ctx.userIdentity.privateKey, adminHex);
-          ctx.yAddressReveals?.set(requestId, reveal);
+          // Attach inventorySystemId so useInventorySync can filter reveals per system
+          ctx.yAddressReveals?.set(requestId, { ...reveal, inventorySystemId: ctx.inventorySystemId });
         }
       } catch (err) {
         console.warn('[ApprovalQueue] Could not create address reveal:', err);
@@ -103,11 +134,38 @@ export default function ApprovalQueue() {
     }
 
     logAudit('request_approved', requestId, `Request ${requestId.slice(0, 8)} approved`);
+
+    // Notify the requestor
+    if (updated?.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, {
+        inventorySystemId: ctx.inventorySystemId,
+        recipientId: updated.requestedBy,
+        type: 'request_approved',
+        message: `Your request for ${updated.catalogItemName || 'item'} has been approved`,
+        relatedId: requestId,
+      });
+    }
+    // Notify the assigned producer (if any)
+    if (updated?.assignedTo) {
+      pushNotification(ctx.yInventoryNotifications, {
+        inventorySystemId: ctx.inventorySystemId,
+        recipientId: updated.assignedTo,
+        type: 'request_approved',
+        message: `Request for ${updated.catalogItemName || 'item'} you claimed has been approved`,
+        relatedId: requestId,
+      });
+    }
+
     setSelected(prev => { const n = new Set(prev); n.delete(requestId); return n; });
-  }, [findAndUpdateRequest, logAudit, ctx]);
+  }, [findAndUpdateRequest, adminNotes, logAudit, ctx.userIdentity, ctx.yInventoryNotifications, ctx.inventorySystemId, ctx.currentWorkspace, ctx.workspaceId, ctx.yPendingAddresses, ctx.yAddressReveals]);
 
   const handleReject = useCallback((requestId) => {
     const notes = adminNotes[requestId] || '';
+
+    // Capture original request data BEFORE modifying it (we need requestedBy and assignedTo)
+    const items = ctx.yInventoryRequests?.toArray() || [];
+    const originalReq = items.find(r => r.id === requestId);
+
     findAndUpdateRequest(requestId, r => ({
       ...r,
       status: 'open',
@@ -118,8 +176,30 @@ export default function ApprovalQueue() {
       adminNotes: notes || r.adminNotes,
     }));
     logAudit('request_rejected', requestId, `Request ${requestId.slice(0, 8)} rejected — returned to open pool`);
+
+    // Notify the requestor
+    if (originalReq?.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, {
+        inventorySystemId: ctx.inventorySystemId,
+        recipientId: originalReq.requestedBy,
+        type: 'request_rejected',
+        message: `Your request for ${originalReq.catalogItemName || 'item'} was returned to open`,
+        relatedId: requestId,
+      });
+    }
+    // Notify the producer if they claimed it
+    if (originalReq?.assignedTo) {
+      pushNotification(ctx.yInventoryNotifications, {
+        inventorySystemId: ctx.inventorySystemId,
+        recipientId: originalReq.assignedTo,
+        type: 'request_rejected',
+        message: `Request for ${originalReq.catalogItemName || 'item'} you claimed was rejected`,
+        relatedId: requestId,
+      });
+    }
+
     setSelected(prev => { const n = new Set(prev); n.delete(requestId); return n; });
-  }, [findAndUpdateRequest, logAudit]);
+  }, [findAndUpdateRequest, adminNotes, logAudit, ctx.yInventoryRequests, ctx.yInventoryNotifications, ctx.inventorySystemId]);
 
   const handleBulkApprove = async () => {
     for (const id of selected) {
@@ -137,10 +217,7 @@ export default function ApprovalQueue() {
 
   const getProducerName = (key) => {
     if (!key) return 'Unassigned';
-    const collab = ctx.collaborators?.find(
-      c => c.publicKey === key || c.publicKeyBase62 === key
-    );
-    return collab?.displayName || collab?.name || key.slice(0, 8);
+    return resolveUserName(ctx.collaborators, key);
   };
 
   const getProducerCapForItem = (producerKey, itemId) => {
@@ -242,7 +319,16 @@ export default function ApprovalQueue() {
                     <span className="aq-assignment-label">
                       {req.status === 'claimed' ? 'Claimed by' : 'Assigned to'}:
                     </span>
-                    <span className="aq-producer-name">{getProducerName(req.assignedTo)}</span>
+                    <span className="aq-producer-name">
+                      {getProducerName(req.assignedTo)}
+                      <ChatButton
+                        publicKey={req.assignedTo}
+                        name={getProducerName(req.assignedTo)}
+                        collaborators={ctx.collaborators}
+                        onStartChatWith={ctx.onStartChatWith}
+                        currentUserKey={ctx.userIdentity?.publicKeyBase62}
+                      />
+                    </span>
                     {producerCap && (
                       <span className="aq-producer-detail">
                         Stock: {producerCap.currentStock || 0} {item?.unit || 'units'}
@@ -307,7 +393,7 @@ export default function ApprovalQueue() {
                       .filter(c => c.permission === 'editor' || c.permission === 'owner')
                       .map(c => (
                         <option key={c.publicKeyBase62 || c.publicKey} value={c.publicKeyBase62 || c.publicKey}>
-                          {c.displayName || c.name || (c.publicKeyBase62 || c.publicKey || '').slice(0, 8)}
+                          {resolveUserName(ctx.collaborators, c.publicKeyBase62 || c.publicKey)}
                         </option>
                       ))
                     }

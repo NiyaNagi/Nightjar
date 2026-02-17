@@ -122,7 +122,7 @@ export function PermissionProvider({ children }) {
    * @param {string} folderId - Folder ID
    * @returns {Object} { permission, scope, scopeId }
    */
-  const resolveFolderPermission = useCallback((folderId) => {
+  const resolveFolderPermission = useCallback((folderId, _visited) => {
     // Check cache first
     if (permissionCache.has(`folder:${folderId}`)) {
       return permissionCache.get(`folder:${folderId}`);
@@ -136,15 +136,16 @@ export function PermissionProvider({ children }) {
       return { permission: workspacePerm, scope: 'workspace', scopeId: currentWorkspaceId };
     }
     
-    // Check if folder has direct permission grant
-    if (permissionCache.has(`folder:${folderId}`)) {
-      const direct = permissionCache.get(`folder:${folderId}`);
-      return direct;
-    }
-    
-    // Walk up hierarchy
+    // Walk up hierarchy with cycle detection
     if (folderInfo.parentId) {
-      const parentPerm = resolveFolderPermission(folderInfo.parentId);
+      const visited = _visited || new Set();
+      if (visited.has(folderId)) {
+        // Cycle detected - fall back to workspace permission
+        const workspacePerm = getWorkspacePermission(folderInfo.workspaceId || currentWorkspaceId);
+        return { permission: workspacePerm, scope: 'workspace', scopeId: folderInfo.workspaceId || currentWorkspaceId };
+      }
+      visited.add(folderId);
+      const parentPerm = resolveFolderPermission(folderInfo.parentId, visited);
       return parentPerm;
     }
     

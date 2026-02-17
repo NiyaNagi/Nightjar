@@ -21,6 +21,18 @@ function setBasePath(bp) {
 }
 
 /**
+ * Sanitize a user-provided string for use in filenames.
+ * Strips path separators, traversal sequences, and null bytes.
+ * @param {string} input
+ * @returns {string}
+ */
+function sanitizeForFilename(input) {
+  if (!input || typeof input !== 'string') return 'unknown';
+  // Remove null bytes, path separators, and traversal patterns
+  return input.replace(/[\x00/\\]/g, '').replace(/\.\./g, '').trim() || 'unknown';
+}
+
+/**
  * Get the storage directory for a given namespace
  * @param {string} namespace - 'addresses' or 'saved-addresses'
  * @returns {string} Absolute path to storage directory
@@ -45,7 +57,7 @@ function getStorageDir(namespace) {
  */
 function storeAddress(inventorySystemId, requestId, encryptedBlob) {
   const dir = getStorageDir('addresses');
-  const filename = `${inventorySystemId}_${requestId}.json`;
+  const filename = `${sanitizeForFilename(inventorySystemId)}_${sanitizeForFilename(requestId)}.json`;
   const filePath = path.join(dir, filename);
   fs.writeFileSync(filePath, JSON.stringify({
     inventorySystemId,
@@ -64,7 +76,7 @@ function storeAddress(inventorySystemId, requestId, encryptedBlob) {
  */
 function getAddress(inventorySystemId, requestId) {
   const dir = getStorageDir('addresses');
-  const filename = `${inventorySystemId}_${requestId}.json`;
+  const filename = `${sanitizeForFilename(inventorySystemId)}_${sanitizeForFilename(requestId)}.json`;
   const filePath = path.join(dir, filename);
   
   if (!fs.existsSync(filePath)) return null;
@@ -86,7 +98,7 @@ function getAddress(inventorySystemId, requestId) {
  */
 function deleteAddress(inventorySystemId, requestId) {
   const dir = getStorageDir('addresses');
-  const filename = `${inventorySystemId}_${requestId}.json`;
+  const filename = `${sanitizeForFilename(inventorySystemId)}_${sanitizeForFilename(requestId)}.json`;
   const filePath = path.join(dir, filename);
   
   if (fs.existsSync(filePath)) {
@@ -104,7 +116,7 @@ function deleteAddress(inventorySystemId, requestId) {
  */
 function listAddresses(inventorySystemId) {
   const dir = getStorageDir('addresses');
-  const prefix = `${inventorySystemId}_`;
+  const prefix = `${sanitizeForFilename(inventorySystemId)}_`;
   const results = [];
   
   if (!fs.existsSync(dir)) return results;
@@ -135,7 +147,7 @@ function listAddresses(inventorySystemId) {
  */
 function storeSavedAddress(addressId, encryptedBlob) {
   const dir = getStorageDir('saved-addresses');
-  const filePath = path.join(dir, `${addressId}.json`);
+  const filePath = path.join(dir, `${sanitizeForFilename(addressId)}.json`);
   fs.writeFileSync(filePath, JSON.stringify({
     addressId,
     data: encryptedBlob,
@@ -180,7 +192,7 @@ function getSavedAddresses() {
  */
 function deleteSavedAddress(addressId) {
   const dir = getStorageDir('saved-addresses');
-  const filePath = path.join(dir, `${addressId}.json`);
+  const filePath = path.join(dir, `${sanitizeForFilename(addressId)}.json`);
   
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);

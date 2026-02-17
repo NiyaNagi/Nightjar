@@ -170,10 +170,36 @@ export async function processFileForUpload(fileData, workspaceKey, onProgress) {
 export async function reassembleFile(chunks, expectedHashes, totalSize) {
   const errors = [];
   
+  // Verify we have the right number of chunks
+  if (chunks.length !== expectedHashes.length) {
+    errors.push(`Expected ${expectedHashes.length} chunks but received ${chunks.length}`);
+    return { data: null, valid: false, errors };
+  }
+  
   // Sort chunks by index
   const sorted = [...chunks].sort((a, b) => a.index - b.index);
   
-  // Validate each chunk
+  // Check for duplicate indices
+  const seenIndices = new Set();
+  for (const chunk of sorted) {
+    if (seenIndices.has(chunk.index)) {
+      errors.push(`Duplicate chunk index: ${chunk.index}`);
+    }
+    seenIndices.add(chunk.index);
+  }
+  
+  // Verify all indices present
+  for (let i = 0; i < expectedHashes.length; i++) {
+    if (!seenIndices.has(i)) {
+      errors.push(`Missing chunk index: ${i}`);
+    }
+  }
+  
+  if (errors.length > 0) {
+    return { data: null, valid: false, errors };
+  }
+  
+  // Validate each chunk hash
   for (const chunk of sorted) {
     const hash = await sha256(chunk.data);
     if (hash !== expectedHashes[chunk.index]) {
@@ -191,6 +217,12 @@ export async function reassembleFile(chunks, expectedHashes, totalSize) {
   for (const chunk of sorted) {
     result.set(chunk.data, offset);
     offset += chunk.data.length;
+  }
+  
+  // Verify assembled size
+  if (offset !== totalSize) {
+    errors.push(`Assembled size ${offset} does not match expected size ${totalSize}`);
+    return { data: result, valid: false, errors };
   }
   
   return { data: result, valid: true, errors: [] };
@@ -222,5 +254,5 @@ export function downloadBlob(blob, filename) {
   setTimeout(() => {
     URL.revokeObjectURL(url);
     document.body.removeChild(a);
-  }, 100);
+  }, 1000);
 }

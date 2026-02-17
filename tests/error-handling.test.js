@@ -357,19 +357,19 @@ describe('Error Handling: Invalid Input Defense', () => {
 });
 
 describe('Error Handling: Backup/Restore Failures', () => {
-  test('restoreBackup with wrong mnemonic fails gracefully', () => {
+  test('restoreBackup with wrong mnemonic fails gracefully', async () => {
     const identity = generateIdentity();
     const otherIdentity = generateIdentity();
     
-    const backup = createBackup(identity, []);
+    const backup = await createBackup(identity, []);
     
     // Try to restore with wrong mnemonic
-    expect(() => {
-      restoreBackup(backup, otherIdentity.mnemonic);
-    }).toThrow();
+    await expect(
+      restoreBackup(backup, otherIdentity.mnemonic)
+    ).rejects.toThrow();
   });
 
-  test('restoreBackup with corrupted backup fails gracefully', () => {
+  test('restoreBackup with corrupted backup fails gracefully', async () => {
     const identity = generateIdentity();
     
     const corruptedBackups = [
@@ -382,18 +382,13 @@ describe('Error Handling: Backup/Restore Failures', () => {
     ];
     
     for (const corrupted of corruptedBackups) {
-      expect(() => {
-        try {
-          restoreBackup(corrupted, identity.mnemonic);
-        } catch (e) {
-          // Expected - should throw descriptive error
-          throw e;
-        }
-      }).toThrow();
+      await expect(
+        restoreBackup(corrupted, identity.mnemonic)
+      ).rejects.toThrow();
     }
   });
 
-  test('createBackup with invalid identity fails gracefully', () => {
+  test('createBackup with invalid identity fails gracefully', async () => {
     const invalidIdentities = [
       null,
       {},
@@ -401,9 +396,9 @@ describe('Error Handling: Backup/Restore Failures', () => {
     ];
     
     for (const invalid of invalidIdentities) {
-      expect(() => {
-        createBackup(invalid, []);
-      }).toThrow();
+      await expect(
+        createBackup(invalid, [])
+      ).rejects.toThrow();
     }
   });
 });
@@ -452,7 +447,7 @@ describe('Error Handling: State Corruption Recovery', () => {
 });
 
 describe('Error Handling: Memory and Resource Limits', () => {
-  test('handles very large workspace lists', () => {
+  test('handles very large workspace lists', async () => {
     const identity = generateIdentity();
     
     // Create 1000 workspaces
@@ -465,14 +460,14 @@ describe('Error Handling: Memory and Resource Limits', () => {
     
     // Should not crash or hang
     const startTime = Date.now();
-    const backup = createBackup(identity, largeWorkspaceList);
+    const backup = await createBackup(identity, largeWorkspaceList);
     const elapsed = Date.now() - startTime;
     
     expect(backup.workspaces).toHaveLength(1000);
     expect(elapsed).toBeLessThan(5000); // Should complete in < 5 seconds
   });
 
-  test('handles very long workspace names', () => {
+  test('handles very long workspace names', async () => {
     const identity = generateIdentity();
     
     const workspaceWithLongName = {
@@ -482,9 +477,9 @@ describe('Error Handling: Memory and Resource Limits', () => {
       encryptionKey: 'key-1',
     };
     
-    expect(() => {
-      createBackup(identity, [workspaceWithLongName]);
-    }).not.toThrow();
+    await expect(
+      createBackup(identity, [workspaceWithLongName])
+    ).resolves.toBeDefined();
   });
 });
 

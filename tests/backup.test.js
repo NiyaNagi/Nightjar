@@ -116,15 +116,15 @@ describe('Backup System', () => {
   });
   
   describe('Backup Creation', () => {
-    test('creates backup with correct version', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
+    test('creates backup with correct version', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
       
       expect(backup.version).toBe(1);
     });
     
-    test('creates backup with timestamp', () => {
+    test('creates backup with timestamp', async () => {
       const before = Date.now();
-      const backup = createBackup(testIdentity, testWorkspaces);
+      const backup = await createBackup(testIdentity, testWorkspaces);
       const after = Date.now();
       
       const createdAt = new Date(backup.createdAt).getTime();
@@ -132,16 +132,16 @@ describe('Backup System', () => {
       expect(createdAt).toBeLessThanOrEqual(after);
     });
     
-    test('includes encrypted identity', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
+    test('includes encrypted identity', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
       
       expect(backup.identity).toBeDefined();
       expect(backup.identity.publicKey).toBe(testIdentity.publicKeyBase62);
       expect(backup.identity.encryptedSecretKey).toBeDefined();
     });
     
-    test('includes encrypted workspaces', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
+    test('includes encrypted workspaces', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
       
       expect(backup.workspaces).toHaveLength(2);
       expect(backup.workspaces[0].id).toBe('workspace1');
@@ -150,17 +150,17 @@ describe('Backup System', () => {
       expect(backup.workspaces[0].encryptedKey).toBeDefined();
     });
     
-    test('requires identity with mnemonic', () => {
+    test('requires identity with mnemonic', async () => {
       const identityWithoutMnemonic = { publicKeyBase62: 'abc' };
       
-      expect(() => {
-        createBackup(identityWithoutMnemonic, testWorkspaces);
-      }).toThrow();
+      await expect(
+        createBackup(identityWithoutMnemonic, testWorkspaces)
+      ).rejects.toThrow();
     });
     
-    test('supports optional passphrase', () => {
-      const backupWithPassphrase = createBackup(testIdentity, testWorkspaces, 'mypassphrase');
-      const backupWithoutPassphrase = createBackup(testIdentity, testWorkspaces);
+    test('supports optional passphrase', async () => {
+      const backupWithPassphrase = await createBackup(testIdentity, testWorkspaces, 'mypassphrase');
+      const backupWithoutPassphrase = await createBackup(testIdentity, testWorkspaces);
       
       expect(backupWithPassphrase.hasPassphrase).toBe(true);
       expect(backupWithoutPassphrase.hasPassphrase).toBe(false);
@@ -168,78 +168,78 @@ describe('Backup System', () => {
   });
   
   describe('Backup Restoration', () => {
-    test('restores identity from backup', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
-      const restored = restoreBackup(backup, testIdentity.mnemonic);
+    test('restores identity from backup', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
+      const restored = await restoreBackup(backup, testIdentity.mnemonic);
       
       expect(restored.identity.publicKeyBase62).toBe(testIdentity.publicKeyBase62);
     });
     
-    test('restores workspaces from backup', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
-      const restored = restoreBackup(backup, testIdentity.mnemonic);
+    test('restores workspaces from backup', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
+      const restored = await restoreBackup(backup, testIdentity.mnemonic);
       
       expect(restored.workspaces).toHaveLength(2);
       expect(restored.workspaces[0].id).toBe('workspace1');
       expect(restored.workspaces[0].encryptionKey).toBe('base64encodedkey1');
     });
     
-    test('fails with invalid mnemonic', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
+    test('fails with invalid mnemonic', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
       
-      expect(() => {
-        restoreBackup(backup, 'invalid mnemonic words here');
-      }).toThrow('Invalid recovery phrase');
+      await expect(
+        restoreBackup(backup, 'invalid mnemonic words here')
+      ).rejects.toThrow('Invalid recovery phrase');
     });
     
-    test('fails with wrong mnemonic', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
+    test('fails with wrong mnemonic', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
       const differentIdentity = generateIdentity();
       
-      expect(() => {
-        restoreBackup(backup, differentIdentity.mnemonic);
-      }).toThrow();
+      await expect(
+        restoreBackup(backup, differentIdentity.mnemonic)
+      ).rejects.toThrow();
     });
     
-    test('requires passphrase if backup has one', () => {
-      const backup = createBackup(testIdentity, testWorkspaces, 'mypassphrase');
+    test('requires passphrase if backup has one', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces, 'mypassphrase');
       
-      expect(() => {
-        restoreBackup(backup, testIdentity.mnemonic);
-      }).toThrow('requires a passphrase');
+      await expect(
+        restoreBackup(backup, testIdentity.mnemonic)
+      ).rejects.toThrow('requires a passphrase');
     });
     
-    test('restores with correct passphrase', () => {
+    test('restores with correct passphrase', async () => {
       const passphrase = 'mySecretPassphrase';
-      const backup = createBackup(testIdentity, testWorkspaces, passphrase);
-      const restored = restoreBackup(backup, testIdentity.mnemonic, passphrase);
+      const backup = await createBackup(testIdentity, testWorkspaces, passphrase);
+      const restored = await restoreBackup(backup, testIdentity.mnemonic, passphrase);
       
       expect(restored.identity.publicKeyBase62).toBe(testIdentity.publicKeyBase62);
     });
     
-    test('fails with wrong passphrase', () => {
-      const backup = createBackup(testIdentity, testWorkspaces, 'correctpassphrase');
+    test('fails with wrong passphrase', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces, 'correctpassphrase');
       
-      expect(() => {
-        restoreBackup(backup, testIdentity.mnemonic, 'wrongpassphrase');
-      }).toThrow();
+      await expect(
+        restoreBackup(backup, testIdentity.mnemonic, 'wrongpassphrase')
+      ).rejects.toThrow();
     });
   });
   
   describe('Backup Version Handling', () => {
-    test('rejects unsupported backup version', () => {
-      const backup = createBackup(testIdentity, testWorkspaces);
+    test('rejects unsupported backup version', async () => {
+      const backup = await createBackup(testIdentity, testWorkspaces);
       backup.version = 999;
       
-      expect(() => {
-        restoreBackup(backup, testIdentity.mnemonic);
-      }).toThrow('unsupported backup version');
+      await expect(
+        restoreBackup(backup, testIdentity.mnemonic)
+      ).rejects.toThrow('unsupported backup version');
     });
     
-    test('rejects null backup', () => {
-      expect(() => {
-        restoreBackup(null, testIdentity.mnemonic);
-      }).toThrow();
+    test('rejects null backup', async () => {
+      await expect(
+        restoreBackup(null, testIdentity.mnemonic)
+      ).rejects.toThrow();
     });
   });
 });

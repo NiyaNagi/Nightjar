@@ -70,6 +70,7 @@ jest.mock('../../../frontend/src/utils/addressCrypto', () => ({
     state: 'OR',
     zipCode: '97201',
   })),
+  decryptPendingAddress: jest.fn(() => Promise.resolve({ fullName: 'Test', street1: '1 Main', city: 'NY', state: 'NY', zipCode: '10001', country: 'US' })),
 }));
 
 jest.mock('../../../frontend/src/utils/inventoryAddressStore', () => ({
@@ -87,6 +88,28 @@ jest.mock('../../../frontend/src/utils/inventorySavedAddresses', () => ({
   getSavedAddresses: jest.fn(() => []),
   storeSavedAddress: jest.fn(),
   deleteSavedAddress: jest.fn(),
+}));
+
+jest.mock('../../../frontend/src/utils/shippingProviders', () => ({
+  SHIPPING_PROVIDERS: [],
+  getAllProviderIds: jest.fn(() => []),
+  getProviderById: jest.fn(() => null),
+  getEnabledProviders: jest.fn(() => []),
+  formatAddressForCopy: jest.fn(() => 'Test Address'),
+}));
+
+jest.mock('../../../frontend/src/hooks/useCopyFeedback', () => ({
+  useCopyFeedback: () => ({ copied: false, copyToClipboard: jest.fn() }),
+}));
+
+jest.mock('../../../frontend/src/utils/trackingLinks', () => ({
+  parseTrackingNumber: jest.fn(() => null),
+  genericTrackingUrl: jest.fn(() => ''),
+}));
+
+jest.mock('../../../frontend/src/utils/inventoryNotifications', () => ({
+  pushNotification: jest.fn(),
+  getUnreadCount: jest.fn(() => 0),
 }));
 
 // Recharts
@@ -209,6 +232,7 @@ function setContext(identity) {
     yPendingAddresses: yPending,
     inventorySystemId: 'sys-1',
     workspaceId: 'ws-1',
+    currentWorkspace: { password: 'test-pwd' },
     userIdentity: identity,
     collaborators: COLLABORATORS,
   };

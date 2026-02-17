@@ -67,6 +67,8 @@ export default function CatalogManager() {
       targetId: item.id,
       targetType: 'catalog_item',
       summary: `Added catalog item "${item.name}"`,
+      actorId: 'system',
+      actorRole: 'owner',
       timestamp: Date.now(),
     }]);
 
@@ -111,6 +113,8 @@ export default function CatalogManager() {
       targetId: editingId,
       targetType: 'catalog_item',
       summary: `Updated catalog item "${updated.name}"`,
+      actorId: 'system',
+      actorRole: 'owner',
       timestamp: Date.now(),
     }]);
 
@@ -142,6 +146,8 @@ export default function CatalogManager() {
       targetId: item.id,
       targetType: 'catalog_item',
       summary: `${item.name} ${updated.active ? 'activated' : 'deactivated'}`,
+      actorId: 'system',
+      actorRole: 'owner',
       timestamp: Date.now(),
     }]);
 

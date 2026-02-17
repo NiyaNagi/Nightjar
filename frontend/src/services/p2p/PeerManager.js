@@ -167,6 +167,22 @@ export class PeerManager extends EventEmitter {
       this.transports.webrtc.handleSignal(event.fromPeerId, event.signalData);
     });
 
+    // Handle Hyperswarm peer discoveries - these are already-connected
+    // remote peers at the sidecar level, so register them as connected
+    // (not just "announced") so getConnectedPeers() includes them.
+    // We call _onPeerConnected on the transport to also populate the
+    // transport's internal peers map (needed for isConnected/send).
+    this.transports.hyperswarm.on('peers-discovered', (event) => {
+      for (const peer of event.peers || []) {
+        if (peer.peerId && peer.peerId !== this.peerId) {
+          // Add to transport's peer map AND trigger peer-connected event
+          // which flows through _setupEventRouting → registerConnectedPeer
+          this.transports.hyperswarm._onPeerConnected(peer.peerId, peer);
+          console.log(`[PeerManager] Hyperswarm peer discovered: ${peer.peerId?.slice(0, 16)}`);
+        }
+      }
+    });
+
     // Handle mDNS discoveries
     this.transports.mdns.on('peer-discovered', (event) => {
       this.emit('mdns-peer-discovered', event);

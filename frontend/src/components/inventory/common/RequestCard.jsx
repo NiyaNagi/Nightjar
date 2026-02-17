@@ -24,8 +24,9 @@ export default function RequestCard({
     <div
       className={`request-card ${compact ? 'request-card--compact' : ''} ${request.urgent ? 'request-card--urgent' : ''}`}
       onClick={() => onClick?.(request)}
-      role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(request); } } : undefined}
+      style={onClick ? { cursor: 'pointer' } : undefined}
     >
       <div className="request-card__header">
         <span className="request-card__id">

@@ -7,6 +7,8 @@ import RequestCard from '../common/RequestCard';
 import { generateId, formatRelativeDate } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
 import { estimateFulfillment, validateClaim } from '../../../utils/inventoryAssignment';
+import SlidePanel from '../common/SlidePanel';
+import RequestDetail from '../common/RequestDetail';
 import './OpenRequests.css';
 
 const PAGE_SIZE = 12;
@@ -25,6 +27,7 @@ export default function OpenRequests() {
   const [filterQtyMax, setFilterQtyMax] = useState('');
   const [sortBy, setSortBy] = useState('urgency');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const catalogMap = useMemo(() => {
     const m = {};
@@ -148,7 +151,7 @@ export default function OpenRequests() {
       <div className="or-filters">
         <select value={filterItem} onChange={e => setFilterItem(e.target.value)}>
           <option value="">All Items</option>
-          {catalogItems.filter(c => c.isActive !== false).map(c => (
+          {catalogItems.filter(c => c.active !== false).map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
@@ -200,6 +203,7 @@ export default function OpenRequests() {
               showClaim={true}
               claimEstimate={formatEstimate(est)}
               onClaim={() => handleClaim(req.id)}
+              onClick={() => setSelectedRequest(req)}
             />
           );
         })}
@@ -221,6 +225,23 @@ export default function OpenRequests() {
       <p className="or-note">
         "Can fill" is calculated from your declared stock and capacity.
       </p>
+
+      {/* Request drill-in slide panel */}
+      <SlidePanel
+        isOpen={!!selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        title={selectedRequest ? `Request #${selectedRequest.id?.slice(4, 10)}` : 'Request Detail'}
+      >
+        {selectedRequest && (
+          <RequestDetail
+            request={selectedRequest}
+            isAdmin={false}
+            isProducer={true}
+            collaborators={ctx.collaborators || []}
+            onClose={() => setSelectedRequest(null)}
+          />
+        )}
+      </SlidePanel>
     </div>
   );
 }

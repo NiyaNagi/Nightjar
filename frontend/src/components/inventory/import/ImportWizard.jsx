@@ -107,6 +107,7 @@ export default function ImportWizard() {
               // Requestor identity (correct field names for analytics)
               requestorId: '',
               requestorName: row.requester_name || '',
+              requestedBy: ctx.userIdentity?.publicKeyBase62 || '',
               city: row.requester_city || '',
               state: row.requester_state || '',
 
@@ -141,7 +142,7 @@ export default function ImportWizard() {
                 (c.name || '').toLowerCase() === nameToMatch
               );
               if (match) {
-                request.assignedTo = match.publicKey;
+                request.assignedTo = match.publicKeyBase62 || match.publicKey;
                 request.assignedToName = match.displayName || match.name || '';
                 // If the request was open and we have an assignment, set to claimed
                 if (request.status === 'open') request.status = 'claimed';

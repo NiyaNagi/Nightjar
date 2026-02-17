@@ -1,0 +1,115 @@
+/* BulkActionBar.css */
+
+.bulk-action-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-secondary, #1e1e2e);
+  border-top: 1px solid var(--border-color, #313244);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 40;
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bulk-action-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.bulk-action-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+  white-space: nowrap;
+}
+
+.bulk-action-deselect {
+  font-size: 11px;
+  color: var(--text-secondary, #a6adc8);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.bulk-action-deselect:hover {
+  color: var(--text-primary, #cdd6f4);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.bulk-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bulk-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: var(--bg-primary, #11111b);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease;
+}
+
+.bulk-action-btn:hover {
+  border-color: var(--accent-color, #89b4fa);
+}
+
+.bulk-action-btn--danger {
+  color: #f38ba8;
+}
+
+.bulk-action-btn--danger:hover {
+  border-color: #f38ba8;
+  background: rgba(243, 139, 168, 0.08);
+}
+
+.bulk-action-btn-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.bulk-action-btn-label {
+  line-height: 1;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .bulk-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .bulk-action-buttons {
+    justify-content: flex-start;
+  }
+
+  .bulk-action-btn-label {
+    display: none;
+  }
+
+  .bulk-action-btn {
+    padding: 8px 10px;
+  }
+}

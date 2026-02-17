@@ -10,7 +10,7 @@
  * See docs/FILE_STORAGE_SPEC.md §15.2
  */
 
-import { createContext, useContext, useMemo, useCallback } from 'react';
+import { createContext, useContext, useMemo, useCallback, useRef } from 'react';
 import { useFileStorageSync } from '../hooks/useFileStorageSync';
 import {
   generateFileId,
@@ -76,12 +76,17 @@ export function FileStorageProvider({
   /** Update a file record in Yjs (find by ID, delete, re-insert) */
   const updateFile = useCallback((fileId, updates) => {
     if (!yStorageFiles) return;
-    const arr = yStorageFiles.toArray();
-    const index = arr.findIndex(f => f.id === fileId);
-    if (index === -1) return;
-    const updated = { ...arr[index], ...updates, updatedAt: Date.now() };
-    yStorageFiles.delete(index, 1);
-    yStorageFiles.insert(index, [updated]);
+    const doc = yStorageFiles.doc;
+    const doUpdate = () => {
+      const arr = yStorageFiles.toArray();
+      const index = arr.findIndex(f => f.id === fileId);
+      if (index === -1) return;
+      const updated = { ...arr[index], ...updates, updatedAt: Date.now() };
+      yStorageFiles.delete(index, 1);
+      yStorageFiles.insert(index, [updated]);
+    };
+    if (doc) doc.transact(doUpdate);
+    else doUpdate();
   }, [yStorageFiles]);
 
   /** Soft-delete a file (set deletedAt) */
@@ -121,15 +126,21 @@ export function FileStorageProvider({
   /** Update a folder */
   const updateFolder = useCallback((folderId, updates) => {
     if (!yStorageFolders) return;
-    const arr = yStorageFolders.toArray();
-    const index = arr.findIndex(f => f.id === folderId);
-    if (index === -1) return;
-    const updated = { ...arr[index], ...updates, updatedAt: Date.now() };
-    yStorageFolders.delete(index, 1);
-    yStorageFolders.insert(index, [updated]);
+    const doc = yStorageFolders.doc;
+    const doUpdate = () => {
+      const arr = yStorageFolders.toArray();
+      const index = arr.findIndex(f => f.id === folderId);
+      if (index === -1) return;
+      const updated = { ...arr[index], ...updates, updatedAt: Date.now() };
+      yStorageFolders.delete(index, 1);
+      yStorageFolders.insert(index, [updated]);
+    };
+    if (doc) doc.transact(doUpdate);
+    else doUpdate();
   }, [yStorageFolders]);
 
   /** Soft-delete a folder and its contents recursively */
+  const deleteFolderRef = useRef(null);
   const deleteFolder = useCallback((folderId) => {
     const now = Date.now();
     updateFolder(folderId, { deletedAt: now });
@@ -139,50 +150,78 @@ export function FileStorageProvider({
       .filter(f => f.parentId === folderId && !f.deletedAt)
       .map(f => f.id);
     for (const childId of childFolderIds) {
-      deleteFolder(childId);
+      deleteFolderRef.current(childId);
     }
-    // Delete files in this folder
+    // Delete files in this folder — iterate in reverse to avoid index shift
     if (yStorageFiles) {
       const arr = yStorageFiles.toArray();
-      arr.forEach((f, idx) => {
+      for (let idx = arr.length - 1; idx >= 0; idx--) {
+        const f = arr[idx];
         if (f.folderId === folderId && !f.deletedAt) {
           const updated = { ...f, deletedAt: now };
           yStorageFiles.delete(idx, 1);
           yStorageFiles.insert(idx, [updated]);
         }
-      });
+      }
     }
   }, [updateFolder, yStorageFolders, yStorageFiles]);
+  deleteFolderRef.current = deleteFolder;
 
-  /** Restore a folder and its contents */
+  /** Restore a folder and its contents recursively (spec §5.5) */
+  const restoreFolderRef = useRef(null);
   const restoreFolder = useCallback((folderId) => {
     updateFolder(folderId, { deletedAt: null });
-    // Restore files in this folder
+    // Recursively restore child subfolders
+    const allFolders = yStorageFolders ? yStorageFolders.toArray() : [];
+    const childFolderIds = allFolders
+      .filter(f => f.parentId === folderId && f.deletedAt)
+      .map(f => f.id);
+    for (const childId of childFolderIds) {
+      restoreFolderRef.current(childId);
+    }
+    // Restore files in this folder — iterate in reverse to avoid index shift
     if (yStorageFiles) {
       const arr = yStorageFiles.toArray();
-      arr.forEach((f, idx) => {
+      for (let idx = arr.length - 1; idx >= 0; idx--) {
+        const f = arr[idx];
         if (f.folderId === folderId && f.deletedAt) {
           const updated = { ...f, deletedAt: null };
           yStorageFiles.delete(idx, 1);
           yStorageFiles.insert(idx, [updated]);
         }
-      });
+      }
     }
-  }, [updateFolder, yStorageFiles]);
+  }, [updateFolder, yStorageFolders, yStorageFiles]);
+  restoreFolderRef.current = restoreFolder;
+
+  /** Permanently remove a folder from Yjs */
+  const permanentlyDeleteFolder = useCallback((folderId) => {
+    if (!yStorageFolders) return;
+    const arr = yStorageFolders.toArray();
+    const index = arr.findIndex(f => f.id === folderId);
+    if (index !== -1) {
+      yStorageFolders.delete(index, 1);
+    }
+  }, [yStorageFolders]);
 
   /** Toggle favorite for a file */
   const toggleFavorite = useCallback((fileId, userPublicKey) => {
     if (!yStorageFiles) return;
-    const arr = yStorageFiles.toArray();
-    const index = arr.findIndex(f => f.id === fileId);
-    if (index === -1) return;
-    const file = arr[index];
-    const favs = file.favoritedBy || [];
-    const isFav = favs.includes(userPublicKey);
-    const newFavs = isFav ? favs.filter(k => k !== userPublicKey) : [...favs, userPublicKey];
-    const updated = { ...file, favoritedBy: newFavs };
-    yStorageFiles.delete(index, 1);
-    yStorageFiles.insert(index, [updated]);
+    const doc = yStorageFiles.doc;
+    const doToggle = () => {
+      const arr = yStorageFiles.toArray();
+      const index = arr.findIndex(f => f.id === fileId);
+      if (index === -1) return;
+      const file = arr[index];
+      const favs = file.favoritedBy || [];
+      const isFav = favs.includes(userPublicKey);
+      const newFavs = isFav ? favs.filter(k => k !== userPublicKey) : [...favs, userPublicKey];
+      const updated = { ...file, favoritedBy: newFavs };
+      yStorageFiles.delete(index, 1);
+      yStorageFiles.insert(index, [updated]);
+    };
+    if (doc) doc.transact(doToggle);
+    else doToggle();
   }, [yStorageFiles]);
 
   /** Update chunk availability */
@@ -228,6 +267,7 @@ export function FileStorageProvider({
 
   /** Create a file record from an uploaded file */
   const createFileRecord = useCallback(({
+    id: preGeneratedId,
     name,
     sizeBytes,
     chunkCount,
@@ -237,7 +277,7 @@ export function FileStorageProvider({
   }) => {
     const ext = getExtension(name);
     const record = {
-      id: generateFileId(),
+      id: preGeneratedId || generateFileId(),
       fileStorageId,
       folderId,
       name,
@@ -323,6 +363,7 @@ export function FileStorageProvider({
     deleteFile,
     restoreFile,
     permanentlyDeleteFile,
+    permanentlyDeleteFolder,
     addFolder,
     updateFolder,
     deleteFolder,
@@ -338,7 +379,7 @@ export function FileStorageProvider({
     yFileStorageSystems, yStorageFiles, yStorageFolders,
     yChunkAvailability, yFileAuditLog,
     userIdentity, collaborators, sync,
-    addFile, updateFile, deleteFile, restoreFile, permanentlyDeleteFile,
+    addFile, updateFile, deleteFile, restoreFile, permanentlyDeleteFile, permanentlyDeleteFolder,
     addFolder, updateFolder, deleteFolder, restoreFolder,
     toggleFavorite, setChunkAvailability, addAuditEntry, updateSettings,
     createFileRecord, createFolderRecord,

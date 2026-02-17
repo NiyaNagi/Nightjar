@@ -3,19 +3,36 @@
  * 
  * Shell component for the file storage feature.
  * Wraps children in FileStorageProvider, renders nav rail + content router.
- * Follows the InventoryDashboard pattern exactly.
+ * Integrates all hooks (upload, download, transfer) and renders real views.
  * 
  * See docs/FILE_STORAGE_SPEC.md §5
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { FileStorageProvider, useFileStorage } from '../../contexts/FileStorageContext';
 import FileStorageNavRail, { FILE_VIEWS } from './FileStorageNavRail';
+import useFileUpload from '../../hooks/useFileUpload';
+import useFileDownload from '../../hooks/useFileDownload';
+import useFileTransfer from '../../hooks/useFileTransfer';
+import { useFileTransferContext } from '../../contexts/FileTransferContext';
+import { getStoredKeyChain } from '../../utils/keyDerivation';
+import { getExtension, getFileTypeCategory } from '../../utils/fileTypeCategories';
+import { generateFileId, generateFolderId, fileExistsInFolder } from '../../utils/fileStorageValidation';
+import BrowseView from './BrowseView';
+import RecentView from './RecentView';
+import FavoritesView from './FavoritesView';
+import TrashView from './TrashView';
+import AuditLogView from './AuditLogView';
+import StorageView from './StorageView';
+import FileStorageSettings from './FileStorageSettings';
+import DownloadsView from './DownloadsView';
+import DownloadsBar from './DownloadsBar';
+import MeshView from './MeshView';
+import { DEFAULT_CHUNK_REDUNDANCY_TARGET } from '../../utils/fileStorageValidation';
 import './FileStorageDashboard.css';
 
 /**
  * View IDs for the content area.
- * These correspond to nav rail items.
  */
 export const VIEWS = {
   BROWSE: FILE_VIEWS.BROWSE,
@@ -25,41 +42,348 @@ export const VIEWS = {
   TRASH: FILE_VIEWS.TRASH,
   AUDIT_LOG: FILE_VIEWS.AUDIT_LOG,
   STORAGE: FILE_VIEWS.STORAGE,
+  MESH: FILE_VIEWS.MESH,
   SETTINGS: FILE_VIEWS.SETTINGS,
 };
 
+/** Download history persistence key */
+const DOWNLOAD_HISTORY_KEY = 'nightjar-download-history';
+
+function loadDownloadHistory(workspaceId) {
+  try {
+    const raw = localStorage.getItem(`${DOWNLOAD_HISTORY_KEY}-${workspaceId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveDownloadHistory(workspaceId, history) {
+  try {
+    // Keep last 200 entries
+    const trimmed = (history || []).slice(0, 200);
+    localStorage.setItem(`${DOWNLOAD_HISTORY_KEY}-${workspaceId}`, JSON.stringify(trimmed));
+  } catch { /* ignore quota errors */ }
+}
+
 /** Inner content component – consumes FileStorageContext */
-function FileStorageContent({ onClose }) {
+function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
   const [activeView, setActiveView] = useState(VIEWS.BROWSE);
   const ctx = useFileStorage();
+  const [downloadHistory, setDownloadHistory] = useState([]);
 
   const {
+    workspaceId,
+    fileStorageId,
     activeFiles,
     trashedFiles,
     activeFolders,
+    trashedFolders,
     totalFileCount,
+    totalFolderCount,
     totalSizeBytes,
     sizeByCategory,
+    chunkAvailability,
     auditLog,
     currentSystem,
     userIdentity,
+    collaborators,
+    addFile,
+    updateFile,
+    deleteFile,
+    restoreFile,
+    permanentlyDeleteFile,
+    permanentlyDeleteFolder,
+    addFolder,
+    updateFolder,
+    deleteFolder,
+    restoreFolder,
+    toggleFavorite,
+    setChunkAvailability,
+    addAuditEntry,
+    updateSettings,
+    createFileRecord,
+    createFolderRecord,
   } = ctx;
 
-  // Compute badge counts
-  const trashedCount = trashedFiles?.length || 0;
-  const favoriteCount = useMemo(() => {
-    const pk = userIdentity?.publicKeyBase62;
-    if (!pk || !activeFiles) return 0;
-    return activeFiles.filter(f => f.favoritedBy?.includes(pk)).length;
-  }, [activeFiles, userIdentity]);
+  const userPublicKey = userIdentity?.publicKeyBase62 || userIdentity?.publicKey;
 
-  // Determine user role for nav rail
+  // Get workspace key for encryption
+  const workspaceKey = useMemo(() => {
+    if (!workspaceId) return null;
+    const keyChain = getStoredKeyChain(workspaceId);
+    return keyChain?.workspaceKey || null;
+  }, [workspaceId]);
+
+  // Load download history from localStorage
+  useEffect(() => {
+    if (workspaceId) {
+      setDownloadHistory(loadDownloadHistory(workspaceId));
+    }
+  }, [workspaceId]);
+
+  // Initialize hooks
+  const {
+    uploadFile,
+    uploadFiles,
+    uploads,
+    clearUpload,
+    clearCompleted: clearCompletedUploads,
+  } = useFileUpload({
+    workspaceId,
+    workspaceKey,
+    userPublicKey,
+    createFileRecord,
+    setChunkAvailability,
+    addAuditEntry,
+  });
+
+  const {
+    handleChunkRequest,
+    requestChunkFromPeer,
+    announceAvailability,
+    getLocalChunkCount,
+    transferStats,
+  } = useFileTransfer({
+    workspaceId,
+    userPublicKey,
+    workspaceProvider,
+    setChunkAvailability,
+  });
+
+  const {
+    downloadFile,
+    checkLocalAvailability,
+    downloads,
+    clearDownload,
+  } = useFileDownload({
+    workspaceId,
+    workspaceKey,
+    requestChunkFromPeer,
+    addAuditEntry,
+    announceAvailability,
+    chunkAvailability,
+  });
+
+  // Get connected peers for mesh view
+  const [connectedPeers, setConnectedPeers] = useState([]);
+  useEffect(() => {
+    const updatePeers = () => {
+      try {
+        const { getPeerManager } = require('../../services/p2p/index.js');
+        const pm = getPeerManager();
+        setConnectedPeers(pm?.getConnectedPeers?.() || []);
+      } catch {
+        setConnectedPeers([]);
+      }
+    };
+    updatePeers();
+    const timer = setInterval(updatePeers, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Track completed downloads for history
+  const prevDownloadsRef = useRef([]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    const prev = prevDownloadsRef.current;
+    const completed = downloads.filter(d =>
+      (d.status === 'complete' || d.status === 'error') &&
+      !prev.some(p => p.downloadId === d.downloadId && (p.status === 'complete' || p.status === 'error'))
+    );
+    if (completed.length > 0) {
+      setDownloadHistory(h => {
+        const updated = [
+          ...completed.map(d => ({
+            ...d,
+            completedAt: Date.now(),
+            isActive: false,
+          })),
+          ...h,
+        ];
+        saveDownloadHistory(workspaceId, updated);
+        return updated;
+      });
+    }
+    prevDownloadsRef.current = downloads;
+  }, [downloads, workspaceId]);
+
+  // Badge counts
+  const trashedCount = (trashedFiles?.length || 0) + (trashedFolders?.length || 0);
+  const downloadingCount = downloads.filter(d => d.status !== 'complete' && d.status !== 'error').length;
+  const favoriteCount = useMemo(() => {
+    if (!userPublicKey || !activeFiles) return 0;
+    return activeFiles.filter(f => f.favoritedBy?.includes(userPublicKey)).length;
+  }, [activeFiles, userPublicKey]);
+
+  // Favorite IDs set for fast lookup
+  const favoriteIds = useMemo(() => {
+    if (!userPublicKey || !activeFiles) return new Set();
+    return new Set(activeFiles.filter(f => f.favoritedBy?.includes(userPublicKey)).map(f => f.id));
+  }, [activeFiles, userPublicKey]);
+
+  // Role
   const role = useMemo(() => {
-    const system = currentSystem;
-    if (!system || !userIdentity) return 'collaborator';
-    if (system.createdBy === userIdentity.publicKeyBase62) return 'admin';
+    if (!currentSystem || !userIdentity) return 'collaborator';
+    if (currentSystem.createdBy === userPublicKey) return 'admin';
     return 'collaborator';
-  }, [currentSystem, userIdentity]);
+  }, [currentSystem, userIdentity, userPublicKey]);
+
+  // Settings from currentSystem
+  const settings = useMemo(() => currentSystem?.settings || {}, [currentSystem]);
+
+  // Chunk seeding & transfer stats from workspace-level context
+  const redundancyTarget = settings.chunkRedundancyTarget ?? DEFAULT_CHUNK_REDUNDANCY_TARGET;
+
+  const {
+    seedingStats,
+    bandwidthHistory,
+    triggerSeedCycle,
+    resetStats,
+  } = useFileTransferContext();
+
+  // Upload files with collision handling
+  const handleUploadFiles = useCallback(async (files, folderId, options = {}) => {
+    for (const file of files) {
+      let name = file.name;
+      if (options.keepBoth && fileExistsInFolder(name, folderId, activeFiles)) {
+        const ext = getExtension(name);
+        const base = name.slice(0, name.length - (ext ? ext.length + 1 : 0));
+        name = `${base} (copy)${ext ? '.' + ext : ''}`;
+      }
+      await uploadFile(file, folderId, {
+        replace: options.replace || false,
+        fileName: options.keepBoth ? name : undefined,
+      });
+    }
+  }, [uploadFile, activeFiles]);
+
+  // Download file
+  const handleDownloadFile = useCallback(async (fileRecord) => {
+    try {
+      setActiveView(VIEWS.DOWNLOADS);
+      await downloadFile(fileRecord);
+    } catch (err) {
+      console.error('[FileStorage] Download error:', err);
+    }
+  }, [downloadFile]);
+
+  // Update file metadata
+  const handleUpdateFile = useCallback((fileId, updates) => {
+    updateFile(fileId, updates);
+    if (updates.name) {
+      addAuditEntry('rename', 'file', fileId, updates.name, 'Renamed file');
+    }
+    if (updates.tags) {
+      addAuditEntry('tag', 'file', fileId, null, 'Tags updated');
+    }
+  }, [updateFile, addAuditEntry]);
+
+  // Delete file (soft)
+  const handleDeleteFile = useCallback((fileId) => {
+    const file = activeFiles.find(f => f.id === fileId);
+    deleteFile(fileId);
+    addAuditEntry('delete', 'file', fileId, file?.name || fileId, 'Deleted file');
+  }, [deleteFile, addAuditEntry, activeFiles]);
+
+  // Toggle favorite
+  const handleToggleFavorite = useCallback((fileId) => {
+    toggleFavorite(fileId, userPublicKey);
+  }, [toggleFavorite, userPublicKey]);
+
+  // Create folder
+  const handleCreateFolder = useCallback(({ name, parentId, color, icon }) => {
+    createFolderRecord({ name, parentId, color, icon });
+    addAuditEntry('create_folder', 'folder', null, name, 'Created folder');
+  }, [createFolderRecord, addAuditEntry]);
+
+  // Update folder
+  const handleUpdateFolder = useCallback((folderId, updates) => {
+    updateFolder(folderId, updates);
+    if (updates.name) {
+      addAuditEntry('rename', 'folder', folderId, updates.name, 'Renamed folder');
+    }
+  }, [updateFolder, addAuditEntry]);
+
+  // Delete folder
+  const handleDeleteFolder = useCallback((folderId) => {
+    const folder = activeFolders.find(f => f.id === folderId);
+    deleteFolder(folderId);
+    addAuditEntry('delete', 'folder', folderId, folder?.name || folderId, 'Deleted folder');
+  }, [deleteFolder, addAuditEntry, activeFolders]);
+
+  // Move file
+  const handleMoveFile = useCallback((fileId, destFolderId) => {
+    const file = activeFiles.find(f => f.id === fileId);
+    updateFile(fileId, { folderId: destFolderId || null });
+    addAuditEntry('move', 'file', fileId, file?.name || fileId, `Moved to ${destFolderId || 'Root'}`);
+  }, [updateFile, addAuditEntry, activeFiles]);
+
+  // Move folder
+  const handleMoveFolder = useCallback((folderId, destParentId) => {
+    const folder = activeFolders.find(f => f.id === folderId);
+    updateFolder(folderId, { parentId: destParentId || null });
+    addAuditEntry('move', 'folder', folderId, folder?.name || folderId, `Moved to ${destParentId || 'Root'}`);
+  }, [updateFolder, addAuditEntry, activeFolders]);
+
+  // Restore file/folder
+  const handleRestoreFile = useCallback((fileId) => {
+    restoreFile(fileId);
+    addAuditEntry('restore', 'file', fileId, null, 'Restored file');
+  }, [restoreFile, addAuditEntry]);
+
+  const handleRestoreFolder = useCallback((folderId) => {
+    restoreFolder(folderId);
+    addAuditEntry('restore', 'folder', folderId, null, 'Restored folder');
+  }, [restoreFolder, addAuditEntry]);
+
+  // Permanent delete
+  const handlePermanentlyDeleteFile = useCallback((fileId) => {
+    permanentlyDeleteFile(fileId);
+    addAuditEntry('permanent_delete', 'file', fileId, null, 'Permanently deleted file');
+  }, [permanentlyDeleteFile, addAuditEntry]);
+
+  const handlePermanentlyDeleteFolder = useCallback((folderId) => {
+    // For folders, remove from yStorageFolders (no chunks to clean)
+    permanentlyDeleteFolder(folderId);
+    addAuditEntry('permanent_delete', 'folder', folderId, null, 'Permanently deleted folder');
+  }, [permanentlyDeleteFolder, addAuditEntry]);
+
+  // Empty trash
+  const handleEmptyTrash = useCallback(() => {
+    (trashedFiles || []).forEach(f => permanentlyDeleteFile(f.id));
+    (trashedFolders || []).forEach(f => permanentlyDeleteFolder(f.id));
+    addAuditEntry('permanent_delete', null, null, null, 'Emptied trash');
+  }, [trashedFiles, trashedFolders, permanentlyDeleteFile, permanentlyDeleteFolder, addAuditEntry]);
+
+  // Delete all files (danger zone)
+  const handleDeleteAllFiles = useCallback(() => {
+    (activeFiles || []).forEach(f => permanentlyDeleteFile(f.id));
+    (activeFolders || []).forEach(f => permanentlyDeleteFolder(f.id));
+    (trashedFiles || []).forEach(f => permanentlyDeleteFile(f.id));
+    (trashedFolders || []).forEach(f => permanentlyDeleteFolder(f.id));
+    addAuditEntry('permanent_delete', null, null, null, 'Deleted all files and folders');
+  }, [activeFiles, activeFolders, trashedFiles, trashedFolders, permanentlyDeleteFile, permanentlyDeleteFolder, addAuditEntry]);
+
+  // Update settings
+  const handleUpdateSettings = useCallback((newSettings) => {
+    updateSettings(newSettings);
+    addAuditEntry('settings', null, null, null, 'Updated settings');
+  }, [updateSettings, addAuditEntry]);
+
+  // Clear download history
+  const handleClearHistory = useCallback(() => {
+    setDownloadHistory([]);
+    saveDownloadHistory(workspaceId, []);
+  }, [workspaceId]);
+
+  // Clear single download from history
+  const handleClearDownloadFromHistory = useCallback((downloadId) => {
+    clearDownload(downloadId);
+    setDownloadHistory(h => {
+      const updated = h.filter(d => d.downloadId !== downloadId);
+      saveDownloadHistory(workspaceId, updated);
+      return updated;
+    });
+  }, [clearDownload, workspaceId]);
 
   const handleViewChange = useCallback((viewId) => {
     setActiveView(viewId);
@@ -69,212 +393,135 @@ function FileStorageContent({ onClose }) {
     switch (activeView) {
       case VIEWS.BROWSE:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-browse">
-            <div className="fs-content-header">
-              <h2>Browse Files</h2>
-              <div className="fs-content-stats">
-                <span>{totalFileCount} file{totalFileCount !== 1 ? 's' : ''}</span>
-                <span>•</span>
-                <span>{formatSize(totalSizeBytes)}</span>
-              </div>
-            </div>
-            <div className="fs-content-body">
-              {activeFiles && activeFiles.length > 0 ? (
-                <div className="fs-file-list">
-                  {activeFiles.map(file => (
-                    <div key={file.id} className="fs-file-item" data-testid={`fs-file-${file.id}`}>
-                      <span className="fs-file-name">{file.name}</span>
-                      <span className="fs-file-size">{formatSize(file.sizeBytes)}</span>
-                      <span className="fs-file-date">{new Date(file.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="fs-empty-state">
-                  <span className="fs-empty-icon">📂</span>
-                  <p>No files yet</p>
-                  <p className="fs-empty-hint">Upload a file to get started</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <BrowseView
+            activeFiles={activeFiles || []}
+            activeFolders={activeFolders || []}
+            chunkAvailability={chunkAvailability}
+            userPublicKey={userPublicKey}
+            userIdentity={userIdentity}
+            role={role}
+            uploads={uploads}
+            onUploadFiles={handleUploadFiles}
+            onClearUpload={clearUpload}
+            onClearCompletedUploads={clearCompletedUploads}
+            onDownloadFile={handleDownloadFile}
+            onUpdateFile={handleUpdateFile}
+            onDeleteFile={handleDeleteFile}
+            onToggleFavorite={handleToggleFavorite}
+            onCreateFolder={handleCreateFolder}
+            onUpdateFolder={handleUpdateFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onMoveFile={handleMoveFile}
+            onMoveFolder={handleMoveFolder}
+            collaborators={collaborators}
+            favoriteIds={favoriteIds}
+            onStartChatWith={onStartChatWith}
+          />
         );
 
       case VIEWS.RECENT:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-recent">
-            <div className="fs-content-header">
-              <h2>Recent Files</h2>
-            </div>
-            <div className="fs-content-body">
-              {activeFiles && activeFiles.length > 0 ? (
-                <div className="fs-file-list">
-                  {[...activeFiles]
-                    .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
-                    .slice(0, 20)
-                    .map(file => (
-                      <div key={file.id} className="fs-file-item" data-testid={`fs-file-${file.id}`}>
-                        <span className="fs-file-name">{file.name}</span>
-                        <span className="fs-file-size">{formatSize(file.sizeBytes)}</span>
-                        <span className="fs-file-date">{new Date(file.updatedAt || file.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="fs-empty-state">
-                  <span className="fs-empty-icon">🕑</span>
-                  <p>No recent activity</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <RecentView
+            activeFiles={activeFiles || []}
+            activeFolders={activeFolders || []}
+            chunkAvailability={chunkAvailability}
+            userPublicKey={userPublicKey}
+            onSelectFile={(f) => { /* detail panel opened from BrowseView */ }}
+            onDownloadFile={handleDownloadFile}
+          />
         );
 
       case VIEWS.DOWNLOADS:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-downloads">
-            <div className="fs-content-header">
-              <h2>Downloads</h2>
-            </div>
-            <div className="fs-content-body">
-              <div className="fs-empty-state">
-                <span className="fs-empty-icon">⬇️</span>
-                <p>No active downloads</p>
-                <p className="fs-empty-hint">Files you download will appear here</p>
-              </div>
-            </div>
-          </div>
+          <DownloadsView
+            downloads={downloads}
+            downloadHistory={downloadHistory}
+            onClearDownload={handleClearDownloadFromHistory}
+            onClearHistory={handleClearHistory}
+            onRetryDownload={(item) => {
+              const file = activeFiles?.find(f => f.id === item.fileId);
+              if (file) handleDownloadFile(file);
+            }}
+          />
         );
 
       case VIEWS.FAVORITES:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-favorites">
-            <div className="fs-content-header">
-              <h2>Favorites</h2>
-            </div>
-            <div className="fs-content-body">
-              {favoriteCount > 0 ? (
-                <div className="fs-file-list">
-                  {activeFiles
-                    .filter(f => f.favoritedBy?.includes(userIdentity?.publicKeyBase62))
-                    .map(file => (
-                      <div key={file.id} className="fs-file-item" data-testid={`fs-file-${file.id}`}>
-                        <span className="fs-file-name">⭐ {file.name}</span>
-                        <span className="fs-file-size">{formatSize(file.sizeBytes)}</span>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="fs-empty-state">
-                  <span className="fs-empty-icon">⭐</span>
-                  <p>No favorites yet</p>
-                  <p className="fs-empty-hint">Star files for quick access</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <FavoritesView
+            activeFiles={activeFiles || []}
+            userIdentity={userIdentity}
+            onSelectFile={(f) => { /* could navigate to browse */ }}
+            onToggleFavorite={handleToggleFavorite}
+          />
         );
 
       case VIEWS.TRASH:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-trash">
-            <div className="fs-content-header">
-              <h2>Trash</h2>
-              {trashedCount > 0 && (
-                <span className="fs-content-stats">{trashedCount} item{trashedCount !== 1 ? 's' : ''}</span>
-              )}
-            </div>
-            <div className="fs-content-body">
-              {trashedFiles && trashedFiles.length > 0 ? (
-                <div className="fs-file-list">
-                  {trashedFiles.map(file => (
-                    <div key={file.id} className="fs-file-item fs-file-trashed" data-testid={`fs-file-${file.id}`}>
-                      <span className="fs-file-name">{file.name}</span>
-                      <span className="fs-file-size">{formatSize(file.sizeBytes)}</span>
-                      <span className="fs-file-date">Deleted {new Date(file.deletedAt).toLocaleDateString()}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="fs-empty-state">
-                  <span className="fs-empty-icon">🗑️</span>
-                  <p>Trash is empty</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <TrashView
+            trashedFiles={trashedFiles || []}
+            trashedFolders={trashedFolders || []}
+            role={role}
+            userIdentity={userIdentity}
+            settings={settings}
+            onRestoreFile={handleRestoreFile}
+            onPermanentlyDeleteFile={handlePermanentlyDeleteFile}
+            onRestoreFolder={handleRestoreFolder}
+            onPermanentlyDeleteFolder={handlePermanentlyDeleteFolder}
+            onEmptyTrash={handleEmptyTrash}
+          />
         );
 
       case VIEWS.AUDIT_LOG:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-audit">
-            <div className="fs-content-header">
-              <h2>Audit Log</h2>
-            </div>
-            <div className="fs-content-body">
-              {auditLog && auditLog.length > 0 ? (
-                <div className="fs-audit-list">
-                  {[...auditLog]
-                    .sort((a, b) => b.timestamp - a.timestamp)
-                    .map(entry => (
-                      <div key={entry.id} className="fs-audit-item" data-testid={`fs-audit-${entry.id}`}>
-                        <span className="fs-audit-time">{new Date(entry.timestamp).toLocaleString()}</span>
-                        <span className="fs-audit-actor">{entry.actorName}</span>
-                        <span className="fs-audit-summary">{entry.summary}</span>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="fs-empty-state">
-                  <span className="fs-empty-icon">📋</span>
-                  <p>No audit entries</p>
-                </div>
-              )}
-            </div>
-          </div>
+          <AuditLogView
+            auditLog={auditLog || []}
+            collaborators={collaborators || []}
+            onStartChatWith={onStartChatWith}
+            currentUserKey={userPublicKey}
+          />
         );
 
       case VIEWS.STORAGE:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-storage">
-            <div className="fs-content-header">
-              <h2>Storage Overview</h2>
-            </div>
-            <div className="fs-content-body">
-              <div className="fs-storage-stats">
-                <div className="fs-storage-stat">
-                  <span className="fs-storage-stat-label">Total Files</span>
-                  <span className="fs-storage-stat-value">{totalFileCount}</span>
-                </div>
-                <div className="fs-storage-stat">
-                  <span className="fs-storage-stat-label">Total Size</span>
-                  <span className="fs-storage-stat-value">{formatSize(totalSizeBytes)}</span>
-                </div>
-                {sizeByCategory && Object.entries(sizeByCategory).map(([cat, size]) => (
-                  <div key={cat} className="fs-storage-stat">
-                    <span className="fs-storage-stat-label">{cat}</span>
-                    <span className="fs-storage-stat-value">{formatSize(size)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <StorageView
+            activeFiles={activeFiles || []}
+            activeFolders={activeFolders || []}
+            trashedFiles={trashedFiles || []}
+            totalSizeBytes={totalSizeBytes}
+            sizeByCategory={sizeByCategory}
+            chunkAvailability={chunkAvailability}
+            collaborators={collaborators}
+            userPublicKey={userPublicKey}
+            onStartChatWith={onStartChatWith}
+          />
         );
 
       case VIEWS.SETTINGS:
         return (
-          <div className="fs-content-placeholder" data-testid="fs-view-settings">
-            <div className="fs-content-header">
-              <h2>File Storage Settings</h2>
-            </div>
-            <div className="fs-content-body">
-              <div className="fs-settings-section">
-                <p className="fs-settings-info">
-                  Settings for this file storage system.
-                </p>
-              </div>
-            </div>
-          </div>
+          <FileStorageSettings
+            currentSystem={currentSystem}
+            settings={settings}
+            role={role}
+            onUpdateSettings={handleUpdateSettings}
+            onEmptyTrash={handleEmptyTrash}
+            onDeleteAllFiles={handleDeleteAllFiles}
+            trashedCount={trashedCount}
+          />
+        );
+
+      case VIEWS.MESH:
+        return (
+          <MeshView
+            activeFiles={activeFiles || []}
+            chunkAvailability={chunkAvailability}
+            seedingStats={seedingStats}
+            bandwidthHistory={bandwidthHistory}
+            transferStats={transferStats}
+            redundancyTarget={redundancyTarget}
+            userPublicKey={userPublicKey}
+            connectedPeers={connectedPeers}
+            onResetStats={resetStats}
+          />
         );
 
       default:
@@ -289,21 +536,19 @@ function FileStorageContent({ onClose }) {
         onViewChange={handleViewChange}
         role={role}
         trashedCount={trashedCount}
+        downloadingCount={downloadingCount}
         favoriteCount={favoriteCount}
       />
       <div className="fs-content-area">
         {renderContent()}
+        <DownloadsBar
+          downloads={downloads}
+          onClearDownload={clearDownload}
+          onClearAll={() => downloads.filter(d => d.status === 'complete' || d.status === 'error').forEach(d => clearDownload(d.downloadId))}
+        />
       </div>
     </div>
   );
-}
-
-/** Format bytes into human-readable string */
-function formatSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(1024));
-  return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
 /**
@@ -320,7 +565,9 @@ export default function FileStorageDashboard({
   yFileAuditLog,
   userIdentity,
   collaborators,
+  workspaceProvider,
   onClose,
+  onStartChatWith,
 }) {
   return (
     <FileStorageProvider
@@ -334,7 +581,7 @@ export default function FileStorageDashboard({
       userIdentity={userIdentity}
       collaborators={collaborators}
     >
-      <FileStorageContent onClose={onClose} />
+      <FileStorageContent onClose={onClose} workspaceProvider={workspaceProvider} onStartChatWith={onStartChatWith} />
     </FileStorageProvider>
   );
 }

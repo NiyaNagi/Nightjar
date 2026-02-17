@@ -137,10 +137,10 @@ export function useInventorySync({
     entry => entry.inventorySystemId === inventorySystemId
   );
 
-  // Producer capacities for this system
-  const producerCapacities = Object.values(producerCapacitiesMap).filter(
-    cap => cap.inventorySystemId === inventorySystemId
-  );
+  // Producer capacities for this system (preserved as object keyed by producer public key)
+  const producerCapacities = Object.entries(producerCapacitiesMap)
+    .filter(([, cap]) => cap.inventorySystemId === inventorySystemId)
+    .reduce((acc, [key, val]) => { acc[key] = val; return acc; }, {});
 
   // Address reveals for this system
   const addressReveals = Object.entries(addressRevealsMap)
@@ -148,7 +148,10 @@ export function useInventorySync({
     .reduce((acc, [key, val]) => { acc[key] = val; return acc; }, {});
 
   // Pending addresses for this system (keyed by requestId)
+  // Filter by inventorySystemId to match other data types, but also include
+  // entries without inventorySystemId for backward compat (older entries)
   const pendingAddresses = Object.entries(pendingAddressesMap)
+    .filter(([, val]) => !val.inventorySystemId || val.inventorySystemId === inventorySystemId)
     .reduce((acc, [key, val]) => { acc[key] = val; return acc; }, {});
 
   // Derived counts

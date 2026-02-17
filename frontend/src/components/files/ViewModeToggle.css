@@ -1,0 +1,39 @@
+/* ViewModeToggle.css */
+
+.view-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-mode-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #a6adc8);
+  font-size: 14px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.view-mode-btn:not(:last-child) {
+  border-right: 1px solid var(--border-color, #313244);
+}
+
+.view-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #cdd6f4);
+}
+
+.view-mode-btn--active {
+  background: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+}
+
+.view-mode-btn--active:hover {
+  background: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+}

@@ -33,7 +33,7 @@ export const MAX_TAGS_PER_FILE = 20;
 export const DEFAULT_AUTO_DELETE_DAYS = 30;
 
 /** Default chunk redundancy target */
-export const DEFAULT_CHUNK_REDUNDANCY_TARGET = 3;
+export const DEFAULT_CHUNK_REDUNDANCY_TARGET = 5;
 
 /** Seed interval in ms */
 export const SEED_INTERVAL_MS = 60000;
@@ -115,8 +115,13 @@ export function validateFolderDepth(parentId, allFolders) {
 
   let depth = 1;
   let currentId = parentId;
+  const visited = new Set();
 
   while (currentId) {
+    if (visited.has(currentId)) {
+      return { valid: false, error: 'Circular folder reference detected' };
+    }
+    visited.add(currentId);
     const parent = allFolders.find(f => f.id === currentId);
     if (!parent) break;
     depth++;
@@ -192,11 +197,26 @@ export function validateTags(tags) {
 }
 
 /**
+ * Generate a cryptographically random hex suffix.
+ * @param {number} bytes - number of random bytes
+ * @returns {string}
+ */
+function randomHex(bytes = 8) {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint8Array(bytes);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  // Fallback for environments without crypto
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+}
+
+/**
  * Generate a unique file ID.
  * @returns {string}
  */
 export function generateFileId() {
-  return 'file-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+  return 'file-' + Date.now().toString(36) + randomHex(8);
 }
 
 /**
@@ -204,7 +224,7 @@ export function generateFileId() {
  * @returns {string}
  */
 export function generateFolderId() {
-  return 'sfolder-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+  return 'sfolder-' + Date.now().toString(36) + randomHex(8);
 }
 
 /**
@@ -212,7 +232,7 @@ export function generateFolderId() {
  * @returns {string}
  */
 export function generateFileStorageId() {
-  return 'fs-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+  return 'fs-' + Date.now().toString(36) + randomHex(8);
 }
 
 /**
@@ -220,7 +240,7 @@ export function generateFileStorageId() {
  * @returns {string}
  */
 export function generateAuditId() {
-  return 'faudit-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+  return 'faudit-' + Date.now().toString(36) + randomHex(8);
 }
 
 export default {

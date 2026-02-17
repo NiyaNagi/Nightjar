@@ -276,7 +276,7 @@ describe('Edge Cases: Backup', () => {
   });
 
   describe('Backup Structure Edge Cases', () => {
-    test('handles workspace with no members', () => {
+    test('handles workspace with no members', async () => {
       const identity = generateIdentity();
       const workspaces = [{
         id: 'ws1',
@@ -285,11 +285,11 @@ describe('Edge Cases: Backup', () => {
         encryptionKey: 'key123',
       }];
       
-      const backup = createBackup(identity, workspaces);
+      const backup = await createBackup(identity, workspaces);
       expect(backup.workspaces).toHaveLength(1);
     });
 
-    test('handles 100 workspaces', () => {
+    test('handles 100 workspaces', async () => {
       const identity = generateIdentity();
       const workspaces = Array.from({ length: 100 }, (_, i) => ({
         id: `workspace${i}`,
@@ -298,11 +298,11 @@ describe('Edge Cases: Backup', () => {
         encryptionKey: `key${i}`,
       }));
       
-      const backup = createBackup(identity, workspaces);
+      const backup = await createBackup(identity, workspaces);
       expect(backup.workspaces).toHaveLength(100);
     });
 
-    test('handles workspace name with special characters', () => {
+    test('handles workspace name with special characters', async () => {
       const identity = generateIdentity();
       const workspaces = [{
         id: 'ws1',
@@ -311,8 +311,8 @@ describe('Edge Cases: Backup', () => {
         encryptionKey: 'key123',
       }];
       
-      const backup = createBackup(identity, workspaces);
-      const restored = restoreBackup(backup, identity.mnemonic);
+      const backup = await createBackup(identity, workspaces);
+      const restored = await restoreBackup(backup, identity.mnemonic);
       
       expect(restored.workspaces[0].name).toContain('script');
     });

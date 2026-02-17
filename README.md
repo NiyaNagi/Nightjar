@@ -841,6 +841,18 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.0 - File Storage, P2P Transfer & Presence Fixes
+- **New Feature**: Complete file storage dashboard UI overhaul (browse, search, folders, bulk ops, downloads)
+- **New Feature**: Floating chat button with unread badge
+- **New Feature**: Slide panel component for inventory request details
+- **Critical Fix**: P2P file transfer end-to-end implementation (was a TODO stub)
+- **Critical Fix**: Server relay-message/relay-broadcast handlers for cross-network delivery
+- **Critical Fix**: Sidecar chunk message routing via direct-message event
+- **Critical Fix**: Presence indicators one-way display (publicKey race condition)
+- **Bug Fix**: Inventory shipping workflow — 5 bugs in approval/address/shipping flow
+- **Bug Fix**: File size display and chunk availability holder merging
+- **Testing**: 110 test suites, 2,921 tests (0 failures)
+
 ### v1.6.1 - Import & Analytics Fixes
 - **Bug Fix**: CSV/XLSX date parsing — imported dates no longer show "just now" (SheetJS serial date conversion fix)
 - **Bug Fix**: Analytics views now correctly display imported request data (field name normalization)

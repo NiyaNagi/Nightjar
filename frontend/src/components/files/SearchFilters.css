@@ -1,0 +1,164 @@
+/* SearchFilters.css */
+
+.fs-search-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.fs-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  color: var(--text-secondary, #a6adc8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.fs-filter-toggle:hover {
+  border-color: var(--accent-color, #89b4fa);
+  color: var(--text-primary, #cdd6f4);
+}
+
+.fs-filter-toggle--active {
+  border-color: var(--accent-color, #89b4fa);
+  color: var(--accent-color, #89b4fa);
+}
+
+.fs-filter-clear {
+  background: none;
+  border: none;
+  color: var(--text-tertiary, #6c7086);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.fs-filter-clear:hover {
+  color: var(--text-primary, #cdd6f4);
+}
+
+.fs-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fs-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(137, 180, 250, 0.1);
+  border: 1px solid rgba(137, 180, 250, 0.2);
+  border-radius: 12px;
+  color: var(--accent-color, #89b4fa);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.fs-filter-chip button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  opacity: 0.7;
+}
+
+.fs-filter-chip button:hover {
+  opacity: 1;
+}
+
+/* Filter panel */
+.fs-filter-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  min-width: 280px;
+  animation: filterPanelIn 0.12s ease;
+}
+
+@keyframes filterPanelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fs-filter-section {
+  margin-bottom: 12px;
+}
+
+.fs-filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.fs-filter-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #a6adc8);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fs-filter-select {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--bg-primary, #11111b);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 4px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 12px;
+  outline: none;
+}
+
+.fs-filter-select:focus {
+  border-color: var(--accent-color, #89b4fa);
+}
+
+.fs-filter-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fs-filter-option {
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 4px;
+  color: var(--text-secondary, #a6adc8);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  white-space: nowrap;
+}
+
+.fs-filter-option:hover {
+  border-color: var(--accent-color, #89b4fa);
+  color: var(--text-primary, #cdd6f4);
+}
+
+.fs-filter-option--active {
+  background: var(--accent-color, #89b4fa);
+  border-color: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+}

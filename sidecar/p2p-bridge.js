@@ -117,6 +117,21 @@ class P2PBridge extends EventEmitter {
         peers: (data.peers || []).map(pk => ({ peerId: pk })),
       });
     });
+
+    // Handle direct messages (chunk-request, chunk-response, chunk-seed,
+    // and any future custom message types that fall through the switch
+    // in HyperswarmManager._handleData's default case).
+    // These are peer-to-peer messages that don't belong to a topic,
+    // so we forward them to ALL connected frontend WebSocket clients.
+    this.hyperswarm.on('direct-message', (data) => {
+      const { peerId, message } = data;
+      console.log(`[P2PBridge] Forwarding direct-message from ${peerId?.slice(0, 16)}...: type=${message?.type}`);
+      this._broadcastToAllClients({
+        type: 'p2p-message',
+        fromPeerId: peerId,
+        payload: message,
+      });
+    });
   }
 
   /**
@@ -254,7 +269,7 @@ class P2PBridge extends EventEmitter {
       topic,
     });
 
-    // Send current peers in topic
+    // Send current peers in topic (local P2P Bridge clients)
     const peers = [];
     for (const otherWs of this.topics.get(topic)) {
       if (otherWs !== ws) {
@@ -265,6 +280,25 @@ class P2PBridge extends EventEmitter {
             ...otherClient.identity,
           });
         }
+      }
+    }
+
+    // Also include Hyperswarm-connected remote peers for this topic.
+    // These are already connected via DHT but the new client doesn't
+    // know about them yet (peer-joined events fired before this client
+    // subscribed to the topic).
+    if (this.hyperswarm && this.isInitialized) {
+      try {
+        const hyperswarmPeers = this.hyperswarm.getPeers(topic);
+        const localPeerIds = new Set(peers.map(p => p.peerId));
+        for (const hsPeer of hyperswarmPeers) {
+          if (!localPeerIds.has(hsPeer.peerId)) {
+            peers.push(hsPeer);
+          }
+        }
+      } catch (e) {
+        // Non-fatal — Hyperswarm peer discovery is optional
+        console.warn('[P2PBridge] Failed to get Hyperswarm peers for topic:', e.message);
       }
     }
 
@@ -487,6 +521,19 @@ class P2PBridge extends EventEmitter {
     if (!sockets) return;
 
     for (const ws of sockets) {
+      if (ws !== excludeWs) {
+        this._sendToClient(ws, message);
+      }
+    }
+  }
+
+  /**
+   * Broadcast a message to ALL connected frontend WebSocket clients,
+   * regardless of topic. Used for direct peer-to-peer messages like
+   * chunk-request/chunk-response that aren't scoped to a topic.
+   */
+  _broadcastToAllClients(message, excludeWs = null) {
+    for (const ws of this.clients.keys()) {
       if (ws !== excludeWs) {
         this._sendToClient(ws, message);
       }

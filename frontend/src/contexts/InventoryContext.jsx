@@ -49,11 +49,13 @@ export function useInventory() {
  * @param {Y.Array} props.yInventoryNotifications - Yjs array of notifications
  * @param {Object} props.userIdentity - Current user identity (publicKeyBase62, etc.)
  * @param {Array} props.collaborators - Workspace collaborators list
+ * @param {Function} [props.onStartChatWith] - Callback to initiate a chat with a user
  */
 export function InventoryProvider({
   children,
   inventorySystemId,
   workspaceId,
+  currentWorkspace,
   yInventorySystems,
   yCatalogItems,
   yInventoryRequests,
@@ -64,6 +66,7 @@ export function InventoryProvider({
   yInventoryNotifications,
   userIdentity,
   collaborators,
+  onStartChatWith,
 }) {
   // Call useInventorySync once here so children don't need to
   const sync = useInventorySync(
@@ -83,6 +86,7 @@ export function InventoryProvider({
     // Raw Yjs refs (for mutations)
     inventorySystemId,
     workspaceId,
+    currentWorkspace,
     yInventorySystems,
     yCatalogItems,
     yInventoryRequests,
@@ -93,13 +97,15 @@ export function InventoryProvider({
     yInventoryNotifications,
     userIdentity,
     collaborators,
+    onStartChatWith,
     // Derived reactive state from useInventorySync
     ...sync,
   }), [
-    inventorySystemId, workspaceId,
+    inventorySystemId, workspaceId, currentWorkspace,
     yInventorySystems, yCatalogItems, yInventoryRequests,
     yProducerCapacities, yAddressReveals, yPendingAddresses,
     yInventoryAuditLog, yInventoryNotifications, userIdentity, collaborators,
+    onStartChatWith,
     sync,
   ]);
 

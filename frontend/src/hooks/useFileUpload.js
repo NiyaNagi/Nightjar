@@ -12,96 +12,19 @@ import { useState, useCallback, useRef } from 'react';
 import { processFileForUpload } from '../utils/fileChunking';
 import {
   validateFileForUpload,
+  generateFileId,
   MAX_FILE_SIZE,
 } from '../utils/fileStorageValidation';
+import {
+  UPLOAD_STATUS,
+  openChunkStore,
+  storeChunk,
+  getChunk,
+  deleteFileChunks,
+} from '../utils/chunkStore';
 
-/**
- * Upload states
- */
-export const UPLOAD_STATUS = {
-  IDLE: 'idle',
-  READING: 'reading',
-  CHUNKING: 'chunking',
-  ENCRYPTING: 'encrypting',
-  STORING: 'storing',
-  COMPLETE: 'complete',
-  ERROR: 'error',
-};
-
-/**
- * Open (or create) the IndexedDB store for file chunks.
- * Each workspace gets its own database.
- * @param {string} workspaceId
- * @returns {Promise<IDBDatabase>}
- */
-function openChunkStore(workspaceId) {
-  return new Promise((resolve, reject) => {
-    const dbName = `nightjar-chunks-${workspaceId}`;
-    const request = indexedDB.open(dbName, 1);
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('chunks')) {
-        db.createObjectStore('chunks'); // key = `${fileId}:${chunkIndex}`
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-/**
- * Store an encrypted chunk in IndexedDB.
- * @param {IDBDatabase} db 
- * @param {string} fileId 
- * @param {number} chunkIndex 
- * @param {{ encrypted: Uint8Array, nonce: Uint8Array }} chunkData 
- */
-function storeChunk(db, fileId, chunkIndex, chunkData) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('chunks', 'readwrite');
-    const store = tx.objectStore('chunks');
-    const key = `${fileId}:${chunkIndex}`;
-    store.put({ ...chunkData, fileId, chunkIndex }, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-/**
- * Retrieve an encrypted chunk from IndexedDB.
- * @param {IDBDatabase} db 
- * @param {string} fileId 
- * @param {number} chunkIndex 
- * @returns {Promise<{ encrypted: Uint8Array, nonce: Uint8Array } | null>}
- */
-export function getChunk(db, fileId, chunkIndex) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('chunks', 'readonly');
-    const store = tx.objectStore('chunks');
-    const key = `${fileId}:${chunkIndex}`;
-    const request = store.get(key);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-/**
- * Delete all chunks for a file from IndexedDB.
- * @param {IDBDatabase} db 
- * @param {string} fileId 
- * @param {number} chunkCount
- */
-export function deleteFileChunks(db, fileId, chunkCount) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('chunks', 'readwrite');
-    const store = tx.objectStore('chunks');
-    for (let i = 0; i < chunkCount; i++) {
-      store.delete(`${fileId}:${i}`);
-    }
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
+// Re-export for backward compatibility
+export { UPLOAD_STATUS, getChunk, deleteFileChunks };
 
 /**
  * React hook providing file upload functionality.
@@ -163,10 +86,10 @@ export default function useFileUpload({
 
     try {
       // Validate
-      const validation = validateFileForUpload(file, []);
+      const validation = validateFileForUpload(file, MAX_FILE_SIZE);
       if (!validation.valid) {
-        updateStatus(UPLOAD_STATUS.ERROR, { error: validation.errors.join('; ') });
-        throw new Error(validation.errors.join('; '));
+        updateStatus(UPLOAD_STATUS.ERROR, { error: validation.error });
+        throw new Error(validation.error);
       }
 
       updateStatus(UPLOAD_STATUS.READING);
@@ -191,8 +114,8 @@ export default function useFileUpload({
       });
       
       const db = await getDb();
-      // Generate file ID now so we can store chunks keyed to it
-      const fileId = 'file-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+      // Generate the canonical file ID up front so chunks are stored under the same key
+      const fileId = generateFileId();
       
       for (let i = 0; i < result.chunks.length; i++) {
         const chunk = result.chunks[i];
@@ -206,8 +129,9 @@ export default function useFileUpload({
         });
       }
 
-      // Create file record in Yjs
-      const fileRecord = createFileRecord({
+      // Create file record in Yjs, passing our pre-generated ID
+      createFileRecord({
+        id: fileId,
         name: file.name,
         sizeBytes: result.totalSize,
         chunkCount: result.chunkCount,
@@ -215,29 +139,10 @@ export default function useFileUpload({
         fileHash: result.fileHash,
         folderId,
       });
-      
-      // Override auto-generated ID with ours so chunk store keys match
-      // Note: createFileRecord already pushed to Yjs, but we used our own fileId
-      // Actually — let's use the fileId from createFileRecord for consistency
-      const actualFileId = fileRecord.id;
-      
-      // Re-store chunks with the canonical fileId if different
-      if (actualFileId !== fileId) {
-        for (let i = 0; i < result.chunks.length; i++) {
-          const chunk = result.chunks[i];
-          await storeChunk(db, actualFileId, i, {
-            encrypted: chunk.encrypted,
-            nonce: chunk.nonce,
-          });
-          // Clean up the temp-keyed chunk
-          const tx = db.transaction('chunks', 'readwrite');
-          tx.objectStore('chunks').delete(`${fileId}:${i}`);
-        }
-      }
 
       // Set chunk availability for ourselves
       for (let i = 0; i < result.chunkCount; i++) {
-        setChunkAvailability(actualFileId, i, [userPublicKey]);
+        setChunkAvailability(fileId, i, [userPublicKey]);
       }
 
       // Apply optional metadata
@@ -248,10 +153,10 @@ export default function useFileUpload({
       updateStatus(UPLOAD_STATUS.COMPLETE, {
         chunksProcessed: result.chunkCount,
         totalChunks: result.chunkCount,
-        fileId: actualFileId,
+        fileId,
       });
 
-      return { fileId: actualFileId, uploadId };
+      return { fileId, uploadId };
     } catch (err) {
       updateStatus(UPLOAD_STATUS.ERROR, { error: err.message });
       throw err;

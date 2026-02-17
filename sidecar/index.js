@@ -3164,8 +3164,27 @@ function setupAwarenessP2PBridging() {
             doc.awareness.on('update', awarenessHandler);
             awarenessListeners.set(roomName, awarenessHandler);
             console.log(`[P2P-AWARENESS] Attached awareness listener for ${roomName}${documentId ? ` (doc: ${documentId.slice(0, 12)}...)` : ''}`);
+            
+            // Immediately broadcast any existing awareness states
+            // This catches awareness that was set BEFORE the listener was attached
+            // (e.g., joiner's frontend set awareness before P2P bridge polling found the doc)
+            try {
+                const allClients = Array.from(doc.awareness.getStates().keys());
+                if (allClients.length > 0) {
+                    const fullUpdate = awarenessProtocol.encodeAwarenessUpdate(doc.awareness, allClients);
+                    const fullPayload = {
+                        type: 'awareness-protocol',
+                        update: Buffer.from(fullUpdate).toString('base64'),
+                        documentId: capturedDocumentId || null
+                    };
+                    broadcastAwarenessUpdate(capturedWorkspaceId, capturedTopicHex, fullPayload);
+                    console.log(`[P2P-AWARENESS] Broadcast initial full awareness (${allClients.length} clients) for ${roomName}`);
+                }
+            } catch (initErr) {
+                console.error('[P2P-AWARENESS] Error broadcasting initial awareness:', initErr.message);
+            }
         }
-    }, 2000); // Check every 2 seconds
+    }, 500); // Check every 500ms for faster awareness bridge attachment
     
     // Return cleanup function (not used currently but could be useful)
     return () => {
@@ -3354,7 +3373,10 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
                 const docMeta = documents.find(d => d.id === roomName);
                 if (docMeta && docMeta.encryptionKey) {
                     // Set the key for this document so it can be persisted
-                    documentKeys.set(roomName, docMeta.encryptionKey);
+                    // Convert base64/base64url string to Uint8Array for consistency with other callers
+                    const base64Key = docMeta.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                    const keyBytes = uint8ArrayFromString(base64Key, 'base64');
+                    documentKeys.set(roomName, keyBytes);
                     console.log(`[P2P-SYNC-STATE] Set encryption key for document ${roomName}`);
                 }
             }
@@ -3718,7 +3740,10 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
                 const documents = yDocuments.toArray();
                 const docMeta = documents.find(d => d.id === roomName);
                 if (docMeta && docMeta.encryptionKey && !documentKeys.has(roomName)) {
-                    documentKeys.set(roomName, docMeta.encryptionKey);
+                    // Convert base64/base64url string to Uint8Array for consistency
+                    const base64Key = docMeta.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                    const keyBytes = uint8ArrayFromString(base64Key, 'base64');
+                    documentKeys.set(roomName, keyBytes);
                     console.log(`[P2P-SYNC] Set encryption key for document ${roomName}`);
                 }
             }
@@ -4036,12 +4061,37 @@ function setupPeerPersistence() {
         }
     });
     
-    // When a peer joins a topic, persist them
+    // When a peer joins a topic, persist them and push awareness
     hyperswarm.on('peer-joined', async ({ peerId, topic }) => {
         try {
             const workspaceId = topicToWorkspace.get(topic);
             if (workspaceId) {
                 await updateWorkspacePeers(workspaceId, peerId, true);
+                
+                // Push full awareness to ALL peers after a short delay
+                // This ensures the new peer (and all existing peers) get
+                // the complete presence picture after the topic handshake settles
+                setTimeout(() => {
+                    try {
+                        const roomName = `workspace-meta:${workspaceId}`;
+                        const doc = docs.get(roomName);
+                        if (doc && doc.awareness) {
+                            const allClients = Array.from(doc.awareness.getStates().keys());
+                            if (allClients.length > 0) {
+                                const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(doc.awareness, allClients);
+                                const awarenessPayload = {
+                                    type: 'awareness-protocol',
+                                    update: Buffer.from(awarenessUpdate).toString('base64'),
+                                    documentId: null
+                                };
+                                p2pBridge.hyperswarm.broadcastAwareness(topic, JSON.stringify(awarenessPayload));
+                                console.log(`[Sidecar] Broadcast awareness (${allClients.length} clients) to all peers on peer-joined for ${workspaceId.slice(0, 16)}...`);
+                            }
+                        }
+                    } catch (awarenessErr) {
+                        console.error('[Sidecar] Error broadcasting awareness on peer-joined:', awarenessErr.message);
+                    }
+                }, 500);
             }
         } catch (err) {
             console.error('[Sidecar] Failed to persist peer on join:', err);
@@ -4732,12 +4782,21 @@ async function shutdown() {
         pendingUpdates.clear();
         console.log('[Sidecar] Pending updates cleared');
         
-        // Close database
+        // Close databases
         try {
             await db.close();
             console.log('[Sidecar] Database closed');
         } catch (err) {
             console.error('[Sidecar] Error closing database:', err);
+        }
+        
+        try {
+            if (metadataDb) {
+                await metadataDb.close();
+                console.log('[Sidecar] Metadata database closed');
+            }
+        } catch (err) {
+            console.error('[Sidecar] Error closing metadata database:', err);
         }
         
         clearTimeout(shutdownTimeout);

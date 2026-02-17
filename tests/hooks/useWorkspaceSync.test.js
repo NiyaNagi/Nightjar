@@ -115,6 +115,7 @@ jest.mock('../../frontend/src/config/constants', () => ({
   META_WS_PORT: 4000,
   WS_RECONNECT_MAX_DELAY: 30000,
   TIMEOUT_LONG: 60000,
+  AWARENESS_HEARTBEAT_MS: 15000,
 }));
 
 // Import after mocks

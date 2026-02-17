@@ -10,6 +10,9 @@
 import React from 'react';
 import StatusBadge from './StatusBadge';
 import { formatRelativeDate } from '../../../utils/inventoryValidation';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import ChatButton from '../../common/ChatButton';
+import { useInventory } from '../../../contexts/InventoryContext';
 import './RequestRow.css';
 
 export default function RequestRow({
@@ -18,8 +21,9 @@ export default function RequestRow({
   isExpanded = false,
   onClick,
 }) {
+  const { onStartChatWith, userIdentity } = useInventory();
   const assignedName = request.assignedTo
-    ? collaborators.find(c => c.publicKeyBase62 === request.assignedTo)?.name || request.assignedTo?.slice(0, 8) + '…'
+    ? resolveUserName(collaborators, request.assignedTo)
     : '—';
 
   return (
@@ -39,7 +43,16 @@ export default function RequestRow({
       <td className="request-row__status">
         <StatusBadge status={request.status} />
       </td>
-      <td className="request-row__assigned">{assignedName}</td>
+      <td className="request-row__assigned">
+        {assignedName}
+        <ChatButton
+          publicKey={request.assignedTo}
+          name={assignedName}
+          collaborators={collaborators}
+          onStartChatWith={onStartChatWith}
+          currentUserKey={userIdentity?.publicKeyBase62}
+        />
+      </td>
       <td className="request-row__date">{formatRelativeDate(request.requestedAt)}</td>
     </tr>
   );

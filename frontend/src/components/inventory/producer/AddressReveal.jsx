@@ -128,7 +128,7 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
     } finally {
       setShipping(false);
     }
-  }, [confirmed, trackingNumber, requestId, ctx, onShipped]);
+  }, [confirmed, trackingNumber, shippingNotes, requestId, ctx, onShipped]);
 
   if (decryptError) {
     return (
@@ -273,8 +273,19 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
               const arr = yArr.toArray();
               const idx = arr.findIndex(r => r.id === requestId);
               if (idx !== -1) {
+                const req = arr[idx];
                 yArr.delete(idx, 1);
-                yArr.insert(idx, [{ ...arr[idx], status: 'open', assignedTo: null, claimedBy: null, assignedAt: null, claimedAt: null }]);
+                yArr.insert(idx, [{ ...req, status: 'open', assignedTo: null, claimedBy: null, assignedAt: null, claimedAt: null, approvedAt: null, approvedBy: null }]);
+                // Notify the requestor that the producer unclaimed
+                if (req.requestedBy) {
+                  pushNotification(ctx.yInventoryNotifications, {
+                    inventorySystemId: ctx.inventorySystemId,
+                    recipientId: req.requestedBy,
+                    type: 'request_unclaimed',
+                    message: `A producer unclaimed your request for ${req.catalogItemName}`,
+                    relatedId: requestId,
+                  });
+                }
               }
             }
             ctx.yAddressReveals?.delete(requestId);

@@ -1,0 +1,127 @@
+/* FileMoveDialog.css */
+
+.move-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.move-dialog {
+  width: 400px;
+  max-width: 90vw;
+  max-height: 70vh;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.move-dialog-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.move-dialog-subtitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #a6adc8);
+}
+
+.move-dialog-tree {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  background: var(--bg-primary, #11111b);
+  padding: 4px;
+  max-height: 300px;
+}
+
+.move-tree-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.move-tree-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.move-tree-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.move-tree-btn--selected {
+  background: rgba(137, 180, 250, 0.12);
+  color: var(--accent-color, #89b4fa);
+}
+
+.move-tree-expand {
+  width: 16px;
+  font-size: 10px;
+  color: var(--text-tertiary, #6c7086);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.move-tree-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.move-tree-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.move-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.move-dialog-cancel,
+.move-dialog-submit {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+}
+
+.move-dialog-cancel {
+  background: var(--border-color, #313244);
+  color: var(--text-secondary, #a6adc8);
+}
+
+.move-dialog-submit {
+  background: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+}
+
+.move-dialog-submit:hover {
+  background: #7ba7f0;
+}

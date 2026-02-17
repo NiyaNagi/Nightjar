@@ -7,13 +7,19 @@
  * See docs/INVENTORY_SYSTEM_SPEC.md §6.4.1 (Admin Dashboard)
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { useToast } from '../../../contexts/ToastContext';
 import StatusBadge from '../common/StatusBadge';
 import RequestCard from '../common/RequestCard';
 import { formatDate, formatRelativeDate, generateId } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
+import { runAutoAssign } from '../../../utils/autoAssign';
+import { exportRequests } from '../../../utils/inventoryExport';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import { getPublicKeyHex, base62ToPublicKeyHex, createAddressReveal, decryptPendingAddress } from '../../../utils/addressCrypto';
+import { getAddress, getWorkspaceKeyMaterial, storeAddress } from '../../../utils/inventoryAddressStore';
+import ChatButton from '../../common/ChatButton';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart } from 'recharts';
 import './AdminDashboard.css';
 
@@ -24,6 +30,105 @@ export default function AdminDashboard({ onNavigate }) {
   const { yInventoryRequests, yInventoryAuditLog, inventorySystemId, collaborators, userIdentity,
     currentSystem, requests, producerCapacities, openRequestCount, pendingApprovalCount } = ctx;
   const { showToast } = useToast();
+
+  const [assigning, setAssigning] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef(null);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const handler = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showExportMenu]);
+
+  const handleRunAutoAssign = useCallback(() => {
+    setAssigning(true);
+    try {
+      const result = runAutoAssign(ctx);
+      if (result.error) {
+        showToast(`Auto-assign failed: ${result.error}`, 'error');
+      } else {
+        showToast(`Auto-assigned ${result.applied} of ${result.total} requests${result.blocked ? ` (${result.blocked} blocked)` : ''}`, 'success');
+      }
+    } catch (err) {
+      showToast(`Auto-assign error: ${err.message}`, 'error');
+    } finally {
+      setAssigning(false);
+    }
+  }, [ctx, showToast]);
+
+  const handleExportCSV = useCallback(() => {
+    exportRequests(requests, 'csv');
+    setShowExportMenu(false);
+    showToast('CSV export downloaded', 'success');
+  }, [requests, showToast]);
+
+  const handleExportSummary = useCallback(() => {
+    const total = requests.length;
+    const statusCounts = {};
+    requests.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
+    const urgentCount = requests.filter(r => r.urgent).length;
+    const totalUnits = requests.reduce((s, r) => s + (r.quantity || 0), 0);
+
+    // Top producers
+    const producerFulfilled = {};
+    requests.filter(r => r.status === 'shipped' || r.status === 'delivered').forEach(r => {
+      const key = r.assignedTo || r.claimedBy;
+      if (key) {
+        if (!producerFulfilled[key]) producerFulfilled[key] = { count: 0, units: 0 };
+        producerFulfilled[key].count++;
+        producerFulfilled[key].units += (r.quantity || 0);
+      }
+    });
+    const topProducers = Object.entries(producerFulfilled)
+      .sort(([, a], [, b]) => b.count - a.count)
+      .slice(0, 5)
+      .map(([key, val]) => {
+        const name = resolveUserName(collaborators, key);
+        return `  - ${name}: ${val.count} requests (${val.units.toLocaleString()} units)`;
+      });
+
+    // Avg fulfillment time
+    const fulfilled = requests.filter(r => r.shippedAt && r.requestedAt);
+    const avgDays = fulfilled.length > 0
+      ? (fulfilled.reduce((s, r) => s + (r.shippedAt - r.requestedAt) / 86400000, 0) / fulfilled.length).toFixed(1)
+      : 'N/A';
+
+    const lines = [
+      `# Inventory Report — ${new Date().toLocaleDateString()}`,
+      '',
+      `## Summary`,
+      `- **Total Requests:** ${total}`,
+      `- **Total Units:** ${totalUnits.toLocaleString()}`,
+      `- **Urgent Requests:** ${urgentCount}`,
+      `- **Avg. Fulfillment Time:** ${avgDays} days`,
+      '',
+      `## Status Breakdown`,
+      ...Object.entries(statusCounts).sort(([, a], [, b]) => b - a).map(([status, count]) => `  - ${status}: ${count}`),
+      '',
+      `## Top Producers`,
+      ...(topProducers.length > 0 ? topProducers : ['  - No fulfillments yet']),
+      '',
+      `---`,
+      `*Generated on ${new Date().toISOString()}*`,
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory-report-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+    showToast('Summary report downloaded', 'success');
+  }, [requests, collaborators, showToast]);
 
   // Derived counts
   const inProgressCount = requests.filter(r => ['approved', 'in_progress'].includes(r.status)).length;
@@ -50,13 +155,55 @@ export default function AdminDashboard({ onNavigate }) {
   const aging7 = requests.filter(r => !['cancelled', 'delivered', 'shipped'].includes(r.status) && (now - r.requestedAt) > 7 * MS_PER_DAY).length;
   const aging14 = requests.filter(r => !['cancelled', 'delivered', 'shipped'].includes(r.status) && (now - r.requestedAt) > 14 * MS_PER_DAY).length;
 
-  const handleApprove = useCallback((req) => {
+  const handleApprove = useCallback(async (req) => {
     const items = yInventoryRequests.toArray();
     const idx = items.findIndex(r => r.id === req.id);
     if (idx === -1) return;
-    const updated = { ...items[idx], status: 'approved', approvedAt: Date.now(), updatedAt: Date.now() };
+    const updated = { ...items[idx], status: 'approved', approvedAt: Date.now(), approvedBy: userIdentity?.publicKeyBase62, updatedAt: Date.now() };
     yInventoryRequests.delete(idx, 1);
     yInventoryRequests.insert(idx, [updated]);
+
+    // Create address reveal for the assigned producer
+    if (updated.assignedTo) {
+      try {
+        const adminHex = getPublicKeyHex(userIdentity);
+        const producerHex = base62ToPublicKeyHex(updated.assignedTo);
+
+        // 1. Try local encrypted store (owner-submitted addresses)
+        let addr = null;
+        try {
+          const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+          addr = await getAddress(km, ctx.inventorySystemId, req.id);
+        } catch {
+          // Key material or local address not available
+        }
+
+        // 2. Fallback: decrypt pending address from non-owner requestor
+        if (!addr && ctx.yPendingAddresses) {
+          const pendingEntries = ctx.yPendingAddresses.get(req.id);
+          if (pendingEntries && userIdentity?.privateKey) {
+            addr = await decryptPendingAddress(pendingEntries, adminHex, userIdentity.privateKey);
+            if (addr) {
+              try {
+                const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+                await storeAddress(km, ctx.inventorySystemId, req.id, addr);
+              } catch {
+                // Non-critical: local caching failed
+              }
+              ctx.yPendingAddresses.delete(req.id);
+            }
+          }
+        }
+
+        if (addr && userIdentity?.privateKey) {
+          const reveal = await createAddressReveal(addr, producerHex, userIdentity.privateKey, adminHex);
+          ctx.yAddressReveals?.set(req.id, { ...reveal, inventorySystemId: ctx.inventorySystemId });
+        }
+      } catch (err) {
+        console.warn('[AdminDashboard] Could not create address reveal:', err);
+      }
+    }
+
     yInventoryAuditLog.push([{
       id: generateId('aud-'),
       inventorySystemId,
@@ -87,13 +234,13 @@ export default function AdminDashboard({ onNavigate }) {
       });
     }
     showToast(`Request #${req.id?.slice(4, 10)} approved`, 'success');
-  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, ctx.yInventoryNotifications]);
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, userIdentity, showToast, ctx.yInventoryNotifications, ctx.currentWorkspace, ctx.workspaceId, ctx.yPendingAddresses, ctx.yAddressReveals]);
 
   const handleReject = useCallback((req) => {
     const items = yInventoryRequests.toArray();
     const idx = items.findIndex(r => r.id === req.id);
     if (idx === -1) return;
-    const updated = { ...items[idx], status: 'open', assignedTo: null, approvedAt: null, updatedAt: Date.now() };
+    const updated = { ...items[idx], status: 'open', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() };
     yInventoryRequests.delete(idx, 1);
     yInventoryRequests.insert(idx, [updated]);
     yInventoryAuditLog.push([{
@@ -126,11 +273,11 @@ export default function AdminDashboard({ onNavigate }) {
       });
     }
     showToast(`Request #${req.id?.slice(4, 10)} rejected — returned to Open`, 'success');
-  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, ctx.yInventoryNotifications]);
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, userIdentity, showToast, ctx.yInventoryNotifications]);
 
   const getAssignedName = (pubkey) => {
     if (!pubkey) return null;
-    return collaborators.find(c => c.publicKeyBase62 === pubkey)?.name || pubkey.slice(0, 8) + '…';
+    return resolveUserName(collaborators, pubkey);
   };
 
   return (
@@ -168,7 +315,16 @@ export default function AdminDashboard({ onNavigate }) {
                 </div>
                 <div className="admin-approval-card__info">
                   {req.assignedTo
-                    ? `${req.status === 'claimed' ? 'Claimed by' : 'Assigned to'}: ${getAssignedName(req.assignedTo)}`
+                    ? <>
+                        {req.status === 'claimed' ? 'Claimed by' : 'Assigned to'}: {getAssignedName(req.assignedTo)}
+                        <ChatButton
+                          publicKey={req.assignedTo}
+                          name={getAssignedName(req.assignedTo)}
+                          collaborators={collaborators}
+                          onStartChatWith={ctx.onStartChatWith}
+                          currentUserKey={userIdentity?.publicKeyBase62}
+                        />
+                      </>
                     : 'Unassigned'}
                   {req.estimatedFulfillmentDate && ` │ Est: ${formatDate(req.estimatedFulfillmentDate, { short: true })}`}
                 </div>
@@ -202,7 +358,7 @@ export default function AdminDashboard({ onNavigate }) {
                 <div className="admin-blocked-card__actions">
                   <button className="btn-sm" onClick={() => onNavigate?.('approval-queue')}>→ Manual Assign</button>
                   <button className="btn-sm" onClick={() => {
-                    const producers = collaborators.filter(c => c.role === 'editor');
+                    const producers = collaborators.filter(c => c.permission === 'editor');
                     producers.forEach(p => {
                       pushNotification(ctx.yInventoryNotifications, {
                         inventorySystemId,
@@ -230,8 +386,18 @@ export default function AdminDashboard({ onNavigate }) {
           <button className="btn-sm" onClick={() => onNavigate?.('producers')}>👥 Manage Producers</button>
           <button className="btn-sm" onClick={() => onNavigate?.('catalog')}>📦 Edit Catalog</button>
           <button className="btn-sm" onClick={() => onNavigate?.('import-export')}>📥 Import</button>
-          <button className="btn-sm" onClick={() => onNavigate?.('settings')}>🔄 Run Auto-Assign</button>
-          <button className="btn-sm" onClick={() => onNavigate?.('analytics')}>📤 Export Report</button>
+          <button className="btn-sm" onClick={handleRunAutoAssign} disabled={assigning}>
+            {assigning ? '⏳ Running…' : '🔄 Run Auto-Assign'}
+          </button>
+          <div className="admin-dashboard__export-wrapper" ref={exportMenuRef}>
+            <button className="btn-sm" onClick={() => setShowExportMenu(v => !v)}>📤 Export Report</button>
+            {showExportMenu && (
+              <div className="admin-dashboard__export-menu">
+                <button className="admin-dashboard__export-option" onClick={handleExportCSV}>📄 Export as CSV</button>
+                <button className="admin-dashboard__export-option" onClick={handleExportSummary}>📝 Export Summary (.md)</button>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 

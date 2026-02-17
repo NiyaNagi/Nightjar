@@ -1,0 +1,169 @@
+/* FolderCreateDialog.css */
+
+.folder-create-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  animation: folderDialogOverlayIn 0.12s ease;
+}
+
+@keyframes folderDialogOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.folder-create-dialog {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: folderDialogIn 0.15s ease;
+}
+
+@keyframes folderDialogIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.folder-create-title {
+  margin: 0 0 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.folder-create-field {
+  margin-bottom: 16px;
+}
+
+.folder-create-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #a6adc8);
+  margin-bottom: 6px;
+}
+
+.folder-create-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary, #11111b);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.folder-create-input:focus {
+  border-color: var(--accent-color, #89b4fa);
+}
+
+.folder-create-colors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.folder-create-color-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.folder-create-color-btn:hover {
+  transform: scale(1.15);
+}
+
+.folder-create-color-btn--selected {
+  border-color: var(--text-primary, #cdd6f4);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.folder-create-icons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.folder-create-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.folder-create-icon-btn:hover {
+  border-color: var(--accent-color, #89b4fa);
+  background: rgba(137, 180, 250, 0.05);
+}
+
+.folder-create-icon-btn--selected {
+  border-color: var(--accent-color, #89b4fa);
+  background: rgba(137, 180, 250, 0.1);
+}
+
+.folder-create-error {
+  font-size: 12px;
+  color: #f38ba8;
+  margin: 0 0 12px;
+}
+
+.folder-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.folder-create-cancel,
+.folder-create-submit {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+}
+
+.folder-create-cancel {
+  background: var(--border-color, #313244);
+  color: var(--text-secondary, #a6adc8);
+}
+
+.folder-create-cancel:hover {
+  background: #3b3b52;
+}
+
+.folder-create-submit {
+  background: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+}
+
+.folder-create-submit:hover:not(:disabled) {
+  background: #7ba7f0;
+}
+
+.folder-create-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

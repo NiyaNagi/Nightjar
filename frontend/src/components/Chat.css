@@ -90,6 +90,19 @@
     margin-left: 4px;
 }
 
+/* Special mention badge - gold/amber to stand out */
+.unread-badge.mention-badge {
+    background: #f59e0b;
+    color: #1a1a1a;
+    font-weight: 700;
+    animation: mention-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mention-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
 .chat-minimized:focus-visible {
     outline: 2px solid var(--accent-light);
     outline-offset: 2px;
@@ -601,6 +614,14 @@
     margin-right: 4px;
 }
 
+/* Tab mention badge - gold/amber */
+.tab-unread-badge.mention-badge {
+    background: #f59e0b;
+    color: #1a1a1a;
+    font-weight: 700;
+    animation: mention-pulse 2s ease-in-out infinite;
+}
+
 /* Group avatar */
 .tab-avatar.group-avatar {
     font-size: 0.75rem;
@@ -782,7 +803,7 @@
     font-weight: 500;
 }
 
-.mention-chip.self-mention {
+.mention-chip.mention-me {
     background: rgba(239, 68, 68, 0.2);
     color: #ef4444;
 }

@@ -1,0 +1,26 @@
+/* ChatButton – inline chat icon */
+.chat-btn-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 2px 4px;
+  margin-left: 4px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.chat-btn-inline:hover {
+  opacity: 1;
+  background: var(--bg-hover, rgba(0, 0, 0, 0.06));
+}
+
+.chat-btn-inline:active {
+  transform: scale(0.92);
+}

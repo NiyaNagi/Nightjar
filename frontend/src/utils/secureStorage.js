@@ -60,8 +60,10 @@ function encrypt(plaintext) {
   combined.set(nonce);
   combined.set(encrypted, nonce.length);
   
-  // Return as base64
-  return btoa(String.fromCharCode(...combined));
+  // Return as base64 (use loop to avoid stack overflow on large data)
+  let binary = '';
+  for (let i = 0; i < combined.length; i++) binary += String.fromCharCode(combined[i]);
+  return btoa(binary);
 }
 
 /**

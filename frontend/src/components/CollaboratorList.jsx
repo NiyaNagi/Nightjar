@@ -8,6 +8,7 @@
 
 import React, { useState } from 'react';
 import { usePermissions } from '../contexts/PermissionContext';
+import ChatButton from './common/ChatButton';
 import './CollaboratorList.css';
 
 // Permission level config
@@ -36,6 +37,8 @@ export default function CollaboratorList({
   compact = false,
   showOnlineOnly = false,
   maxDisplay = 0, // 0 = show all
+  onStartChatWith,
+  currentUserKey,
 }) {
   const { isOwner, canShare } = usePermissions();
   const [expanded, setExpanded] = useState(false);
@@ -130,6 +133,13 @@ export default function CollaboratorList({
                 {collab.displayName || `User ${(collab.identityId || '').slice(0, 6)}`}
                 {collab.isMe && <span className="collaborator-list__item-you">(you)</span>}
               </span>
+              <ChatButton
+                publicKey={collab.publicKey || collab.publicKeyBase62}
+                currentUserKey={currentUserKey}
+                collaborators={collaborators}
+                onStartChatWith={onStartChatWith}
+                size="small"
+              />
               {collab.isOnline && (
                 <span className="collaborator-list__item-status">Online</span>
               )}

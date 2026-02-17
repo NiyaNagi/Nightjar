@@ -532,8 +532,13 @@ function listIdentities() {
  */
 function switchIdentity(filename) {
     const identityDir = getIdentityDir();
-    const sourcePath = path.join(identityDir, filename);
+    const sourcePath = path.resolve(identityDir, filename);
     const activePath = getIdentityPath();
+    
+    // Prevent path traversal attacks
+    if (!sourcePath.startsWith(path.resolve(identityDir) + path.sep) && sourcePath !== path.resolve(identityDir)) {
+        throw new Error('Invalid identity filename: path traversal detected');
+    }
     
     if (!fs.existsSync(sourcePath)) {
         throw new Error('Identity file not found');

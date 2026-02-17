@@ -1,4 +1,4 @@
-/* FileStorageDashboard.css – Follows InventoryDashboard.css pattern */
+/* FileStorageDashboard.css – Layout for nav rail + content area */
 
 .file-storage-dashboard {
   display: flex;
@@ -6,222 +6,39 @@
   width: 100%;
   overflow: hidden;
   background: var(--bg-primary, #11111b);
+  position: relative;
 }
 
 .fs-content-area {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* Content placeholder (all views) */
-.fs-content-placeholder {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-.fs-content-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border-color, #313244);
-  flex-shrink: 0;
-}
-
-.fs-content-header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary, #cdd6f4);
-}
-
-.fs-content-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary, #a6adc8);
-}
-
-.fs-content-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 24px;
-}
-
-/* Empty state */
-.fs-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  color: var(--text-secondary, #a6adc8);
-  text-align: center;
-}
-
-.fs-empty-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.fs-empty-state p {
-  margin: 4px 0;
-  font-size: 14px;
-}
-
-.fs-empty-hint {
-  font-size: 12px !important;
-  color: var(--text-tertiary, #6c7086);
-}
-
-/* File list */
-.fs-file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.fs-file-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.fs-file-item:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
-}
-
-.fs-file-item.fs-file-trashed {
-  opacity: 0.6;
-}
-
-.fs-file-name {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text-primary, #cdd6f4);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.fs-file-size {
-  font-size: 12px;
-  color: var(--text-secondary, #a6adc8);
-  white-space: nowrap;
-}
-
-.fs-file-date {
-  font-size: 12px;
-  color: var(--text-tertiary, #6c7086);
-  white-space: nowrap;
-}
-
-/* Audit log */
-.fs-audit-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.fs-audit-item {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.fs-audit-item:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
-}
-
-.fs-audit-time {
-  font-size: 11px;
-  color: var(--text-tertiary, #6c7086);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.fs-audit-actor {
-  color: var(--accent-color, #89b4fa);
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.fs-audit-summary {
-  color: var(--text-secondary, #a6adc8);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Storage overview */
-.fs-storage-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.fs-storage-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  background: var(--bg-secondary, #1e1e2e);
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #313244);
-}
-
-.fs-storage-stat-label {
-  font-size: 12px;
-  color: var(--text-secondary, #a6adc8);
-  text-transform: capitalize;
-}
-
-.fs-storage-stat-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary, #cdd6f4);
-}
-
-/* Settings */
-.fs-settings-section {
-  padding: 16px;
-}
-
-.fs-settings-info {
-  font-size: 13px;
-  color: var(--text-secondary, #a6adc8);
+  position: relative;
+  min-width: 0;
 }
 
 /* Scrollbar */
-.fs-content-area::-webkit-scrollbar,
-.fs-content-body::-webkit-scrollbar {
+.fs-content-area::-webkit-scrollbar {
   width: 6px;
 }
 
-.fs-content-area::-webkit-scrollbar-track,
-.fs-content-body::-webkit-scrollbar-track {
+.fs-content-area::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.fs-content-area::-webkit-scrollbar-thumb,
-.fs-content-body::-webkit-scrollbar-thumb {
+.fs-content-area::-webkit-scrollbar-thumb {
   background: var(--border-color, #313244);
   border-radius: 3px;
 }
 
-.fs-content-area::-webkit-scrollbar-thumb:hover,
-.fs-content-body::-webkit-scrollbar-thumb:hover {
+.fs-content-area::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary, #a6adc8);
+}
+
+/* Mobile: stack nav on top */
+@media (max-width: 600px) {
+  .file-storage-dashboard {
+    flex-direction: column;
+  }
 }

@@ -93,6 +93,7 @@ export default function InventoryDashboard({
   yPendingAddresses,
   yInventoryAuditLog,
   yInventoryNotifications,
+  onStartChatWith,
 }) {
   // Permission check — spec §11.2.5: use usePermission('workspace', workspaceId)
   const { isOwner, isEditor, isViewer } = usePermission('workspace', workspaceId);
@@ -132,15 +133,62 @@ export default function InventoryDashboard({
   }, [isOwner, isEditor]);
 
   const [activeView, setActiveView] = useState(getDefaultView);
-  const [showOnboarding, setShowOnboarding] = useState(
-    () => !inventoryState.currentSystem?.onboardingComplete
-  );
+  // showOnboarding: null = still loading (Yjs hasn't synced yet),
+  //                 true = system exists but onboarding not complete,
+  //                 false = onboarding finished or system not yet created
+  const [showOnboarding, setShowOnboarding] = useState(null);
+
+  // Watch Yjs sync — once currentSystem loads, decide whether to show onboarding.
+  // This replaces the buggy useState initializer that always saw null on first render.
+  useEffect(() => {
+    const sys = inventoryState.currentSystem;
+    if (sys === undefined || sys === null) {
+      // Yjs hasn't synced this system yet — stay in loading state
+      // But only if we haven't already resolved it (avoid flicker on remount)
+      return;
+    }
+    setShowOnboarding(!sys.onboardingComplete);
+  }, [inventoryState.currentSystem]);
+
+  // After a brief delay, if we still haven't received system data, stop loading.
+  // This handles the case where the system truly doesn't exist (non-owner view).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowOnboarding(prev => prev === null ? false : prev);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Content router — renders the active view component
   const renderContent = () => {
-    // Show onboarding wizard if system hasn't been set up yet
+    // Loading state — Yjs data hasn't synced yet
+    if (showOnboarding === null) {
+      return (
+        <div className="inventory-placeholder">
+          <div className="inventory-placeholder__icon">⏳</div>
+          <h2 className="inventory-placeholder__title">Loading Inventory System</h2>
+          <p className="inventory-placeholder__description">Syncing data with peers…</p>
+        </div>
+      );
+    }
+
+    // System needs onboarding and user is the owner — show wizard
     if (showOnboarding && isOwner) {
       return <OnboardingWizard onComplete={() => setShowOnboarding(false)} />;
+    }
+
+    // System needs onboarding but user is NOT the owner — show waiting message
+    if (showOnboarding && !isOwner) {
+      return (
+        <div className="inventory-placeholder">
+          <div className="inventory-placeholder__icon">⏳</div>
+          <h2 className="inventory-placeholder__title">Waiting for Setup</h2>
+          <p className="inventory-placeholder__description">
+            The workspace admin hasn't finished setting up the inventory system yet.
+            Please check back shortly.
+          </p>
+        </div>
+      );
     }
 
     switch (activeView) {
@@ -199,6 +247,7 @@ export default function InventoryDashboard({
     <InventoryProvider
       inventorySystemId={inventorySystemId}
       workspaceId={workspaceId}
+      currentWorkspace={currentWorkspace}
       yInventorySystems={yInventorySystems}
       yCatalogItems={yCatalogItems}
       yInventoryRequests={yInventoryRequests}
@@ -209,6 +258,7 @@ export default function InventoryDashboard({
       yInventoryNotifications={yInventoryNotifications}
       userIdentity={userIdentity}
       collaborators={collaborators}
+      onStartChatWith={onStartChatWith}
     >
       <div className="inventory-dashboard">
         <InventoryNavRail

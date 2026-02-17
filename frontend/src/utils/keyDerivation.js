@@ -104,7 +104,23 @@ export async function deriveTopicHash(password, documentId) {
 const keyCache = new Map();
 
 export async function deriveKeyWithCache(password, documentId, purpose = 'encryption') {
-  const cacheKey = `${documentId}:${purpose}:${password}`;
+  // Hash password for cache key to avoid storing cleartext in memory
+  let hashBuffer;
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+  } else {
+    try {
+      const nodeCrypto = require('crypto');
+      hashBuffer = nodeCrypto.createHash('sha256').update(password).digest();
+    } catch {
+      // Fallback: use password directly (less secure but won't crash)
+      const encoder = new TextEncoder();
+      hashBuffer = encoder.encode(password);
+    }
+  }
+  const passwordHash = Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+  const cacheKey = `${documentId}:${purpose}:${passwordHash}`;
   
   if (keyCache.has(cacheKey)) {
     return keyCache.get(cacheKey);
@@ -357,7 +373,7 @@ export function clearWorkspaceKeys(workspaceId) {
   
   // Also clear individual keys from cache
   for (const key of keyCache.keys()) {
-    if (key.includes(workspaceId)) {
+    if (key.startsWith(workspaceId + ':')) {
       keyCache.delete(key);
     }
   }

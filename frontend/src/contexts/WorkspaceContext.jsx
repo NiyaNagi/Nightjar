@@ -39,7 +39,9 @@ function getIdentityScopedStorageKey(baseKey) {
  */
 function keyToBase64(bytes) {
   if (!bytes || !(bytes instanceof Uint8Array)) return null;
-  const base64 = btoa(String.fromCharCode(...bytes));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const base64 = btoa(binary);
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 

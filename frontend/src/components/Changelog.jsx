@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import * as Y from 'yjs';
 import { getChangelog, getChangelogCount, getMaxEntriesSetting, setMaxEntriesSetting, clearChangelog, loadChangelogSync, saveChangelogSync } from '../utils/changelogStore';
+import ChatButton from './common/ChatButton';
 import './Changelog.css';
 
 // Changelog entry structure
@@ -188,7 +189,10 @@ const ChangelogPanel = ({
     isOpen, 
     onClose, 
     onRollback,
-    currentUser 
+    currentUser,
+    userPublicKey,
+    collaborators = [],
+    onStartChatWith,
 }) => {
     const [changelog, setChangelog] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
@@ -397,6 +401,13 @@ const ChangelogPanel = ({
                                                     {entry.author?.icon || entry.author?.name?.charAt(0) || '?'}
                                                 </span>
                                                 <span className="author-name">{entry.author?.name || 'Unknown'}</span>
+                                                <ChatButton
+                                                    publicKey={entry.author?.publicKey}
+                                                    currentUserKey={userPublicKey}
+                                                    collaborators={collaborators}
+                                                    onStartChatWith={onStartChatWith}
+                                                    size="small"
+                                                />
                                                 <span className="entry-time">{formatTime(entry.timestamp)}</span>
                                             </div>
                                             <div className="entry-summary">

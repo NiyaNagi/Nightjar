@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useConfirmDialog } from './common/ConfirmDialog';
+import ChatButton from './common/ChatButton';
 import './Comments.css';
 
 /**
@@ -18,7 +19,10 @@ const Comments = ({
     onClose,
     pendingSelection, // Selection from the bubble menu or cell reference
     onPendingSelectionHandled,
-    onNavigateToSelection // Optional: callback to navigate to a comment location
+    onNavigateToSelection, // Optional: callback to navigate to a comment location
+    userPublicKey,
+    collaborators = [],
+    onStartChatWith,
 }) => {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
@@ -140,6 +144,7 @@ const Comments = ({
             text: newComment.trim(),
             author: username,
             authorColor: userColor,
+            authorKey: userPublicKey || '',
             timestamp: Date.now(),
             selection: selection, // { from, to, text } or null
             resolved: false,
@@ -163,6 +168,7 @@ const Comments = ({
             text: replyText.trim(),
             author: username,
             authorColor: userColor,
+            authorKey: userPublicKey || '',
             timestamp: Date.now()
         };
 
@@ -359,6 +365,12 @@ const Comments = ({
                                 {comment.author?.charAt(0).toUpperCase() || '?'}
                             </span>
                             <span className="comment-author">{comment.author}</span>
+                            <ChatButton
+                                publicKey={comment.authorKey}
+                                currentUserKey={userPublicKey}
+                                collaborators={collaborators}
+                                onStartChatWith={onStartChatWith}
+                            />
                             <span className="comment-time">{formatTime(comment.timestamp)}</span>
                         </div>
 
@@ -397,6 +409,13 @@ const Comments = ({
                                         </span>
                                         <div className="reply-content">
                                             <span className="reply-author">{reply.author}</span>
+                                            <ChatButton
+                                                publicKey={reply.authorKey}
+                                                currentUserKey={userPublicKey}
+                                                collaborators={collaborators}
+                                                onStartChatWith={onStartChatWith}
+                                                size="small"
+                                            />
                                             <span className="reply-text">{reply.text}</span>
                                         </div>
                                     </div>
@@ -488,6 +507,13 @@ const Comments = ({
                                         {comment.author?.charAt(0).toUpperCase() || '?'}
                                     </span>
                                     <span className="comment-author">{comment.author}</span>
+                                    <ChatButton
+                                        publicKey={comment.authorKey}
+                                        currentUserKey={userPublicKey}
+                                        collaborators={collaborators}
+                                        onStartChatWith={onStartChatWith}
+                                        size="small"
+                                    />
                                     <button 
                                         className="btn-unresolve"
                                         onClick={(e) => {

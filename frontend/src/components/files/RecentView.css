@@ -1,0 +1,122 @@
+/* RecentView.css */
+
+.recent-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #313244);
+  flex-shrink: 0;
+}
+
+.recent-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.recent-count {
+  font-size: 12px;
+  color: var(--text-tertiary, #6c7086);
+}
+
+.recent-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.recent-table-header {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 0.8fr 1fr 0.8fr;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary, #6c7086);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color, #313244);
+  background: var(--bg-primary, #11111b);
+  position: sticky;
+  top: 0;
+}
+
+.recent-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 0.8fr 1fr 0.8fr;
+  padding: 10px 16px;
+  align-items: center;
+  border-bottom: 1px solid rgba(49, 50, 68, 0.5);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.recent-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.recent-col-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recent-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.recent-col-loc { font-size: 12px; }
+.recent-col-size { font-size: 12px; color: var(--text-secondary, #a6adc8); }
+.recent-col-date { font-size: 12px; color: var(--text-tertiary, #6c7086); }
+.recent-col-status { font-size: 12px; }
+
+.recent-location {
+  color: var(--text-tertiary, #6c7086);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.recent-empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.recent-empty p {
+  color: var(--text-secondary, #a6adc8);
+  font-size: 14px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .recent-table-header { display: none; }
+  .recent-row {
+    grid-template-columns: 1fr auto;
+    gap: 4px;
+  }
+  .recent-col-loc,
+  .recent-col-status { display: none; }
+}

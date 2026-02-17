@@ -1,14 +1,28 @@
 /**
  * useFileTransfer
  * 
- * React hook for P2P file chunk distribution.
- * Listens for chunk requests from peers, serves chunks from local IndexedDB,
- * and requests chunks from peers when downloading.
+ * Thin compatibility wrapper around FileTransferContext.
+ * 
+ * Previously this hook contained all the PeerManager handler registration
+ * and chunk request/response logic in component-scoped useEffects. That logic
+ * has been promoted to FileTransferContext (workspace-level) so that handlers
+ * stay registered regardless of which view the user is on.
+ * 
+ * This wrapper exists so existing consumers (FileStorageDashboard) can continue
+ * calling useFileTransfer() without changes to their API. New code should
+ * import useFileTransferContext from contexts/FileTransferContext directly.
  * 
  * See docs/FILE_STORAGE_SPEC.md §8
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useFileTransferContext } from '../contexts/FileTransferContext';
+
+/** Message types for chunk transfer protocol */
+const CHUNK_MSG_TYPES = {
+  REQUEST: 'chunk-request',
+  RESPONSE: 'chunk-response',
+  SEED: 'chunk-seed',
+};
 
 /**
  * Open the IndexedDB chunk store for a workspace.
@@ -57,133 +71,48 @@ function storeLocalChunk(db, fileId, chunkIndex, chunkData) {
 }
 
 /**
- * @param {object} params
- * @param {string} params.workspaceId
- * @param {string} params.userPublicKey
- * @param {object} params.workspaceProvider - Yjs WebSocket provider (has awareness)
- * @param {function} params.setChunkAvailability - from FileStorageContext
+ * Encode Uint8Array to base64 string for wire transfer.
  */
-export default function useFileTransfer({
-  workspaceId,
-  userPublicKey,
-  workspaceProvider,
-  setChunkAvailability,
-}) {
-  const dbRef = useRef(null);
-  const [transferStats, setTransferStats] = useState({
-    chunksServed: 0,
-    chunksFetched: 0,
-    bytesServed: 0,
-    bytesFetched: 0,
-  });
+function uint8ToBase64(uint8) {
+  if (!uint8 || uint8.length === 0) return '';
+  const chunkSize = 32768;
+  let binary = '';
+  for (let i = 0; i < uint8.length; i += chunkSize) {
+    const slice = uint8.subarray(i, Math.min(i + chunkSize, uint8.length));
+    binary += String.fromCharCode.apply(null, slice);
+  }
+  return btoa(binary);
+}
 
-  /** Open/get the local chunk store */
-  const getDb = useCallback(async () => {
-    if (!dbRef.current && workspaceId) {
-      dbRef.current = await openChunkStore(workspaceId);
-    }
-    return dbRef.current;
-  }, [workspaceId]);
+/**
+ * Decode base64 string back to Uint8Array.
+ */
+function base64ToUint8(base64) {
+  if (!base64) return new Uint8Array(0);
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
 
-  /**
-   * Handle an incoming chunk request from a peer.
-   * Used as a message handler attached to the P2P layer.
-   * 
-   * @param {{ fileId: string, chunkIndex: number, requestId: string }} request
-   * @returns {Promise<{ encrypted: Uint8Array, nonce: Uint8Array } | null>}
-   */
-  const handleChunkRequest = useCallback(async (request) => {
-    try {
-      const db = await getDb();
-      const chunk = await getLocalChunk(db, request.fileId, request.chunkIndex);
-      if (chunk) {
-        setTransferStats(prev => ({
-          ...prev,
-          chunksServed: prev.chunksServed + 1,
-          bytesServed: prev.bytesServed + (chunk.encrypted?.length || 0),
-        }));
-        return {
-          encrypted: chunk.encrypted,
-          nonce: chunk.nonce,
-        };
-      }
-      return null;
-    } catch (err) {
-      console.error('[FileTransfer] Error serving chunk:', err);
-      return null;
-    }
-  }, [getDb]);
-
-  /**
-   * Request a chunk from peers.
-   * Currently uses a simple sequential strategy: try each known holder.
-   * 
-   * @param {string} fileId
-   * @param {number} chunkIndex
-   * @param {string[]} [holders] - known peer public keys that have this chunk
-   * @returns {Promise<{ encrypted: Uint8Array, nonce: Uint8Array } | null>}
-   */
-  const requestChunkFromPeer = useCallback(async (fileId, chunkIndex, holders = []) => {
-    // In a full implementation, this would send a P2P message to each holder
-    // and wait for a response. For now, we check local availability.
-    try {
-      const db = await getDb();
-      const localChunk = await getLocalChunk(db, fileId, chunkIndex);
-      if (localChunk) return localChunk;
-      
-      // TODO: Implement actual P2P chunk request via mesh protocol
-      // The message format would be:
-      // { type: MESSAGE_TYPES.FILE_CHUNK_REQUEST, fileId, chunkIndex, requestId }
-      // Response: { type: MESSAGE_TYPES.FILE_CHUNK_RESPONSE, requestId, encrypted, nonce }
-      
-      console.warn(`[FileTransfer] Chunk ${chunkIndex} for ${fileId} not available locally or from peers`);
-      return null;
-    } catch (err) {
-      console.error('[FileTransfer] Error requesting chunk:', err);
-      return null;
-    }
-  }, [getDb]);
-
-  /**
-   * Announce which chunks we have for a file.
-   * Updates the Yjs chunkAvailability map so peers know we can serve them.
-   * 
-   * @param {string} fileId
-   * @param {number} chunkCount
-   */
-  const announceAvailability = useCallback(async (fileId, chunkCount) => {
-    if (!setChunkAvailability || !userPublicKey) return;
-    
-    const db = await getDb();
-    for (let i = 0; i < chunkCount; i++) {
-      const chunk = await getLocalChunk(db, fileId, i);
-      if (chunk) {
-        setChunkAvailability(fileId, i, [userPublicKey]);
-      }
-    }
-  }, [getDb, setChunkAvailability, userPublicKey]);
-
-  /**
-   * Check how many chunks we have locally for a given file.
-   * @param {string} fileId
-   * @param {number} chunkCount
-   * @returns {Promise<number>} number of chunks available locally
-   */
-  const getLocalChunkCount = useCallback(async (fileId, chunkCount) => {
-    const db = await getDb();
-    let count = 0;
-    for (let i = 0; i < chunkCount; i++) {
-      const chunk = await getLocalChunk(db, fileId, i);
-      if (chunk) count++;
-    }
-    return count;
-  }, [getDb]);
-
+/**
+ * Compatibility hook — delegates to FileTransferContext.
+ * 
+ * @param {object} params - (ignored — context already has workspace data)
+ * @returns {object} Same shape as the old useFileTransfer return value
+ */
+export default function useFileTransfer(_params = {}) {
+  const ctx = useFileTransferContext();
   return {
-    handleChunkRequest,
-    requestChunkFromPeer,
-    announceAvailability,
-    getLocalChunkCount,
-    transferStats,
+    handleChunkRequest: ctx.handleChunkRequest,
+    requestChunkFromPeer: ctx.requestChunkFromPeer,
+    announceAvailability: ctx.announceAvailability,
+    getLocalChunkCount: ctx.getLocalChunkCount,
+    transferStats: ctx.transferStats,
   };
 }
+
+// Export utilities for use by useChunkSeeding and other modules
+export { CHUNK_MSG_TYPES, uint8ToBase64, base64ToUint8, openChunkStore, getLocalChunk, storeLocalChunk };

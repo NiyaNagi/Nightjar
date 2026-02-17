@@ -12,6 +12,8 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import StatusBadge from '../common/StatusBadge';
 import RequestDetail from '../common/RequestDetail';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import ChatButton from '../../common/ChatButton';
 import './ProducerManagement.css';
 
 export default function ProducerManagement() {
@@ -31,9 +33,10 @@ export default function ProducerManagement() {
 
     // Ensure the current user (admin) appears even if not in collaborators list
     const myKey = ctx.userIdentity?.publicKeyBase62;
-    if (myKey && !editors.find(c => c.publicKey === myKey)) {
+    if (myKey && !editors.find(c => c.publicKey === myKey || c.publicKeyBase62 === myKey)) {
       editors.unshift({
         publicKey: myKey,
+        publicKeyBase62: myKey,
         displayName: ctx.userIdentity?.displayName || ctx.userIdentity?.name || 'Me',
         permission: 'owner',
         isOnline: true,
@@ -78,7 +81,7 @@ export default function ProducerManagement() {
 
       return {
         id: key,
-        displayName: collab.displayName || key.slice(0, 8),
+        displayName: resolveUserName(ctx.collaborators, key),
         status,
         totalStock,
         totalRate,
@@ -138,7 +141,16 @@ export default function ProducerManagement() {
                     onClick={() => setSelectedProducer(selectedProducer === p.id ? null : p.id)}
                   >
                     <td>{p.isOnline ? '🟢' : '⚪'}</td>
-                    <td className="pm-name">{p.displayName}</td>
+                    <td className="pm-name">
+                      {p.displayName}
+                      <ChatButton
+                        publicKey={p.id}
+                        name={p.displayName}
+                        collaborators={ctx.collaborators}
+                        onStartChatWith={ctx.onStartChatWith}
+                        currentUserKey={ctx.userIdentity?.publicKeyBase62}
+                      />
+                    </td>
                     <td>{statusIndicator(p.status)}</td>
                     <td>{p.totalStock}</td>
                     <td>{p.totalRate}</td>

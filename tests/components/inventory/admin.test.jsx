@@ -64,10 +64,13 @@ jest.mock('../../../frontend/src/utils/addressCrypto', () => ({
   getPublicKeyHex: jest.fn(() => 'admin-hex'),
   base62ToPublicKeyHex: jest.fn(() => 'producer-hex'),
   createAddressReveal: jest.fn(() => Promise.resolve({ encrypted: 'data' })),
+  decryptPendingAddress: jest.fn(() => Promise.resolve({ fullName: 'Test', street1: '123 Main', city: 'NY', state: 'NY', zipCode: '10001', country: 'US' })),
 }));
 
 jest.mock('../../../frontend/src/utils/inventoryAddressStore', () => ({
   getAddress: jest.fn(() => Promise.resolve(null)),
+  getWorkspaceKeyMaterial: jest.fn(() => 'mock-key-material'),
+  storeAddress: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('../../../frontend/src/utils/inventoryAssignment', () => ({
@@ -97,6 +100,8 @@ beforeEach(() => {
     yPendingAddresses: yPending,
     yInventoryNotifications: yNotifications,
     inventorySystemId: 'sys1',
+    workspaceId: 'ws1',
+    currentWorkspace: { password: 'test-pwd' },
     collaborators: [
       { publicKey: 'key1', publicKeyBase62: 'key1', name: 'Alice', displayName: 'Alice', permission: 'owner', isOnline: true },
       { publicKey: 'key2', publicKeyBase62: 'key2', name: 'Bob', displayName: 'Bob', permission: 'editor', isOnline: false },

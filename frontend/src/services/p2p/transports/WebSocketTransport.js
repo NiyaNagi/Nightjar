@@ -261,14 +261,17 @@ export class WebSocketTransport extends BaseTransport {
       throw new Error('Not connected to server');
     }
     
-    // Add routing info for server to forward
-    const routedMessage = {
-      ...message,
-      _targetPeerId: peerId,
-      _fromPeerId: this.localPeerId,
+    // Wrap in relay-message envelope so the server knows to forward it
+    const relayEnvelope = {
+      type: 'relay-message',
+      targetPeerId: peerId,
+      payload: {
+        ...message,
+        _fromPeerId: this.localPeerId,
+      },
     };
     
-    this.serverSocket.send(encodeMessage(routedMessage));
+    this.serverSocket.send(encodeMessage(relayEnvelope));
   }
 
   /**
@@ -279,13 +282,16 @@ export class WebSocketTransport extends BaseTransport {
       return;
     }
     
-    const broadcastMessage = {
-      ...message,
-      _broadcast: true,
-      _fromPeerId: this.localPeerId,
+    // Wrap in relay-broadcast envelope so the server broadcasts to all topic peers
+    const broadcastEnvelope = {
+      type: 'relay-broadcast',
+      payload: {
+        ...message,
+        _fromPeerId: this.localPeerId,
+      },
     };
     
-    this.serverSocket.send(encodeMessage(broadcastMessage));
+    this.serverSocket.send(encodeMessage(broadcastEnvelope));
   }
 
   /**

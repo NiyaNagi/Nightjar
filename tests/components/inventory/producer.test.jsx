@@ -85,6 +85,8 @@ beforeEach(() => {
     yPendingAddresses: yPending,
     yInventoryNotifications: yNotifications,
     inventorySystemId: 'sys1',
+    workspaceId: 'ws1',
+    currentWorkspace: { password: 'test-pwd' },
     collaborators: [
       { publicKey: 'myKey', publicKeyBase62: 'myKey', name: 'Me', displayName: 'Me', permission: 'editor', isOnline: true },
     ],
@@ -130,8 +132,9 @@ describe('ProducerDashboard', () => {
   it('renders kanban columns', () => {
     render(<ProducerDashboard />);
     expect(screen.getByText('Claimed')).toBeInTheDocument();
+    expect(screen.getByText('Pending Approval')).toBeInTheDocument();
     expect(screen.getByText('Approved')).toBeInTheDocument();
-    expect(screen.getByText('Ready to Ship')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
     expect(screen.getByText('Shipped')).toBeInTheDocument();
   });
 

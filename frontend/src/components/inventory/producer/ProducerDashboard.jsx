@@ -6,13 +6,17 @@ import { useInventory } from '../../../contexts/InventoryContext';
 import CapacityInput from '../common/CapacityInput';
 import StatusBadge from '../common/StatusBadge';
 import AddressReveal from './AddressReveal';
+import SlidePanel from '../common/SlidePanel';
+import RequestDetail from '../common/RequestDetail';
 import { generateId, formatRelativeDate } from '../../../utils/inventoryValidation';
+import { pushNotification } from '../../../utils/inventoryNotifications';
 import './ProducerDashboard.css';
 
 const KANBAN_COLUMNS = [
   { key: 'claimed', label: 'Claimed', statuses: ['claimed'] },
+  { key: 'pending', label: 'Pending Approval', statuses: ['pending_approval'] },
   { key: 'approved', label: 'Approved', statuses: ['approved'] },
-  { key: 'ready', label: 'Ready to Ship', statuses: ['pending_approval'] },
+  { key: 'in_progress', label: 'In Progress', statuses: ['in_progress'] },
   { key: 'shipped', label: 'Shipped', statuses: ['shipped'] },
 ];
 
@@ -24,6 +28,7 @@ export default function ProducerDashboard() {
   const myDisplayName = ctx.userIdentity?.displayName || ctx.userIdentity?.name || '';
   const [revealRequestId, setRevealRequestId] = useState(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // My capacity data
   const myCap = producerCapacities?.[myKey] || {};
@@ -105,6 +110,7 @@ export default function ProducerDashboard() {
     const existing = ctx.yProducerCapacities.get(myKey) || {};
     const updated = {
       ...existing,
+      inventorySystemId: ctx.inventorySystemId,
       items: {
         ...(existing.items || {}),
         [itemId]: {
@@ -162,6 +168,17 @@ export default function ProducerDashboard() {
       targetId: requestId,
       summary: `Request ${requestId.slice(0, 8)} unclaimed`,
     }]);
+
+    // Notify the requestor that their request was unclaimed
+    if (req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, {
+        inventorySystemId: ctx.inventorySystemId,
+        recipientId: req.requestedBy,
+        type: 'request_unclaimed',
+        message: `Your request for ${req.catalogItemName || 'item'} was unclaimed and returned to open`,
+        relatedId: requestId,
+      });
+    }
   }, [ctx, myKey]);
 
   // My stats
@@ -229,7 +246,7 @@ export default function ProducerDashboard() {
       <section className="pd-section">
         <h3>My Capacity</h3>
         <div className="pd-capacity-grid">
-          {catalogItems.filter(c => c.isActive !== false).map(item => (
+          {catalogItems.filter(c => c.active !== false).map(item => (
             <CapacityInput
               key={item.id}
               item={item}
@@ -257,7 +274,10 @@ export default function ProducerDashboard() {
                     const item = catalogMap[req.catalogItemId];
                     const hasReveal = addressReveals?.[req.id];
                     return (
-                      <div key={req.id} className={`pd-kanban-card ${req.urgent ? 'pd-kanban-card--urgent' : ''}`}>
+                      <div key={req.id} className={`pd-kanban-card ${req.urgent ? 'pd-kanban-card--urgent' : ''}`}
+                        onClick={() => setSelectedRequest(req)} tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter') setSelectedRequest(req); }}
+                        style={{ cursor: 'pointer' }}>
                         <div className="pd-kanban-card-top">
                           <span className="pd-card-id">#{req.id.slice(0, 6)}</span>
                           {req.urgent && <span className="pd-urgent">⚡</span>}
@@ -271,7 +291,7 @@ export default function ProducerDashboard() {
                         {hasReveal && req.status === 'approved' && (
                           <button
                             className="pd-reveal-btn"
-                            onClick={() => setRevealRequestId(req.id)}
+                            onClick={(e) => { e.stopPropagation(); setRevealRequestId(req.id); }}
                           >
                             📍 View Address
                           </button>
@@ -280,7 +300,7 @@ export default function ProducerDashboard() {
                         {(req.status === 'claimed' || req.status === 'approved') && (
                           <button
                             className="pd-unclaim-btn"
-                            onClick={() => handleUnclaim(req.id)}
+                            onClick={(e) => { e.stopPropagation(); handleUnclaim(req.id); }}
                           >
                             ↩️ Unclaim
                           </button>
@@ -309,17 +329,54 @@ export default function ProducerDashboard() {
 
       {/* Address reveal modal */}
       {revealRequestId && addressReveals?.[revealRequestId] && (
-        <div className="pd-overlay" onClick={() => setRevealRequestId(null)}>
-          <div className="pd-modal" onClick={e => e.stopPropagation()}>
-            <AddressReveal
-              requestId={revealRequestId}
-              reveal={addressReveals[revealRequestId]}
-              identity={ctx.userIdentity}
-              onShipped={() => setRevealRequestId(null)}
-              onClose={() => setRevealRequestId(null)}
-            />
-          </div>
-        </div>
+        <SlidePanel
+          isOpen={true}
+          onClose={() => setRevealRequestId(null)}
+          title="Address & Shipping"
+        >
+          <AddressReveal
+            requestId={revealRequestId}
+            reveal={addressReveals[revealRequestId]}
+            identity={ctx.userIdentity}
+            onShipped={() => setRevealRequestId(null)}
+            onClose={() => setRevealRequestId(null)}
+          />
+        </SlidePanel>
+      )}
+
+      {/* Request drill-in slide panel */}
+      {selectedRequest && !revealRequestId && (
+        <SlidePanel
+          isOpen={true}
+          onClose={() => setSelectedRequest(null)}
+          title={`Request #${selectedRequest.id?.slice(4, 10)}`}
+        >
+          <RequestDetail
+            request={selectedRequest}
+            isAdmin={false}
+            isProducer={true}
+            collaborators={ctx.collaborators || []}
+            onClose={() => setSelectedRequest(null)}
+            onCancel={() => { handleUnclaim(selectedRequest.id); setSelectedRequest(null); }}
+            onMarkShipped={(req, tracking) => {
+              // Open address reveal for shipping
+              setSelectedRequest(null);
+              setRevealRequestId(req.id);
+            }}
+          />
+          {addressReveals?.[selectedRequest.id] && (selectedRequest.status === 'approved' || selectedRequest.status === 'in_progress') && (
+            <>
+              <div className="slide-panel__divider" />
+              <AddressReveal
+                requestId={selectedRequest.id}
+                reveal={addressReveals[selectedRequest.id]}
+                identity={ctx.userIdentity}
+                onShipped={() => setSelectedRequest(null)}
+                onClose={() => setSelectedRequest(null)}
+              />
+            </>
+          )}
+        </SlidePanel>
       )}
     </div>
   );

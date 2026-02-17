@@ -10,11 +10,15 @@
 import React, { useMemo, useState } from 'react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { exportProducers } from '../../../utils/inventoryExport';
+import { resolveUserName } from '../../../utils/resolveUserName';
+import ChatButton from '../../common/ChatButton';
+import { useInventory } from '../../../contexts/InventoryContext';
 
 /**
  * @param {{ requests: object[], collaborators: object[], dateRange: [number,number], catalogItems: object[] }} props
  */
 export default function ProducerLeaderboard({ requests, collaborators, dateRange, catalogItems }) {
+  const { onStartChatWith, userIdentity } = useInventory();
   const [sortKey, setSortKey] = useState('fulfilled');
   const [sortDir, setSortDir] = useState('desc');
   const [filterItemId, setFilterItemId] = useState('');
@@ -28,10 +32,10 @@ export default function ProducerLeaderboard({ requests, collaborators, dateRange
     for (const r of inRange) {
       if (!r.assignedTo) continue;
       if (!map[r.assignedTo]) {
-        const collab = collaborators?.find(c => c.publicKey === r.assignedTo);
+        const collab = collaborators?.find(c => c.publicKey === r.assignedTo || c.publicKeyBase62 === r.assignedTo);
         map[r.assignedTo] = {
           id: r.assignedTo,
-          displayName: collab?.displayName || r.assignedTo.slice(0, 8),
+          displayName: resolveUserName(collaborators, r.assignedTo),
           fulfilled: 0,
           units: 0,
           totalDays: 0,
@@ -106,7 +110,7 @@ export default function ProducerLeaderboard({ requests, collaborators, dateRange
             onChange={e => setFilterItemId(e.target.value)}
           >
             <option value="">All Items</option>
-            {(catalogItems || []).filter(c => c.isActive !== false).map(c => (
+            {(catalogItems || []).filter(c => c.active !== false).map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -142,7 +146,16 @@ export default function ProducerLeaderboard({ requests, collaborators, dateRange
             {sorted.map((p, i) => (
               <tr key={p.id}>
                 <td>{i + 1}</td>
-                <td>{p.displayName}</td>
+                <td>
+                  {p.displayName}
+                  <ChatButton
+                    publicKey={p.id}
+                    name={p.displayName}
+                    collaborators={collaborators}
+                    onStartChatWith={onStartChatWith}
+                    currentUserKey={userIdentity?.publicKeyBase62}
+                  />
+                </td>
                 <td>{p.fulfilled}</td>
                 <td>{p.units}</td>
                 <td>{p.avgDays != null ? `${p.avgDays}d` : '—'}</td>

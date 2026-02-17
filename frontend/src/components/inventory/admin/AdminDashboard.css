@@ -144,6 +144,47 @@
   gap: 8px;
 }
 
+/* Export dropdown */
+.admin-dashboard__export-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.admin-dashboard__export-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.admin-dashboard__export-option {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: var(--text-primary, #eee);
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.admin-dashboard__export-option:hover {
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.08));
+}
+
+.admin-dashboard__export-option + .admin-dashboard__export-option {
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+}
+
 /* Aging */
 .admin-dashboard__aging {
   display: flex;

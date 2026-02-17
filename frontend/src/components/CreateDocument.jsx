@@ -78,6 +78,7 @@ export default function CreateDocumentDialog({
   onCreateKanban,
   onCreateInventory,
   onCreateFileStorage,
+  disabledTypes = [],
 }) {
   const { folders } = useFolders();
   const { currentWorkspace, currentWorkspaceId } = useWorkspaces();
@@ -197,19 +198,26 @@ export default function CreateDocumentDialog({
           <div className="create-document-field">
             <label className="create-document-field__label">Document Type</label>
             <div className="document-type-grid" data-testid="doc-type-grid">
-              {DOCUMENT_TYPES.map((type) => (
-                <button
-                  key={type.type}
-                  type="button"
-                  className={`document-type-option ${documentType === type.type ? 'selected' : ''}`}
-                  onClick={() => setDocumentType(type.type)}
-                  data-testid={`doc-type-${type.type}`}
-                >
-                  <div className="document-type-option__icon">{type.icon}</div>
-                  <div className="document-type-option__label">{type.label}</div>
-                  <div className="document-type-option__description">{type.description}</div>
-                </button>
-              ))}
+              {DOCUMENT_TYPES.map((type) => {
+                const isDisabled = disabledTypes.includes(type.type);
+                return (
+                  <button
+                    key={type.type}
+                    type="button"
+                    className={`document-type-option ${documentType === type.type ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                    onClick={() => !isDisabled && setDocumentType(type.type)}
+                    disabled={isDisabled}
+                    title={isDisabled ? `Only one ${type.label.toLowerCase()} per workspace is allowed` : undefined}
+                    data-testid={`doc-type-${type.type}`}
+                  >
+                    <div className="document-type-option__icon">{type.icon}</div>
+                    <div className="document-type-option__label">{type.label}</div>
+                    <div className="document-type-option__description">
+                      {isDisabled ? 'Already exists in this workspace' : type.description}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
           

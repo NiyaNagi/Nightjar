@@ -5,6 +5,7 @@ import React, { useState, useCallback } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { generateId } from '../../../utils/inventoryValidation';
 import { assignRequests } from '../../../utils/inventoryAssignment';
+import { runAutoAssign } from '../../../utils/autoAssign';
 import { SHIPPING_PROVIDERS, getAllProviderIds } from '../../../utils/shippingProviders';
 import './InventorySettings.css';
 
@@ -60,53 +61,15 @@ export default function InventorySettings() {
     setAssigning(true);
     setAssignResult(null);
     try {
-      const assignments = assignRequests(requests, producerCapacities);
-      let applied = 0;
-
-      const yArr = ctx.yInventoryRequests;
-      if (!yArr) return;
-
-      for (const a of assignments) {
-        if (!a.producerId || a.source === 'blocked') continue;
-        const arr = yArr.toArray();
-        const idx = arr.findIndex(r => r.id === a.requestId);
-        if (idx === -1) continue;
-        const req = arr[idx];
-        if (req.status !== 'open') continue;
-
-        const updated = {
-          ...req,
-          status: settings.requireApproval ? 'pending_approval' : 'approved',
-          assignedTo: a.producerId,
-          assignedAt: Date.now(),
-          estimatedFulfillmentDate: a.estimatedDate,
-        };
-        yArr.delete(idx, 1);
-        yArr.insert(idx, [updated]);
-        applied++;
-
-        ctx.yInventoryAuditLog?.push([{
-          id: generateId(),
-          inventorySystemId: ctx.inventorySystemId,
-          timestamp: Date.now(),
-          actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown',
-          actorRole: 'owner',
-          action: 'request_auto_assigned',
-          targetType: 'request',
-          targetId: a.requestId,
-          summary: `Auto-assigned to ${a.producerId.slice(0, 8)} (${a.source})`,
-        }]);
-      }
-
-      const blocked = assignments.filter(a => a.source === 'blocked').length;
-      setAssignResult({ applied, blocked, total: assignments.length });
+      const result = runAutoAssign(ctx);
+      setAssignResult(result);
     } catch (err) {
       console.error('[InventorySettings] Auto-assign error:', err);
       setAssignResult({ error: err.message });
     } finally {
       setAssigning(false);
     }
-  }, [requests, producerCapacities, settings, ctx]);
+  }, [ctx]);
 
   return (
     <div className="inventory-settings">

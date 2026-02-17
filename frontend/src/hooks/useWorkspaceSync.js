@@ -19,7 +19,7 @@ import { isElectron } from '../hooks/useEnvironment';
 import { getYjsWebSocketUrl } from '../utils/websocket';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { toString as uint8ArrayToString } from 'uint8arrays';
-import { META_WS_PORT, WS_RECONNECT_MAX_DELAY, TIMEOUT_LONG } from '../config/constants';
+import { META_WS_PORT, WS_RECONNECT_MAX_DELAY, TIMEOUT_LONG, AWARENESS_HEARTBEAT_MS } from '../config/constants';
 
 // Alias for backwards compatibility
 const getWsUrl = getYjsWebSocketUrl;
@@ -88,6 +88,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const yAddressRevealsRef = useRef(null); // Map of encrypted address reveals
   const yPendingAddressesRef = useRef(null); // Map of pending addresses
   const yInventoryAuditLogRef = useRef(null); // Array of audit log entries
+  const yInventoryNotificationsRef = useRef(null); // Array of inventory notifications
   // File Storage shared types — live in workspace-level Y.Doc (NOT separate per-document rooms)
   // See docs/FILE_STORAGE_SPEC.md §15.2
   const yFileStorageSystemsRef = useRef(null); // Map of file storage systems
@@ -281,7 +282,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           console.warn('[WorkspaceSync] Heartbeat error, clearing interval:', err.message);
           clearInterval(heartbeatInterval);
         }
-      }, TIMEOUT_LONG); // Update every 30 seconds
+      }, AWARENESS_HEARTBEAT_MS); // Update every 15 seconds
       
       // Store interval ID for cleanup
       provider._heartbeatInterval = heartbeatInterval;
@@ -313,6 +314,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     const yAddressReveals = ydoc.getMap('addressReveals');
     const yPendingAddresses = ydoc.getMap('pendingAddresses');
     const yInventoryAuditLog = ydoc.getArray('inventoryAuditLog');
+    const yInventoryNotifications = ydoc.getArray('inventoryNotifications');
     
     // File Storage shared types — live in workspace-level Y.Doc (NOT separate per-document rooms)
     // See docs/FILE_STORAGE_SPEC.md §15.2
@@ -382,6 +384,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     yAddressRevealsRef.current = yAddressReveals;
     yPendingAddressesRef.current = yPendingAddresses;
     yInventoryAuditLogRef.current = yInventoryAuditLog;
+    yInventoryNotificationsRef.current = yInventoryNotifications;
     yFileStorageSystemsRef.current = yFileStorageSystems;
     yStorageFilesRef.current = yStorageFiles;
     yStorageFoldersRef.current = yStorageFolders;
@@ -622,11 +625,29 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     }
     
     // Sync workspace-level collaborators from Yjs
+    // Derive from yMembers (the authoritative membership map) since yCollaborators
+    // Y.Array is a legacy type that is never populated.  Also merge any entries
+    // from the legacy yCollaborators array so nothing is lost.
     const syncCollaborators = () => {
       if (cleanedUp) return; // Prevent state updates after cleanup
-      const collabs = yCollaborators.toArray();
-      setCollaborators(collabs);
-      setTotalCount(collabs.length);
+      const membersArr = [];
+      yMembers.forEach((value, key) => {
+        membersArr.push({
+          ...value,
+          publicKey: key,
+          publicKeyBase62: key, // alias so resolveCollaborator works with both fields
+        });
+      });
+      // Merge legacy yCollaborators entries (if any exist)
+      const legacyCollabs = yCollaborators.toArray();
+      for (const lc of legacyCollabs) {
+        const lcKey = lc.publicKey || lc.publicKeyBase62;
+        if (lcKey && !membersArr.find(m => m.publicKey === lcKey)) {
+          membersArr.push({ ...lc, publicKey: lcKey, publicKeyBase62: lcKey });
+        }
+      }
+      setCollaborators(membersArr);
+      setTotalCount(membersArr.length);
     };
     
     // Sync members map (keyed by publicKey for deduplication)
@@ -697,33 +718,23 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       states.forEach((state, clientId) => {
         if (clientId === myClientId) return;
         if (state?.user?.name) {
-          // Require publicKey for proper identity - skip clients without it
           const publicKey = state.user.publicKey;
-          if (!publicKey) {
-            // Skip legacy clients without publicKey - they need to update
-            // Debug: Show what fields ARE present to diagnose why publicKey is missing
-            console.log(`[WorkspaceSync] Skipping client ${clientId} without publicKey - state.user:`, JSON.stringify({
-              name: state.user.name,
-              color: state.user.color,
-              icon: state.user.icon,
-              hasPublicKey: !!state.user.publicKey,
-              openDocId: state.openDocumentId || state.user?.openDocumentId || null,
-              allUserKeys: Object.keys(state.user || {})
-            }));
-            return;
-          }
           
           // CRITICAL: Skip if this is our own user (same publicKey, different tab/session)
           // This prevents the current user from appearing in their own presence indicators
-          if (myPublicKey && publicKey === myPublicKey) {
+          if (myPublicKey && publicKey && publicKey === myPublicKey) {
             return;
           }
           
           online++;
           
-          // Skip if we've already processed this publicKey (same user, different connection)
-          if (onlinePublicKeys.has(publicKey)) return;
-          onlinePublicKeys.add(publicKey);
+          // Use publicKey for deduplication when available, fall back to clientId
+          // This ensures clients whose identity hasn't loaded yet still show presence
+          const deduplicationKey = publicKey || `client-${clientId}`;
+          
+          // Skip if we've already processed this identity (same user, different connection)
+          if (onlinePublicKeys.has(deduplicationKey)) return;
+          onlinePublicKeys.add(deduplicationKey);
           
           // Track which documents this user has open (for tab presence)
           // Support both legacy single openDocumentId and new openDocumentIds array
@@ -748,6 +759,10 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           }
           
           // Update the members map (keyed by publicKey for proper deduplication)
+          // Only update members map if publicKey is available (identity has loaded)
+          if (!publicKey) {
+            // Client identity hasn't loaded yet - skip member tracking but still show presence pips
+          } else {
           const existingMember = yMembers.get(publicKey);
           
           if (!existingMember) {
@@ -763,8 +778,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
               joinedAt: now,
               isOnline: true,
             });
-          } else if (now - (existingMember.lastSeen || 0) > TIMEOUT_LONG) {
-            // Update existing member if more than 30s since last update
+          } else if (now - (existingMember.lastSeen || 0) > 2 * AWARENESS_HEARTBEAT_MS) {
+            // Update existing member if more than 2 heartbeats since last update
             yMembers.set(publicKey, {
               ...existingMember,
               displayName: state.user.name || existingMember.displayName,
@@ -775,6 +790,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
               isOnline: true,
             });
           }
+          } // end if (publicKey) for member tracking
         }
       });
       
@@ -795,6 +811,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     yTrashedDocs.observe(syncTrashedDocs);
     yCollaborators.observe(syncCollaborators);
     yMembers.observe(syncMembers);
+    // Also re-derive collaborators when members change (collaborators are now sourced from yMembers)
+    yMembers.observe(syncCollaborators);
     yKicked.observe(syncKicked);
     provider.awareness.on('change', syncOnlineFromAwareness);
     
@@ -827,6 +845,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       yTrashedDocs.unobserve(syncTrashedDocs);
       yCollaborators.unobserve(syncCollaborators);
       yMembers.unobserve(syncMembers);
+      yMembers.unobserve(syncCollaborators); // collaborators also derived from members
       yKicked.unobserve(syncKicked);
       provider.awareness.off('change', syncOnlineFromAwareness);
       // Clear heartbeat interval if it exists
@@ -1250,6 +1269,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     yAddressReveals: yAddressRevealsRef.current,
     yPendingAddresses: yPendingAddressesRef.current,
     yInventoryAuditLog: yInventoryAuditLogRef.current,
+    yInventoryNotifications: yInventoryNotificationsRef.current,
     // Inventory operations
     addInventorySystem,
     removeInventorySystem,

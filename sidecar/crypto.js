@@ -34,14 +34,13 @@ function timingSafeEqual(a, b) {
     if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array)) {
         return false;
     }
-    if (a.length !== b.length) {
-        b = new Uint8Array(a.length);
-    }
+    const lengthsMatch = a.length === b.length;
+    const compareTo = lengthsMatch ? b : new Uint8Array(a.length);
     let result = 0;
     for (let i = 0; i < a.length; i++) {
-        result |= a[i] ^ b[i];
+        result |= a[i] ^ compareTo[i];
     }
-    return result === 0 && a.length === b.length;
+    return result === 0 && lengthsMatch;
 }
 
 /**

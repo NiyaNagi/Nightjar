@@ -5,6 +5,8 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import StatusBadge from '../common/StatusBadge';
 import AddressReveal from './AddressReveal';
+import SlidePanel from '../common/SlidePanel';
+import RequestDetail from '../common/RequestDetail';
 import { generateId, formatRelativeDate } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
 import './ProducerMyRequests.css';
@@ -23,6 +25,7 @@ export default function ProducerMyRequests() {
   const myKey = ctx.userIdentity?.publicKeyBase62;
   const [revealRequestId, setRevealRequestId] = useState(null);
   const [filterStatus, setFilterStatus] = useState('');
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const catalogMap = useMemo(() => {
     const m = {};
@@ -158,7 +161,10 @@ export default function ProducerMyRequests() {
                 const hasReveal = addressReveals?.[req.id];
 
                 return (
-                  <div key={req.id} className={`pmr-card ${req.urgent ? 'pmr-card--urgent' : ''}`}>
+                  <div key={req.id} className={`pmr-card ${req.urgent ? 'pmr-card--urgent' : ''}`}
+                    onClick={() => setSelectedRequest(req)} tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setSelectedRequest(req); }}
+                    style={{ cursor: 'pointer' }}>
                     <div className="pmr-card-top">
                       <span className="pmr-card-id">#{req.id.slice(0, 6)}</span>
                       {req.urgent && <span className="pmr-card-urgent">⚡</span>}
@@ -178,17 +184,17 @@ export default function ProducerMyRequests() {
 
                     <div className="pmr-card-actions">
                       {hasReveal && (req.status === 'approved' || req.status === 'in_progress') && (
-                        <button className="pmr-btn pmr-btn--reveal" onClick={() => setRevealRequestId(req.id)}>
+                        <button className="pmr-btn pmr-btn--reveal" onClick={(e) => { e.stopPropagation(); setRevealRequestId(req.id); }}>
                           📍 View Address
                         </button>
                       )}
                       {req.status === 'approved' && (
-                        <button className="pmr-btn pmr-btn--progress" onClick={() => handleMarkInProgress(req.id)}>
+                        <button className="pmr-btn pmr-btn--progress" onClick={(e) => { e.stopPropagation(); handleMarkInProgress(req.id); }}>
                           🔨 Mark In Progress
                         </button>
                       )}
                       {['claimed', 'pending_approval', 'approved', 'in_progress'].includes(req.status) && (
-                        <button className="pmr-btn pmr-btn--unclaim" onClick={() => handleUnclaim(req.id)}>
+                        <button className="pmr-btn pmr-btn--unclaim" onClick={(e) => { e.stopPropagation(); handleUnclaim(req.id); }}>
                           ↩️ Unclaim
                         </button>
                       )}
@@ -204,19 +210,48 @@ export default function ProducerMyRequests() {
         ))}
       </div>
 
-      {/* Address reveal modal */}
+      {/* Address reveal slide panel */}
       {revealRequestId && addressReveals?.[revealRequestId] && (
-        <div className="pmr-overlay" onClick={() => setRevealRequestId(null)}>
-          <div className="pmr-modal" onClick={e => e.stopPropagation()}>
-            <AddressReveal
-              requestId={revealRequestId}
-              reveal={addressReveals[revealRequestId]}
-              identity={ctx.userIdentity}
-              onShipped={() => setRevealRequestId(null)}
-              onClose={() => setRevealRequestId(null)}
-            />
-          </div>
-        </div>
+        <SlidePanel
+          isOpen={true}
+          onClose={() => setRevealRequestId(null)}
+          title="Address & Shipping"
+        >
+          <AddressReveal
+            requestId={revealRequestId}
+            reveal={addressReveals[revealRequestId]}
+            identity={ctx.userIdentity}
+            onShipped={() => setRevealRequestId(null)}
+            onClose={() => setRevealRequestId(null)}
+          />
+        </SlidePanel>
+      )}
+
+      {/* Request drill-in slide panel */}
+      {selectedRequest && !revealRequestId && (
+        <SlidePanel
+          isOpen={true}
+          onClose={() => setSelectedRequest(null)}
+          title={`Request #${selectedRequest.id?.slice(4, 10)}`}
+        >
+          <RequestDetail
+            request={selectedRequest}
+            isAdmin={false}
+            isProducer={true}
+            collaborators={ctx.collaborators || []}
+            onClose={() => setSelectedRequest(null)}
+            onCancel={() => { handleUnclaim(selectedRequest.id); setSelectedRequest(null); }}
+            onMarkInProgress={(req) => { handleMarkInProgress(req.id); setSelectedRequest(null); }}
+            onMarkShipped={(req, tracking) => {
+              // If there's an address reveal, close detail and open AddressReveal panel
+              // for the full shipping workflow. Otherwise close detail.
+              setSelectedRequest(null);
+              if (addressReveals?.[req.id]) {
+                setRevealRequestId(req.id);
+              }
+            }}
+          />
+        </SlidePanel>
       )}
     </div>
   );

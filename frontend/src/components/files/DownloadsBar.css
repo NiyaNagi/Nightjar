@@ -1,0 +1,112 @@
+/* DownloadsBar.css */
+
+.downloads-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-primary, #11111b);
+  border-top: 1px solid var(--border-color, #313244);
+  overflow-x: auto;
+}
+
+.downloads-bar-items {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.downloads-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  min-width: 150px;
+  max-width: 250px;
+  flex-shrink: 0;
+}
+
+.downloads-bar-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-primary, #cdd6f4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.downloads-bar-progress {
+  width: 40px;
+  height: 4px;
+  background: var(--border-color, #313244);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.downloads-bar-progress-fill {
+  height: 100%;
+  background: var(--accent-color, #89b4fa);
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.downloads-bar-done {
+  color: #a6e3a1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.downloads-bar-error {
+  color: #f38ba8;
+  font-size: 10px;
+}
+
+.downloads-bar-close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary, #6c7086);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.downloads-bar-close:hover {
+  color: var(--text-primary, #cdd6f4);
+}
+
+.downloads-bar-clear-all {
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary, #6c7086);
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.downloads-bar-clear-all:hover {
+  color: var(--text-primary, #cdd6f4);
+}
+
+/* Hide scrollbar */
+.downloads-bar-items::-webkit-scrollbar {
+  height: 0;
+}
+
+@media (max-width: 768px) {
+  .downloads-bar-item {
+    min-width: 120px;
+    max-width: 180px;
+  }
+}

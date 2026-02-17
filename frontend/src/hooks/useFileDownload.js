@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { decryptChunk, reassembleFile, toBlob, downloadBlob, sha256 } from '../utils/fileChunking';
-import { getChunk } from './useFileUpload';
+import { getChunk, openChunkStore } from '../utils/chunkStore';
 
 /**
  * Download states
@@ -25,24 +25,6 @@ export const DOWNLOAD_STATUS = {
 };
 
 /**
- * Open the IndexedDB chunk store for a workspace (same as useFileUpload).
- */
-function openChunkStore(workspaceId) {
-  return new Promise((resolve, reject) => {
-    const dbName = `nightjar-chunks-${workspaceId}`;
-    const request = indexedDB.open(dbName, 1);
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('chunks')) {
-        db.createObjectStore('chunks');
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-/**
  * React hook providing file download functionality.
  * 
  * @param {object} params
@@ -50,12 +32,16 @@ function openChunkStore(workspaceId) {
  * @param {Uint8Array} params.workspaceKey - 32-byte NaCl key
  * @param {function} [params.requestChunkFromPeer] - P2P chunk fetch callback
  * @param {function} [params.addAuditEntry] - from FileStorageContext
+ * @param {function} [params.announceAvailability] - from useFileTransfer
+ * @param {object}   [params.chunkAvailability] - chunk availability map for holder hints
  */
 export default function useFileDownload({
   workspaceId,
   workspaceKey,
   requestChunkFromPeer,
   addAuditEntry,
+  announceAvailability,
+  chunkAvailability,
 }) {
   const [downloads, setDownloads] = useState(new Map()); // downloadId -> state
   const dbRef = useRef(null);
@@ -79,6 +65,7 @@ export default function useFileDownload({
     const downloadId = `download-${++downloadIdCounter.current}`;
     const { id: fileId, name, chunkCount, chunkHashes, sizeBytes, mimeType } = fileRecord;
 
+    const startedAt = Date.now();
     const updateStatus = (status, progress = {}) => {
       setDownloads(prev => {
         const next = new Map(prev);
@@ -91,6 +78,7 @@ export default function useFileDownload({
           chunksDownloaded: 0,
           totalChunks: chunkCount,
           error: null,
+          startedAt,
           ...progress,
         });
         return next;
@@ -103,26 +91,57 @@ export default function useFileDownload({
       const db = await getDb();
       const decryptedChunks = [];
 
+      console.log(`[FileDownload] Starting download: fileId=${fileId}, name=${name}, chunkCount=${chunkCount}`);
+      console.log(`[FileDownload] DB open: ${!!db}, requestChunkFromPeer available: ${!!requestChunkFromPeer}`);
+
       for (let i = 0; i < chunkCount; i++) {
         // Try local IndexedDB first
         let chunkData = await getChunk(db, fileId, i);
         
+        if (chunkData) {
+          console.log(`[FileDownload] Chunk ${i}/${chunkCount} found locally`);
+        }
+        
         // If not available locally, try P2P
         if (!chunkData && requestChunkFromPeer) {
           try {
-            chunkData = await requestChunkFromPeer(fileId, i);
+            // Pass holder hints so requestChunkFromPeer can target the right peers
+            const chunkKey = `${fileId}:${i}`;
+            const entry = chunkAvailability?.[chunkKey];
+            const holders = (entry && Array.isArray(entry.holders)) ? entry.holders : (Array.isArray(entry) ? entry : []);
+            console.log(`[FileDownload] Chunk ${i} not local, requesting from peers. Holders:`, holders);
+            chunkData = await requestChunkFromPeer(fileId, i, holders);
             // Store locally for future seeding
             if (chunkData) {
+              console.log(`[FileDownload] Chunk ${i} received from peer`);
               const tx = db.transaction('chunks', 'readwrite');
               tx.objectStore('chunks').put(chunkData, `${fileId}:${i}`);
+            } else {
+              console.warn(`[FileDownload] Chunk ${i} peer request returned null`);
             }
           } catch (err) {
             console.warn(`[FileDownload] P2P fetch failed for chunk ${i}:`, err);
           }
+        } else if (!chunkData) {
+          console.warn(`[FileDownload] Chunk ${i} not local and no requestChunkFromPeer function available`);
         }
 
         if (!chunkData) {
-          throw new Error(`Chunk ${i} not available locally or from peers`);
+          // Log all available chunk keys in IndexedDB to help diagnose mismatched IDs
+          try {
+            const allKeys = await new Promise((resolve, reject) => {
+              const tx = db.transaction('chunks', 'readonly');
+              const store = tx.objectStore('chunks');
+              const req = store.getAllKeys();
+              req.onsuccess = () => resolve(req.result);
+              req.onerror = () => reject(req.error);
+            });
+            const fileKeys = allKeys.filter(k => typeof k === 'string' && k.includes(':0'));
+            console.error(`[FileDownload] Chunk ${i} not available. File ID: ${fileId}. DB has ${allKeys.length} total keys. File chunk-0 keys:`, fileKeys.slice(0, 20));
+          } catch (dbErr) {
+            console.error(`[FileDownload] Could not list DB keys:`, dbErr);
+          }
+          throw new Error(`Chunk ${i} not available locally or from peers (fileId: ${fileId})`);
         }
 
         // Decrypt
@@ -158,14 +177,68 @@ export default function useFileDownload({
 
       // Trigger browser download unless suppressed
       if (!options.skipBrowserDownload) {
-        const blob = toBlob(data, mimeType || 'application/octet-stream');
-        downloadBlob(blob, name);
+        let savedFilePath = null;
+        // In Electron, save to disk via IPC
+        if (typeof window !== 'undefined' && window.electronAPI?.fileSystem) {
+          let downloadLocation = localStorage.getItem('nightjar_download_location') || '';
+          // First download: ask user to pick a folder
+          if (!downloadLocation) {
+            downloadLocation = await window.electronAPI.fileSystem.selectFolder({
+              title: 'Choose Download Location',
+            });
+            if (downloadLocation) {
+              localStorage.setItem('nightjar_download_location', downloadLocation);
+            }
+          }
+          if (downloadLocation) {
+            const filePath = downloadLocation.replace(/[\\/]$/, '') + '/' + name;
+            // Convert Uint8Array to base64 for IPC transfer
+            let base64 = '';
+            const chunkSize = 32768;
+            for (let offset = 0; offset < data.length; offset += chunkSize) {
+              const slice = data.subarray(offset, Math.min(offset + chunkSize, data.length));
+              base64 += String.fromCharCode.apply(null, slice);
+            }
+            base64 = btoa(base64);
+            const result = await window.electronAPI.fileSystem.saveDownload(filePath, base64);
+            if (result?.success) {
+              savedFilePath = filePath;
+            } else {
+              // Fallback to browser download if save fails
+              const blob = toBlob(data, mimeType || 'application/octet-stream');
+              downloadBlob(blob, name);
+            }
+          } else {
+            // User cancelled folder selection — fallback to browser download
+            const blob = toBlob(data, mimeType || 'application/octet-stream');
+            downloadBlob(blob, name);
+          }
+        } else {
+          // Non-Electron environment — use browser download
+          const blob = toBlob(data, mimeType || 'application/octet-stream');
+          downloadBlob(blob, name);
+        }
+
+        updateStatus(DOWNLOAD_STATUS.COMPLETE, {
+          chunksDownloaded: chunkCount,
+          totalChunks: chunkCount,
+          filePath: savedFilePath,
+        });
+      } else {
+        updateStatus(DOWNLOAD_STATUS.COMPLETE, {
+          chunksDownloaded: chunkCount,
+          totalChunks: chunkCount,
+        });
       }
 
-      updateStatus(DOWNLOAD_STATUS.COMPLETE, {
-        chunksDownloaded: chunkCount,
-        totalChunks: chunkCount,
-      });
+      // Announce chunk availability to peers (spec §4.6 step 9)
+      if (announceAvailability) {
+        try {
+          await announceAvailability(fileId, chunkCount);
+        } catch (announceErr) {
+          console.warn('[FileDownload] Failed to announce availability:', announceErr);
+        }
+      }
 
       if (addAuditEntry) {
         addAuditEntry(
@@ -182,7 +255,7 @@ export default function useFileDownload({
       updateStatus(DOWNLOAD_STATUS.ERROR, { error: err.message });
       throw err;
     }
-  }, [workspaceId, workspaceKey, requestChunkFromPeer, addAuditEntry, getDb]);
+  }, [workspaceId, workspaceKey, requestChunkFromPeer, chunkAvailability, addAuditEntry, announceAvailability, getDb]);
 
   /**
    * Check which chunks we have locally for a file.

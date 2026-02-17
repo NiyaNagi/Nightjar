@@ -319,10 +319,14 @@ export function exportLogs(filename) {
  */
 export async function exportLogsToFile(filepath) {
   if (typeof require !== 'undefined') {
-    const fs = require('fs').promises;
-    const json = getLogsAsJSON();
-    await fs.writeFile(filepath, json, 'utf-8');
-    logBehavior('app', 'logs_exported_to_file', { entryCount: logBuffer.length });
+    try {
+      const fs = require('fs').promises;
+      const json = getLogsAsJSON();
+      await fs.writeFile(filepath, json, 'utf-8');
+      logBehavior('app', 'logs_exported_to_file', { entryCount: logBuffer.length });
+    } catch {
+      // require('fs') not available in bundled environment
+    }
   } else if (typeof window !== 'undefined' && window.__electron_fs__) {
     await window.__electron_fs__.writeFile(filepath, getLogsAsJSON());
     logBehavior('app', 'logs_exported_to_file', { entryCount: logBuffer.length });

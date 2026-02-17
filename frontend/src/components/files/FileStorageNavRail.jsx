@@ -19,6 +19,7 @@ export const FILE_VIEWS = {
   TRASH: 'trash',
   AUDIT_LOG: 'audit_log',
   STORAGE: 'storage',
+  MESH: 'mesh',
   SETTINGS: 'settings',
 };
 
@@ -30,9 +31,8 @@ const ADMIN_NAV = [
   { id: FILE_VIEWS.FAVORITES, label: 'Favorites', icon: '⭐' },
   { id: FILE_VIEWS.TRASH, label: 'Trash', icon: '🗑️' },
   { divider: true },
-  { id: FILE_VIEWS.AUDIT_LOG, label: 'Audit Log', icon: '📋' },
-  { id: FILE_VIEWS.STORAGE, label: 'Storage', icon: '💾' },
-  { id: FILE_VIEWS.SETTINGS, label: 'Settings', icon: '⚙️' },
+  { id: FILE_VIEWS.AUDIT_LOG, label: 'Audit Log', icon: '📜' },
+  { id: FILE_VIEWS.STORAGE, label: 'Storage', icon: '📊' },  { id: FILE_VIEWS.MESH, label: 'Mesh', icon: '🌐' },  { id: FILE_VIEWS.SETTINGS, label: 'Settings', icon: '⚙️' },
 ];
 
 // Non-admin (collaborator) – no settings, audit, or storage

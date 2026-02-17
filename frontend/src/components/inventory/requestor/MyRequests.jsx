@@ -14,6 +14,10 @@ import StatusBadge from '../common/StatusBadge';
 import { formatDate, formatRelativeDate, generateId } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
 import { parseTrackingNumber, genericTrackingUrl } from '../../../utils/trackingLinks';
+import { getPublicKeyHex, encryptAddressForAdmins } from '../../../utils/addressCrypto';
+import { getAddress, getWorkspaceKeyMaterial, storeAddress } from '../../../utils/inventoryAddressStore';
+import SlidePanel from '../common/SlidePanel';
+import RequestDetail from '../common/RequestDetail';
 import './MyRequests.css';
 
 const STATUS_LABELS = {
@@ -42,6 +46,7 @@ export default function MyRequests() {
   const [editQty, setEditQty] = useState('');
   const [editUrgent, setEditUrgent] = useState(false);
   const [editNotes, setEditNotes] = useState('');
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // My requests only
   const myRequests = useMemo(() => {
@@ -67,7 +72,7 @@ export default function MyRequests() {
       targetType: 'request',
       summary: `Request cancelled by requestor: ${req.catalogItemName}`,
       actorId: userIdentity?.publicKeyBase62 || '',
-      actorRole: 'requestor',
+      actorRole: 'viewer',
       timestamp: Date.now(),
     }]);
     // Notify the assigned producer if any
@@ -97,7 +102,7 @@ export default function MyRequests() {
       targetType: 'request',
       summary: `Delivery confirmed by requestor: ${req.catalogItemName}`,
       actorId: userIdentity?.publicKeyBase62 || '',
-      actorRole: 'requestor',
+      actorRole: 'viewer',
       timestamp: Date.now(),
     }]);
     // Notify the producer that delivery was confirmed
@@ -113,7 +118,7 @@ export default function MyRequests() {
     showToast(`Request #${req.id?.slice(4, 10)} marked as delivered`, 'success');
   }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, userIdentity, ctx.yInventoryNotifications]);
 
-  const handleRequestAgain = useCallback((req) => {
+  const handleRequestAgain = useCallback(async (req) => {
     const now = Date.now();
     const requestId = generateId('req-');
     const newRequest = {
@@ -139,6 +144,38 @@ export default function MyRequests() {
       estimatedFulfillmentDate: null,
     };
     yInventoryRequests.push([newRequest]);
+
+    // Re-encrypt the address for the new request
+    // Try local store first, then copy pending entries from the original request
+    try {
+      const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
+      const addr = await getAddress(km, inventorySystemId, req.id);
+      if (addr) {
+        // Store locally for the new request
+        await storeAddress(km, inventorySystemId, requestId, addr);
+
+        // Also encrypt for admin(s) in yPendingAddresses
+        const admins = (ctx.collaborators || []).filter(
+          c => c.permission === 'owner'
+        );
+        if (admins.length > 0 && userIdentity?.privateKey) {
+          const senderPubHex = getPublicKeyHex(userIdentity);
+          const entries = await encryptAddressForAdmins(
+            addr, admins, userIdentity.privateKey, senderPubHex
+          );
+          ctx.yPendingAddresses?.set(requestId, entries);
+        }
+      }
+    } catch {
+      // Fallback: copy encrypted pending entries from the old request if available
+      if (ctx.yPendingAddresses) {
+        const oldEntries = ctx.yPendingAddresses.get(req.id);
+        if (oldEntries) {
+          ctx.yPendingAddresses.set(requestId, oldEntries);
+        }
+      }
+    }
+
     yInventoryAuditLog.push([{
       id: generateId('aud-'),
       inventorySystemId,
@@ -147,11 +184,11 @@ export default function MyRequests() {
       targetType: 'request',
       summary: `Re-request: ${req.catalogItemName} x${req.quantity} to ${req.city}, ${req.state}`,
       actorId: userIdentity?.publicKeyBase62 || '',
-      actorRole: 'requestor',
+      actorRole: 'viewer',
       timestamp: now,
     }]);
     showToast(`New request for ${req.catalogItemName} submitted!`, 'success');
-  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, userIdentity]);
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, userIdentity, ctx]);
 
   const handleStartEdit = useCallback((req) => {
     setEditingId(req.id);
@@ -185,7 +222,7 @@ export default function MyRequests() {
       targetType: 'request',
       summary: `Request edited: qty=${qty}, urgent=${editUrgent}`,
       actorId: userIdentity?.publicKeyBase62 || '',
-      actorRole: 'requestor',
+      actorRole: 'viewer',
       timestamp: Date.now(),
     }]);
     setEditingId(null);
@@ -236,7 +273,10 @@ export default function MyRequests() {
           {myRequests.map(req => {
             const timeline = getTimeline(req);
             return (
-              <div key={req.id} className={`my-request-card ${req.urgent ? 'my-request-card--urgent' : ''}`}>
+              <div key={req.id} className={`my-request-card ${req.urgent ? 'my-request-card--urgent' : ''}`}
+                onClick={() => setSelectedRequest(req)} tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') setSelectedRequest(req); }}
+                style={{ cursor: 'pointer' }}>
                 <div className="my-request-card__header">
                   <span className="my-request-card__id">#{req.id?.slice(4, 10)}</span>
                   <span className="my-request-card__item">{req.catalogItemName}</span>
@@ -312,19 +352,19 @@ export default function MyRequests() {
                 {canCancel(req.status) && (
                   <div className="my-request-card__actions">
                     {req.status === 'open' && editingId !== req.id && (
-                      <button className="btn-sm btn-secondary" onClick={() => handleStartEdit(req)}>✏️ Edit</button>
+                      <button className="btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); handleStartEdit(req); }}>✏️ Edit</button>
                     )}
-                    <button className="btn-sm btn-danger" onClick={() => handleCancel(req)}>Cancel Request</button>
+                    <button className="btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); handleCancel(req); }}>Cancel Request</button>
                   </div>
                 )}
                 {req.status === 'shipped' && (
                   <div className="my-request-card__actions">
-                    <button className="btn-sm btn-success" onClick={() => handleConfirmDelivered(req)}>📬 Confirm Delivered</button>
+                    <button className="btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleConfirmDelivered(req); }}>📬 Confirm Delivered</button>
                   </div>
                 )}
                 {['shipped', 'delivered', 'cancelled'].includes(req.status) && (
                   <div className="my-request-card__actions">
-                    <button className="btn-sm btn-secondary" onClick={() => handleRequestAgain(req)}>🔄 Request Again</button>
+                    <button className="btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); handleRequestAgain(req); }}>🔄 Request Again</button>
                   </div>
                 )}
               </div>
@@ -332,6 +372,24 @@ export default function MyRequests() {
           })}
         </div>
       )}
+
+      {/* Request drill-in slide panel */}
+      <SlidePanel
+        isOpen={!!selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        title={selectedRequest ? `Request #${selectedRequest.id?.slice(4, 10)}` : 'Request Detail'}
+      >
+        {selectedRequest && (
+          <RequestDetail
+            request={selectedRequest}
+            isAdmin={false}
+            isProducer={false}
+            collaborators={ctx.collaborators || []}
+            onClose={() => setSelectedRequest(null)}
+            onCancel={(req) => { handleCancel(req); setSelectedRequest(null); }}
+          />
+        )}
+      </SlidePanel>
     </div>
   );
 }

@@ -1,0 +1,88 @@
+/* UploadZone.css */
+
+.upload-zone {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.upload-zone--dragging {
+  /* Subtle border highlight during drag */
+}
+
+.upload-zone--disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.upload-zone-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(137, 180, 250, 0.12);
+  border: 2px dashed var(--accent-color, #89b4fa);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.upload-zone-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-zone-overlay-icon {
+  font-size: 48px;
+  animation: uploadBounce 0.8s ease infinite alternate;
+}
+
+@keyframes uploadBounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-8px); }
+}
+
+.upload-zone-overlay-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-color, #89b4fa);
+  margin: 0;
+}
+
+.upload-zone-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upload-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--accent-color, #89b4fa);
+  color: var(--bg-primary, #11111b);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+}
+
+.upload-trigger-btn:hover {
+  background: #7ba7f0;
+  transform: translateY(-1px);
+}
+
+.upload-trigger-btn:active {
+  transform: translateY(0);
+}

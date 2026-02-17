@@ -8,6 +8,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import { resolveUserName } from '../../../utils/resolveUserName';
 
 const GROUP_KEYS = [
   { key: 'item', label: 'Item', accessor: r => r.catalogItemName || 'Unknown' },
@@ -35,8 +36,7 @@ export default function PivotTable({ requests, collaborators, dateRange }) {
       let key = gDef.accessor(r);
       // Resolve producer names
       if (groupBy === 'assignedTo' && key !== 'Unassigned') {
-        const collab = collaborators?.find(c => c.publicKey === key);
-        if (collab) key = collab.displayName;
+        key = resolveUserName(collaborators, key);
       }
       if (!buckets[key]) buckets[key] = { group: key, count: 0, units: 0, shipped: 0, avgDays: 0, totalDays: 0, fulfilledCount: 0 };
       const b = buckets[key];

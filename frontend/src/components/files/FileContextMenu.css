@@ -1,0 +1,59 @@
+/* FileContextMenu.css */
+
+.file-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  animation: ctxFadeIn 0.1s ease;
+}
+
+@keyframes ctxFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.file-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+
+.file-context-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.file-context-item--danger {
+  color: #f38ba8;
+}
+
+.file-context-item--danger:hover {
+  background: rgba(243, 139, 168, 0.1);
+}
+
+.file-context-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.file-context-divider {
+  height: 1px;
+  background: var(--border-color, #313244);
+  margin: 4px 8px;
+}

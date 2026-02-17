@@ -75,6 +75,13 @@ export const TIMEOUT_DEFAULT = 5000;
 export const TIMEOUT_LONG = 30000;
 
 /**
+ * Awareness heartbeat interval for presence updates (15s)
+ * Separate from TIMEOUT_LONG so presence updates are more responsive
+ * without affecting general timeout behavior
+ */
+export const AWARENESS_HEARTBEAT_MS = 15000;
+
+/**
  * Extended timeout for very slow operations
  */
 export const TIMEOUT_EXTENDED = 60000;
@@ -193,6 +200,16 @@ export const PEER_SYNC_RETRY_BASE_MS = 2000;
 export const PEER_SYNC_RETRY_MAX_MS = 30000;
 
 // =============================================================================
+// Document Type Constants
+// =============================================================================
+
+/**
+ * Document types that support Comments and History panels.
+ * Files and Inventory views do not have per-document comments/history.
+ */
+export const CONTENT_DOC_TYPES = new Set(['text', 'sheet', 'kanban']);
+
+// =============================================================================
 // Default Export (for convenient importing)
 // =============================================================================
 
@@ -209,6 +226,7 @@ export default {
   TIMEOUT_SHORT,
   TIMEOUT_DEFAULT,
   TIMEOUT_LONG,
+  AWARENESS_HEARTBEAT_MS,
   TIMEOUT_EXTENDED,
   WS_RECONNECT_DELAY,
   WS_RECONNECT_MAX_DELAY,
@@ -237,4 +255,7 @@ export default {
   MAX_SEEN_PEERS_CAP,
   PEER_SYNC_RETRY_BASE_MS,
   PEER_SYNC_RETRY_MAX_MS,
+
+  // Document Types
+  CONTENT_DOC_TYPES,
 };

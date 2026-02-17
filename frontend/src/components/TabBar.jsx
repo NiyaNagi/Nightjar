@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import './TabBar.css';
 import UserProfile from './UserProfile';
 import { createColorGradient, getDominantColor, getTextColorForBackground } from '../utils/colorUtils';
+import { CONTENT_DOC_TYPES } from '../config/constants';
 
 // Load DND state from notification settings
 const loadDoNotDisturb = () => {
@@ -32,6 +33,7 @@ const TabBar = ({
     onShowChangelog,
     onShowComments,
     showComments,
+    activeDocType,
     userProfile,
     onProfileChange,
     isFullscreen,
@@ -157,6 +159,8 @@ const TabBar = ({
                 {/* Do Not Disturb Toggle */}
                 <DoNotDisturbToggle />
                 
+                {CONTENT_DOC_TYPES.has(activeDocType) && (
+                <>
                 <button 
                     type="button"
                     className={`tab-bar-btn ${showComments ? 'active' : ''}`}
@@ -177,6 +181,8 @@ const TabBar = ({
                 >
                     📜 History
                 </button>
+                </>
+                )}
                 
                 <button 
                     type="button"

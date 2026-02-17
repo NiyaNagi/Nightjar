@@ -1,0 +1,182 @@
+/* BulkTagDialog.css */
+
+.bulk-tag-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.bulk-tag-dialog {
+  background: var(--bg-secondary, #1e1e2e);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 380px;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.bulk-tag-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #cdd6f4);
+}
+
+.bulk-tag-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.bulk-tag-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #cdd6f4);
+  cursor: pointer;
+}
+
+.bulk-tag-mode-option input[type="radio"] {
+  accent-color: var(--accent-color, #89b4fa);
+}
+
+.bulk-tag-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.bulk-tag-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-primary, #11111b);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 13px;
+}
+
+.bulk-tag-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #89b4fa);
+}
+
+.bulk-tag-add-btn {
+  padding: 8px 14px;
+  background: var(--bg-primary, #11111b);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  color: var(--accent-color, #89b4fa);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.bulk-tag-add-btn:hover:not(:disabled) {
+  border-color: var(--accent-color, #89b4fa);
+}
+
+.bulk-tag-add-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bulk-tag-error {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #f38ba8;
+}
+
+.bulk-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.bulk-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(137, 180, 250, 0.1);
+  border: 1px solid rgba(137, 180, 250, 0.2);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--accent-color, #89b4fa);
+}
+
+.bulk-tag-chip-remove {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #a6adc8);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.bulk-tag-chip-remove:hover {
+  color: #f38ba8;
+}
+
+.bulk-tag-warning {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #fab387;
+  line-height: 1.4;
+}
+
+.bulk-tag-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.bulk-tag-cancel {
+  padding: 8px 16px;
+  background: var(--bg-primary, #11111b);
+  border: 1px solid var(--border-color, #313244);
+  border-radius: 6px;
+  color: var(--text-primary, #cdd6f4);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bulk-tag-cancel:hover {
+  border-color: var(--text-secondary, #a6adc8);
+}
+
+.bulk-tag-apply {
+  padding: 8px 16px;
+  background: rgba(137, 180, 250, 0.15);
+  border: 1px solid rgba(137, 180, 250, 0.3);
+  border-radius: 6px;
+  color: var(--accent-color, #89b4fa);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bulk-tag-apply:hover:not(:disabled) {
+  background: rgba(137, 180, 250, 0.25);
+  border-color: var(--accent-color, #89b4fa);
+}
+
+.bulk-tag-apply:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
