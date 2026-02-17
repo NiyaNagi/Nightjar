@@ -14,6 +14,20 @@ const WebSocket = require('ws');
 const Y = require('yjs');
 const { docs, getYDoc } = require('y-websocket/bin/utils');
 const awarenessProtocol = require('y-protocols/awareness');
+
+// Lazy-load socks-proxy-agent (only needed when Tor is enabled)
+let SocksProxyAgent = null;
+function getSocksProxyAgent(proxyUrl) {
+  if (!SocksProxyAgent) {
+    try {
+      SocksProxyAgent = require('socks-proxy-agent').SocksProxyAgent;
+    } catch (err) {
+      console.warn('[RelayBridge] socks-proxy-agent not available, Tor routing disabled');
+      return null;
+    }
+  }
+  return new SocksProxyAgent(proxyUrl);
+}
 const { BOOTSTRAP_NODES, DEV_BOOTSTRAP_NODES } = require('./mesh-constants');
 
 // RELAY_OVERRIDE allows tests to specify a custom relay URL
@@ -50,6 +64,9 @@ class RelayBridge {
     
     // Retry attempt counters for exponential backoff: roomName -> attemptCount
     this.retryAttempts = new Map();
+    
+    // SOCKS proxy URL for Tor routing (set externally when Tor is enabled)
+    this.socksProxy = null;
     
     // Event handlers
     this.onStatusChange = null;
@@ -94,11 +111,16 @@ class RelayBridge {
       return;
     }
 
+    // If no relay nodes are configured, skip silently (direct P2P only)
+    const relays = relayUrl ? [relayUrl] : [...RELAY_NODES];
+    if (relays.length === 0) {
+      console.log(`[RelayBridge] No relay nodes configured, using direct P2P only`);
+      return;
+    }
+
     this.pending.add(roomName);
 
     // Try relay nodes in order
-    const relays = relayUrl ? [relayUrl] : [...RELAY_NODES];
-    
     for (const relay of relays) {
       try {
         await this._connectToRelay(roomName, ydoc, relay);
@@ -110,7 +132,13 @@ class RelayBridge {
     }
 
     this.pending.delete(roomName);
-    console.error(`[RelayBridge] Failed to connect to any relay for ${roomName}`);
+    // Graceful degradation: relay is unreachable, continue with direct Hyperswarm P2P
+    console.warn(`[RelayBridge] All relay nodes unreachable for ${roomName} — falling back to direct P2P`);
+    
+    // Schedule a background retry so we auto-connect when relay comes online
+    if (relays.length > 0) {
+      this._scheduleReconnect(roomName, ydoc, relays[0]);
+    }
   }
 
   /**
@@ -125,7 +153,17 @@ class RelayBridge {
       // The relay server uses y-websocket protocol: ws://host/roomName
       const wsUrl = relayUrl.endsWith('/') ? `${relayUrl}${roomName}` : `${relayUrl}/${roomName}`;
       
-      const ws = new WebSocket(wsUrl);
+      // Route through Tor SOCKS proxy if available
+      const wsOptions = {};
+      if (this.socksProxy) {
+        const agent = getSocksProxyAgent(this.socksProxy);
+        if (agent) {
+          wsOptions.agent = agent;
+          console.log(`[RelayBridge] Routing through Tor: ${this.socksProxy}`);
+        }
+      }
+      
+      const ws = new WebSocket(wsUrl, wsOptions);
       let connected = false;
       
       const connectionTimeout = setTimeout(() => {

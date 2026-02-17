@@ -115,7 +115,7 @@ function makeProps(overrides = {}) {
   const fsId = 'fs-test-dash';
   const yFileStorageSystems = new MockYMap();
   const yStorageFiles = new MockYArray();
-  const yStorageFolders = new MockYArray();
+  const yStorageFolders = new MockYMap();
   const yChunkAvailability = new MockYMap();
   const yFileAuditLog = new MockYArray();
 

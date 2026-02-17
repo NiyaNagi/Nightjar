@@ -32,6 +32,9 @@ class P2PBridge extends EventEmitter {
     this.topics = new Map(); // topic -> Set<websocket>
     this.peerIdToSocket = new Map(); // peerId -> websocket
     this.isInitialized = false;
+    this.isSuspended = false; // True when Tor relay-only mode is active
+    this._suspendedIdentity = null; // Saved identity for resume
+    this._suspendedTopics = null; // Saved topics for resume
     this.maxClients = MAX_CLIENTS;
     
     // mDNS (optional - try to load bonjour)
@@ -547,6 +550,92 @@ class P2PBridge extends EventEmitter {
     if (ws.readyState === 1) { // WebSocket.OPEN
       ws.send(JSON.stringify(message));
     }
+  }
+
+  /**
+   * Suspend Hyperswarm connections (relay-only mode for Tor privacy).
+   * Tears down UDP-based Hyperswarm to prevent IP leakage while keeping
+   * client state intact so resume() can re-join the same topics.
+   */
+  async suspend() {
+    if (this.isSuspended || !this.isInitialized) return;
+    
+    console.log('[P2PBridge] Suspending Hyperswarm (relay-only mode)...');
+    
+    // Save current topics so we can re-join on resume
+    this._suspendedTopics = new Set();
+    for (const topic of this.topics.keys()) {
+      this._suspendedTopics.add(topic);
+    }
+    
+    // Tear down Hyperswarm (stops UDP DHT)
+    if (this.hyperswarm) {
+      try {
+        // Save identity for re-initialization
+        this._suspendedIdentity = this.hyperswarm.identity || null;
+        await this.hyperswarm.destroy();
+        this.hyperswarm = null;
+      } catch (err) {
+        console.error('[P2PBridge] Error suspending Hyperswarm:', err);
+      }
+    }
+    
+    // Stop mDNS (also leaks on LAN)
+    if (this.mdnsService) {
+      this.mdnsService.stop();
+      this.mdnsService = null;
+    }
+    if (this.mdnsBrowser) {
+      this.mdnsBrowser.stop();
+      this.mdnsBrowser = null;
+    }
+    
+    this.isSuspended = true;
+    this.emit('suspended');
+    console.log('[P2PBridge] Hyperswarm suspended — all sync via relay only');
+  }
+  
+  /**
+   * Resume Hyperswarm connections after Tor is disabled.
+   * Re-initializes Hyperswarm and re-joins previously active topics.
+   */
+  async resume() {
+    if (!this.isSuspended) return;
+    
+    console.log('[P2PBridge] Resuming Hyperswarm connections...');
+    
+    try {
+      // Re-initialize Hyperswarm
+      if (this._suspendedIdentity) {
+        await ensureHyperswarm();
+        this.hyperswarm = new HyperswarmManager();
+        await this.hyperswarm.initialize(this._suspendedIdentity);
+        this._setupHyperswarmEvents();
+        
+        // Re-join previously active topics
+        if (this._suspendedTopics) {
+          for (const topic of this._suspendedTopics) {
+            try {
+              await this.hyperswarm.joinTopic(topic);
+              console.log(`[P2PBridge] Re-joined topic: ${topic.slice(0, 16)}...`);
+            } catch (err) {
+              console.warn(`[P2PBridge] Failed to re-join topic ${topic.slice(0, 16)}...:`, err.message);
+            }
+          }
+        }
+      }
+      
+      // Re-initialize mDNS
+      this._initMDNS();
+    } catch (err) {
+      console.error('[P2PBridge] Error resuming Hyperswarm:', err);
+    }
+    
+    this.isSuspended = false;
+    this._suspendedIdentity = null;
+    this._suspendedTopics = null;
+    this.emit('resumed');
+    console.log('[P2PBridge] Hyperswarm resumed — direct P2P active');
   }
 
   /**

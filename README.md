@@ -517,21 +517,21 @@ This allows new users to bootstrap into the mesh even if they haven't discovered
 
 ### Running Your Own Relay
 
-Deploy a relay server with Docker:
+Deploy a relay server with Docker and Caddy (auto-TLS):
 
 ```bash
-# Using Docker Compose
-PUBLIC_URL=wss://your-domain.com docker-compose --profile relay up -d
+# Using Docker Compose (relay mode — lightweight, no persistence)
+PUBLIC_URL=wss://relay.your-domain.com docker compose --profile relay up -d
 
-# Or with Docker directly
-docker run -d \
-  -e NIGHTJAR_MODE=relay \
-  -e PUBLIC_URL=wss://your-domain.com \
-  -p 3000:3000 \
-  nightjar/server
+# Or host mode (with encrypted persistence) — starts by default
+PUBLIC_URL=wss://your-domain.com docker compose up -d
 ```
 
-See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for full deployment options.
+The default public relay is `wss://relay.night-jar.io`. Clients will automatically connect when available, and gracefully fall back to direct Hyperswarm P2P if the relay is unreachable.
+
+**Full step-by-step deployment guide:** [docs/RELAY_DEPLOYMENT_GUIDE.md](docs/RELAY_DEPLOYMENT_GUIDE.md)
+
+See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for all deployment modes and options.
 
 ### Security Properties
 
@@ -840,6 +840,22 @@ npm run test:e2e:smoke      # Quick smoke tests
 ---
 
 ## Changelog
+
+### v1.7.3 - Ownership Transfer, Relay Infrastructure & Y.Map Migration
+- **New Feature**: PermissionWatcher component — auto-syncs ownership transfers from Yjs to local workspace with toast notifications
+- **Enhancement**: Factory reset warns when you are the sole owner of workspaces and requires typing "DELETE WORKSPACES" to proceed
+- **Enhancement**: Relay bridge graceful fallback — logs warning and schedules background retry instead of stopping sync
+- **Enhancement**: Tor SOCKS proxy support for relay WebSocket connections (relay-bridge.js)
+- **Enhancement**: P2P bridge suspend/resume — tears down Hyperswarm UDP when Tor is active (relay-only mode) to prevent IP leakage
+- **Enhancement**: Default BOOTSTRAP_NODES now includes `wss://relay.night-jar.io`
+- **Critical Fix**: `getMap('info')` → `getMap('workspaceInfo')` — fixes workspace metadata never persisting via Yjs
+- **Bug Fix**: Duplicate Yjs observer guard prevents registering update observers more than once per workspace
+- **Bug Fix**: Sync exchange guard prevents redundant sync-state-request messages on duplicate join-topic events
+- **Infrastructure**: Signaling server hardening — peer cleanup on disconnect, room ID validation, maxPayload limits, CORS, graceful shutdown
+- **Infrastructure**: Nginx + Docker Compose updates for unified server deployment
+- **Docs**: Comprehensive CSS color audit (520+ hardcoded violations catalogued with fix recommendations)
+- **Docs**: Relay deployment guide — VPS + Docker + Caddy step-by-step setup
+- **Testing**: 5 new test suites (82 new tests), 3 updated suites — 119 suites, 3,267 tests total (0 failures)
 
 ### v1.7.0 - File Storage, P2P Transfer & Presence Fixes
 - **New Feature**: Complete file storage dashboard UI overhaul (browse, search, folders, bulk ops, downloads)

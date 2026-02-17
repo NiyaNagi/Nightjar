@@ -44,7 +44,7 @@ provider.on('synced', (isSynced) => {
   console.log(`[Provider] Synced: ${isSynced}`);
   
   if (isSynced) {
-    const yFolders = ydoc.getArray('folders');
+    const yFolders = ydoc.getMap('folders');
     const yDocFolders = ydoc.getMap('documentFolders');
     const yTrashedDocs = ydoc.getArray('trashedDocuments');
     
@@ -52,7 +52,10 @@ provider.on('synced', (isSynced) => {
     console.log('FOLDER DATA IN YJS');
     console.log('='.repeat(60));
     
-    const folders = yFolders.toArray();
+    const folders = [];
+    yFolders.forEach((folder, folderId) => {
+      folders.push({ ...folder, id: folder.id || folderId });
+    });
     console.log(`\nFolders (${folders.length}):`);
     if (folders.length === 0) {
       console.log('  (none)');

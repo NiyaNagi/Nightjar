@@ -65,7 +65,7 @@ class MockYArray {
 function createMockRefs(fileStorageId) {
   const yFileStorageSystems = new MockYMap();
   const yStorageFiles = new MockYArray();
-  const yStorageFolders = new MockYArray();
+  const yStorageFolders = new MockYMap();
   const yChunkAvailability = new MockYMap();
   const yFileAuditLog = new MockYArray();
 
@@ -141,10 +141,12 @@ describe('useFileStorageSync', () => {
 
   it('should separate active and trashed folders', () => {
     const refs = createMockRefs(FILE_STORAGE_ID);
-    refs.yStorageFolders.push([
-      { id: 'd1', fileStorageId: FILE_STORAGE_ID, name: 'Photos', deletedAt: null },
-      { id: 'd2', fileStorageId: FILE_STORAGE_ID, name: 'Old', deletedAt: Date.now() },
-    ]);
+    refs.yStorageFolders.set('d1', 
+      { id: 'd1', fileStorageId: FILE_STORAGE_ID, name: 'Photos', deletedAt: null }
+    );
+    refs.yStorageFolders.set('d2', 
+      { id: 'd2', fileStorageId: FILE_STORAGE_ID, name: 'Old', deletedAt: Date.now() }
+    );
 
     const { result } = renderHook(() => useFileStorageSync(refs, FILE_STORAGE_ID));
     
@@ -230,11 +232,15 @@ describe('useFileStorageSync', () => {
 
   it('should return total folder count', () => {
     const refs = createMockRefs(FILE_STORAGE_ID);
-    refs.yStorageFolders.push([
-      { id: 'd1', fileStorageId: FILE_STORAGE_ID, name: 'A', deletedAt: null },
-      { id: 'd2', fileStorageId: FILE_STORAGE_ID, name: 'B', deletedAt: null },
-      { id: 'd3', fileStorageId: FILE_STORAGE_ID, name: 'C', deletedAt: Date.now() },
-    ]);
+    refs.yStorageFolders.set('d1', 
+      { id: 'd1', fileStorageId: FILE_STORAGE_ID, name: 'A', deletedAt: null }
+    );
+    refs.yStorageFolders.set('d2', 
+      { id: 'd2', fileStorageId: FILE_STORAGE_ID, name: 'B', deletedAt: null }
+    );
+    refs.yStorageFolders.set('d3', 
+      { id: 'd3', fileStorageId: FILE_STORAGE_ID, name: 'C', deletedAt: Date.now() }
+    );
 
     const { result } = renderHook(() => useFileStorageSync(refs, FILE_STORAGE_ID));
     

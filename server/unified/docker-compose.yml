@@ -5,13 +5,12 @@
 #
 # Reference: docs/RELAY_MESH_ARCHITECTURE.md
 
-version: '3.8'
-
 services:
   # ==========================================================================
   # HOST MODE (Default)
   # Full persistence + mesh participation
   # Use this for your main server that stores encrypted workspace data
+  # Starts by default with `docker compose up -d`
   # ==========================================================================
   nightjar:
     build:
@@ -36,9 +35,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    profiles:
-      - host
-      - default
 
   # ==========================================================================
   # RELAY MODE

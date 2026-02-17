@@ -357,6 +357,7 @@ const documentKeys = new Map(); // Map of docName -> encryption key
 let isOnline = false; // Track if P2P/Tor is available
 let connectionStatus = 'offline'; // 'offline', 'connecting', 'connected'
 let torEnabled = false; // Whether Tor should be enabled (default OFF)
+let torSocksProxy = null; // SOCKS5 proxy URL from main process Tor daemon
 
 // --- 1. Persistence Layer ---
 const db = new Level(DB_PATH, { valueEncoding: 'binary' });
@@ -837,16 +838,15 @@ function addFolderToYjs(workspaceId, folder) {
     }
     
     try {
-        const yFolders = doc.getArray('folders');
+        const yFolders = doc.getMap('folders');
         
         // Check if folder already exists
-        const existing = yFolders.toArray().find(f => f.id === folder.id);
-        if (existing) {
+        if (yFolders.has(folder.id)) {
             console.log(`[Sidecar] Folder ${folder.id} already in Yjs, skipping add`);
             return true;
         }
         
-        yFolders.push([folder]);
+        yFolders.set(folder.id, folder);
         console.log(`[Sidecar] Added folder ${folder.id} to Yjs for P2P sync`);
         return true;
     } catch (err) {
@@ -866,22 +866,18 @@ function updateFolderInYjs(workspaceId, folder) {
     }
     
     try {
-        const yFolders = doc.getArray('folders');
-        const folders = yFolders.toArray();
-        const index = folders.findIndex(f => f.id === folder.id);
+        const yFolders = doc.getMap('folders');
         
-        if (index === -1) {
+        if (!yFolders.has(folder.id)) {
             // Folder not found, add it
-            yFolders.push([folder]);
+            yFolders.set(folder.id, folder);
             console.log(`[Sidecar] Folder ${folder.id} not found, added to Yjs`);
             return true;
         }
         
-        // Update by removing and re-adding at same position
-        doc.transact(() => {
-            yFolders.delete(index, 1);
-            yFolders.insert(index, [folder]);
-        });
+        // Merge existing data with new data and set
+        const existing = yFolders.get(folder.id);
+        yFolders.set(folder.id, { ...existing, ...folder });
         console.log(`[Sidecar] Updated folder ${folder.id} in Yjs for P2P sync`);
         return true;
     } catch (err) {
@@ -901,16 +897,14 @@ function removeFolderFromYjs(workspaceId, folderId) {
     }
     
     try {
-        const yFolders = doc.getArray('folders');
-        const folders = yFolders.toArray();
-        const index = folders.findIndex(f => f.id === folderId);
+        const yFolders = doc.getMap('folders');
         
-        if (index === -1) {
+        if (!yFolders.has(folderId)) {
             console.log(`[Sidecar] Folder ${folderId} not found in Yjs`);
             return true; // Not an error, folder already removed
         }
         
-        yFolders.delete(index, 1);
+        yFolders.delete(folderId);
         console.log(`[Sidecar] Removed folder ${folderId} from Yjs for P2P sync`);
         return true;
     } catch (err) {
@@ -970,12 +964,11 @@ async function persistMetadataFromYjs(workspaceId, metaDoc) {
         console.log(`[P2P-SYNC-PERSIST] ✓ Persisted ${docsPersisted} documents to LevelDB`);
         
         // 2. Persist folder metadata
-        const yFolders = metaDoc.getArray('folders');
-        const folders = yFolders.toArray();
+        const yFolders = metaDoc.getMap('folders');
         let foldersPersisted = 0;
-        
-        for (const folder of folders) {
-            if (folder && folder.id) {
+        const folderEntries = Object.entries(yFolders.toJSON());
+        for (const [folderId, folder] of folderEntries) {
+            if (folder && (folder.id || folderId)) {
                 const folderMeta = {
                     id: folder.id,
                     name: folder.name || 'Untitled Folder',
@@ -983,14 +976,14 @@ async function persistMetadataFromYjs(workspaceId, metaDoc) {
                     parentId: folder.parentId || null,
                     createdAt: folder.createdAt || Date.now(),
                 };
-                await saveFolderMetadata(folder.id, folderMeta);
+                await saveFolderMetadata(folder.id || folderId, folderMeta);
                 foldersPersisted++;
             }
         }
         console.log(`[P2P-SYNC-PERSIST] ✓ Persisted ${foldersPersisted} folders to LevelDB`);
         
         // 3. Update workspace name from Yjs if present
-        const yInfo = metaDoc.getMap('info');
+        const yInfo = metaDoc.getMap('workspaceInfo');
         const syncedName = yInfo.get('name');
         if (syncedName && typeof syncedName === 'string') {
             try {
@@ -1577,15 +1570,57 @@ async function handleMetadataMessage(ws, parsed) {
             
             if (enable && !torEnabled) {
                 torEnabled = true;
-                // P2P is now always on, tor just affects how we connect
+                torSocksProxy = payload?.socksProxy || null;
+                console.log(`[Sidecar] Tor enabled, SOCKS proxy: ${torSocksProxy || 'none'}`);
+                
+                // Update relay bridge to use SOCKS proxy for all WebSocket connections
+                if (torSocksProxy && relayBridge) {
+                    relayBridge.socksProxy = torSocksProxy;
+                    console.log('[Sidecar] Relay bridge will route through Tor SOCKS proxy');
+                }
+                
+                // RELAY-ONLY MODE: Suspend Hyperswarm to prevent IP leakage via UDP DHT.
+                // All sync will go through the relay server (routed via Tor SOCKS proxy).
+                if (p2pBridge && p2pBridge.isInitialized) {
+                    console.log('[Sidecar] Entering relay-only mode — suspending Hyperswarm (IP privacy)');
+                    p2pBridge.suspend().catch(err => {
+                        console.error('[Sidecar] Error suspending P2P bridge:', err);
+                    });
+                }
+                
+                // Force-enable relay bridge for cross-platform sharing through Tor
+                if (!relayBridgeEnabled) {
+                    relayBridgeEnabled = true;
+                    console.log('[Sidecar] Relay bridge force-enabled for Tor relay-only mode');
+                }
             } else if (!enable && torEnabled) {
                 torEnabled = false;
+                torSocksProxy = null;
+                
+                // Clear SOCKS proxy from relay bridge
+                if (relayBridge) {
+                    relayBridge.socksProxy = null;
+                    console.log('[Sidecar] Relay bridge SOCKS proxy cleared');
+                }
+                
+                // Resume Hyperswarm connections (direct P2P)
+                if (p2pBridge && p2pBridge.isSuspended) {
+                    console.log('[Sidecar] Exiting relay-only mode — resuming Hyperswarm');
+                    p2pBridge.resume().catch(err => {
+                        console.error('[Sidecar] Error resuming P2P bridge:', err);
+                    });
+                }
+                
+                // Restore relay bridge to original env-configured state
+                relayBridgeEnabled = process.env.NIGHTJAR_RELAY_BRIDGE === 'true';
             }
             
             // Send confirmation
             ws.send(JSON.stringify({ 
                 type: 'tor-toggled', 
                 enabled: torEnabled,
+                socksProxy: torSocksProxy,
+                relayOnly: torEnabled, // When Tor is on, we're relay-only
                 status: connectionStatus
             }));
             break;
@@ -3018,6 +3053,11 @@ async function initializeMesh() {
 // Map of topicHash -> workspaceId for reverse lookup
 const topicToWorkspace = new Map();
 
+// Track which workspaces already have a P2P broadcast observer on their doc
+// Prevents duplicate doc.on('update') listeners from stacking when
+// registerWorkspaceTopic() is called multiple times for the same workspace
+const registeredTopicObservers = new Set();
+
 // Map of peerId -> Set of topicHex that need sync after identity is verified
 // This ensures we only send sync-request after the peer handshake is complete
 const pendingSyncRequests = new Map();
@@ -3063,6 +3103,18 @@ function setupYjsP2PBridge() {
     // Listen for awareness updates from P2P peers (presence/chat)
     hyperswarm.on('awareness-update', ({ peerId, topic, state }) => {
         handleP2PAwarenessUpdate(peerId, topic, state);
+    });
+    
+    // CRITICAL FIX: When a peer joins a topic (via DHT discovery or direct connect),
+    // send them an explicit sync-request so we get THEIR state too.
+    // Without this, peers discovered via DHT (not lastKnownPeers) never trigger
+    // a bidirectional sync — they only get OUR state via the sync-state-request handler.
+    hyperswarm.on('peer-joined', ({ peerId, topic }) => {
+        const workspaceId = topicToWorkspace.get(topic);
+        if (workspaceId) {
+            console.log(`[Sidecar] Peer joined topic, sending sync-request to ${peerId.slice(0, 16)}... for workspace ${workspaceId.slice(0, 8)}...`);
+            hyperswarm.sendSyncRequest(peerId, topic);
+        }
     });
     
     console.log('[Sidecar] Yjs P2P bridge initialized');
@@ -3337,10 +3389,31 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
     
     try {
         // Find the workspace ID for this topic
-        const workspaceId = topicToWorkspace.get(topicHex);
+        let workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            console.warn(`[P2P-SYNC-STATE] ✗ Unknown topic - not registered`);
-            return;
+            // CRITICAL FIX: Fallback lookup — same pattern as handleP2PSyncMessage.
+            // Without this, full state payloads are silently dropped when
+            // sync-state arrives before autoRejoinWorkspaces registers the topic.
+            console.warn(`[P2P-SYNC-STATE] ⚠ Unknown topic - attempting fallback lookup...`);
+            try {
+                const workspaces = await loadWorkspaceList();
+                for (const ws of workspaces) {
+                    const canonicalHash = getWorkspaceTopicHex(ws.id);
+                    if (canonicalHash === topicHex) {
+                        workspaceId = ws.id;
+                        registerWorkspaceTopic(ws.id, topicHex);
+                        console.log(`[P2P-SYNC-STATE] ✓ Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
+                        break;
+                    }
+                }
+            } catch (lookupErr) {
+                console.warn(`[P2P-SYNC-STATE] Fallback lookup failed:`, lookupErr.message);
+            }
+            
+            if (!workspaceId) {
+                console.warn(`[P2P-SYNC-STATE] ✗ Unknown topic - not registered and fallback failed`);
+                return;
+            }
         }
         
         // Parse the message
@@ -3423,9 +3496,11 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
 // --- Sync Verification and Manifest Handling ---
 // Track pending manifest verifications for intelligent retry
 const pendingManifestVerifications = new Map(); // workspaceId -> { retryCount, lastRequest, timeoutId }
-const SYNC_VERIFY_RETRY_INTERVALS = [5000, 10000, 15000]; // 5s, 10s, 15s
-const SYNC_VERIFY_MAX_RETRIES = 3;
-const SYNC_VERIFY_TIMEOUT = 30000; // 30s total timeout
+// Increased from [5s, 10s, 15s] / 3 retries to give DHT rediscovery
+// a realistic window after extended offline periods (can take 30-60s)
+const SYNC_VERIFY_RETRY_INTERVALS = [15000, 15000, 15000, 15000, 15000, 15000]; // 15s each
+const SYNC_VERIFY_MAX_RETRIES = 6;
+const SYNC_VERIFY_TIMEOUT = 120000; // 120s total timeout
 
 // Build a sync manifest for a workspace (document/folder counts and IDs)
 function buildSyncManifest(workspaceId) {
@@ -3437,16 +3512,19 @@ function buildSyncManifest(workspaceId) {
     }
     
     const yDocuments = metaDoc.getArray('documents');
-    const yFolders = metaDoc.getArray('folders');
+    const yFolders = metaDoc.getMap('folders');
     
     const documents = yDocuments.toArray();
-    const folders = yFolders.toArray();
+    const folderIds = [];
+    yFolders.forEach((folder, folderId) => {
+        folderIds.push(folder.id || folderId);
+    });
     
     return {
         documentCount: documents.length,
-        folderCount: folders.length,
+        folderCount: folderIds.length,
         documentIds: documents.map(d => d.id).filter(Boolean),
-        folderIds: folders.map(f => f.id).filter(Boolean),
+        folderIds: folderIds.filter(Boolean),
         timestamp: Date.now(),
     };
 }
@@ -3849,7 +3927,16 @@ async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
             
             // Determine the room name based on documentId or fall back to workspace-meta
             const roomName = documentId || `workspace-meta:${workspaceId}`;
-            const doc = docs.get(roomName);
+            let doc = docs.get(roomName);
+            
+            // Create doc on demand if not yet opened locally.
+            // This matches the pattern in handleP2PSyncMessage and prevents
+            // awareness updates (cursor positions, selections) from being
+            // silently dropped when the receiving client hasn't opened the doc yet.
+            if (!doc) {
+                doc = getYDoc(roomName);
+                console.log(`[P2P-AWARENESS] Created new WSSharedDoc for awareness: ${roomName}`);
+            }
             
             if (doc && doc.awareness) {
                 // Apply the awareness update to the Yjs awareness with 'p2p' origin to prevent loops
@@ -4002,11 +4089,14 @@ function registerWorkspaceTopic(workspaceId, topicHex) {
         });
     }
     
-    // Set up doc observer to broadcast updates
+    // Set up doc observer to broadcast updates — but only ONCE per workspace
+    // This function is called from 6+ locations; without the guard, each call
+    // stacks a new doc.on('update') listener causing 2-3x duplicate P2P broadcasts.
     const roomName = `workspace-meta:${workspaceId}`;
     let doc = docs.get(roomName);
     
-    if (doc) {
+    if (doc && !registeredTopicObservers.has(workspaceId)) {
+        registeredTopicObservers.add(workspaceId);
         // Add update observer to broadcast to P2P peers
         doc.on('update', (update, origin) => {
             // Don't re-broadcast updates that came from P2P
@@ -4015,6 +4105,8 @@ function registerWorkspaceTopic(workspaceId, topicHex) {
             }
         });
         console.log(`[Sidecar] Registered P2P observer for ${roomName}`);
+    } else if (doc) {
+        console.log(`[Sidecar] P2P observer already registered for ${roomName}, skipping`);
     }
 }
 
@@ -4229,13 +4321,13 @@ async function autoRejoinWorkspaces() {
         // Schedule sync verification for all workspaces after a delay
         // This ensures we detect and recover any missing data after initial sync
         if (workspacesToVerify.length > 0) {
-            console.log(`[Sidecar] Scheduling sync verification for ${workspacesToVerify.length} workspace(s) in 5s...`);
+            console.log(`[Sidecar] Scheduling sync verification for ${workspacesToVerify.length} workspace(s) in 30s...`);
             setTimeout(() => {
                 for (const { workspaceId, topicHash } of workspacesToVerify) {
                     // Check if local metadata seems sparse (possible incomplete sync)
                     checkAndRecoverSparse(workspaceId, topicHash);
                 }
-            }, 5000);
+            }, 30000);
         }
     } catch (err) {
         console.error('[Sidecar] Auto-rejoin failed:', err);
@@ -4282,8 +4374,8 @@ async function checkAndRecoverSparse(workspaceId, topicHash) {
 
 // P2P initialization with retry loop
 // Retries initialization until identity is available or max attempts reached
-// Reduced from 20 to 3 for faster test execution
-const P2P_INIT_MAX_ATTEMPTS = process.env.P2P_INIT_MAX_ATTEMPTS ? parseInt(process.env.P2P_INIT_MAX_ATTEMPTS) : 3;
+// Default 10 for production; override via env var (e.g. P2P_INIT_MAX_ATTEMPTS=3 for tests)
+const P2P_INIT_MAX_ATTEMPTS = process.env.P2P_INIT_MAX_ATTEMPTS ? parseInt(process.env.P2P_INIT_MAX_ATTEMPTS) : 10;
 const P2P_INIT_RETRY_INTERVAL_MS = process.env.P2P_INIT_RETRY_INTERVAL_MS ? parseInt(process.env.P2P_INIT_RETRY_INTERVAL_MS) : 3000;
 let p2pInitAttempts = 0;
 
@@ -4602,6 +4694,21 @@ docs.on('doc-added', async (doc, docName) => {
                     }).catch(err => {
                         console.error(`[Sidecar] Failed to broadcast document update to P2P:`, err);
                     });
+                } else if (docName.startsWith('workspace-meta:')) {
+                    // Safety net: also broadcast workspace-meta updates from the
+                    // persistence handler. The primary observer is in registerWorkspaceTopic,
+                    // but if that observer wasn't registered yet (race condition), this
+                    // ensures workspace metadata still reaches P2P peers.
+                    const wsId = docName.replace('workspace-meta:', '');
+                    if (!registeredTopicObservers.has(wsId)) {
+                        for (const [topicHex, mappedWsId] of topicToWorkspace.entries()) {
+                            if (mappedWsId === wsId) {
+                                broadcastYjsUpdate(wsId, topicHex, update);
+                                console.log(`[Sidecar] Safety-net broadcast workspace-meta update for ${wsId.slice(0, 8)}... via P2P`);
+                                break;
+                            }
+                        }
+                    }
                 }
             } else {
                 // Queue the update for when key is available
@@ -4635,24 +4742,29 @@ docs.on('doc-added', async (doc, docName) => {
         
         // For workspace-meta docs, add P2P broadcast observer if topic is registered
         // This handles the case where doc is created AFTER registerWorkspaceTopic() is called (e.g., joiners)
+        // Uses registeredTopicObservers guard to prevent duplicate listeners
         if (docName.startsWith('workspace-meta:')) {
             const workspaceId = docName.replace('workspace-meta:', '');
             console.log(`[Sidecar] Checking deferred P2P observer for ${docName}, topicToWorkspace has ${topicToWorkspace.size} entries`);
             
-            // Find if this workspace has a registered topic
+            // Find if this workspace has a registered topic AND doesn't already have an observer
             let foundTopic = false;
             for (const [topicHex, wsId] of topicToWorkspace.entries()) {
                 if (wsId === workspaceId) {
                     foundTopic = true;
-                    console.log(`[Sidecar] Adding deferred P2P observer for ${docName} on topic ${topicHex.slice(0, 16)}...`);
-                    doc.on('update', (update, origin) => {
-                        // Don't re-broadcast updates that came from P2P
-                        if (origin !== 'p2p') {
-                            console.log(`[Sidecar] [DEFERRED-OBSERVER] Update in ${docName}, origin: ${origin}, broadcasting...`);
-                            broadcastYjsUpdate(workspaceId, topicHex, update);
-                        }
-                    });
-                    console.log(`[Sidecar] ✓ Registered deferred P2P observer for ${docName}`);
+                    if (!registeredTopicObservers.has(workspaceId)) {
+                        registeredTopicObservers.add(workspaceId);
+                        console.log(`[Sidecar] Adding deferred P2P observer for ${docName} on topic ${topicHex.slice(0, 16)}...`);
+                        doc.on('update', (update, origin) => {
+                            // Don't re-broadcast updates that came from P2P
+                            if (origin !== 'p2p') {
+                                broadcastYjsUpdate(workspaceId, topicHex, update);
+                            }
+                        });
+                        console.log(`[Sidecar] ✓ Registered deferred P2P observer for ${docName}`);
+                    } else {
+                        console.log(`[Sidecar] Deferred P2P observer already registered for ${docName}, skipping`);
+                    }
                     break;
                 }
             }

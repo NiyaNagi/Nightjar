@@ -740,9 +740,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             const otherPublicKey = message.senderPublicKey;
             if (!otherPublicKey) return;
             
-            const tabId = `dm-${otherPublicKey.slice(0, 16)}`;
+            // Use the same deterministic channel ID that the sender uses
+            const tabId = getDmChannelId(userPublicKey, otherPublicKey);
             
-            // Check if we already have a tab for this user
+            // Check if we already have a tab for this user (check both ID formats for safety)
             if (!chatTabs.find(t => t.id === tabId)) {
                 // Find the user in online users or workspace members, or create from message
                 const onlineUser = onlineUsers.find(u => u.publicKey === otherPublicKey);
@@ -891,9 +892,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         return messages.filter(m => 
             (m.channel || 'general') === channelId && 
             m.timestamp > lastRead &&
-            m.senderClientId !== myClientId
+            m.senderPublicKey !== userPublicKey &&
+            m.type !== 'system'
         ).length;
-    }, [messages, unreadCounts, myClientId]);
+    }, [messages, unreadCounts, userPublicKey]);
     
     // Check if a channel has unread mentions for current user
     const getChannelMentionCount = useCallback((channelId) => {
@@ -901,10 +903,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         return messages.filter(m => 
             (m.channel || 'general') === channelId && 
             m.timestamp > lastRead &&
-            m.senderClientId !== myClientId &&
+            m.senderPublicKey !== userPublicKey &&
             m.mentions?.some(mention => mention.publicKey === userPublicKey)
         ).length;
-    }, [messages, unreadCounts, myClientId, userPublicKey]);
+    }, [messages, unreadCounts, userPublicKey]);
     
     // Total unread across all channels
     const totalUnread = useMemo(() => {

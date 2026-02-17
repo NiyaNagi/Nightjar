@@ -10,6 +10,8 @@ import './AppSettings.css';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useConfirmDialog } from './ConfirmDialog';
 import { useEnvironment, isFeatureAvailable } from '../../hooks/useEnvironment';
+import { useWorkspaces } from '../../contexts/WorkspaceContext';
+import { useWorkspaceSyncContext } from '../../contexts/WorkspaceSyncContext';
 
 // Default settings values
 const DEFAULT_SETTINGS = {
@@ -172,6 +174,16 @@ export default function AppSettings({ isOpen, onClose }) {
   // Notification settings state
   const [notificationSettings, setNotificationSettings] = useState(loadNotificationSettings);
   
+  // Factory reset ownership warning state
+  const [factoryResetConfirmText, setFactoryResetConfirmText] = useState('');
+  const [showOwnershipWarning, setShowOwnershipWarning] = useState(false);
+  const [soleOwnerWorkspaces, setSoleOwnerWorkspaces] = useState([]);
+  
+  // Workspace context for ownership checking
+  const { workspaces, currentWorkspaceId } = useWorkspaces();
+  const syncContext = useWorkspaceSyncContext();
+  const syncMembers = syncContext?.members || {};
+  
   // Focus trap for modal accessibility
   useFocusTrap(modalRef, isOpen, { onEscape: onClose });
 
@@ -180,6 +192,8 @@ export default function AppSettings({ isOpen, onClose }) {
     if (isOpen) {
       setSettings(loadSettings());
       setHasChanges(false);
+      setShowOwnershipWarning(false);
+      setFactoryResetConfirmText('');
       
       // Load desktop-only settings from Electron
       if (isElectron && isFeatureAvailable('tor')) {
@@ -262,29 +276,8 @@ export default function AppSettings({ isOpen, onClose }) {
     }
   }, [confirm]);
 
-  // Factory reset - wipe ALL local data
-  const handleFactoryReset = useCallback(async () => {
-    const confirmed = await confirm({
-      title: '⚠️ Factory Reset',
-      message: 'This will DELETE ALL local data including:\n\n• All identities and their keys\n• All workspaces\n• All documents\n• All settings\n\nThis action CANNOT be undone. The app will restart after reset.',
-      confirmText: 'Delete Everything',
-      cancelText: 'Cancel',
-      variant: 'danger'
-    });
-    
-    if (!confirmed) return;
-    
-    // Double-confirm for safety
-    const doubleConfirmed = await confirm({
-      title: '🚨 Final Confirmation',
-      message: 'Are you ABSOLUTELY SURE? All your data will be permanently deleted.',
-      confirmText: 'Yes, Delete All Data',
-      cancelText: 'No, Keep My Data',
-      variant: 'danger'
-    });
-    
-    if (!doubleConfirmed) return;
-    
+  // Execute the actual factory reset (shared by both paths)
+  const executeFactoryReset = useCallback(async () => {
     try {
       // 1. Clear localStorage
       localStorage.clear();
@@ -317,7 +310,64 @@ export default function AppSettings({ isOpen, onClose }) {
       console.error('[FactoryReset] Error:', err);
       alert('Factory reset failed: ' + err.message);
     }
-  }, [confirm, isElectron]);
+  }, [isElectron]);
+
+  // Factory reset - wipe ALL local data
+  const handleFactoryReset = useCallback(async () => {
+    // Check for workspaces where the user is the sole owner
+    const ownedWorkspaces = workspaces.filter(w => w.myPermission === 'owner');
+    
+    // For the current workspace, check if another owner exists in synced members
+    const soleOwned = ownedWorkspaces.filter(w => {
+      if (w.id === currentWorkspaceId && Object.keys(syncMembers).length > 0) {
+        // We have live member data — check if more than one owner exists
+        const ownerCount = Object.values(syncMembers).filter(
+          m => m.permission === 'owner'
+        ).length;
+        return ownerCount <= 1;
+      }
+      // For non-current workspaces, we can't check members — assume sole owner
+      return true;
+    });
+    
+    if (soleOwned.length > 0) {
+      // Show inline ownership warning with type-to-confirm
+      setSoleOwnerWorkspaces(soleOwned);
+      setShowOwnershipWarning(true);
+      setFactoryResetConfirmText('');
+      return;
+    }
+    
+    // No sole-owner workspaces — use standard double confirmation
+    const confirmed = await confirm({
+      title: '⚠️ Factory Reset',
+      message: 'This will DELETE ALL local data including:\n\n• All identities and their keys\n• All workspaces\n• All documents\n• All settings\n\nThis action CANNOT be undone. The app will restart after reset.',
+      confirmText: 'Delete Everything',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
+    
+    if (!confirmed) return;
+    
+    const doubleConfirmed = await confirm({
+      title: '🚨 Final Confirmation',
+      message: 'Are you ABSOLUTELY SURE? All your data will be permanently deleted.',
+      confirmText: 'Yes, Delete All Data',
+      cancelText: 'No, Keep My Data',
+      variant: 'danger'
+    });
+    
+    if (!doubleConfirmed) return;
+    await executeFactoryReset();
+  }, [confirm, workspaces, currentWorkspaceId, syncMembers, executeFactoryReset]);
+  
+  // Handle the type-to-confirm factory reset bypass
+  const handleOwnershipBypassReset = useCallback(async () => {
+    if (factoryResetConfirmText !== 'DELETE WORKSPACES') return;
+    setShowOwnershipWarning(false);
+    setFactoryResetConfirmText('');
+    await executeFactoryReset();
+  }, [factoryResetConfirmText, executeFactoryReset]);
 
   // Handle keyboard
   const handleKeyDown = (e) => {
@@ -1028,6 +1078,58 @@ export default function AppSettings({ isOpen, onClose }) {
                     >
                       🗑️ Factory Reset - Delete Everything
                     </button>
+                    
+                    {showOwnershipWarning && (
+                      <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'rgba(255, 107, 107, 0.1)', border: '1px solid rgba(255, 107, 107, 0.3)', borderRadius: '6px' }}>
+                        <p style={{ fontSize: '13px', color: '#ff6b6b', margin: '0 0 8px 0', fontWeight: 'bold' }}>
+                          ⚠️ You are the sole owner of {soleOwnerWorkspaces.length === 1 ? 'this workspace' : 'these workspaces'}:
+                        </p>
+                        <ul style={{ margin: '0 0 10px 0', paddingLeft: '20px', fontSize: '12px', color: '#ff6b6b' }}>
+                          {soleOwnerWorkspaces.map(w => (
+                            <li key={w.id}>{w.name || 'Untitled Workspace'}</li>
+                          ))}
+                        </ul>
+                        <p style={{ fontSize: '12px', color: '#ccc', margin: '0 0 10px 0' }}>
+                          Without an owner, other members will not be able to manage these workspaces. Transfer ownership in each workspace's settings first, or type <strong style={{ color: '#ff6b6b' }}>DELETE WORKSPACES</strong> below to proceed anyway.
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={factoryResetConfirmText}
+                            onChange={(e) => setFactoryResetConfirmText(e.target.value)}
+                            placeholder='Type "DELETE WORKSPACES" to confirm'
+                            style={{
+                              flex: 1,
+                              padding: '6px 10px',
+                              fontSize: '13px',
+                              backgroundColor: 'rgba(0,0,0,0.3)',
+                              border: '1px solid rgba(255, 107, 107, 0.3)',
+                              borderRadius: '4px',
+                              color: '#fff',
+                              fontFamily: 'monospace',
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            className="app-settings__btn-danger"
+                            style={{ backgroundColor: '#8b0000', opacity: factoryResetConfirmText === 'DELETE WORKSPACES' ? 1 : 0.4 }}
+                            disabled={factoryResetConfirmText !== 'DELETE WORKSPACES'}
+                            onClick={handleOwnershipBypassReset}
+                          >
+                            Confirm Reset
+                          </button>
+                          <button
+                            type="button"
+                            className="app-settings__btn-secondary"
+                            onClick={() => { setShowOwnershipWarning(false); setFactoryResetConfirmText(''); }}
+                            style={{ fontSize: '12px' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
