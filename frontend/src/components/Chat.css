@@ -92,8 +92,8 @@
 
 /* Special mention badge - gold/amber to stand out */
 .unread-badge.mention-badge {
-    background: #f59e0b;
-    color: #1a1a1a;
+    background: var(--warning-color);
+    color: var(--bg-primary);
     font-weight: 700;
     animation: mention-pulse 2s ease-in-out infinite;
 }
@@ -235,7 +235,7 @@
 
 .chat-tab .tab-close:hover {
     opacity: 1;
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--hover-bg);
     border-radius: 3px;
 }
 
@@ -369,8 +369,8 @@
 
 .user-search-item .user-status {
     font-size: 0.7rem;
-    color: #22c55e;
-    background: rgba(34, 197, 94, 0.1);
+    color: var(--success-color);
+    background: var(--success-bg, rgba(34, 197, 94, 0.1));
     padding: 2px 8px;
     border-radius: 10px;
 }
@@ -616,8 +616,8 @@
 
 /* Tab mention badge - gold/amber */
 .tab-unread-badge.mention-badge {
-    background: #f59e0b;
-    color: #1a1a1a;
+    background: var(--warning-color);
+    color: var(--bg-primary);
     font-weight: 700;
     animation: mention-pulse 2s ease-in-out infinite;
 }
@@ -762,7 +762,7 @@
 }
 
 .mention-status.online {
-    color: #22c55e;
+    color: var(--success-color);
 }
 
 .mention-status.offline {
@@ -805,7 +805,18 @@
 
 .mention-chip.mention-me {
     background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    color: var(--error-color);
+}
+
+/* Ensure mention chips are visible in own messages (white bg, not blue-on-blue) */
+.chat-message.own .mention-chip {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+.chat-message.own .mention-chip.mention-me {
+    background: rgba(255, 255, 255, 0.35);
+    color: #ffffff;
 }
 
 /* System messages */

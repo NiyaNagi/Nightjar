@@ -123,5 +123,5 @@
 }
 
 .move-dialog-submit:hover {
-  background: #7ba7f0;
+  background: var(--accent-color);
 }

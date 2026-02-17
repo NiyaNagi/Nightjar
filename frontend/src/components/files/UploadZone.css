@@ -79,7 +79,7 @@
 }
 
 .upload-trigger-btn:hover {
-  background: #7ba7f0;
+  background: var(--accent-color);
   transform: translateY(-1px);
 }
 

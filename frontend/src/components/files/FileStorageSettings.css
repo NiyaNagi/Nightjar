@@ -36,7 +36,7 @@
 }
 
 .settings-save-btn:hover {
-  background: #7ba7f0;
+  background: var(--accent-color);
 }
 
 .settings-body {
@@ -99,7 +99,7 @@
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: #f38ba8;
+  color: var(--error-color);
 }
 
 .settings-danger-actions {
@@ -128,10 +128,10 @@
 
 .settings-danger-btn {
   padding: 6px 14px;
-  border: 1px solid #f38ba8;
+  border: 1px solid var(--error-color);
   border-radius: 6px;
   background: none;
-  color: #f38ba8;
+  color: var(--error-color);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -149,12 +149,12 @@
 }
 
 .settings-danger-btn--critical {
-  background: #f38ba8;
+  background: var(--error-color);
   color: var(--bg-primary, #11111b);
 }
 
 .settings-danger-btn--critical:hover:not(:disabled) {
-  background: #e67a96;
+  background: var(--error-hover);
 }
 
 .settings-notice {
