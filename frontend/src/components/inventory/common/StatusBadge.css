@@ -34,11 +34,11 @@
 
 /* Open: blue — new, unassigned */
 .status-badge--open {
-  color: var(--accent-light, #60a5fa);
+  color: #60a5fa;
   background: rgba(96, 165, 250, 0.15);
 }
 .status-badge--compact.status-badge--open {
-  background: var(--accent-light, #60a5fa);
+  background: #60a5fa;
 }
 
 /* Claimed: purple — producer claimed, pending approval */
@@ -70,20 +70,20 @@
 
 /* Shipped: teal — in transit */
 .status-badge--shipped {
-  color: var(--accent-light, #2dd4bf);
+  color: #2dd4bf;
   background: rgba(45, 212, 191, 0.15);
 }
 .status-badge--compact.status-badge--shipped {
-  background: var(--accent-light, #2dd4bf);
+  background: #2dd4bf;
 }
 
 /* Delivered: dark green — complete */
 .status-badge--delivered {
-  color: var(--success-color, #16a34a);
+  color: #16a34a;
   background: rgba(22, 163, 74, 0.12);
 }
 .status-badge--compact.status-badge--delivered {
-  background: var(--success-color, #16a34a);
+  background: #16a34a;
 }
 
 /* Blocked: red/error — no capacity */

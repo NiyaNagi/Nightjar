@@ -64,13 +64,13 @@
 
 .confirm-dialog-btn--danger {
   background: rgba(243, 139, 168, 0.15);
-  color: var(--error-color);
+  color: #f38ba8;
   border-color: rgba(243, 139, 168, 0.3);
 }
 
 .confirm-dialog-btn--danger:hover {
   background: rgba(243, 139, 168, 0.25);
-  border-color: var(--error-color);
+  border-color: #f38ba8;
 }
 
 .confirm-dialog-btn--default {

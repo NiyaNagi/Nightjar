@@ -124,7 +124,7 @@
 
 .folder-create-error {
   font-size: 12px;
-  color: var(--error-color);
+  color: #f38ba8;
   margin: 0 0 12px;
 }
 
@@ -151,7 +151,7 @@
 }
 
 .folder-create-cancel:hover {
-  background: var(--hover-bg);
+  background: #3b3b52;
 }
 
 .folder-create-submit {
@@ -160,7 +160,7 @@
 }
 
 .folder-create-submit:hover:not(:disabled) {
-  background: var(--accent-color);
+  background: #7ba7f0;
 }
 
 .folder-create-submit:disabled {

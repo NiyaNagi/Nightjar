@@ -29,7 +29,7 @@
 }
 
 .folder-card--drop-target {
-  border-color: var(--success-color) !important;
+  border-color: #a6e3a1 !important;
   background: rgba(166, 227, 161, 0.08) !important;
   box-shadow: 0 0 0 2px rgba(166, 227, 161, 0.3) !important;
 }

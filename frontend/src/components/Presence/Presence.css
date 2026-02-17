@@ -6,7 +6,7 @@
     align-items: center;
     gap: 12px;
     padding: 6px 12px;
-    background: var(--hover-bg);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 20px;
 }
 
@@ -19,7 +19,7 @@
 .online-dot {
     width: 8px;
     height: 8px;
-    background: var(--success-color);
+    background: #22c55e;
     border-radius: 50%;
     animation: pulse 2s ease-in-out infinite;
 }
@@ -30,7 +30,7 @@
 }
 
 .online-count {
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.7);
     font-size: 0.85rem;
 }
 
@@ -48,7 +48,7 @@
     justify-content: center;
     font-size: 0.8rem;
     margin-left: -8px;
-    border: 2px solid var(--bg-primary);
+    border: 2px solid #1a1a2e;
     position: relative;
     cursor: pointer;
     transition: transform 0.2s;
@@ -74,9 +74,9 @@
     right: -2px;
     width: 10px;
     height: 10px;
-    background: var(--accent-color);
+    background: #3b82f6;
     border-radius: 50%;
-    border: 2px solid var(--bg-primary);
+    border: 2px solid #1a1a2e;
     animation: typingPulse 0.5s ease-in-out infinite;
 }
 
@@ -94,13 +94,13 @@
     justify-content: center;
     font-size: 0.7rem;
     margin-left: -8px;
-    background: var(--surface-2);
-    color: var(--text-primary);
-    border: 2px solid var(--bg-primary);
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid #1a1a2e;
 }
 
 .typing-indicator {
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.5);
     font-size: 0.8rem;
     font-style: italic;
     animation: fadeInOut 1s ease-in-out infinite;
@@ -176,7 +176,7 @@
 
 .peers-list-panel {
     background: var(--bg-tertiary, #1a1a2e);
-    border: 1px solid var(--border-color);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     width: 320px;
     max-height: 70vh;
@@ -191,26 +191,26 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .peers-list-header h3 {
     margin: 0;
-    color: var(--text-primary);
+    color: white;
     font-size: 1rem;
 }
 
 .peers-list-header .close-btn {
     background: none;
     border: none;
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 1rem;
     cursor: pointer;
     padding: 4px;
 }
 
 .peers-list-header .close-btn:hover {
-    color: var(--text-primary);
+    color: white;
 }
 
 .peers-list-header .close-btn:focus-visible {
@@ -227,7 +227,7 @@
 .no-peers {
     text-align: center;
     padding: 40px 20px;
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .no-peers p {
@@ -236,7 +236,7 @@
 
 .no-peers .hint {
     font-size: 0.85rem;
-    color: var(--text-tertiary);
+    color: rgba(255, 255, 255, 0.3);
     margin-bottom: 16px;
 }
 
@@ -276,7 +276,7 @@
     display: flex;
     gap: 12px;
     padding: 12px;
-    background: var(--hover-bg);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 10px;
 }
 
@@ -297,13 +297,13 @@
 }
 
 .peer-name {
-    color: var(--text-primary);
+    color: white;
     font-weight: 500;
     margin-bottom: 2px;
 }
 
 .peer-device {
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.4);
     font-size: 0.8rem;
     margin-bottom: 4px;
 }
@@ -317,7 +317,7 @@
 }
 
 .status-typing {
-    color: var(--accent-color);
+    color: #3b82f6;
     animation: typingText 1s ease-in-out infinite;
 }
 

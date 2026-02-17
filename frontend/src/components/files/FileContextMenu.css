@@ -38,7 +38,7 @@
 }
 
 .file-context-item--danger {
-  color: var(--error-color);
+  color: #f38ba8;
 }
 
 .file-context-item--danger:hover {

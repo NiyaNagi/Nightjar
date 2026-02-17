@@ -1,6 +1,6 @@
 /* Basic editor styles */
 .tiptap {
-    border: 1px solid var(--border-color);
+    border: 1px solid #444;
     border-radius: 4px;
     padding: 1rem;
     min-height: 400px;
@@ -12,7 +12,7 @@
 }
 
 .tiptap:focus-within {
-    border-color: var(--text-muted);
+    border-color: #888;
 }
 
 /* Collaboration cursor styles */
@@ -54,14 +54,14 @@
 }
 
 .tiptap th, .tiptap td {
-    border: 1px solid var(--border-color);
+    border: 1px solid #666;
     padding: 8px;
     text-align: left;
     min-width: 50px;
 }
 
 .tiptap th {
-    background-color: var(--surface-2);
+    background-color: #444;
     font-weight: bold;
 }
 
@@ -85,15 +85,15 @@
 /* Toolbar styles */
 .editor-toolbar {
     padding: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid #444;
     display: flex;
     flex-wrap: wrap;
 }
 
 .editor-toolbar button {
-    background: var(--surface-2);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    background: #2c2c2c;
+    color: #fff;
+    border: 1px solid #555;
     border-radius: 3px;
     margin: 0.25rem;
     padding: 0.4rem 0.6rem;
@@ -101,7 +101,7 @@
 }
 
 .editor-toolbar button.is-active {
-    background: var(--surface-3);
+    background: #555;
 }
 
 /* Link styles */
@@ -113,13 +113,13 @@
 }
 
 .editor-link:hover {
-    color: var(--accent-light);
+    color: #818cf8;
 }
 
 /* Highlight styles */
 .tiptap mark {
     background-color: #fef08a;
-    color: var(--bg-primary);
+    color: #1a1a2e;
     padding: 0.1em 0.2em;
     border-radius: 2px;
 }
@@ -131,8 +131,8 @@
 
 /* Inline code */
 .tiptap code {
-    background: var(--accent-alpha);
-    color: var(--accent-light);
+    background: rgba(99, 102, 241, 0.15);
+    color: #c4b5fd;
     padding: 0.15em 0.4em;
     border-radius: 4px;
     font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
@@ -156,7 +156,7 @@
     background: rgba(99, 102, 241, 0.1);
     border: 1px solid rgba(99, 102, 241, 0.3);
     border-radius: 6px;
-    color: var(--accent-light);
+    color: #a5b4fc;
     font-size: 0.85rem;
     margin-bottom: 0.5rem;
 }

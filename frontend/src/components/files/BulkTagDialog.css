@@ -95,7 +95,7 @@
 .bulk-tag-error {
   margin: 0 0 8px;
   font-size: 12px;
-  color: var(--error-color);
+  color: #f38ba8;
 }
 
 .bulk-tag-chips {
@@ -128,13 +128,13 @@
 }
 
 .bulk-tag-chip-remove:hover {
-  color: var(--error-color);
+  color: #f38ba8;
 }
 
 .bulk-tag-warning {
   margin: 0 0 12px;
   font-size: 12px;
-  color: var(--warning-color);
+  color: #fab387;
   line-height: 1.4;
 }
 

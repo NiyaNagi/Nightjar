@@ -349,7 +349,7 @@
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--error-color, #ef4444);
+  color: #ef4444;
 }
 
 /* About section */
@@ -475,7 +475,7 @@
 
 .app-settings__btn-danger {
   padding: 10px 20px;
-  background: var(--error-color, #ef4444);
+  background: #ef4444;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -486,12 +486,12 @@
 }
 
 .app-settings__btn-danger:hover {
-  background: var(--error-hover, #dc2626);
+  background: #dc2626;
 }
 
 .app-settings__btn-danger:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #1f2937), 0 0 0 4px var(--error-color, #ef4444);
+  box-shadow: 0 0 0 2px var(--bg-primary, #1f2937), 0 0 0 4px #ef4444;
 }
 
 /* Responsive */
@@ -550,35 +550,37 @@
 
 .app-settings__field--dnd .app-settings__toggle-text {
   font-weight: 600;
-  color: var(--error-color, #ef4444);
+  color: #ef4444;
 }
 
 /* Light mode */
-[data-theme="light"] .app-settings-modal {
-  background: var(--bg-primary, #ffffff);
-  border-color: var(--border-color, #e5e7eb);
-}
-
-[data-theme="light"] .app-settings__title {
-  color: var(--text-primary, #111827);
-}
-
-[data-theme="light"] .app-settings__nav {
-  background: var(--bg-secondary, #f9fafb);
-}
-
-[data-theme="light"] .app-settings__select,
-[data-theme="light"] .app-settings__input {
-  background: var(--bg-primary, #ffffff);
-  color: var(--text-primary, #111827);
-}
-
-[data-theme="light"] .app-settings__label,
-[data-theme="light"] .app-settings__toggle-text,
-[data-theme="light"] .app-settings__section-title {
-  color: var(--text-primary, #111827);
-}
-
-[data-theme="light"] .app-settings__footer {
-  background: var(--bg-secondary, #f9fafb);
+@media (prefers-color-scheme: light) {
+  .app-settings-modal {
+    background: var(--bg-primary, #ffffff);
+    border-color: var(--border-color, #e5e7eb);
+  }
+  
+  .app-settings__title {
+    color: var(--text-primary, #111827);
+  }
+  
+  .app-settings__nav {
+    background: var(--bg-secondary, #f9fafb);
+  }
+  
+  .app-settings__select,
+  .app-settings__input {
+    background: var(--bg-primary, #ffffff);
+    color: var(--text-primary, #111827);
+  }
+  
+  .app-settings__label,
+  .app-settings__toggle-text,
+  .app-settings__section-title {
+    color: var(--text-primary, #111827);
+  }
+  
+  .app-settings__footer {
+    background: var(--bg-secondary, #f9fafb);
+  }
 }

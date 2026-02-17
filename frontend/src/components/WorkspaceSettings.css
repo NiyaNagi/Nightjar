@@ -91,7 +91,7 @@
 }
 
 .workspace-settings__section--danger {
-  background: var(--error-bg, #fef2f2);
+  background: #fef2f2;
   margin: 0 -20px -20px;
   padding: 20px;
   border-radius: 0 0 8px 8px;
@@ -563,8 +563,8 @@
 }
 
 .workspace-settings__kick-btn:hover {
-  background: var(--error-bg, #fef2f2);
-  border-color: var(--error-color, #fecaca);
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .workspace-settings__kick-confirm {
@@ -583,12 +583,12 @@
 }
 
 .workspace-settings__kick-yes {
-  background: var(--error-color, #dc2626);
+  background: #dc2626;
   color: white;
 }
 
 .workspace-settings__kick-yes:hover {
-  background: var(--error-hover, #b91c1c);
+  background: #b91c1c;
 }
 
 .workspace-settings__kick-no {
@@ -619,12 +619,12 @@
 
 /* Danger zone */
 .workspace-settings__section--danger .workspace-settings__section-title {
-  color: var(--error-color, #dc2626);
+  color: #dc2626;
 }
 
 .workspace-settings__delete-btn {
   padding: 10px 16px;
-  background: var(--error-color, #dc2626);
+  background: #dc2626;
   color: white;
   border: none;
   border-radius: 6px;
@@ -635,30 +635,30 @@
 }
 
 .workspace-settings__delete-btn:hover {
-  background: var(--error-hover, #b91c1c);
+  background: #b91c1c;
 }
 
 .workspace-settings__delete-btn:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--error-color, #dc2626);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
 }
 
 .workspace-settings__delete-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--error-color, #dc2626);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
 }
 
 .workspace-settings__delete-confirm {
   padding: 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--error-color, #fca5a5);
+  background: white;
+  border: 1px solid #fca5a5;
   border-radius: 6px;
 }
 
 .workspace-settings__delete-confirm p {
   margin: 0 0 8px;
   font-size: 14px;
-  color: var(--text-primary);
+  color: #111827;
 }
 
 .workspace-settings__delete-note {
@@ -700,7 +700,7 @@
 .workspace-settings__confirm-delete-btn {
   flex: 1;
   padding: 8px 12px;
-  background: var(--error-color, #dc2626);
+  background: #dc2626;
   color: white;
   border: none;
   border-radius: 6px;
@@ -711,50 +711,50 @@
 }
 
 .workspace-settings__confirm-delete-btn:hover {
-  background: var(--error-hover, #b91c1c);
+  background: #b91c1c;
 }
 
 .workspace-settings__confirm-delete-btn:focus {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--error-color, #dc2626);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
 }
 
 .workspace-settings__confirm-delete-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--error-color, #dc2626);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #dc2626;
 }
 
 /* Leave button variant - orange/amber instead of red */
 .workspace-settings__leave-btn {
-  background: var(--warning-color, #f59e0b);
+  background: #f59e0b;
 }
 
 .workspace-settings__leave-btn:hover {
-  background: var(--warning-hover, #d97706);
+  background: #d97706;
 }
 
 .workspace-settings__leave-btn:focus {
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--warning-color, #f59e0b);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
 }
 
 .workspace-settings__leave-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--warning-color, #f59e0b);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
 }
 
 .workspace-settings__confirm-leave-btn {
-  background: var(--warning-color, #f59e0b);
+  background: #f59e0b;
 }
 
 .workspace-settings__confirm-leave-btn:hover {
-  background: var(--warning-hover, #d97706);
+  background: #d97706;
 }
 
 .workspace-settings__confirm-leave-btn:focus {
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--warning-color, #f59e0b);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
 }
 
 .workspace-settings__confirm-leave-btn:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--warning-color, #f59e0b);
+  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px #f59e0b;
 }
 
 /* Scrollable collaborators container */
@@ -857,13 +857,58 @@
   font-style: italic;
 }
 
-/* Dark mode overrides - applied via data-theme attribute */
-:root:not([data-theme="light"]) .workspace-settings__section--danger {
-  background: rgba(127, 29, 29, 0.3);
-}
-
-:root:not([data-theme="light"]) .workspace-settings__server-url {
-  background: var(--bg-tertiary);
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .workspace-settings {
+    --bg-primary: #1f2937;
+    --bg-secondary: #111827;
+    --bg-hover: #374151;
+    --border-color: #374151;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --text-tertiary: #6b7280;
+  }
+  
+  .workspace-settings__section--danger {
+    background: rgba(127, 29, 29, 0.3);
+  }
+  
+  .workspace-settings__delete-confirm {
+    background: #1f2937;
+    border-color: #7f1d1d;
+  }
+  
+  .workspace-settings__delete-confirm p {
+    color: #f9fafb;
+  }
+  
+  .workspace-settings__icon-btn {
+    background: var(--bg-secondary, #111827);
+  }
+  
+  .workspace-settings__icon-input {
+    background: var(--bg-secondary, #111827);
+    color: var(--text-primary, #f9fafb);
+  }
+  
+  .workspace-settings__select {
+    background: var(--bg-secondary, #111827);
+    color: var(--text-primary, #f9fafb);
+  }
+  
+  .workspace-settings__share-menu {
+    background: var(--bg-primary, #1f2937);
+    border-color: var(--border-color, #374151);
+  }
+  
+  .workspace-settings__server-url {
+    background: #1f2937;
+  }
+  
+  .workspace-settings__input--server {
+    background: var(--bg-secondary, #111827);
+    color: var(--text-primary, #f9fafb);
+  }
 }
 
 /* Server URL section for cross-network sharing */
@@ -903,7 +948,7 @@
   display: block;
   margin-top: 8px;
   font-size: 12px;
-  color: var(--warning-hover, #b45309);
+  color: #b45309;
   background: rgba(180, 83, 9, 0.1);
   padding: 8px 10px;
   border-radius: 4px;
@@ -924,12 +969,12 @@
 
 .workspace-settings__p2p-status--connected {
   background: rgba(16, 185, 129, 0.1);
-  color: var(--success-color, #059669);
+  color: #059669;
 }
 
 .workspace-settings__p2p-status--offline {
   background: rgba(239, 68, 68, 0.1);
-  color: var(--error-color, #dc2626);
+  color: #dc2626;
 }
 
 .workspace-settings__p2p-icon {
@@ -955,7 +1000,7 @@
 
 .workspace-settings__p2p-info--warning {
   background: rgba(234, 179, 8, 0.1);
-  color: var(--warning-hover, #b45309);
+  color: #b45309;
 }
 .workspace-settings__server-input-group {
   display: flex;
@@ -1005,7 +1050,7 @@
 
 .workspace-settings__server-success {
   font-size: 12px;
-  color: var(--success-color, #059669);
+  color: #059669;
   padding: 8px 12px;
   background: rgba(16, 185, 129, 0.1);
   border-radius: 6px;
@@ -1083,12 +1128,12 @@
 }
 
 .workspace-settings__relay-status.valid {
-  color: var(--success-color, #059669);
+  color: #059669;
   font-weight: 500;
 }
 
 .workspace-settings__relay-status.invalid {
-  color: var(--error-color, #dc2626);
+  color: #dc2626;
   font-weight: 500;
 }
 

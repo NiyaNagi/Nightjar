@@ -81,11 +81,11 @@
 }
 
 .mesh-card-value.mesh-card-warn {
-  color: var(--warning-color);
+  color: #fab387;
 }
 
 .mesh-card-value.mesh-card-ok {
-  color: var(--success-color);
+  color: #a6e3a1;
 }
 
 .mesh-card-label {
@@ -215,11 +215,11 @@
 }
 
 .mesh-status-ok {
-  color: var(--success-color);
+  color: #a6e3a1;
 }
 
 .mesh-status-warn {
-  color: var(--warning-color);
+  color: #fab387;
 }
 
 /* Chart */

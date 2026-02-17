@@ -214,7 +214,7 @@
 }
 
 .file-picker-confirm:hover:not(:disabled) {
-  background: var(--accent-color);
+  background: #7ba7f0;
 }
 
 .file-picker-confirm:disabled {

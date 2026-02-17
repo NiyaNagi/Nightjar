@@ -15,7 +15,7 @@
 }
 
 .share-dialog {
-  background: var(--bg-tertiary);
+  background: var(--bg-tertiary, #1a1a2e);
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
@@ -23,7 +23,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px var(--shadow-color);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   animation: slideUp 0.3s ease-out;
 }
 
@@ -48,20 +48,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color, #2a2a4a);
 }
 
 .share-dialog-header h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #fff;
 }
 
 .share-dialog-header .close-button {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: #888;
   font-size: 24px;
   cursor: pointer;
   padding: 0;
@@ -70,7 +70,7 @@
 }
 
 .share-dialog-header .close-button:hover {
-  color: var(--text-primary);
+  color: #fff;
 }
 
 .share-dialog-header .close-button:focus-visible {
@@ -81,7 +81,7 @@
 /* Tabs */
 .share-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color, #2a2a4a);
 }
 
 .share-tab {
@@ -89,7 +89,7 @@
   padding: 12px 16px;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: #888;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
@@ -97,8 +97,8 @@
 }
 
 .share-tab:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .share-tab:focus-visible {
@@ -146,14 +146,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--text-secondary);
+  color: #ccc;
   cursor: pointer;
 }
 
 .share-option input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: var(--accent-color);
+  accent-color: #6366f1;
   cursor: pointer;
 }
 
@@ -161,17 +161,17 @@
 .join-password-section input {
   width: 100%;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
 }
 
 .share-password input:focus,
 .join-password-section input:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: #6366f1;
 }
 
 /* Share Link */
@@ -187,17 +187,17 @@
 .share-link-input {
   flex: 1;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 13px;
   font-family: 'Monaco', 'Menlo', monospace;
 }
 
 .copy-button {
   padding: 10px 20px;
-  background: var(--accent-color);
+  background: #6366f1;
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -209,7 +209,7 @@
 }
 
 .copy-button:hover {
-  background: var(--accent-hover);
+  background: #5558e3;
 }
 
 .copy-button:focus-visible {
@@ -247,7 +247,7 @@
 .no-document {
   text-align: center;
   padding: 40px 20px;
-  color: var(--text-muted);
+  color: #888;
 }
 
 .no-document p {
@@ -258,8 +258,12 @@
 .join-input-section label,
 .join-password-section label {
   display: block;
-  color: var(--text-secondary);
+  color: #aaa;
   font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.join-input-container {
   display: flex;
   gap: 8px;
 }
@@ -267,10 +271,10 @@
 .join-input-container input {
   flex: 1;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
 }
 
@@ -280,22 +284,22 @@
 
 .join-input-container input:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: #6366f1;
 }
 
 .paste-button {
   padding: 10px 16px;
-  background: var(--surface-2);
+  background: #2a2a4a;
   border: none;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .paste-button:hover {
-  background: var(--surface-3);
+  background: #3a3a5a;
 }
 
 .join-error {
@@ -317,23 +321,23 @@
 .scan-button {
   flex: 1;
   padding: 12px 20px;
-  background: var(--surface-2);
+  background: #2a2a4a;
   border: none;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .scan-button:hover {
-  background: var(--surface-3);
+  background: #3a3a5a;
 }
 
 .join-button {
   flex: 1;
   padding: 12px 20px;
-  background: var(--accent-color);
+  background: #6366f1;
   border: none;
   border-radius: 8px;
   color: #fff;
@@ -344,11 +348,11 @@
 }
 
 .join-button:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: #5558e3;
 }
 
 .join-button:disabled {
-  background: var(--surface-3);
+  background: #3a3a5a;
   cursor: not-allowed;
   opacity: 0.7;
 }
@@ -376,29 +380,29 @@
 
 .scanner-close {
   padding: 10px 24px;
-  background: var(--surface-2);
+  background: #2a2a4a;
   border: none;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .scanner-close:hover {
-  background: var(--surface-3);
+  background: #3a3a5a;
 }
 
 /* New Panel */
 .new-description {
-  color: var(--text-secondary);
+  color: #aaa;
   margin: 0 0 8px 0;
   line-height: 1.5;
 }
 
 .create-new-button {
   padding: 14px 24px;
-  background: linear-gradient(135deg, var(--accent-color), var(--accent-light));
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   border: none;
   border-radius: 10px;
   color: #fff;
@@ -411,7 +415,10 @@
 
 .create-new-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px var(--accent-alpha);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.create-new-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -424,7 +431,7 @@
 }
 
 .share-format-section label {
-  color: var(--text-secondary);
+  color: #aaa;
   font-size: 14px;
   white-space: nowrap;
 }
@@ -432,17 +439,17 @@
 .share-format-select {
   flex: 1;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
   cursor: pointer;
 }
 
 .share-format-select:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: #6366f1;
 }
 
 /* Password Section */
@@ -453,7 +460,7 @@
 }
 
 .share-password-section label {
-  color: var(--text-secondary);
+  color: #aaa;
   font-size: 14px;
 }
 
@@ -465,36 +472,36 @@
 .password-input {
   flex: 1;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 14px;
   font-family: 'Monaco', 'Menlo', monospace;
 }
 
 .password-input:focus {
   outline: none;
-  border-color: var(--accent-color);
+  border-color: #6366f1;
 }
 
 .regenerate-button {
   padding: 10px 14px;
-  background: var(--surface-2);
+  background: #2a2a4a;
   border: none;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #fff;
   font-size: 16px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .regenerate-button:hover {
-  background: var(--surface-3);
+  background: #3a3a5a;
 }
 
 .password-hint {
-  color: var(--text-muted);
+  color: #666;
   font-size: 12px;
   margin: 0;
 }
@@ -507,21 +514,21 @@
 }
 
 .share-preview-section label {
-  color: var(--text-secondary);
+  color: #aaa;
   font-size: 14px;
 }
 
 .share-preview-box {
   padding: 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background: #0a0a14;
+  border: 1px solid #2a2a4a;
   border-radius: 8px;
   max-height: 120px;
   overflow-y: auto;
 }
 
 .message-preview {
-  color: var(--text-secondary);
+  color: #ccc;
   font-size: 13px;
   margin: 0;
   white-space: pre-wrap;
@@ -529,14 +536,14 @@
 }
 
 .password-preview {
-  color: var(--accent-color);
+  color: #6366f1;
   font-size: 16px;
   font-family: 'Monaco', 'Menlo', monospace;
 }
 
 /* QR Hint */
 .qr-hint {
-  color: var(--text-muted);
+  color: #666;
   font-size: 12px;
   margin: 8px 0 0 0;
   text-align: center;
@@ -545,7 +552,7 @@
 /* Large Copy Button */
 .copy-button-large {
   padding: 14px 24px;
-  background: linear-gradient(135deg, var(--accent-color), var(--accent-light));
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
   border: none;
   border-radius: 10px;
   color: #fff;
@@ -559,7 +566,10 @@
 
 .copy-button-large:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px var(--accent-alpha);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.copy-button-large:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

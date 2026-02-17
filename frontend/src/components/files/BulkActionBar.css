@@ -75,11 +75,11 @@
 }
 
 .bulk-action-btn--danger {
-  color: var(--error-color);
+  color: #f38ba8;
 }
 
 .bulk-action-btn--danger:hover {
-  border-color: var(--error-color);
+  border-color: #f38ba8;
   background: rgba(243, 139, 168, 0.08);
 }
 

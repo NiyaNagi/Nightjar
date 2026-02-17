@@ -53,19 +53,19 @@
 }
 
 .trash-btn--restore:hover {
-  border-color: var(--success-color);
-  color: var(--success-color);
+  border-color: #a6e3a1;
+  color: #a6e3a1;
 }
 
 .trash-btn--delete:hover,
 .trash-btn--danger:hover {
-  border-color: var(--error-color);
-  color: var(--error-color);
+  border-color: #f38ba8;
+  color: #f38ba8;
 }
 
 .trash-btn--danger {
-  border-color: var(--error-color);
-  color: var(--error-color);
+  border-color: #f38ba8;
+  color: #f38ba8;
 }
 
 .trash-info-bar {
@@ -140,7 +140,7 @@
 }
 
 .trash-days--urgent {
-  color: var(--error-color);
+  color: #f38ba8;
   background: rgba(243, 139, 168, 0.1);
 }
 

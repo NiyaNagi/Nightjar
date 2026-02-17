@@ -151,16 +151,16 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 14px;
-  background: var(--warning-bg, #fef3c7);
+  background: #fef3c7;
   border-radius: 8px;
   margin-bottom: 20px;
   font-size: 13px;
-  color: var(--warning-hover, #92400e);
+  color: #92400e;
 }
 
 .sync-progress-modal__expiry.expired {
-  background: var(--error-bg, #fee2e2);
-  color: var(--error-hover, #991b1b);
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .sync-progress-modal__expiry svg {
@@ -176,11 +176,11 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 14px;
-  background: var(--error-bg, #fee2e2);
+  background: #fee2e2;
   border-radius: 8px;
   margin-bottom: 20px;
   font-size: 13px;
-  color: var(--error-hover, #991b1b);
+  color: #991b1b;
 }
 
 .sync-progress-modal__error svg {
@@ -227,41 +227,43 @@
 }
 
 /* Dark mode */
-:root:not([data-theme="light"]) .sync-progress-modal {
-  background: var(--bg-primary, #1f2937);
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__icon.syncing {
-  background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__icon.success {
-  background: linear-gradient(135deg, #064e3b 0%, #1e293b 100%);
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__icon.error {
-  background: linear-gradient(135deg, #7f1d1d 0%, #1e293b 100%);
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__title {
-  color: var(--text-primary, #f9fafb);
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__stat-value {
-  color: var(--text-primary, #f9fafb);
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__expiry {
-  background: #451a03;
-  color: #fcd34d;
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__expiry.expired {
-  background: #450a0a;
-  color: #fca5a5;
-}
-
-:root:not([data-theme="light"]) .sync-progress-modal__error {
-  background: #450a0a;
-  color: #fca5a5;
+@media (prefers-color-scheme: dark) {
+  .sync-progress-modal {
+    background: var(--bg-primary, #1f2937);
+  }
+  
+  .sync-progress-modal__icon.syncing {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+  }
+  
+  .sync-progress-modal__icon.success {
+    background: linear-gradient(135deg, #064e3b 0%, #1e293b 100%);
+  }
+  
+  .sync-progress-modal__icon.error {
+    background: linear-gradient(135deg, #7f1d1d 0%, #1e293b 100%);
+  }
+  
+  .sync-progress-modal__title {
+    color: var(--text-primary, #f9fafb);
+  }
+  
+  .sync-progress-modal__stat-value {
+    color: var(--text-primary, #f9fafb);
+  }
+  
+  .sync-progress-modal__expiry {
+    background: #451a03;
+    color: #fcd34d;
+  }
+  
+  .sync-progress-modal__expiry.expired {
+    background: #450a0a;
+    color: #fca5a5;
+  }
+  
+  .sync-progress-modal__error {
+    background: #450a0a;
+    color: #fca5a5;
+  }
 }
