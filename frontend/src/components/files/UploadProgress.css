@@ -79,7 +79,7 @@
 }
 
 .upload-progress-item--error .upload-progress-item-meta {
-  color: #f38ba8;
+  color: var(--error-color);
 }
 
 .upload-progress-bar-wrap {

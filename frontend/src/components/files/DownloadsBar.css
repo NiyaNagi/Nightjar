@@ -61,13 +61,13 @@
 }
 
 .downloads-bar-done {
-  color: #a6e3a1;
+  color: var(--success-color);
   font-size: 12px;
   font-weight: 600;
 }
 
 .downloads-bar-error {
-  color: #f38ba8;
+  color: var(--error-color);
   font-size: 10px;
 }
 

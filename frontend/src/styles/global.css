@@ -48,6 +48,12 @@
     --shadow-color: rgba(0, 0, 0, 0.3);
     --code-bg: rgba(255, 255, 255, 0.1);
     
+    /* Surface elevation layers */
+    --surface-1: #1a1a2e;
+    --surface-2: #25253d;
+    --surface-3: #2d2d44;
+    --surface-4: #3d3d5c;
+    
     --cursor-colors: #ff6b6b, #4ecdc4, #ffe66d, #95e1d3, #f38181, #aa96da;
     
     /* Z-index scale for consistent stacking */
@@ -115,6 +121,12 @@
     
     --shadow-color: rgba(0, 0, 0, 0.1);
     --code-bg: rgba(0, 0, 0, 0.05);
+    
+    /* Surface elevation layers */
+    --surface-1: #f3f4f6;
+    --surface-2: #e5e7eb;
+    --surface-3: #d1d5db;
+    --surface-4: #c5c9d1;
 }
 
 /* Global resets */

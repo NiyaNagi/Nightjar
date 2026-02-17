@@ -127,12 +127,12 @@
 }
 
 .file-detail-action-primary:hover {
-  background: #7ba7f0;
+  background: var(--accent-color);
 }
 
 .file-detail-action-danger:hover {
-  border-color: #f38ba8;
-  color: #f38ba8;
+  border-color: var(--error-color);
+  color: var(--error-color);
 }
 
 /* Sections */
@@ -236,7 +236,7 @@
 
 .file-detail-error {
   font-size: 11px;
-  color: #f38ba8;
+  color: var(--error-color);
 }
 
 /* Tags */

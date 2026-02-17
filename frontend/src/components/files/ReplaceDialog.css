@@ -61,12 +61,12 @@
 }
 
 .replace-dialog-btn--danger {
-  background: #f38ba8;
+  background: var(--error-color);
   color: var(--bg-primary, #11111b);
 }
 
 .replace-dialog-btn--danger:hover {
-  background: #e67a96;
+  background: var(--error-hover);
 }
 
 .replace-dialog-btn--secondary {
@@ -75,7 +75,7 @@
 }
 
 .replace-dialog-btn--secondary:hover {
-  background: #7ba7f0;
+  background: var(--accent-color);
 }
 
 .replace-dialog-btn--cancel {
@@ -84,5 +84,5 @@
 }
 
 .replace-dialog-btn--cancel:hover {
-  background: #3b3b52;
+  background: var(--hover-bg);
 }
