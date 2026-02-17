@@ -640,6 +640,20 @@ class HyperswarmManager extends EventEmitter {
                 topic: message.topic
               });
             }
+          } else {
+            // Even when alreadyTracked, still ensure at least one sync exchange
+            // completes per peer+topic pair. This handles the case where a peer was
+            // already tracked from a previous session but we never completed a full
+            // sync (e.g., after 8+ hours offline and reconnecting via DHT).
+            const syncKey = `${peerId}:${message.topic}`;
+            if (!this._syncExchangeCompleted) {
+              this._syncExchangeCompleted = new Set();
+            }
+            if (!this._syncExchangeCompleted.has(syncKey)) {
+              this._syncExchangeCompleted.add(syncKey);
+              console.log(`[Hyperswarm] Peer ${peerId.slice(0, 16)}... already tracked for topic ${message.topic?.slice(0, 16)}... but no sync exchange completed yet - requesting sync`);
+              this.emit('sync-state-request', { peerId, topic: message.topic });
+            }
           }
           break;
 

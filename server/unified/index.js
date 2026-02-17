@@ -503,7 +503,7 @@ class SignalingServer {
   handleJoin(ws, info, msg) {
     const { roomId, profile } = msg;
     
-    if (!roomId || typeof roomId !== 'string') {
+    if (!roomId || typeof roomId !== 'string' || roomId.length > 256) {
       this.send(ws, { type: 'error', error: 'invalid_room' });
       return;
     }
@@ -929,7 +929,30 @@ class SignalingServer {
   handleClose(ws) {
     const info = this.peerInfo.get(ws);
     if (info) {
+      // Clean up signaling room
       this.handleLeave(ws, info);
+      
+      // Clean up all P2P topic rooms (prevents ghost peers)
+      if (info.topics) {
+        for (const topic of info.topics) {
+          const roomId = `p2p:${topic}`;
+          const room = this.rooms.get(roomId);
+          if (room) {
+            room.delete(ws);
+            this.broadcast(roomId, {
+              type: 'peer-left',
+              peerId: info.peerId,
+            });
+            if (room.size === 0) {
+              this.rooms.delete(roomId);
+            }
+          }
+        }
+        info.topics.clear();
+      }
+      
+      // Remove peer info
+      this.peerInfo.delete(ws);
     }
   }
 }
@@ -1016,12 +1039,12 @@ if (!DISABLE_PERSISTENCE) {
   console.log('[Persistence] Disabled - server running in pure relay mode');
 }
 
-// WebSocket server for signaling (WebRTC)
-const wssSignaling = new WebSocketServer({ noServer: true });
+// WebSocket server for signaling (WebRTC) - 1MB max payload
+const wssSignaling = new WebSocketServer({ noServer: true, maxPayload: 1 * 1024 * 1024 });
 wssSignaling.on('connection', (ws, req) => signaling.handleConnection(ws, req));
 
-// WebSocket server for y-websocket (document sync)
-const wssYjs = new WebSocketServer({ noServer: true });
+// WebSocket server for y-websocket (document sync) - 10MB max payload
+const wssYjs = new WebSocketServer({ noServer: true, maxPayload: 10 * 1024 * 1024 });
 
 // Track WebSocket connections with heartbeat for awareness cleanup
 const wsHeartbeats = new Map();
@@ -1082,6 +1105,15 @@ server.on('upgrade', (request, socket, head) => {
       wssYjs.emit('connection', ws, request);
     });
   }
+});
+
+// CORS headers for API endpoints
+app.use('/api', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
 });
 
 // Health check
@@ -1287,8 +1319,8 @@ server.listen(PORT, async () => {
   }
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
+// Graceful shutdown handler
+const gracefulShutdown = async () => {
   console.log('\n[Server] Shutting down...');
   
   // Stop mesh participation
@@ -1309,4 +1341,7 @@ process.on('SIGTERM', async () => {
     }
     process.exit(0);
   });
-});
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

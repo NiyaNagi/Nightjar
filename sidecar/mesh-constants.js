@@ -59,12 +59,12 @@ function getWorkspaceTopicHex(workspaceId) {
 
 /**
  * Bootstrap relay nodes
- * For Electron: Hyperswarm DHT is used for P2P discovery (no relay needed)
- * For Browser: Auto-detected from window.location.origin
- * These are only used if explicitly configured or in development
+ * These are the default public relay servers for cross-platform sharing.
+ * Clients will attempt to connect but gracefully fall back to direct
+ * Hyperswarm P2P if the relay is unreachable.
  */
 const BOOTSTRAP_NODES = [
-  // Empty by default - use Hyperswarm DHT or auto-detection
+  'wss://relay.night-jar.io'
 ];
 
 /**

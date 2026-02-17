@@ -8,6 +8,7 @@ import { FolderProvider } from './contexts/FolderContext'
 import { PermissionProvider } from './contexts/PermissionContext'
 import { IdentityProvider } from './contexts/IdentityContext'
 import { ToastProvider } from './contexts/ToastContext'
+import PermissionWatcher from './components/PermissionWatcher'
 
 /**
  * Application providers in dependency order:
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <FolderProvider>
               <PermissionProvider>
                 <ToastProvider>
+                  <PermissionWatcher />
                   <App />
                 </ToastProvider>
               </PermissionProvider>

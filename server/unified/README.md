@@ -92,31 +92,55 @@ curl http://localhost:3000/health
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 3000 | Server port |
+| `NIGHTJAR_MODE` | `host` | Server mode: `host` (persistence + mesh), `relay` (mesh only), `private` (persistence, no mesh) |
+| `PUBLIC_URL` | (none) | WebSocket URL for mesh relay announcements (e.g., `wss://relay.night-jar.io`). Required for relay mode. |
 | `STATIC_PATH` | `../../frontend/dist` | Path to built React app |
 | `DB_PATH` | `./data/Nightjar.db` | SQLite database path |
 | `MAX_PEERS_PER_ROOM` | 100 | Max concurrent users per workspace |
+| `NAHMA_DISABLE_PERSISTENCE` | `false` | Set to `true` to disable persistence (relay mode sets this automatically) |
 
 ## API
 
-### WebSocket (`/signal`)
+### WebSocket — Signaling (`/signal`)
 
 | Message | Direction | Description |
 |---------|-----------|-------------|
 | `join` | → Server | Join a workspace room |
 | `joined` | ← Server | Confirmation with peer list |
+| `leave` | → Server | Leave room |
 | `signal` | ↔ | WebRTC signaling data |
-| `enable_persistence` | → Server | Enable server storage |
-| `store` | → Server | Send encrypted data |
+| `join-topic` | → Server | Join a P2P topic (Hyperswarm-style) |
+| `leave-topic` | → Server | Leave a P2P topic |
+| `peer-request` | → Server | Request peer list for topic |
+| `peer-announce` | → Server | Announce self to topic peers |
+| `webrtc-signal` | ↔ | Forward WebRTC signaling between specific peers |
+| `relay-message` | → Server | Forward message to a specific peer in same topic |
+| `relay-broadcast` | → Server | Broadcast message to all peers in same topics |
+| `enable_persistence` | → Server | Enable server storage for this workspace |
+| `store` | → Server | Send encrypted data for server storage |
 | `sync_request` | → Server | Request stored data |
 | `sync_response` | ← Server | Encrypted data from storage |
+| `ping` / `pong` | ↔ | Keepalive |
 
-### HTTP
+### WebSocket — Document Sync (`/*` except `/signal`)
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Health check |
-| `GET /api/workspace/:id/persisted` | Check if workspace has storage enabled |
-| `GET /*` | Static files / SPA |
+All other WebSocket paths use the **y-websocket** binary protocol for Yjs CRDT document synchronization. The URL path becomes the room/document name.
+
+### HTTP REST API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check — returns JSON with rooms, uptime, mode |
+| `/api/mesh/status` | GET | Mesh network status and peer info |
+| `/api/mesh/relays` | GET | Top relay nodes (for share link embedding) |
+| `/api/workspace/:id/persisted` | GET | Check if workspace has persistence enabled |
+| `/api/invites` | POST | Create a share invite |
+| `/api/invites/:token` | GET | Retrieve invite details |
+| `/*` | GET | Static files / SPA fallback |
+
+## Deployment
+
+For step-by-step deployment instructions (VPS + Docker + Caddy), see: [../../docs/RELAY_DEPLOYMENT_GUIDE.md](../../docs/RELAY_DEPLOYMENT_GUIDE.md)
 
 ## For QNAP Deployment
 

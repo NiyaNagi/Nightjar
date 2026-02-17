@@ -120,23 +120,15 @@ export function FileStorageProvider({
   /** Add a folder */
   const addFolder = useCallback((folderRecord) => {
     if (!yStorageFolders) return;
-    yStorageFolders.push([folderRecord]);
+    yStorageFolders.set(folderRecord.id, folderRecord);
   }, [yStorageFolders]);
 
   /** Update a folder */
   const updateFolder = useCallback((folderId, updates) => {
     if (!yStorageFolders) return;
-    const doc = yStorageFolders.doc;
-    const doUpdate = () => {
-      const arr = yStorageFolders.toArray();
-      const index = arr.findIndex(f => f.id === folderId);
-      if (index === -1) return;
-      const updated = { ...arr[index], ...updates, updatedAt: Date.now() };
-      yStorageFolders.delete(index, 1);
-      yStorageFolders.insert(index, [updated]);
-    };
-    if (doc) doc.transact(doUpdate);
-    else doUpdate();
+    const existing = yStorageFolders.get(folderId);
+    if (!existing) return;
+    yStorageFolders.set(folderId, { ...existing, ...updates, updatedAt: Date.now() });
   }, [yStorageFolders]);
 
   /** Soft-delete a folder and its contents recursively */
@@ -145,7 +137,12 @@ export function FileStorageProvider({
     const now = Date.now();
     updateFolder(folderId, { deletedAt: now });
     // Recursively delete subfolders
-    const allFolders = yStorageFolders ? yStorageFolders.toArray() : [];
+    const allFolders = [];
+    if (yStorageFolders) {
+      yStorageFolders.forEach((folder, id) => {
+        allFolders.push({ ...folder, id: folder.id || id });
+      });
+    }
     const childFolderIds = allFolders
       .filter(f => f.parentId === folderId && !f.deletedAt)
       .map(f => f.id);
@@ -172,7 +169,12 @@ export function FileStorageProvider({
   const restoreFolder = useCallback((folderId) => {
     updateFolder(folderId, { deletedAt: null });
     // Recursively restore child subfolders
-    const allFolders = yStorageFolders ? yStorageFolders.toArray() : [];
+    const allFolders = [];
+    if (yStorageFolders) {
+      yStorageFolders.forEach((folder, id) => {
+        allFolders.push({ ...folder, id: folder.id || id });
+      });
+    }
     const childFolderIds = allFolders
       .filter(f => f.parentId === folderId && f.deletedAt)
       .map(f => f.id);
@@ -197,11 +199,7 @@ export function FileStorageProvider({
   /** Permanently remove a folder from Yjs */
   const permanentlyDeleteFolder = useCallback((folderId) => {
     if (!yStorageFolders) return;
-    const arr = yStorageFolders.toArray();
-    const index = arr.findIndex(f => f.id === folderId);
-    if (index !== -1) {
-      yStorageFolders.delete(index, 1);
-    }
+    yStorageFolders.delete(folderId);
   }, [yStorageFolders]);
 
   /** Toggle favorite for a file */

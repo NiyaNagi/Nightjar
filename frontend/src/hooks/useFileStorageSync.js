@@ -56,6 +56,34 @@ function useYjsArray(yArray) {
 }
 
 /**
+ * Observe a Yjs Map and return its values as a plain JS array.
+ * Each value gets its `id` field set to the map key if not already present.
+ * @param {import('yjs').Map|null} yMap
+ * @returns {Array}
+ */
+function useYjsMapAsArray(yMap) {
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    if (!yMap) { setData([]); return; }
+
+    const sync = () => {
+      const result = [];
+      yMap.forEach((value, key) => {
+        result.push({ ...value, id: value.id || key });
+      });
+      setData(result);
+    };
+
+    sync();
+    yMap.observe(sync);
+    return () => yMap.unobserve(sync);
+  }, [yMap]);
+
+  return data;
+}
+
+/**
  * Main hook: observe all file storage Yjs shared types and return React state.
  * 
  * @param {Object} params
@@ -77,7 +105,7 @@ export function useFileStorageSync({
   // Observe raw Yjs data
   const fileStorageSystemsMap = useYjsMap(yFileStorageSystems);
   const allStorageFiles = useYjsArray(yStorageFiles);
-  const allStorageFolders = useYjsArray(yStorageFolders);
+  const allStorageFolders = useYjsMapAsArray(yStorageFolders);
   const chunkAvailabilityMap = useYjsMap(yChunkAvailability);
   const allAuditLog = useYjsArray(yFileAuditLog);
 

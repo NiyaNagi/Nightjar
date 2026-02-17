@@ -1279,13 +1279,39 @@ function App() {
         }
     }, [inviteLink, showToast]);
 
-    const toggleTor = useCallback(() => {
+    const toggleTor = useCallback(async () => {
+        const enabling = !torEnabled;
+        
+        // 1. Actually start/stop Tor via main process (spawns/kills daemon)
+        if (window.electronAPI?.tor) {
+            try {
+                if (enabling) {
+                    const savedMode = localStorage.getItem('Nightjar_tor_mode') || 'bundled';
+                    showToast('Starting Tor...', 'info');
+                    await window.electronAPI.tor.start(savedMode === 'disabled' ? 'bundled' : savedMode);
+                    showToast('Tor connected', 'success');
+                } else {
+                    showToast('Stopping Tor...', 'info');
+                    await window.electronAPI.tor.stop();
+                    showToast('Tor disconnected', 'success');
+                }
+            } catch (err) {
+                showToast(`Tor error: ${err.message || err}`, 'error');
+                console.error('[App] Tor toggle failed:', err);
+                return; // Don't flip sidecar state if main process failed
+            }
+        }
+        
+        // 2. Notify sidecar of the toggle + pass SOCKS proxy info
         if (metaSocketRef.current?.readyState === WebSocket.OPEN) {
+            let socksProxy = null;
+            if (enabling && window.electronAPI?.tor) {
+                try { socksProxy = await window.electronAPI.tor.getSocksProxy(); } catch (_) {}
+            }
             metaSocketRef.current.send(JSON.stringify({ 
                 type: 'toggle-tor', 
-                payload: { enable: !torEnabled }
+                payload: { enable: enabling, socksProxy }
             }));
-            showToast(torEnabled ? 'Disabling Tor...' : 'Enabling Tor...', 'info');
         }
     }, [torEnabled, showToast]);
 

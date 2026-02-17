@@ -38,7 +38,7 @@ class MockYArray {
 function makeRefs(fsId) {
   const yFileStorageSystems = new MockYMap();
   const yStorageFiles = new MockYArray();
-  const yStorageFolders = new MockYArray();
+  const yStorageFolders = new MockYMap();
   const yChunkAvailability = new MockYMap();
   const yFileAuditLog = new MockYArray();
 
@@ -176,31 +176,31 @@ describe('FileStorageContext', () => {
   // --- permanentlyDeleteFolder ---
   it('should permanently delete folder from yStorageFolders', () => {
     const refs = makeRefs(FS_ID);
-    refs.yStorageFolders.push([
-      { id: 'd1', fileStorageId: FS_ID, name: 'Old Folder', parentId: null, deletedAt: Date.now() },
-    ]);
+    refs.yStorageFolders.set('d1', 
+      { id: 'd1', fileStorageId: FS_ID, name: 'Old Folder', parentId: null, deletedAt: Date.now() }
+    );
 
     const { result } = renderHook(() => useFileStorage(), {
       wrapper: makeWrapper(refs, FS_ID),
     });
 
     act(() => result.current.permanentlyDeleteFolder('d1'));
-    expect(refs.yStorageFolders.toArray().find(f => f.id === 'd1')).toBeUndefined();
+    expect(refs.yStorageFolders.has('d1')).toBe(false);
   });
 
   it('should be a no-op for non-existent folder IDs', () => {
     const refs = makeRefs(FS_ID);
-    refs.yStorageFolders.push([
-      { id: 'd1', fileStorageId: FS_ID, name: 'Keeper', parentId: null, deletedAt: null },
-    ]);
+    refs.yStorageFolders.set('d1', 
+      { id: 'd1', fileStorageId: FS_ID, name: 'Keeper', parentId: null, deletedAt: null }
+    );
 
     const { result } = renderHook(() => useFileStorage(), {
       wrapper: makeWrapper(refs, FS_ID),
     });
 
     act(() => result.current.permanentlyDeleteFolder('nonexistent'));
-    expect(refs.yStorageFolders.toArray()).toHaveLength(1);
-    expect(refs.yStorageFolders.toArray()[0].id).toBe('d1');
+    expect(refs.yStorageFolders.has('d1')).toBe(true);
+    expect(refs.yStorageFolders.get('d1').id).toBe('d1');
   });
 
   // --- addFolder / updateFolder ---
@@ -219,19 +219,21 @@ describe('FileStorageContext', () => {
         deletedAt: null,
       });
     });
-    expect(refs.yStorageFolders.toArray()).toHaveLength(1);
+    expect(refs.yStorageFolders.has('d1')).toBe(true);
 
     act(() => result.current.updateFolder('d1', { name: 'Images' }));
-    expect(refs.yStorageFolders.toArray()[0].name).toBe('Images');
+    expect(refs.yStorageFolders.get('d1').name).toBe('Images');
   });
 
   // --- deleteFolder (recursive) ---
   it('should recursively delete folder and children', () => {
     const refs = makeRefs(FS_ID);
-    refs.yStorageFolders.push([
-      { id: 'd1', fileStorageId: FS_ID, name: 'Root', parentId: null, deletedAt: null },
-      { id: 'd2', fileStorageId: FS_ID, name: 'Child', parentId: 'd1', deletedAt: null },
-    ]);
+    refs.yStorageFolders.set('d1', 
+      { id: 'd1', fileStorageId: FS_ID, name: 'Root', parentId: null, deletedAt: null }
+    );
+    refs.yStorageFolders.set('d2', 
+      { id: 'd2', fileStorageId: FS_ID, name: 'Child', parentId: 'd1', deletedAt: null }
+    );
     refs.yStorageFiles.push([
       { id: 'f1', fileStorageId: FS_ID, name: 'a.txt', folderId: 'd1', deletedAt: null },
     ]);
@@ -241,10 +243,11 @@ describe('FileStorageContext', () => {
     });
 
     act(() => result.current.deleteFolder('d1'));
-    const folders = refs.yStorageFolders.toArray();
+    const d1 = refs.yStorageFolders.get('d1');
+    const d2 = refs.yStorageFolders.get('d2');
     const files = refs.yStorageFiles.toArray();
-    expect(folders.find(f => f.id === 'd1').deletedAt).not.toBeNull();
-    expect(folders.find(f => f.id === 'd2').deletedAt).not.toBeNull();
+    expect(d1.deletedAt).not.toBeNull();
+    expect(d2.deletedAt).not.toBeNull();
     expect(files.find(f => f.id === 'f1').deletedAt).not.toBeNull();
   });
 
@@ -252,9 +255,9 @@ describe('FileStorageContext', () => {
   it('should restore folder and its files', () => {
     const refs = makeRefs(FS_ID);
     const now = Date.now();
-    refs.yStorageFolders.push([
-      { id: 'd1', fileStorageId: FS_ID, name: 'Root', parentId: null, deletedAt: now },
-    ]);
+    refs.yStorageFolders.set('d1', 
+      { id: 'd1', fileStorageId: FS_ID, name: 'Root', parentId: null, deletedAt: now }
+    );
     refs.yStorageFiles.push([
       { id: 'f1', fileStorageId: FS_ID, name: 'a.txt', folderId: 'd1', deletedAt: now },
     ]);
@@ -264,7 +267,7 @@ describe('FileStorageContext', () => {
     });
 
     act(() => result.current.restoreFolder('d1'));
-    expect(refs.yStorageFolders.toArray()[0].deletedAt).toBeNull();
+    expect(refs.yStorageFolders.get('d1').deletedAt).toBeNull();
     expect(refs.yStorageFiles.toArray()[0].deletedAt).toBeNull();
   });
 

@@ -182,7 +182,7 @@ export function FolderProvider({ children }) {
     });
     
     // Shared types for folders, doc-folder mapping, and trash
-    const yFolders = ydoc.getArray('folders');
+    const yFolders = ydoc.getMap('folders');
     const yDocFolders = ydoc.getMap('documentFolders');
     const yTrashedDocs = ydoc.getArray('trashedDocuments');
     
@@ -194,7 +194,10 @@ export function FolderProvider({ children }) {
     
     // Sync folders from Yjs to React state
     const syncFolders = () => {
-      const folders = yFolders.toArray();
+      const folders = [];
+      yFolders.forEach((folder, folderId) => {
+        folders.push({ ...folder, id: folder.id || folderId });
+      });
       console.log('[FolderContext] Yjs folder sync - received', folders.length, 'folders');
       setAllFolders(prev => {
         // Keep folders from other workspaces, merge folders for this workspace
@@ -239,7 +242,10 @@ export function FolderProvider({ children }) {
       if (isSynced && !hasSynced) {
         hasSynced = true;
         // Now we have the real data from server
-        const remoteFolders = yFolders.toArray();
+        const remoteFolders = [];
+        yFolders.forEach((folder, folderId) => {
+          remoteFolders.push({ ...folder, id: folder.id || folderId });
+        });
         console.log('[FolderContext] Remote folders:', remoteFolders.length);
         
         // If Yjs is empty but we have local folders, push them to Yjs
@@ -253,7 +259,7 @@ export function FolderProvider({ children }) {
             if (localFolders.length > 0) {
               console.log('[FolderContext] Pushing', localFolders.length, 'local folders to Yjs');
               localFolders.forEach(folder => {
-                yFolders.push([folder]);
+                yFolders.set(folder.id, folder);
               });
             }
             return currentFolders;

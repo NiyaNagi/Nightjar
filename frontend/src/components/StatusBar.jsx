@@ -231,39 +231,15 @@ const StatusBar = ({
                                     <span className="menu-icon">⚙️</span>
                                     <span>Tor Settings...</span>
                                 </button>
+                                {onOpenRelaySettings && (
+                                    <button type="button" className="tor-menu-item" onClick={() => { onOpenRelaySettings(); setShowTorMenu(false); }} role="menuitem">
+                                        <span className="menu-icon">📡</span>
+                                        <span>Relay Settings...</span>
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
-                
-                {/* Mesh network status indicator - Electron only */}
-                {isElectron && meshStatus && (
-                    <div 
-                        className={`mesh-status ${meshStatus.running ? 'active' : 'inactive'}`}
-                        title={meshStatus.running 
-                            ? `Mesh: ${meshStatus.connectedPeers || 0} peers, ${meshStatus.knownRelays || 0} relays` 
-                            : 'Mesh network disabled'
-                        }
-                    >
-                        <span className="mesh-icon">🌐</span>
-                        <span className="mesh-label">
-                            {meshStatus.running ? `${meshStatus.knownRelays || 0}` : 'OFF'}
-                        </span>
-                    </div>
-                )}
-                
-                {/* Relay settings button - Electron only */}
-                {isElectron && isFeatureAvailable('relay') && onOpenRelaySettings && (
-                    <button 
-                        type="button"
-                        className="relay-settings-btn"
-                        onClick={onOpenRelaySettings}
-                        title="Configure relay settings"
-                        aria-label="Configure relay settings"
-                    >
-                        <span className="relay-icon">📡</span>
-                        <span className="relay-label">Relay</span>
-                    </button>
                 )}
                 
                 {/* Connection status - shown on all platforms */}
@@ -272,7 +248,16 @@ const StatusBar = ({
                     data-testid="sync-status"
                     data-synced={workspaceSynced ? 'true' : 'false'}
                     data-phase={syncPhase}
-                    title={publicIP ? `Your IP: ${publicIP}` : 'Connection status'}
+                    title={[
+                        publicIP ? `IP: ${publicIP}` : null,
+                        (totalSeenPeers > 0 || totalCollaborators > 0) 
+                            ? `${activePeers} active / ${totalSeenPeers || totalCollaborators} total peers` 
+                            : null,
+                        relayConnected ? 'Relay connected' : null,
+                        meshStatus?.running 
+                            ? `Mesh: ${meshStatus.connectedPeers || 0} peers, ${meshStatus.knownRelays || 0} relays` 
+                            : null,
+                    ].filter(Boolean).join(' · ') || 'Connection status'}
                     role="status"
                     aria-live="polite"
                     aria-label={`Connection status: ${connectionStatus.label}`}
@@ -284,38 +269,20 @@ const StatusBar = ({
                             ({ipDisplay})
                         </span>
                     )}
+                    {relayConnected && (
+                        <span className="relay-indicator" title="Connected to relay server">📡</span>
+                    )}
+                    {activePeers === 0 && !relayConnected && onRequestSync && (
+                        <button 
+                            className={`retry-sync-btn ${isRetrying ? 'retrying' : ''}`}
+                            onClick={onRequestSync}
+                            disabled={isRetrying}
+                            title="Retry connecting to peers"
+                        >
+                            {isRetrying ? '⟳' : '↻'}
+                        </button>
+                    )}
                 </div>
-
-                {/* Peer counts display - show active / total format */}
-                {(totalSeenPeers > 0 || totalCollaborators > 0) && (
-                    <div 
-                        className={`peer-counts ${activePeers === 0 && !relayConnected ? 'warning' : ''}`}
-                        title={
-                            activePeers === 0 && !relayConnected
-                                ? 'Editing offline copy - changes will sync when a peer connects'
-                                : `${activePeers} active · ${totalSeenPeers || totalCollaborators} total seen${relayConnected ? ' · Relay connected' : ''}`
-                        }
-                    >
-                        <span className={`peer-ratio ${activePeers === 0 ? 'zero-peers' : ''}`}>
-                            <span className="active-peers">{activePeers}</span>
-                            <span className="peer-separator">/</span>
-                            <span className="total-peers">{totalSeenPeers || totalCollaborators}</span>
-                        </span>
-                        {relayConnected && (
-                            <span className="relay-indicator" title="Connected to relay server">📡</span>
-                        )}
-                        {activePeers === 0 && !relayConnected && onRequestSync && (
-                            <button 
-                                className={`retry-sync-btn ${isRetrying ? 'retrying' : ''}`}
-                                onClick={onRequestSync}
-                                disabled={isRetrying}
-                                title="Retry connecting to peers"
-                            >
-                                {isRetrying ? '⟳' : '↻'}
-                            </button>
-                        )}
-                    </div>
-                )}
                 
                 {/* Sync verification status indicator */}
                 {syncStatus && syncStatus !== 'idle' && (

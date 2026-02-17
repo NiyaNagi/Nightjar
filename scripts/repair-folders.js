@@ -75,11 +75,13 @@ async function repairFolders(neededFolderIds) {
     
     folderProvider.on('synced', (isSynced) => {
       if (isSynced) {
-        const yFolders = folderDoc.getArray('folders');
-        const existingFolders = yFolders.toArray();
-        const existingIds = new Set(existingFolders.map(f => f.id));
+        const yFolders = folderDoc.getMap('folders');
+        const existingIds = new Set();
+        yFolders.forEach((folder, folderId) => {
+          existingIds.add(folder.id || folderId);
+        });
         
-        console.log(`    Found ${existingFolders.length} existing folders`);
+        console.log(`    Found ${existingIds.size} existing folders`);
         
         // Find missing folders
         const missingIds = neededFolderIds.filter(id => !existingIds.has(id));
@@ -110,7 +112,7 @@ async function repairFolders(neededFolderIds) {
           };
           
           console.log(`    Creating: ${folder.name} (${folderId})`);
-          yFolders.push([folder]);
+          yFolders.set(folderId, folder);
         });
         
         // Wait for sync
