@@ -10,6 +10,24 @@ import { IdentityProvider } from './contexts/IdentityContext'
 import { ToastProvider } from './contexts/ToastContext'
 import PermissionWatcher from './components/PermissionWatcher'
 
+// Apply saved theme BEFORE first render to prevent flash of wrong theme
+// (AppSettings module only loads after identity selection, so IdentitySelector
+//  would otherwise always render with the default dark theme)
+try {
+  const saved = JSON.parse(localStorage.getItem('Nightjar-app-settings') || '{}');
+  const theme = saved.theme || 'system';
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (!prefersDark) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+} catch (e) {
+  // Ignore - will fall through to default dark theme
+}
+
 /**
  * Application providers in dependency order:
  * 1. ErrorBoundary - Catch React render errors (no deps)
