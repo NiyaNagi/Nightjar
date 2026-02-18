@@ -66,10 +66,18 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - **CSV/XLSX import**: Smart column auto-mapping with validation preview
 - **Encrypted addresses**: End-to-end encrypted shipping address handling (AES-GCM)
 - **Catalog management**: Define item catalog with categories
-- **Analytics dashboard**: Fulfillment metrics, demand trends, producer leaderboards
+- **Analytics dashboard**: 15-component suite — fulfillment histograms, pipeline funnel, pivot table, US state heatmap, producer leaderboard, response time charts, status transitions, demand trends, inflow/outflow analysis, blocked request aging, units shipped by type, and summary metrics with date range and export controls
 - **Audit logging**: Complete history of all inventory operations
 
-### 👥 Real-Time Collaboration
+### � File Storage & P2P Transfer *(New in v1.7)*
+- **Full dashboard**: Browse, search, mesh view, recent files, favorites, trash, downloads, and audit log
+- **P2P file transfer**: End-to-end encrypted chunk-based transfer with seeding, bandwidth sampling, and progress tracking
+- **Bulk operations**: Multi-select, tag, move, and delete across files and folders
+- **Upload & download**: Drag-and-drop upload zones, download bars, file detail panels
+- **Organization**: Folder creation, breadcrumb navigation, grid/list view toggle
+- **Storage metrics**: Per-workspace storage usage with visual breakdown
+
+### �👥 Real-Time Collaboration
 - **Live cursor tracking** with collaborator names and colors
 - **Document-level presence pips** showing who has each document open *(Enhanced in v1.5+)*
 - **Focused state indicators** with glowing effect for active documents
@@ -207,6 +215,7 @@ Nightjar implements a **"hard cutover"** security model that prioritizes data pr
 | **Encryption** | XSalsa20-Poly1305 | Authenticated encryption (NaCl) |
 | **Key Derivation** | Argon2id | Memory-hard KDF (64MB, 4 iterations) |
 | **Recovery Phrase** | BIP39 | 12-word mnemonic (128-bit entropy) |
+| **Scoped Encryption** | Curve25519 | ed2curve-derived encryption-only keys (inventory subsystem isolation) |
 
 ### How Your Data is Protected
 
@@ -557,7 +566,7 @@ See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for a
 | **Rich Text** | TipTap / ProseMirror | Collaborative text editor |
 | **Spreadsheet** | Fortune Sheet | Excel-like spreadsheets |
 | **CRDT** | Yjs | Conflict-free real-time sync |
-| **Visualization** | D3.js / TopoJSON | Geographic heatmaps and charts |
+| **Visualization** | Recharts / D3.js / TopoJSON | Analytics charts, geographic heatmaps |
 
 ### Networking
 
@@ -840,6 +849,20 @@ npm run test:e2e:smoke      # Quick smoke tests
 ---
 
 ## Changelog
+
+### v1.7.5 - Analytics, History Sanitization & Account Migration
+- **New Feature**: ProducerResponseTime — per-producer average claim/start/ship time bar charts
+- **New Feature**: StatusTransitions — request outcome summary with delivery rate and stage timing
+- **New Feature**: UnitsShippedByType — stacked bar chart of units shipped by catalog item per time bucket
+- **Security**: Full git history sanitization — all 147 commits rewritten to remove prior identity references
+- **Account Migration**: All references migrated from InyanRock to SaoneYanpa across configs, URLs, and app IDs
+- **Testing**: 125 suites, 3,630 tests (0 failures)
+
+### v1.7.4 - Curve25519 Scoped Keys, Address Reveal Fix & GitHub Migration
+- **Security**: Inventory subsystem now receives Curve25519 encryption-only key (pre-derived via ed2curve) instead of full Ed25519 signing key — prevents signing capability leakage
+- **Critical Fix**: Address reveal pipeline — `publicIdentity` was missing crypto keys, causing all address encryption/decryption to silently no-op; fixed with `inventoryIdentity` extending `publicIdentity` with `curveSecretKey`
+- **Account Migration**: Migrated all references from InyanRock/Tokahe to SaoneYanpa across package.json, capacitor.config.json, main.js, README, docs, and UI
+- **Testing**: 125 suites, 3,630 tests — fixed 5 test regressions (stage bar queries, privacy note text, duplicate emoji element)
 
 ### v1.7.3 - Ownership Transfer, Relay Infrastructure & Y.Map Migration
 - **New Feature**: PermissionWatcher component — auto-syncs ownership transfers from Yjs to local workspace with toast notifications
