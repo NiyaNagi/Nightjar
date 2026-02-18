@@ -461,9 +461,22 @@ class HyperswarmManager extends EventEmitter {
     const conn = this.connections.get(peerId);
     if (!conn) return;
     
-    // Notify about peer leaving for each topic
+    // Notify about peer leaving for each topic and remove from topic peer sets
     for (const topic of conn.topics) {
       this.emit('peer-left', { peerId, topic, identity: conn.identity });
+      const topicData = this.topics.get(topic);
+      if (topicData) {
+        topicData.peers.delete(peerId);
+      }
+    }
+    
+    // Clean up sync exchange tracking for this peer
+    if (this._syncExchangeCompleted) {
+      for (const key of this._syncExchangeCompleted) {
+        if (key.startsWith(peerId + ':')) {
+          this._syncExchangeCompleted.delete(key);
+        }
+      }
     }
     
     // Close socket if possible
@@ -516,12 +529,32 @@ class HyperswarmManager extends EventEmitter {
       peerInfo,
       authenticated: false,
       identity: null,
-      topics: new Set()
+      topics: new Set(),
+      lastPongReceived: Date.now() // Grace period for first heartbeat cycle
     });
+
+    // Per-connection buffer for newline-delimited JSON framing
+    // Use raw Buffer accumulation to avoid splitting multi-byte UTF-8 characters
+    const MAX_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB - prevent OOM from malicious peers
+    let dataBuffer = Buffer.alloc(0);
 
     // Handle incoming data
     socket.on('data', (data) => {
-      this._handleData(peerId, data);
+      dataBuffer = Buffer.concat([dataBuffer, data]);
+      if (dataBuffer.length > MAX_BUFFER_SIZE) {
+        console.error('[Hyperswarm] Buffer size exceeded for peer:', shortId, '- destroying connection');
+        socket.destroy();
+        dataBuffer = Buffer.alloc(0);
+        return;
+      }
+      let newlineIdx;
+      while ((newlineIdx = dataBuffer.indexOf(10)) !== -1) { // 10 = '\n'
+        const lineBuffer = dataBuffer.slice(0, newlineIdx);
+        dataBuffer = dataBuffer.slice(newlineIdx + 1);
+        if (lineBuffer.length > 0) {
+          this._handleData(peerId, lineBuffer.toString('utf8'));
+        }
+      }
     });
 
     // Handle connection close
@@ -529,9 +562,21 @@ class HyperswarmManager extends EventEmitter {
       console.log('[Hyperswarm] Connection closed:', shortId);
       const conn = this.connections.get(peerId);
       if (conn) {
-        // Notify about peer leaving for each topic
+        // Notify about peer leaving for each topic and remove from topic peer sets
         for (const topic of conn.topics) {
           this.emit('peer-left', { peerId, topic, identity: conn.identity });
+          const topicData = this.topics.get(topic);
+          if (topicData) {
+            topicData.peers.delete(peerId);
+          }
+        }
+      }
+      // Clean up sync exchange tracking for this peer
+      if (this._syncExchangeCompleted) {
+        for (const key of this._syncExchangeCompleted) {
+          if (key.startsWith(peerId + ':')) {
+            this._syncExchangeCompleted.delete(key);
+          }
         }
       }
       this.connections.delete(peerId);
@@ -552,8 +597,9 @@ class HyperswarmManager extends EventEmitter {
    * Handle incoming data from peer
    */
   _handleData(peerId, data) {
+    const dataStr = typeof data === 'string' ? data : data.toString();
     try {
-      const message = JSON.parse(data.toString());
+      const message = JSON.parse(dataStr);
       const conn = this.connections.get(peerId);
 
       if (!conn) return;
@@ -570,7 +616,7 @@ class HyperswarmManager extends EventEmitter {
       }
 
       // Check for duplicate messages (skip for identity which has its own replay protection)
-      if (message.type !== 'identity' && this._isDuplicateMessage(peerId, data.toString())) {
+      if (message.type !== 'identity' && this._isDuplicateMessage(peerId, dataStr)) {
         console.log(`[Hyperswarm] Dropping duplicate message from ${peerId.slice(0, 16)}: ${message.type}`);
         return;
       }
@@ -625,6 +671,11 @@ class HyperswarmManager extends EventEmitter {
           // Only add if not already in topics (prevents duplicates from reciprocal messages)
           const alreadyTracked = conn.topics.has(message.topic);
           conn.topics.add(message.topic);
+          // Track this peer in the topic's peer set
+          const joinedTopicData = this.topics.get(message.topic);
+          if (joinedTopicData) {
+            joinedTopicData.peers.add(peerId);
+          }
           
           if (!alreadyTracked) {
             this.emit('peer-joined', { peerId, topic: message.topic, identity: conn.identity });
@@ -659,6 +710,11 @@ class HyperswarmManager extends EventEmitter {
 
         case 'leave-topic':
           conn.topics.delete(message.topic);
+          // Remove peer from topic's peer set
+          const leftTopicData = this.topics.get(message.topic);
+          if (leftTopicData) {
+            leftTopicData.peers.delete(peerId);
+          }
           this.emit('peer-left', { peerId, topic: message.topic, identity: conn.identity });
           break;
 
@@ -743,7 +799,7 @@ class HyperswarmManager extends EventEmitter {
         console.warn('[Hyperswarm] Cannot send message: socket not writable');
         return false;
       }
-      socket.write(JSON.stringify(message));
+      socket.write(JSON.stringify(message) + '\n');
       return true;
     } catch (err) {
       console.error('[Hyperswarm] Failed to send message:', err.message);
@@ -1213,9 +1269,15 @@ class HyperswarmManager extends EventEmitter {
       this.heartbeatInterval = null;
     }
 
-    // Leave all topics
-    for (const topicHex of this.topics.keys()) {
-      await this.leaveTopic(topicHex);
+    // Leave all topics - call swarm.leave() directly since topics map stores hex strings,
+    // not workspace IDs, and leaveTopic expects hex strings but we need to clean up properly
+    for (const [topicHex, topicData] of this.topics) {
+      try {
+        await topicData.discovery.destroy();
+        this.swarm.leave(b4a.from(topicHex, 'hex'));
+      } catch (e) {
+        // Ignore cleanup errors during shutdown
+      }
     }
 
     // Close swarm
@@ -1224,6 +1286,9 @@ class HyperswarmManager extends EventEmitter {
     this.connections.clear();
     this.topics.clear();
     this.processedMessages.clear();
+    if (this._syncExchangeCompleted) {
+      this._syncExchangeCompleted.clear();
+    }
     this.isInitialized = false;
 
     console.log('[Hyperswarm] Destroyed');

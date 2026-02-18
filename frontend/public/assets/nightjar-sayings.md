@@ -413,3 +413,35 @@ Stealthy collaboration in progress
 Under cover of encryption
 In the shadows, writing light
 Dark mode, bright ideas!
+<!-- ====== NEW SAYINGS v1.7.3 ====== -->
+Spreadsheets: encrypted cells, free thoughts
+Inventory: every widget accounted for
+Ctrl+Z is self-care
+Auto-saved before you even worried
+Your edits arrived before you blinked
+CRDT: keeping the peace since forever
+Syncing across the void
+Workspace vibes: immaculate
+Documents forged in encryption
+Folders within folders within folders
+Nightjar: the bird that never sleeps
+Feathers ruffled? Try Ctrl+Z
+Nested deeper than my folder tree
+Crepuscular and proud of it
+Flying encrypted circles
+Peer found! High five!
+Connection forged in the mesh
+Hyperswarm: swarming responsibly
+Who needs a server when you have friends?
+Kanban: dragging tasks to victory
+Your workspace, your kingdom
+Editing at the speed of trust
+Merge completed before you noticed
+Another peer joins the flock!
+Swooping into your documents
+Nightjar says: back up your seed phrase
+The mesh remembers
+Whispers of encrypted data
+Tabs organized, mind at peace
+Local-first: your data never left home
+Synced and sealed with a key

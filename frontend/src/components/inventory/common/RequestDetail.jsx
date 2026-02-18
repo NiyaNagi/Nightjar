@@ -1,8 +1,9 @@
 /**
  * RequestDetail
  * 
- * Expanded detail panel for a single request. Shows timeline, notes, admin actions.
- * Used inline below an expanded RequestRow or in a modal/drawer.
+ * Expanded detail panel for a single request. Shows status banner, grouped info
+ * sections, interactive stage bar for Approved ↔ In Progress ↔ Shipped transitions,
+ * timeline, notes, and admin/producer actions.
  * 
  * See docs/INVENTORY_SYSTEM_SPEC.md §6.4.2, §6.6.2 (detail panels)
  */
@@ -13,6 +14,7 @@ import { useInventory } from '../../../contexts/InventoryContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { formatDate, generateId } from '../../../utils/inventoryValidation';
 import { getAddress, getWorkspaceKeyMaterial } from '../../../utils/inventoryAddressStore';
+import { decryptAddressReveal } from '../../../utils/addressCrypto';
 import { parseTrackingNumber, genericTrackingUrl } from '../../../utils/trackingLinks';
 import { resolveUserName } from '../../../utils/resolveUserName';
 import ChatButton from '../../common/ChatButton';
@@ -27,6 +29,15 @@ const TIMELINE_STEPS = [
   { key: 'deliveredAt', label: 'Delivered' },
 ];
 
+/** The three stages users can freely move between */
+const FULFILLMENT_STAGES = [
+  { key: 'approved', label: 'Approved', icon: '✓' },
+  { key: 'in_progress', label: 'In Progress', icon: '🔨' },
+  { key: 'shipped', label: 'Shipped', icon: '📦' },
+];
+
+const STAGE_INDEX = { approved: 0, in_progress: 1, shipped: 2 };
+
 export default function RequestDetail({
   request,
   isAdmin = false,
@@ -39,6 +50,8 @@ export default function RequestDetail({
   onCancel,
   onMarkShipped,
   onMarkInProgress,
+  onRevertToApproved,
+  onRevertToInProgress,
 }) {
   const { yInventoryRequests, yInventoryAuditLog, inventorySystemId, currentWorkspace, workspaceId, addressReveals, onStartChatWith, userIdentity: ctxIdentity } = useInventory();
   const { showToast } = useToast();
@@ -69,6 +82,24 @@ export default function RequestDetail({
     return () => { cancelled = true; };
   }, [isAdmin, request.id, inventorySystemId, currentWorkspace, workspaceId]);
 
+  // Producer: decrypt address reveal once approved/in-progress/shipped (reveal now persists)
+  useEffect(() => {
+    if (!isProducer || !request.id) return;
+    const reveal = addressReveals?.[request.id];
+    if (!reveal || !ctxIdentity?.curveSecretKey) return;
+    if (!['approved', 'in_progress', 'shipped'].includes(request.status)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const addr = await decryptAddressReveal(reveal, ctxIdentity.curveSecretKey);
+        if (!cancelled && addr) setFullAddress(addr);
+      } catch (err) {
+        console.warn('[RequestDetail] Could not decrypt address reveal:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isProducer, request.id, request.status, addressReveals, ctxIdentity]);
+
   const assignedName = request.assignedTo
     ? resolveUserName(collaborators, request.assignedTo)
     : null;
@@ -88,121 +119,247 @@ export default function RequestDetail({
   }, [adminNotes, request.id, yInventoryRequests, showToast]);
 
   const canCancel = ['open', 'pending_approval', 'claimed'].includes(request.status);
+  const showStageBar = ['approved', 'in_progress', 'shipped'].includes(request.status);
+  const canInteractStageBar = isAdmin || isProducer;
 
-  // Build timeline
-  const timelineEntries = TIMELINE_STEPS.filter(step => request[step.key]).map(step => ({
+  // Handle stage bar clicks
+  const handleStageClick = useCallback((targetStage) => {
+    if (!canInteractStageBar) return;
+    const currentIdx = STAGE_INDEX[request.status];
+    const targetIdx = STAGE_INDEX[targetStage];
+    if (currentIdx === undefined || targetIdx === undefined || currentIdx === targetIdx) return;
+
+    if (targetIdx > currentIdx) {
+      // Forward transition
+      if (targetStage === 'in_progress') {
+        onMarkInProgress?.(request);
+      } else if (targetStage === 'shipped') {
+        onMarkShipped?.(request, trackingNumber);
+      }
+    } else {
+      // Backward transition
+      if (targetStage === 'approved') {
+        onRevertToApproved?.(request);
+      } else if (targetStage === 'in_progress') {
+        onRevertToInProgress?.(request);
+      }
+    }
+  }, [request, canInteractStageBar, onMarkInProgress, onMarkShipped, onRevertToApproved, onRevertToInProgress, trackingNumber]);
+
+  // Build timeline (early non-interactive steps only)
+  const earlyTimelineEntries = TIMELINE_STEPS
+    .filter(step => step.key === 'requestedAt' || step.key === 'assignedAt')
+    .filter(step => request[step.key])
+    .map(step => ({ ...step, date: request[step.key] }));
+
+  // Full timeline for non-stage-bar statuses
+  const fullTimelineEntries = TIMELINE_STEPS.filter(step => request[step.key]).map(step => ({
     ...step,
     date: request[step.key],
   }));
 
+  // Render an address block (shared between admin and producer views)
+  const renderAddressBlock = (addr, label) => (
+    <div className="request-detail__field request-detail__field--full">
+      <span className="request-detail__label">{label}</span>
+      <div className="request-detail__address-block">
+        <p>{addr.name || addr.fullName || addr.recipientName}</p>
+        <p>{addr.line1 || addr.street1}</p>
+        {(addr.line2 || addr.street2) && <p>{addr.line2 || addr.street2}</p>}
+        <p>{addr.city}, {addr.state} {addr.zip || addr.zipCode}</p>
+        {addr.phone && <p>Phone: {addr.phone}</p>}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="request-detail">
+    <div className="request-detail" data-testid="request-detail">
+      {/* Header */}
       <div className="request-detail__header">
         <h3>
           {request.urgent && '⚡ '}Request #{request.id?.slice(4, 10)}
         </h3>
-        <StatusBadge status={request.status} />
         {onClose && (
-          <button className="request-detail__close" onClick={onClose}>✕</button>
+          <button className="request-detail__close" onClick={onClose} aria-label="Close">✕</button>
         )}
       </div>
 
-      <div className="request-detail__grid">
-        <div className="request-detail__field">
-          <span className="request-detail__label">Item</span>
-          <span>{request.catalogItemName}</span>
-        </div>
-        <div className="request-detail__field">
-          <span className="request-detail__label">Quantity</span>
-          <span>{request.quantity?.toLocaleString()} {request.unit || 'units'}</span>
-        </div>
-        <div className="request-detail__field">
-          <span className="request-detail__label">Location</span>
-          <span>{request.city}, {request.state}</span>
-        </div>
-        {isAdmin && fullAddress && (
-          <div className="request-detail__field request-detail__field--full">
-            <span className="request-detail__label">🔒 Full Address (admin only)</span>
-            <div className="request-detail__address-block">
-              <p>{fullAddress.name || fullAddress.fullName || fullAddress.recipientName}</p>
-              <p>{fullAddress.line1 || fullAddress.street1}</p>
-              {(fullAddress.line2 || fullAddress.street2) && <p>{fullAddress.line2 || fullAddress.street2}</p>}
-              <p>{fullAddress.city}, {fullAddress.state} {fullAddress.zip || fullAddress.zipCode}</p>
-              {fullAddress.phone && <p>Phone: {fullAddress.phone}</p>}
-            </div>
-          </div>
-        )}
-        <div className="request-detail__field">
-          <span className="request-detail__label">Requested by</span>
-          <span>
-            {requestedByName}
-            <ChatButton
-              publicKey={request.requestedBy}
-              name={requestedByName}
-              collaborators={collaborators}
-              onStartChatWith={onStartChatWith}
-              currentUserKey={currentUserKey}
-            />
-          </span>
-        </div>
-        {assignedName && (
+      {/* Status banner */}
+      <div className={`request-detail__status-banner request-detail__status-banner--${request.status}`}>
+        <StatusBadge status={request.status} />
+        {request.urgent && <span className="request-detail__urgent-flag">⚡ Urgent</span>}
+      </div>
+
+      {/* Request Info section */}
+      <div className="request-detail__section">
+        <div className="request-detail__section-title">Request Info</div>
+        <div className="request-detail__grid">
           <div className="request-detail__field">
-            <span className="request-detail__label">Assigned to</span>
-            <span>
-              {assignedName}
+            <span className="request-detail__label">Item</span>
+            <span className="request-detail__value">{request.catalogItemName}</span>
+          </div>
+          <div className="request-detail__field">
+            <span className="request-detail__label">Quantity</span>
+            <span className="request-detail__value">{request.quantity?.toLocaleString()} {request.unit || 'units'}</span>
+          </div>
+          {request.notes && (
+            <div className="request-detail__field request-detail__field--full">
+              <span className="request-detail__label">Notes</span>
+              <span className="request-detail__value">{request.notes}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Location section */}
+      <div className="request-detail__section">
+        <div className="request-detail__section-title">Location</div>
+        <div className="request-detail__grid">
+          <div className="request-detail__field">
+            <span className="request-detail__label">City / State</span>
+            <span className="request-detail__value">{request.city}, {request.state}</span>
+          </div>
+          {isAdmin && fullAddress && renderAddressBlock(fullAddress, '🔒 Full Address')}
+          {isProducer && fullAddress && renderAddressBlock(fullAddress, '📍 Shipping Address')}
+        </div>
+      </div>
+
+      {/* People section */}
+      <div className="request-detail__section">
+        <div className="request-detail__section-title">People</div>
+        <div className="request-detail__grid">
+          <div className="request-detail__field">
+            <span className="request-detail__label">Requested by</span>
+            <span className="request-detail__value">
+              {requestedByName}
               <ChatButton
-                publicKey={request.assignedTo}
-                name={assignedName}
+                publicKey={request.requestedBy}
+                name={requestedByName}
                 collaborators={collaborators}
                 onStartChatWith={onStartChatWith}
                 currentUserKey={currentUserKey}
               />
             </span>
           </div>
-        )}
-        {request.estimatedFulfillmentDate && (
-          <div className="request-detail__field">
-            <span className="request-detail__label">Est. Fulfillment</span>
-            <span>{formatDate(request.estimatedFulfillmentDate)}</span>
-          </div>
-        )}
-        {request.trackingNumber && (
-          <div className="request-detail__field">
-            <span className="request-detail__label">Tracking #</span>
-            <span>
-              {(() => {
-                const carrier = parseTrackingNumber(request.trackingNumber);
-                const url = carrier?.url || genericTrackingUrl(request.trackingNumber);
-                return (
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="request-detail__tracking-link">
-                    {carrier ? `${carrier.icon} ${carrier.carrier}: ` : ''}{request.trackingNumber} ↗
-                  </a>
-                );
-              })()}
-            </span>
-          </div>
-        )}
-        {request.notes && (
-          <div className="request-detail__field request-detail__field--full">
-            <span className="request-detail__label">Requestor Notes</span>
-            <span>{request.notes}</span>
-          </div>
-        )}
+          {assignedName && (
+            <div className="request-detail__field">
+              <span className="request-detail__label">Assigned to</span>
+              <span className="request-detail__value">
+                {assignedName}
+                <ChatButton
+                  publicKey={request.assignedTo}
+                  name={assignedName}
+                  collaborators={collaborators}
+                  onStartChatWith={onStartChatWith}
+                  currentUserKey={currentUserKey}
+                />
+              </span>
+            </div>
+          )}
+          {request.estimatedFulfillmentDate && (
+            <div className="request-detail__field">
+              <span className="request-detail__label">Est. Fulfillment</span>
+              <span className="request-detail__value">{formatDate(request.estimatedFulfillmentDate)}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Timeline */}
-      {timelineEntries.length > 0 && (
+      {/* Shipping section — tracking & fulfillment info */}
+      {(request.trackingNumber || showStageBar) && (
+        <div className="request-detail__section">
+          <div className="request-detail__section-title">Shipping</div>
+          <div className="request-detail__grid">
+            {request.trackingNumber && (
+              <div className="request-detail__field request-detail__field--full">
+                <span className="request-detail__label">Tracking #</span>
+                <span className="request-detail__value">
+                  {(() => {
+                    const carrier = parseTrackingNumber(request.trackingNumber);
+                    const url = carrier?.url || genericTrackingUrl(request.trackingNumber);
+                    return (
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="request-detail__tracking-link">
+                        {carrier ? `${carrier.icon} ${carrier.carrier}: ` : ''}{request.trackingNumber} ↗
+                      </a>
+                    );
+                  })()}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Stage Bar — Approved ↔ In Progress ↔ Shipped */}
+      {showStageBar && (
+        <div className="request-detail__stage-section">
+          {/* Early timeline checkmarks */}
+          {earlyTimelineEntries.length > 0 && (
+            <div className="request-detail__early-timeline">
+              {earlyTimelineEntries.map((entry, i) => (
+                <div key={entry.key} className="request-detail__early-step">
+                  <span className="request-detail__early-check">✓</span>
+                  <span className="request-detail__early-label">{entry.label}</span>
+                  <span className="request-detail__early-date">{formatDate(entry.date)}</span>
+                  {i < earlyTimelineEntries.length - 1 && (
+                    <span className="request-detail__early-connector">→</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Stage bar */}
+          <div className="request-detail__stage-bar" data-testid="stage-bar" role="group" aria-label="Fulfillment stage">
+            {FULFILLMENT_STAGES.map((stage, idx) => {
+              const currentIdx = STAGE_INDEX[request.status];
+              const isPast = idx < currentIdx;
+              const isActive = idx === currentIdx;
+              const isFuture = idx > currentIdx;
+              const isClickable = canInteractStageBar && !isActive;
+
+              let className = 'stage-btn';
+              if (isActive) className += ' stage-btn--active';
+              else if (isPast) className += ' stage-btn--past';
+              else className += ' stage-btn--future';
+              className += ` stage-btn--${stage.key}`;
+
+              return (
+                <button
+                  key={stage.key}
+                  className={className}
+                  onClick={() => isClickable && handleStageClick(stage.key)}
+                  disabled={!isClickable}
+                  aria-current={isActive ? 'step' : undefined}
+                  data-testid={`stage-btn-${stage.key}`}
+                  title={
+                    isActive ? `Current stage: ${stage.label}`
+                    : isClickable ? `Move to ${stage.label}`
+                    : stage.label
+                  }
+                >
+                  <span className="stage-btn__icon">{stage.icon}</span>
+                  <span className="stage-btn__label">{stage.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Read-only timeline for non-stage-bar statuses */}
+      {!showStageBar && fullTimelineEntries.length > 0 && (
         <div className="request-detail__timeline">
           <h4>Timeline</h4>
           <div className="request-timeline">
-            {timelineEntries.map((entry, i) => (
+            {fullTimelineEntries.map((entry, i) => (
               <div key={entry.key} className="request-timeline__step">
-                <div className={`request-timeline__dot ${i === timelineEntries.length - 1 ? 'current' : 'past'}`} />
+                <div className={`request-timeline__dot ${i === fullTimelineEntries.length - 1 ? 'current' : 'past'}`} />
                 <div className="request-timeline__info">
                   <span className="request-timeline__label">{entry.label}</span>
                   <span className="request-timeline__date">{formatDate(entry.date)}</span>
                 </div>
-                {i < timelineEntries.length - 1 && <div className="request-timeline__line" />}
+                {i < fullTimelineEntries.length - 1 && <div className="request-timeline__line" />}
               </div>
             ))}
           </div>
@@ -225,26 +382,25 @@ export default function RequestDetail({
 
       {/* Actions */}
       <div className="request-detail__actions">
+        {/* Pre-approval admin actions */}
         {isAdmin && (request.status === 'claimed' || request.status === 'pending_approval') && (
           <>
             <button className="btn-primary" onClick={() => onApprove?.(request)}>✓ Approve</button>
             <button className="btn-secondary btn-danger" onClick={() => onReject?.(request)}>✗ Reject</button>
-            <button className="btn-secondary" onClick={() => onReassign?.(request)}>→ Reassign</button>
+            <button className="btn-secondary" onClick={() => onReassign?.(request.id)}>→ Reassign</button>
           </>
         )}
-        {isProducer && request.status === 'approved' && onMarkInProgress && (
-          <button className="btn-secondary" onClick={() => onMarkInProgress?.(request)}>🔨 Mark In Progress</button>
-        )}
+
+        {/* Producer: inline AddressReveal when approved/in_progress */}
         {isProducer && (request.status === 'approved' || request.status === 'in_progress') && (
           <>
-            {/* Inline AddressReveal with shipping providers — spec §4.4 */}
             {addressReveals?.[request.id] ? (
               <div className="request-detail__address-reveal-inline">
                 <AddressReveal
                   requestId={request.id}
                   reveal={addressReveals[request.id]}
                   identity={ctxIdentity}
-                  onShipped={() => onMarkShipped?.(request, trackingNumber)}
+                  onShipped={() => onMarkShipped?.(request)}
                   onClose={onClose}
                 />
               </div>
@@ -267,8 +423,10 @@ export default function RequestDetail({
             )}
           </>
         )}
-        {canCancel && (
-          <button className="btn-secondary btn-danger" onClick={() => onCancel?.(request)}>Cancel Request</button>
+
+        {/* Cancel — early statuses only */}
+        {canCancel && onCancel && (
+          <button className="btn-secondary btn-danger" onClick={() => onCancel(request)}>Cancel Request</button>
         )}
       </div>
     </div>

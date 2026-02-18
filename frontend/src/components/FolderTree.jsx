@@ -18,7 +18,9 @@ function FolderItem({
   folder, 
   level = 0, 
   isSelected,
+  selectedFolderId,
   isExpanded,
+  expandedFolders,
   onSelect,
   onToggle,
   onContextMenu,
@@ -99,8 +101,10 @@ function FolderItem({
               key={child.id}
               folder={child}
               level={level + 1}
-              isSelected={isSelected === child.id}
-              isExpanded={false}
+              isSelected={selectedFolderId === child.id}
+              selectedFolderId={selectedFolderId}
+              isExpanded={expandedFolders?.has(child.id) || false}
+              expandedFolders={expandedFolders}
               onSelect={onSelect}
               onToggle={onToggle}
               onContextMenu={onContextMenu}
@@ -233,17 +237,15 @@ function FolderTreeItem({
 }) {
   const isSelected = selectedFolderId === folder.id;
   const isExpanded = expandedFolders.has(folder.id);
-  const hasChildren = folder.children && folder.children.length > 0;
   
   return (
     <FolderItem
-      folder={{
-        ...folder,
-        children: hasChildren && isExpanded ? folder.children : []
-      }}
+      folder={folder}
       level={level}
       isSelected={isSelected}
+      selectedFolderId={selectedFolderId}
       isExpanded={isExpanded}
+      expandedFolders={expandedFolders}
       onSelect={onSelect}
       onToggle={onToggle}
       onContextMenu={onContextMenu}

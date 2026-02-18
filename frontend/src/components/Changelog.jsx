@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import * as Y from 'yjs';
 import { getChangelog, getChangelogCount, getMaxEntriesSetting, setMaxEntriesSetting, clearChangelog, loadChangelogSync, saveChangelogSync } from '../utils/changelogStore';
+import { getTextFromFragment } from '../utils/yjsTextExtraction';
 import ChatButton from './common/ChatButton';
+import { useConfirmDialog } from './common/ConfirmDialog';
 import './Changelog.css';
 
 // Changelog entry structure
@@ -27,64 +29,6 @@ const base64ToUint8 = (str) => {
     } catch (e) {
         console.error('Failed to decode base64:', e);
         return null;
-    }
-};
-
-// Helper to get text content from XmlFragment using toDOM
-const getTextFromFragment = (fragment) => {
-    if (!fragment) return '';
-    try {
-        // Method 1: Try using toDOM if available
-        if (typeof fragment.toDOM === 'function') {
-            try {
-                const dom = fragment.toDOM();
-                return dom.textContent || '';
-            } catch (e) {
-                // Fall through to other methods
-            }
-        }
-        
-        // Method 2: Traverse the Yjs structure directly
-        let text = '';
-        
-        const traverse = (node) => {
-            if (!node) return;
-            
-            // String content
-            if (typeof node === 'string') {
-                text += node;
-                return;
-            }
-            
-            // XmlText - has _start property
-            if (node._start !== undefined) {
-                let item = node._start;
-                while (item) {
-                    if (item.content && typeof item.content.str === 'string') {
-                        text += item.content.str;
-                    }
-                    item = item.right;
-                }
-                return;
-            }
-            
-            // XmlElement or XmlFragment - has toArray
-            if (typeof node.toArray === 'function') {
-                const children = node.toArray();
-                children.forEach(child => traverse(child));
-                // Add newline after block elements
-                if (node.nodeName && ['paragraph', 'heading', 'blockquote'].includes(node.nodeName)) {
-                    text += '\n';
-                }
-                return;
-            }
-        };
-        
-        traverse(fragment);
-        return text.trim();
-    } catch (e) {
-        console.warn('Failed to extract text from fragment:', e);
-        return '';
     }
 };
 
@@ -203,6 +147,7 @@ const ChangelogPanel = ({
     const [showSettings, setShowSettings] = useState(false);
     const [maxEntries, setMaxEntries] = useState(0); // 0 = unlimited
     const [isLoading, setIsLoading] = useState(false);
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
     // Load changelog from IndexedDB
     const loadChangelogAsync = useCallback(async () => {
@@ -301,14 +246,20 @@ const ChangelogPanel = ({
     }, [maxEntries]);
 
     const handleClearHistory = useCallback(async () => {
-        if (window.confirm('Are you sure you want to clear all changelog history for this document? This cannot be undone.')) {
+        const confirmed = await confirm({
+            title: 'Clear All History',
+            message: 'Are you sure you want to clear all changelog history for this document? This cannot be undone.',
+            confirmText: 'Clear History',
+            variant: 'danger'
+        });
+        if (confirmed) {
             await clearChangelog(docId);
             setChangelog([]);
             setTotalCount(0);
             setSelectedEntry(null);
             setSelectedIndex(null);
         }
-    }, [docId]);
+    }, [docId, confirm]);
 
     const formatTime = (timestamp) => {
         const date = new Date(timestamp);
@@ -331,6 +282,7 @@ const ChangelogPanel = ({
 
     return (
         <>
+            {ConfirmDialogComponent}
             <div className="changelog-backdrop" onClick={onClose} />
             <div className="changelog-panel" role="dialog" aria-modal="true" aria-label="Document changelog">
                 <div className="changelog-header">

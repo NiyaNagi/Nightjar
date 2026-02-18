@@ -9,6 +9,7 @@ import { generateId } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
 import { useCopyFeedback } from '../../../hooks/useCopyFeedback';
 import { formatAddressForCopy, getEnabledProviders } from '../../../utils/shippingProviders';
+import { useToast } from '../../../contexts/ToastContext';
 import './AddressReveal.css';
 
 /**
@@ -16,6 +17,7 @@ import './AddressReveal.css';
  */
 export default function AddressReveal({ requestId, reveal, identity, onShipped, onClose }) {
   const ctx = useInventory();
+  const { showToast } = useToast();
   const [address, setAddress] = useState(null);
   const [decryptError, setDecryptError] = useState(null);
   const { copied, copyToClipboard } = useCopyFeedback();
@@ -40,12 +42,12 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
   }, [ctx.yInventorySystems, ctx.inventorySystemId]);
 
   useEffect(() => {
-    if (!reveal || !identity?.privateKey) return;
+    if (!reveal || !identity?.curveSecretKey) return;
     let cancelled = false;
 
     (async () => {
       try {
-        const addr = await decryptAddressReveal(reveal, identity.privateKey);
+        const addr = await decryptAddressReveal(reveal, identity.curveSecretKey);
         if (!cancelled) setAddress(addr);
       } catch (err) {
         console.error('[AddressReveal] Decryption failed:', err);
@@ -94,8 +96,7 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
         }
       }
 
-      // Delete the address reveal from Yjs
-      ctx.yAddressReveals?.delete(requestId);
+      // Address reveal is kept until delivered/cancelled so backward transitions work
 
       // Audit log
       ctx.yInventoryAuditLog?.push([{
@@ -125,6 +126,7 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
       onShipped?.(requestId);
     } catch (err) {
       console.error('[AddressReveal] Error marking shipped:', err);
+      showToast('Failed to mark as shipped: ' + err.message, 'error');
     } finally {
       setShipping(false);
     }
@@ -275,7 +277,7 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
               if (idx !== -1) {
                 const req = arr[idx];
                 yArr.delete(idx, 1);
-                yArr.insert(idx, [{ ...req, status: 'open', assignedTo: null, claimedBy: null, assignedAt: null, claimedAt: null, approvedAt: null, approvedBy: null }]);
+                yArr.insert(idx, [{ ...req, status: 'open', assignedTo: null, claimedBy: null, assignedAt: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
                 // Notify the requestor that the producer unclaimed
                 if (req.requestedBy) {
                   pushNotification(ctx.yInventoryNotifications, {
@@ -307,7 +309,7 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
         </button>
 
         <p className="ar-privacy-note">
-          After marking shipped, the encrypted address will be permanently deleted from the network.
+          The encrypted address is automatically deleted when the request is delivered or cancelled.
         </p>
       </div>
     </div>

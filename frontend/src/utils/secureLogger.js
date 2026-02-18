@@ -14,7 +14,7 @@ const SENSITIVE_PATTERNS = [
   { pattern: /\b[A-Za-z0-9+/=]{43,44}\b/g, replacement: '[REDACTED_KEY_B64]' },
   
   // Mnemonics (typically 12-24 words)
-  { pattern: /\b(\w+ ){11,23}\w+\b/g, replacement: '[REDACTED_MNEMONIC]' },
+  { pattern: /\b([a-z]{2,8} ){11,23}[a-z]{2,8}\b/g, replacement: '[REDACTED_MNEMONIC]' },
   
   // Private keys in various formats
   { pattern: /privateKey['":\s]+['"A-Za-z0-9+/=]+/gi, replacement: 'privateKey: [REDACTED]' },

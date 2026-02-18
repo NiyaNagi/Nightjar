@@ -86,6 +86,9 @@ export default function CreateFolderDialog({
   const handleClose = () => {
     setName('');
     setError('');
+    setIcon('📁');
+    setColor(null);
+    setSelectedParent(parentFolderId);
     onClose?.();
   };
   
@@ -199,7 +202,7 @@ export default function CreateFolderDialog({
             <button 
               type="submit" 
               className="create-folder__btn create-folder__btn--primary"
-              disabled={isCreating || !hasPermission}
+              disabled={isCreating || !hasPermission || !name.trim()}
             >
               {isCreating ? 'Creating...' : 'Create Folder'}
             </button>

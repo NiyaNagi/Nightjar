@@ -70,7 +70,10 @@ export function FileStorageProvider({
   /** Add a file record to Yjs */
   const addFile = useCallback((fileRecord) => {
     if (!yStorageFiles) return;
-    yStorageFiles.push([fileRecord]);
+    const doc = yStorageFiles.doc;
+    const doPush = () => yStorageFiles.push([fileRecord]);
+    if (doc) doc.transact(doPush);
+    else doPush();
   }, [yStorageFiles]);
 
   /** Update a file record in Yjs (find by ID, delete, re-insert) */
@@ -102,105 +105,174 @@ export function FileStorageProvider({
   /** Permanently remove a file from Yjs */
   const permanentlyDeleteFile = useCallback((fileId) => {
     if (!yStorageFiles) return;
-    const arr = yStorageFiles.toArray();
-    const index = arr.findIndex(f => f.id === fileId);
-    if (index !== -1) {
-      yStorageFiles.delete(index, 1);
-    }
-    // Also remove chunk availability entries
-    if (yChunkAvailability) {
-      const keysToDelete = [];
-      yChunkAvailability.forEach((_, key) => {
-        if (key.startsWith(fileId + ':')) keysToDelete.push(key);
-      });
-      keysToDelete.forEach(k => yChunkAvailability.delete(k));
-    }
+    const doc = yStorageFiles.doc;
+    const doDelete = () => {
+      const arr = yStorageFiles.toArray();
+      const index = arr.findIndex(f => f.id === fileId);
+      if (index !== -1) {
+        yStorageFiles.delete(index, 1);
+      }
+      // Also remove chunk availability entries
+      if (yChunkAvailability) {
+        const keysToDelete = [];
+        yChunkAvailability.forEach((_, key) => {
+          if (key.startsWith(fileId + ':')) keysToDelete.push(key);
+        });
+        keysToDelete.forEach(k => yChunkAvailability.delete(k));
+      }
+    };
+    if (doc) doc.transact(doDelete);
+    else doDelete();
   }, [yStorageFiles, yChunkAvailability]);
 
   /** Add a folder */
   const addFolder = useCallback((folderRecord) => {
     if (!yStorageFolders) return;
-    yStorageFolders.set(folderRecord.id, folderRecord);
+    const doc = yStorageFolders.doc;
+    const doAdd = () => yStorageFolders.set(folderRecord.id, folderRecord);
+    if (doc) doc.transact(doAdd);
+    else doAdd();
   }, [yStorageFolders]);
 
   /** Update a folder */
   const updateFolder = useCallback((folderId, updates) => {
     if (!yStorageFolders) return;
-    const existing = yStorageFolders.get(folderId);
-    if (!existing) return;
-    yStorageFolders.set(folderId, { ...existing, ...updates, updatedAt: Date.now() });
+    const doc = yStorageFolders.doc;
+    const doUpdate = () => {
+      const existing = yStorageFolders.get(folderId);
+      if (!existing) return;
+      yStorageFolders.set(folderId, { ...existing, ...updates, updatedAt: Date.now() });
+    };
+    if (doc) doc.transact(doUpdate);
+    else doUpdate();
   }, [yStorageFolders]);
 
   /** Soft-delete a folder and its contents recursively */
   const deleteFolderRef = useRef(null);
   const deleteFolder = useCallback((folderId) => {
-    const now = Date.now();
-    updateFolder(folderId, { deletedAt: now });
-    // Recursively delete subfolders
-    const allFolders = [];
-    if (yStorageFolders) {
-      yStorageFolders.forEach((folder, id) => {
-        allFolders.push({ ...folder, id: folder.id || id });
-      });
-    }
-    const childFolderIds = allFolders
-      .filter(f => f.parentId === folderId && !f.deletedAt)
-      .map(f => f.id);
-    for (const childId of childFolderIds) {
-      deleteFolderRef.current(childId);
-    }
-    // Delete files in this folder — iterate in reverse to avoid index shift
-    if (yStorageFiles) {
-      const arr = yStorageFiles.toArray();
-      for (let idx = arr.length - 1; idx >= 0; idx--) {
-        const f = arr[idx];
-        if (f.folderId === folderId && !f.deletedAt) {
-          const updated = { ...f, deletedAt: now };
-          yStorageFiles.delete(idx, 1);
-          yStorageFiles.insert(idx, [updated]);
+    const doc = yStorageFiles?.doc || yStorageFolders?.doc;
+    const doDelete = () => {
+      const now = Date.now();
+      updateFolder(folderId, { deletedAt: now });
+      // Recursively delete subfolders
+      const allFolders = [];
+      if (yStorageFolders) {
+        yStorageFolders.forEach((folder, id) => {
+          allFolders.push({ ...folder, id: folder.id || id });
+        });
+      }
+      const childFolderIds = allFolders
+        .filter(f => f.parentId === folderId && !f.deletedAt)
+        .map(f => f.id);
+      for (const childId of childFolderIds) {
+        deleteFolderRef.current?.(childId);
+      }
+      // Delete files in this folder — iterate in reverse to avoid index shift
+      if (yStorageFiles) {
+        const arr = yStorageFiles.toArray();
+        for (let idx = arr.length - 1; idx >= 0; idx--) {
+          const f = arr[idx];
+          if (f.folderId === folderId && !f.deletedAt) {
+            const updated = { ...f, deletedAt: now };
+            yStorageFiles.delete(idx, 1);
+            yStorageFiles.insert(idx, [updated]);
+          }
         }
       }
-    }
+    };
+    if (doc) doc.transact(doDelete);
+    else doDelete();
   }, [updateFolder, yStorageFolders, yStorageFiles]);
   deleteFolderRef.current = deleteFolder;
 
   /** Restore a folder and its contents recursively (spec §5.5) */
   const restoreFolderRef = useRef(null);
-  const restoreFolder = useCallback((folderId) => {
-    updateFolder(folderId, { deletedAt: null });
-    // Recursively restore child subfolders
-    const allFolders = [];
-    if (yStorageFolders) {
-      yStorageFolders.forEach((folder, id) => {
-        allFolders.push({ ...folder, id: folder.id || id });
-      });
-    }
-    const childFolderIds = allFolders
-      .filter(f => f.parentId === folderId && f.deletedAt)
-      .map(f => f.id);
-    for (const childId of childFolderIds) {
-      restoreFolderRef.current(childId);
-    }
-    // Restore files in this folder — iterate in reverse to avoid index shift
-    if (yStorageFiles) {
-      const arr = yStorageFiles.toArray();
-      for (let idx = arr.length - 1; idx >= 0; idx--) {
-        const f = arr[idx];
-        if (f.folderId === folderId && f.deletedAt) {
-          const updated = { ...f, deletedAt: null };
-          yStorageFiles.delete(idx, 1);
-          yStorageFiles.insert(idx, [updated]);
+  const restoreFolder = useCallback((folderId, parentDeletedAt) => {
+    const doc = yStorageFiles?.doc || yStorageFolders?.doc;
+    const TOLERANCE_MS = 5000; // 5s tolerance for batch-deleted timestamps
+    const doRestore = () => {
+      // Read the folder's own deletedAt to use for matching children
+      let folderDeletedAt = parentDeletedAt;
+      if (!folderDeletedAt && yStorageFolders) {
+        const folder = yStorageFolders.get(folderId);
+        folderDeletedAt = folder?.deletedAt;
+      }
+      updateFolder(folderId, { deletedAt: null });
+      // Recursively restore child subfolders whose deletedAt matches
+      const allFolders = [];
+      if (yStorageFolders) {
+        yStorageFolders.forEach((folder, id) => {
+          allFolders.push({ ...folder, id: folder.id || id });
+        });
+      }
+      const childFolderIds = allFolders
+        .filter(f => f.parentId === folderId && f.deletedAt &&
+          (!folderDeletedAt || Math.abs(f.deletedAt - folderDeletedAt) <= TOLERANCE_MS))
+        .map(f => f.id);
+      for (const childId of childFolderIds) {
+        restoreFolderRef.current(childId, folderDeletedAt);
+      }
+      // Restore files in this folder — only those deleted at the same time
+      if (yStorageFiles) {
+        const arr = yStorageFiles.toArray();
+        for (let idx = arr.length - 1; idx >= 0; idx--) {
+          const f = arr[idx];
+          if (f.folderId === folderId && f.deletedAt &&
+            (!folderDeletedAt || Math.abs(f.deletedAt - folderDeletedAt) <= TOLERANCE_MS)) {
+            const updated = { ...f, deletedAt: null };
+            yStorageFiles.delete(idx, 1);
+            yStorageFiles.insert(idx, [updated]);
+          }
         }
       }
-    }
+    };
+    if (doc) doc.transact(doRestore);
+    else doRestore();
   }, [updateFolder, yStorageFolders, yStorageFiles]);
   restoreFolderRef.current = restoreFolder;
 
-  /** Permanently remove a folder from Yjs */
+  /** Permanently remove a folder and its contents from Yjs */
+  const permanentlyDeleteFolderRef = useRef(null);
   const permanentlyDeleteFolder = useCallback((folderId) => {
     if (!yStorageFolders) return;
-    yStorageFolders.delete(folderId);
-  }, [yStorageFolders]);
+    const doc = yStorageFiles?.doc || yStorageFolders?.doc;
+    const doPermanentDelete = () => {
+      // Recursively delete child subfolders
+      const allFolders = [];
+      yStorageFolders.forEach((folder, id) => {
+        allFolders.push({ ...folder, id: folder.id || id });
+      });
+      const childFolderIds = allFolders
+        .filter(f => f.parentId === folderId)
+        .map(f => f.id);
+      for (const childId of childFolderIds) {
+        permanentlyDeleteFolderRef.current?.(childId);
+      }
+      // Permanently delete files in this folder
+      if (yStorageFiles) {
+        const arr = yStorageFiles.toArray();
+        for (let idx = arr.length - 1; idx >= 0; idx--) {
+          if (arr[idx].folderId === folderId) {
+            const fileId = arr[idx].id;
+            yStorageFiles.delete(idx, 1);
+            // Also remove chunk availability entries
+            if (yChunkAvailability) {
+              const keysToDelete = [];
+              yChunkAvailability.forEach((_, key) => {
+                if (key.startsWith(fileId + ':')) keysToDelete.push(key);
+              });
+              keysToDelete.forEach(k => yChunkAvailability.delete(k));
+            }
+          }
+        }
+      }
+      // Delete the folder record itself
+      yStorageFolders.delete(folderId);
+    };
+    if (doc) doc.transact(doPermanentDelete);
+    else doPermanentDelete();
+  }, [yStorageFolders, yStorageFiles, yChunkAvailability]);
+  permanentlyDeleteFolderRef.current = permanentlyDeleteFolder;
 
   /** Toggle favorite for a file */
   const toggleFavorite = useCallback((fileId, userPublicKey) => {
@@ -237,7 +309,8 @@ export function FileStorageProvider({
   /** Add audit log entry */
   const addAuditEntry = useCallback((action, targetType, targetId, targetName, summary, metadata = {}) => {
     if (!yFileAuditLog) return;
-    yFileAuditLog.push([{
+    const doc = yFileAuditLog.doc;
+    const doPush = () => yFileAuditLog.push([{
       id: generateAuditId(),
       fileStorageId,
       timestamp: Date.now(),
@@ -250,6 +323,8 @@ export function FileStorageProvider({
       summary,
       metadata,
     }]);
+    if (doc) doc.transact(doPush);
+    else doPush();
   }, [yFileAuditLog, fileStorageId, userIdentity]);
 
   /** Update file storage system settings */

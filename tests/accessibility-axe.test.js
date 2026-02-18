@@ -145,7 +145,7 @@ describe('Axe-Core Accessibility Tests', () => {
       expect(ratio).toBeGreaterThanOrEqual(WCAG_AA_NORMAL);
     });
 
-    test('light theme text-muted on white meets WCAG AA for large text (3:1)', () => {
+    test('light theme text-muted/text-tertiary on white meets WCAG AA for large text (3:1)', () => {
       const ratio = getContrastRatio('#6b7280', '#ffffff');
       expect(ratio).toBeGreaterThanOrEqual(WCAG_AA_LARGE);
     });

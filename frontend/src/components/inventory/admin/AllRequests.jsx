@@ -81,8 +81,8 @@ export default function AllRequests() {
 
     // Sort
     result.sort((a, b) => {
-      let va = a[sortField];
-      let vb = b[sortField];
+      let va = a[sortField] ?? '';
+      let vb = b[sortField] ?? '';
       if (typeof va === 'string') va = va.toLowerCase();
       if (typeof vb === 'string') vb = vb.toLowerCase();
       if (va < vb) return sortDir === 'asc' ? -1 : 1;
@@ -104,6 +104,7 @@ export default function AllRequests() {
       setSortField(field);
       setSortDir('asc');
     }
+    setPage(1);
   };
 
   const handleRowClick = (req) => {
@@ -112,12 +113,16 @@ export default function AllRequests() {
 
   // Admin actions on detail panel
   const handleApprove = useCallback(async (req) => {
-    const items = yInventoryRequests.toArray();
-    const idx = items.findIndex(r => r.id === req.id);
-    if (idx === -1) return;
-    const updated = { ...items[idx], status: 'approved', approvedAt: Date.now(), approvedBy: ctx.userIdentity?.publicKeyBase62, updatedAt: Date.now() };
-    yInventoryRequests.delete(idx, 1);
-    yInventoryRequests.insert(idx, [updated]);
+    let updated;
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      updated = { ...items[idx], status: 'approved', approvedAt: Date.now(), approvedBy: ctx.userIdentity?.publicKeyBase62, updatedAt: Date.now() };
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [updated]);
+    });
+    if (!updated) return;
 
     // Create address reveal for the assigned producer (mirrors ApprovalQueue logic)
     if (updated.assignedTo) {
@@ -137,8 +142,8 @@ export default function AllRequests() {
         // 2. Fallback: decrypt pending address from non-owner requestor
         if (!addr && ctx.yPendingAddresses) {
           const pendingEntries = ctx.yPendingAddresses.get(req.id);
-          if (pendingEntries && ctx.userIdentity?.privateKey) {
-            addr = await decryptPendingAddress(pendingEntries, adminHex, ctx.userIdentity.privateKey);
+          if (pendingEntries && ctx.userIdentity?.curveSecretKey) {
+            addr = await decryptPendingAddress(pendingEntries, adminHex, ctx.userIdentity.curveSecretKey);
             // Store locally for future reference, then clean up pending entry
             if (addr) {
               try {
@@ -152,9 +157,13 @@ export default function AllRequests() {
           }
         }
 
-        if (addr && ctx.userIdentity?.privateKey) {
-          const reveal = await createAddressReveal(addr, producerHex, ctx.userIdentity.privateKey, adminHex);
+        if (addr && ctx.userIdentity?.curveSecretKey) {
+          const reveal = await createAddressReveal(addr, producerHex, ctx.userIdentity.curveSecretKey, adminHex);
           ctx.yAddressReveals?.set(req.id, { ...reveal, inventorySystemId });
+        } else if (!addr) {
+          console.warn('[AllRequests] Address reveal not created — address not found in local store or pending addresses for request', req.id?.slice(0, 8));
+        } else if (!ctx.userIdentity?.curveSecretKey) {
+          console.warn('[AllRequests] Address reveal not created — admin encryption key not available');
         }
       } catch (err) {
         console.warn('[AllRequests] Could not create address reveal:', err);
@@ -169,32 +178,59 @@ export default function AllRequests() {
       message: `Your request for ${req.catalogItemName} has been approved`,
       relatedId: req.id,
     });
+    if (updated.assignedTo && updated.assignedTo !== req.requestedBy) {
+      pushNotification(yInventoryNotifications, {
+        inventorySystemId,
+        recipientId: updated.assignedTo,
+        type: 'request_approved',
+        message: `Request for ${req.catalogItemName} you are assigned to has been approved`,
+        relatedId: req.id,
+      });
+    }
     showToast(`#${req.id?.slice(4, 10)} approved`, 'success');
   }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx]);
 
   const handleReject = useCallback((req) => {
-    const items = yInventoryRequests.toArray();
-    const idx = items.findIndex(r => r.id === req.id);
-    if (idx === -1) return;
-    yInventoryRequests.delete(idx, 1);
-    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'open', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
+    let originalAssignedTo;
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      originalAssignedTo = items[idx].assignedTo;
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [{ ...items[idx], status: 'open', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
+    });
     yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_rejected', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} rejected`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
     pushNotification(yInventoryNotifications, {
       inventorySystemId,
       recipientId: req.requestedBy,
       type: 'request_rejected',
-      message: `Your request for ${req.catalogItemName} was rejected`,
+      message: `Your request for ${req.catalogItemName} has been returned to the open pool`,
       relatedId: req.id,
     });
+    // Notify the assigned producer (matching ApprovalQueue pattern)
+    if (originalAssignedTo) {
+      pushNotification(yInventoryNotifications, {
+        inventorySystemId,
+        recipientId: originalAssignedTo,
+        type: 'request_rejected',
+        message: `Request for ${req.catalogItemName} you claimed was rejected`,
+        relatedId: req.id,
+      });
+    }
     showToast(`#${req.id?.slice(4, 10)} returned to Open`, 'success');
   }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
 
   const handleCancel = useCallback((req) => {
-    const items = yInventoryRequests.toArray();
-    const idx = items.findIndex(r => r.id === req.id);
-    if (idx === -1) return;
-    yInventoryRequests.delete(idx, 1);
-    yInventoryRequests.insert(idx, [{ ...items[idx], status: 'cancelled', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [{ ...items[idx], status: 'cancelled', assignedTo: null, assignedAt: null, claimedBy: null, claimedAt: null, approvedAt: null, approvedBy: null, updatedAt: Date.now() }]);
+    });
+    // Terminal state: clean up address reveal
+    ctx.yAddressReveals?.delete(req.id);
     yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_cancelled', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} cancelled`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
     pushNotification(yInventoryNotifications, {
       inventorySystemId,
@@ -204,6 +240,74 @@ export default function AllRequests() {
       relatedId: req.id,
     });
     showToast(`#${req.id?.slice(4, 10)} cancelled`, 'success');
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
+
+  // ── Stage transition handlers (admin) ──
+
+  const handleMarkInProgress = useCallback((req) => {
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [{ ...items[idx], status: 'in_progress', inProgressAt: Date.now(), updatedAt: Date.now() }]);
+    });
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_in_progress', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} marked in progress by admin`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
+    pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.requestedBy, type: 'request_in_progress', message: `Your request for ${req.catalogItemName} is now in progress`, relatedId: req.id });
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.assignedTo, type: 'request_in_progress', message: `Request for ${req.catalogItemName} is now in progress`, relatedId: req.id });
+    }
+    showToast(`#${req.id?.slice(4, 10)} → In Progress`, 'success');
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
+
+  const handleMarkShipped = useCallback((req, trackingNumber) => {
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      const updates = { status: 'shipped', shippedAt: Date.now(), updatedAt: Date.now() };
+      if (trackingNumber) updates.trackingNumber = trackingNumber;
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [{ ...items[idx], ...updates }]);
+    });
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_shipped', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} marked shipped by admin`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
+    pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.requestedBy, type: 'request_shipped', message: `Your request for ${req.catalogItemName} has been shipped`, relatedId: req.id });
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.assignedTo, type: 'request_shipped', message: `Request for ${req.catalogItemName} has been shipped`, relatedId: req.id });
+    }
+    showToast(`#${req.id?.slice(4, 10)} → Shipped`, 'success');
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
+
+  const handleRevertToApproved = useCallback((req) => {
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [{ ...items[idx], status: 'approved', shippedAt: null, inProgressAt: null, trackingNumber: null, updatedAt: Date.now() }]);
+    });
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_reverted_approved', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} reverted to approved by admin`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
+    pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.requestedBy, type: 'status_change', message: `Your request for ${req.catalogItemName} was reverted to approved`, relatedId: req.id });
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.assignedTo, type: 'status_change', message: `Request for ${req.catalogItemName} was reverted to approved`, relatedId: req.id });
+    }
+    showToast(`#${req.id?.slice(4, 10)} → Approved`, 'success');
+  }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
+
+  const handleRevertToInProgress = useCallback((req) => {
+    yInventoryRequests.doc.transact(() => {
+      const items = yInventoryRequests.toArray();
+      const idx = items.findIndex(r => r.id === req.id);
+      if (idx === -1) return;
+      yInventoryRequests.delete(idx, 1);
+      yInventoryRequests.insert(idx, [{ ...items[idx], status: 'in_progress', shippedAt: null, trackingNumber: null, updatedAt: Date.now() }]);
+    });
+    yInventoryAuditLog.push([{ id: generateId('aud-'), inventorySystemId, action: 'request_reverted_in_progress', targetId: req.id, targetType: 'request', summary: `Request ${req.id?.slice(0, 8)} reverted to in progress by admin`, actorId: ctx.userIdentity?.publicKeyBase62 || 'unknown', actorRole: 'owner', timestamp: Date.now() }]);
+    pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.requestedBy, type: 'status_change', message: `Your request for ${req.catalogItemName} was reverted to in progress`, relatedId: req.id });
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(yInventoryNotifications, { inventorySystemId, recipientId: req.assignedTo, type: 'status_change', message: `Request for ${req.catalogItemName} was reverted to in progress`, relatedId: req.id });
+    }
+    showToast(`#${req.id?.slice(4, 10)} → In Progress`, 'success');
   }, [yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, yInventoryNotifications, ctx.userIdentity]);
 
   // Unique states appearing in requests
@@ -292,6 +396,10 @@ export default function AllRequests() {
                         onApprove={handleApprove}
                         onReject={handleReject}
                         onCancel={handleCancel}
+                        onMarkInProgress={handleMarkInProgress}
+                        onMarkShipped={handleMarkShipped}
+                        onRevertToApproved={handleRevertToApproved}
+                        onRevertToInProgress={handleRevertToInProgress}
                       />
                     </td>
                   </tr>
@@ -307,7 +415,7 @@ export default function AllRequests() {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {totalPages > 1 && filtered.length > 0 && (
         <div className="all-requests__pagination">
           <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
           <div className="all-requests__page-btns">

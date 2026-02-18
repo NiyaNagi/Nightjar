@@ -15,6 +15,7 @@ import useFileUpload from '../../hooks/useFileUpload';
 import useFileDownload from '../../hooks/useFileDownload';
 import useFileTransfer from '../../hooks/useFileTransfer';
 import { useFileTransferContext } from '../../contexts/FileTransferContext';
+import { useWorkspaces } from '../../contexts/WorkspaceContext';
 import { getStoredKeyChain } from '../../utils/keyDerivation';
 import { getExtension, getFileTypeCategory } from '../../utils/fileTypeCategories';
 import { generateFileId, generateFolderId, fileExistsInFolder } from '../../utils/fileStorageValidation';
@@ -220,12 +221,15 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
     return new Set(activeFiles.filter(f => f.favoritedBy?.includes(userPublicKey)).map(f => f.id));
   }, [activeFiles, userPublicKey]);
 
-  // Role
+  // Role – incorporate workspace-level permissions so viewers can't write
+  const { canEdit: workspaceCanEdit } = useWorkspaces();
   const role = useMemo(() => {
+    // If the workspace permission is viewer, override to 'viewer' regardless
+    if (!workspaceCanEdit) return 'viewer';
     if (!currentSystem || !userIdentity) return 'collaborator';
     if (currentSystem.createdBy === userPublicKey) return 'admin';
     return 'collaborator';
-  }, [currentSystem, userIdentity, userPublicKey]);
+  }, [currentSystem, userIdentity, userPublicKey, workspaceCanEdit]);
 
   // Settings from currentSystem
   const settings = useMemo(() => currentSystem?.settings || {}, [currentSystem]);
@@ -312,13 +316,23 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
 
   // Move file
   const handleMoveFile = useCallback((fileId, destFolderId) => {
+    // Validate target folder exists (guard against concurrent deletion)
+    if (destFolderId && !activeFolders.find(f => f.id === destFolderId)) {
+      console.warn('[FileStorage] Target folder no longer exists, moving to root instead');
+      destFolderId = null;
+    }
     const file = activeFiles.find(f => f.id === fileId);
     updateFile(fileId, { folderId: destFolderId || null });
     addAuditEntry('move', 'file', fileId, file?.name || fileId, `Moved to ${destFolderId || 'Root'}`);
-  }, [updateFile, addAuditEntry, activeFiles]);
+  }, [updateFile, addAuditEntry, activeFiles, activeFolders]);
 
   // Move folder
   const handleMoveFolder = useCallback((folderId, destParentId) => {
+    // Validate target parent folder exists (guard against concurrent deletion)
+    if (destParentId && !activeFolders.find(f => f.id === destParentId)) {
+      console.warn('[FileStorage] Target parent folder no longer exists, moving to root instead');
+      destParentId = null;
+    }
     const folder = activeFolders.find(f => f.id === folderId);
     updateFolder(folderId, { parentId: destParentId || null });
     addAuditEntry('move', 'folder', folderId, folder?.name || folderId, `Moved to ${destParentId || 'Root'}`);

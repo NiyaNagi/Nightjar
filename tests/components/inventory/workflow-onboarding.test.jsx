@@ -130,7 +130,7 @@ const ADMIN_IDENTITY = {
   publicKeyBase62: 'adminKey123',
   displayName: 'Admin Alice',
   name: 'Admin Alice',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 // ── Shared Yjs mock instances ─────────────────────────────────────────────

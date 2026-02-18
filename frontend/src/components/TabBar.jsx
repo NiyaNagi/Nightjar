@@ -38,6 +38,7 @@ const TabBar = ({
     onProfileChange,
     isFullscreen,
     onToggleFullscreen,
+    onOpenSearch,
     documents = [], // Added for color lookups
     folders = [], // Added for color lookups
     collaboratorsByDocument = {} // Map of documentId -> [{ name, color, icon }]
@@ -73,7 +74,7 @@ const TabBar = ({
             const docColor = doc?.color;
             const hasColor = folderColor || docColor;
             const backgroundStyle = hasColor
-                ? { background: createColorGradient(folderColor, docColor, 0.25) }
+                ? { background: createColorGradient(folderColor, docColor, 0.35) }
                 : {};
             
             // Get dynamic text color based on dominant background color
@@ -156,6 +157,18 @@ const TabBar = ({
             </div>
             
             <div className="tab-bar-actions">
+                {/* Search */}
+                <button
+                    type="button"
+                    className="tab-bar-btn"
+                    onClick={onOpenSearch}
+                    title="Search everything (Ctrl+K)"
+                    aria-label="Open search palette"
+                    data-testid="search-btn"
+                >
+                    🔍 Search
+                </button>
+                
                 {/* Do Not Disturb Toggle */}
                 <DoNotDisturbToggle />
                 

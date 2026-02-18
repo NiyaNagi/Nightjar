@@ -20,6 +20,9 @@ import { generateId } from './inventoryValidation';
  * @param {string} opts.message - Human-readable message
  * @param {string} [opts.relatedId] - Related entity ID (request, catalog item, etc.)
  */
+// Dedup window: suppress duplicate notifications within this period (ms)
+const DEDUP_WINDOW_MS = 5000;
+
 export function pushNotification(yNotifications, {
   inventorySystemId,
   recipientId,
@@ -28,6 +31,20 @@ export function pushNotification(yNotifications, {
   relatedId = null,
 }) {
   if (!yNotifications) return;
+  
+  // Bug #114: Deduplicate identical notifications within a short window
+  // to prevent notification spam from rapid Yjs sync events
+  const now = Date.now();
+  const existing = yNotifications.toArray();
+  const isDuplicate = existing.some(n =>
+    n.recipientId === recipientId &&
+    n.inventorySystemId === inventorySystemId &&
+    n.type === type &&
+    n.relatedId === relatedId &&
+    (now - n.createdAt) < DEDUP_WINDOW_MS
+  );
+  if (isDuplicate) return;
+  
   yNotifications.push([{
     id: generateId('notif-'),
     inventorySystemId,
@@ -36,7 +53,7 @@ export function pushNotification(yNotifications, {
     message,
     relatedId,
     read: false,
-    createdAt: Date.now(),
+    createdAt: now,
   }]);
 }
 
@@ -64,14 +81,19 @@ export function markNotificationRead(yNotifications, notificationId) {
  */
 export function markAllRead(yNotifications, recipientId, inventorySystemId) {
   if (!yNotifications) return;
-  const arr = yNotifications.toArray();
-  for (let i = arr.length - 1; i >= 0; i--) {
-    const n = arr[i];
-    if (n.recipientId === recipientId && n.inventorySystemId === inventorySystemId && !n.read) {
-      yNotifications.delete(i, 1);
-      yNotifications.insert(i, [{ ...n, read: true }]);
+  const doc = yNotifications.doc;
+  const doMarkAll = () => {
+    const arr = yNotifications.toArray();
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const n = arr[i];
+      if (n.recipientId === recipientId && n.inventorySystemId === inventorySystemId && !n.read) {
+        yNotifications.delete(i, 1);
+        yNotifications.insert(i, [{ ...n, read: true }]);
+      }
     }
-  }
+  };
+  if (doc) doc.transact(doMarkAll);
+  else doMarkAll();
 }
 
 /**

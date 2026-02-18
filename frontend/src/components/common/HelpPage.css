@@ -1,0 +1,355 @@
+/**
+ * HelpPage Styles
+ * 
+ * Full-screen documentation overlay with sidebar TOC.
+ * Bambu Labs wiki-inspired design.
+ */
+
+.help-page-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: var(--z-modal);
+  padding: 20px;
+}
+
+.help-page-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  background: var(--bg-primary, #1f2937);
+  border: 1px solid var(--border-color, #374151);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+/* Header */
+.help-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color, #374151);
+  flex-shrink: 0;
+}
+
+.help-page__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary, #f9fafb);
+}
+
+.help-page__close {
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--text-secondary, #9ca3af);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.help-page__close:hover {
+  background: var(--hover-bg, #374151);
+  color: var(--text-primary, #f9fafb);
+}
+
+/* Body */
+.help-page__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* TOC Sidebar */
+.help-page__toc {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border-color, #374151);
+  background: var(--bg-secondary, #111827);
+  overflow-y: auto;
+}
+
+.help-page__toc-item {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-secondary, #9ca3af);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.help-page__toc-item:hover {
+  background: var(--hover-bg, #374151);
+  color: var(--text-primary, #f9fafb);
+}
+
+.help-page__toc-item--active {
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.15));
+  color: var(--accent-color, #6366f1);
+}
+
+/* Content */
+.help-page__content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.help-page__section-title {
+  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #f9fafb);
+}
+
+.help-page__content-heading {
+  margin: 24px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #f9fafb);
+}
+
+.help-page__content-heading:first-child {
+  margin-top: 0;
+}
+
+.help-page__content-paragraph {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text-secondary, #c4c4cc);
+  line-height: 1.7;
+}
+
+.help-page__content-list {
+  margin: 0 0 16px;
+  padding-left: 24px;
+  font-size: 14px;
+  color: var(--text-secondary, #c4c4cc);
+  line-height: 1.8;
+}
+
+.help-page__content-list li {
+  margin-bottom: 6px;
+}
+
+.help-page__content-steps {
+  margin: 0 0 16px;
+  padding-left: 24px;
+  font-size: 14px;
+  color: var(--text-secondary, #c4c4cc);
+  line-height: 1.8;
+  counter-reset: step-counter;
+  list-style: none;
+}
+
+.help-page__content-steps li {
+  margin-bottom: 8px;
+  counter-increment: step-counter;
+  position: relative;
+  padding-left: 8px;
+}
+
+.help-page__content-steps li::before {
+  content: counter(step-counter) ".";
+  font-weight: 600;
+  color: var(--accent-color, #6366f1);
+  position: absolute;
+  left: -24px;
+}
+
+/* Tip callout */
+.help-page__tip {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.help-page__tip-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.help-page__tip p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary, #c4c4cc);
+  line-height: 1.5;
+}
+
+/* Shortcuts table */
+.help-page__shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+
+.help-page__shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #111827);
+  border-radius: 6px;
+}
+
+.help-page__shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.help-page__shortcut-keys kbd {
+  padding: 3px 7px;
+  background: var(--hover-bg, #374151);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-primary, #f9fafb);
+}
+
+.help-page__shortcut-plus {
+  font-size: 11px;
+  color: var(--text-tertiary, #6b7280);
+}
+
+.help-page__shortcut-action {
+  font-size: 13px;
+  color: var(--text-secondary, #9ca3af);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .help-page-modal {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .help-page__body {
+    flex-direction: column;
+  }
+
+  .help-page__toc {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color, #374151);
+    padding: 8px;
+    display: flex;
+    gap: 4px;
+  }
+
+  .help-page__toc-item {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* Light mode */
+:root[data-theme="light"] .help-page-modal {
+  background: var(--bg-primary, #ffffff);
+  border-color: var(--border-color, #e5e7eb);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme="light"] .help-page__header {
+  border-bottom-color: var(--border-color, #e5e7eb);
+}
+
+:root[data-theme="light"] .help-page__title {
+  color: var(--text-primary, #111827);
+}
+
+:root[data-theme="light"] .help-page__close {
+  color: var(--text-secondary, #6b7280);
+}
+
+:root[data-theme="light"] .help-page__close:hover {
+  background: var(--hover-bg, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+:root[data-theme="light"] .help-page__toc {
+  background: var(--bg-secondary, #f9fafb);
+  border-right-color: var(--border-color, #e5e7eb);
+}
+
+:root[data-theme="light"] .help-page__toc-item {
+  color: var(--text-secondary, #4b5563);
+}
+
+:root[data-theme="light"] .help-page__toc-item:hover {
+  background: var(--hover-bg, #f3f4f6);
+  color: var(--text-primary, #111827);
+}
+
+:root[data-theme="light"] .help-page__toc-item--active {
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.1));
+  color: var(--accent-color, #6366f1);
+}
+
+:root[data-theme="light"] .help-page__section-title {
+  color: var(--text-primary, #111827);
+}
+
+:root[data-theme="light"] .help-page__content-heading {
+  color: var(--text-primary, #111827);
+}
+
+:root[data-theme="light"] .help-page__content-paragraph {
+  color: var(--text-secondary, #4b5563);
+}
+
+:root[data-theme="light"] .help-page__content-list {
+  color: var(--text-secondary, #4b5563);
+}
+
+:root[data-theme="light"] .help-page__content-steps {
+  color: var(--text-secondary, #4b5563);
+}
+
+:root[data-theme="light"] .help-page__tip {
+  background: rgba(99, 102, 241, 0.06);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+:root[data-theme="light"] .help-page__tip p {
+  color: var(--text-secondary, #4b5563);
+}
+
+:root[data-theme="light"] .help-page__shortcut-row {
+  background: var(--bg-secondary, #f9fafb);
+}
+
+:root[data-theme="light"] .help-page__shortcut-keys kbd {
+  background: var(--bg-tertiary, #f3f4f6);
+  border: 1px solid var(--border-color, #e5e7eb);
+  color: var(--text-primary, #111827);
+}
+
+:root[data-theme="light"] .help-page__shortcut-action {
+  color: var(--text-secondary, #4b5563);
+}

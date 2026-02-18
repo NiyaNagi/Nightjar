@@ -35,7 +35,7 @@ export default function OnboardingWizard({ onComplete }) {
   // Step 2: first catalog item
   const [firstItem, setFirstItem] = useState({
     name: '',
-    unit: 'units',
+    unitName: 'units',
     quantityMin: 1,
     quantityMax: '',
     quantityStep: 1,
@@ -93,7 +93,7 @@ export default function OnboardingWizard({ onComplete }) {
       id: generateId('cat-'),
       inventorySystemId,
       name: firstItem.name.trim(),
-      unit: firstItem.unit.trim(),
+      unitName: firstItem.unitName.trim(),
       quantityMin: Number(firstItem.quantityMin),
       quantityMax: noMax ? null : Number(firstItem.quantityMax),
       quantityStep: Number(firstItem.quantityStep),
@@ -240,8 +240,8 @@ export default function OnboardingWizard({ onComplete }) {
                   Unit *
                   <input
                     type="text"
-                    value={firstItem.unit}
-                    onChange={e => setFirstItem({ ...firstItem, unit: e.target.value })}
+                    value={firstItem.unitName}
+                    onChange={e => setFirstItem({ ...firstItem, unitName: e.target.value })}
                     placeholder="e.g., units, boxes"
                   />
                 </label>

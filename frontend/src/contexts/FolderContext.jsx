@@ -334,7 +334,7 @@ export function FolderProvider({ children }) {
   // Load folders from sidecar for current workspace
   useEffect(() => {
     // Only request when connected and have a workspace
-    if (connected && metaSocket && currentWorkspaceId) {
+    if (connected && metaSocket && currentWorkspaceId && metaSocket.readyState === WebSocket.OPEN) {
       console.log('[FolderContext] Requesting folder list for workspace:', currentWorkspaceId);
       metaSocket.send(JSON.stringify({ 
         type: 'list-folders', 
@@ -365,7 +365,7 @@ export function FolderProvider({ children }) {
           });
           setDocumentFolders(prev => ({ ...prev, ...(data.documentFolders || {}) }));
         } else if (data.type === 'trash-list') {
-          setTrashedDocuments(data.documents || []);
+          setTrashedDocuments(data.documents || data.trash || []);
         } else if (data.type === 'folder-created') {
           // Only add if not already present (avoid duplicates from optimistic update)
           setAllFolders(prev => {
@@ -399,7 +399,10 @@ export function FolderProvider({ children }) {
             [data.documentId]: data.folderId
           }));
         } else if (data.type === 'document-trashed') {
-          setTrashedDocuments(prev => [...prev, data.document]);
+          setTrashedDocuments(prev => {
+            if (prev.some(d => d.id === data.document.id)) return prev;
+            return [...prev, data.document];
+          });
         } else if (data.type === 'document-restored') {
           setTrashedDocuments(prev => prev.filter(d => d.id !== data.documentId));
         }
@@ -417,6 +420,11 @@ export function FolderProvider({ children }) {
     if (!currentWorkspaceId) {
       console.error('Cannot create folder without a workspace');
       return null;
+    }
+    
+    // Enforce name length limit
+    if (name && name.length > 200) {
+      name = name.slice(0, 200);
     }
     
     const folderId = generateFolderId();

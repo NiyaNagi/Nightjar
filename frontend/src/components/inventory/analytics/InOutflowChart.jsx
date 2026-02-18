@@ -86,14 +86,23 @@ export default function InOutflowChart({ requests, dateRange, granularity = 'day
 
 function bucketize(requests, from, to, granularity) {
   const buckets = new Map();
-  const msPerBucket = granularity === 'month' ? 30 * 86400000
-    : granularity === 'week' ? 7 * 86400000
-    : 86400000;
 
-  // Create empty buckets
-  for (let t = from; t <= to; t += msPerBucket) {
-    const label = formatBucketLabel(t, granularity);
-    buckets.set(label, { label, created: 0, fulfilled: 0, gap: 0 });
+  // Create empty buckets with proper boundaries
+  if (granularity === 'month') {
+    // Use actual month boundaries to avoid drift
+    const start = new Date(from);
+    start.setDate(1); start.setHours(0, 0, 0, 0);
+    const end = new Date(to);
+    for (let d = new Date(start); d <= end; d.setMonth(d.getMonth() + 1)) {
+      const label = formatBucketLabel(d.getTime(), granularity);
+      buckets.set(label, { label, created: 0, fulfilled: 0, gap: 0 });
+    }
+  } else {
+    const msPerBucket = granularity === 'week' ? 7 * 86400000 : 86400000;
+    for (let t = from; t <= to; t += msPerBucket) {
+      const label = formatBucketLabel(t, granularity);
+      buckets.set(label, { label, created: 0, fulfilled: 0, gap: 0 });
+    }
   }
 
   for (const r of requests) {
@@ -124,7 +133,8 @@ function formatBucketLabel(ts, granularity) {
   if (granularity === 'week') {
     // ISO week start (Monday)
     const start = new Date(d);
-    start.setDate(start.getDate() - start.getDay() + 1);
+    const dow = start.getDay() || 7;
+    start.setDate(start.getDate() - dow + 1);
     return `${start.getMonth() + 1}/${start.getDate()}`;
   }
   return `${d.getMonth() + 1}/${d.getDate()}`;

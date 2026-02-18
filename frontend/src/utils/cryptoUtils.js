@@ -20,16 +20,17 @@ export function timingSafeEqual(a, b) {
     return false;
   }
   
-  const lengthsMatch = a.length === b.length;
+  const aLen = a.length;
+  const bLen = b.length;
   // Compare against b or a zero-filled dummy to maintain constant time
-  const compareTo = lengthsMatch ? b : new Uint8Array(a.length);
+  if (aLen !== bLen) b = new Uint8Array(aLen);
   
   let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a[i] ^ compareTo[i];
+  for (let i = 0; i < aLen; i++) {
+    result |= a[i] ^ b[i];
   }
   
-  return result === 0 && lengthsMatch;
+  return result === 0 && aLen === bLen;
 }
 
 /**
@@ -100,6 +101,67 @@ export function secureWipeString(obj, key) {
     // Replace with empty string to allow GC of original
     obj[key] = '';
   }
+}
+
+/**
+ * Validate a hex string
+ * 
+ * @param {string} hex - String to validate
+ * @returns {boolean} True if valid hex string
+ */
+export function isValidHex(hex) {
+  if (typeof hex !== 'string') return false;
+  return /^[0-9a-fA-F]*$/.test(hex) && hex.length % 2 === 0;
+}
+
+/**
+ * Convert a hex string to Uint8Array
+ * 
+ * @param {string} hex - Hex string to convert
+ * @returns {Uint8Array} Byte array
+ */
+export function hexToBytes(hex) {
+  if (!isValidHex(hex)) {
+    throw new Error(`Invalid hex string: expected even-length hex characters`);
+  }
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return bytes;
+}
+
+/**
+ * Convert a hex string to a NaCl secretbox key (32 bytes) with length validation
+ * 
+ * @param {string} hex - Hex string to convert (must be 64 hex chars = 32 bytes)
+ * @param {number} expectedLength - Expected key length in bytes (default: 32)
+ * @returns {Uint8Array} Key bytes
+ * @throws {Error} If resulting key is not the expected length
+ */
+export function hexToKey(hex, expectedLength = nacl.secretbox.keyLength) {
+  const bytes = hexToBytes(hex);
+  if (bytes.length !== expectedLength) {
+    throw new Error(
+      `Invalid key length: expected ${expectedLength} bytes but got ${bytes.length} bytes (from ${hex.length} hex chars)`
+    );
+  }
+  return bytes;
+}
+
+/**
+ * Convert Uint8Array to hex string
+ * 
+ * @param {Uint8Array} bytes - Byte array to convert
+ * @returns {string} Hex string
+ */
+export function bytesToHex(bytes) {
+  if (!(bytes instanceof Uint8Array)) {
+    throw new Error('Expected Uint8Array');
+  }
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -186,7 +248,7 @@ export function safeJsonParse(json, defaultValue = null) {
     
     // Protect against prototype pollution
     if (parsed && typeof parsed === 'object') {
-      sanitizeObject(parsed);
+      return sanitizeObject(parsed);
     }
     
     return parsed;
@@ -214,30 +276,22 @@ export function sanitizeObject(obj, seen = new Set()) {
   }
   seen.add(obj);
   
-  // Handle arrays
+  // Handle arrays - return new array
   if (Array.isArray(obj)) {
-    for (let i = 0; i < obj.length; i++) {
-      obj[i] = sanitizeObject(obj[i], seen);
-    }
-    return obj;
+    return obj.map(item => sanitizeObject(item, seen));
   }
   
-  // Remove dangerous properties
+  // Clone object, skipping dangerous properties
   const dangerous = ['__proto__', 'constructor', 'prototype'];
-  for (const prop of dangerous) {
-    if (Object.prototype.hasOwnProperty.call(obj, prop)) {
-      delete obj[prop];
-    }
-  }
-  
-  // Recursively sanitize child objects
+  const clone = {};
   for (const key of Object.keys(obj)) {
-    if (typeof obj[key] === 'object' && obj[key] !== null) {
-      obj[key] = sanitizeObject(obj[key], seen);
-    }
+    if (dangerous.includes(key)) continue;
+    clone[key] = (typeof obj[key] === 'object' && obj[key] !== null)
+      ? sanitizeObject(obj[key], seen)
+      : obj[key];
   }
   
-  return obj;
+  return clone;
 }
 
 /**
@@ -297,8 +351,9 @@ export function isValidUrl(url, allowedProtocols = ['https:'], allowedHosts = []
       return false;
     }
     
-    // Normalize hostname - remove IPv6 brackets for pattern matching
-    const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+    // Normalize hostname - remove IPv6 brackets and strip IPv6-mapped IPv4 prefix
+    let hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+    hostname = hostname.replace(/^::ffff:/i, '');
     
     // Reject localhost/internal IPs in production
     const blockedPatterns = [
@@ -400,6 +455,10 @@ export default Object.freeze({
   secureWipeString,
   isValidKey,
   isValidNonce,
+  isValidHex,
+  hexToBytes,
+  hexToKey,
+  bytesToHex,
   generateSecureKey,
   generateSecureNonce,
   constantTimeSelect,

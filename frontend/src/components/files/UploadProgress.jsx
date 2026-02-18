@@ -36,8 +36,8 @@ export default function UploadProgress({ uploads, onClear, onClearCompleted }) {
   };
 
   const getProgress = (upload) => {
-    if (upload.totalChunks === 0) return 0;
-    return Math.round((upload.chunksProcessed / upload.totalChunks) * 100);
+    if (!upload.totalChunks || upload.totalChunks === 0) return 0;
+    return Math.min(100, Math.round((upload.chunksProcessed / upload.totalChunks) * 100));
   };
 
   return (

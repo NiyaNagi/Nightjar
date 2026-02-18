@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
 import TrashView from '../../../frontend/src/components/files/TrashView';
 
 const baseTrashedFile = (overrides = {}) => ({
@@ -45,8 +45,7 @@ const defaultProps = {
 
 describe('TrashView', () => {
   beforeEach(() => {
-    // TrashView uses window.confirm for permanent delete and empty trash
-    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    // TrashView now uses useConfirmDialog instead of window.confirm
   });
   afterEach(() => jest.clearAllMocks());
 
@@ -73,10 +72,14 @@ describe('TrashView', () => {
     expect(defaultProps.onRestoreFile).toHaveBeenCalledWith('tf1');
   });
 
-  it('should call onPermanentlyDeleteFile when delete button clicked', () => {
+  it('should call onPermanentlyDeleteFile when delete button clicked', async () => {
     render(<TrashView {...defaultProps} trashedFiles={[baseTrashedFile()]} />);
     fireEvent.click(screen.getByTestId('trash-perm-delete-tf1'));
-    expect(defaultProps.onPermanentlyDeleteFile).toHaveBeenCalledWith('tf1');
+    // ConfirmDialog is now rendered — click the confirm button within the dialog
+    const dialog = await waitFor(() => screen.getByRole('alertdialog'));
+    const confirmBtn = within(dialog).getAllByRole('button').find(b => b.textContent === 'Delete Forever');
+    fireEvent.click(confirmBtn);
+    await waitFor(() => expect(defaultProps.onPermanentlyDeleteFile).toHaveBeenCalledWith('tf1'));
   });
 
   it('should call onRestoreFolder for folder restore', () => {
@@ -85,10 +88,13 @@ describe('TrashView', () => {
     expect(defaultProps.onRestoreFolder).toHaveBeenCalledWith('td1');
   });
 
-  it('should call onPermanentlyDeleteFolder when folder delete button clicked', () => {
+  it('should call onPermanentlyDeleteFolder when folder delete button clicked', async () => {
     render(<TrashView {...defaultProps} trashedFolders={[baseTrashedFolder()]} />);
     fireEvent.click(screen.getByTestId('trash-perm-delete-td1'));
-    expect(defaultProps.onPermanentlyDeleteFolder).toHaveBeenCalledWith('td1');
+    const dialog = await waitFor(() => screen.getByRole('alertdialog'));
+    const confirmBtn = within(dialog).getAllByRole('button').find(b => b.textContent === 'Delete Forever');
+    fireEvent.click(confirmBtn);
+    await waitFor(() => expect(defaultProps.onPermanentlyDeleteFolder).toHaveBeenCalledWith('td1'));
   });
 
   it('should support checkbox selection', () => {
@@ -105,10 +111,13 @@ describe('TrashView', () => {
     expect(screen.getByTestId('trash-empty')).toBeInTheDocument();
   });
 
-  it('should call onEmptyTrash when Empty Trash clicked', () => {
+  it('should call onEmptyTrash when Empty Trash clicked', async () => {
     render(<TrashView {...defaultProps} trashedFiles={[baseTrashedFile()]} />);
     fireEvent.click(screen.getByTestId('trash-empty'));
-    expect(defaultProps.onEmptyTrash).toHaveBeenCalled();
+    const dialog = await waitFor(() => screen.getByRole('alertdialog'));
+    const confirmBtn = within(dialog).getAllByRole('button').find(b => b.textContent === 'Empty Trash');
+    fireEvent.click(confirmBtn);
+    await waitFor(() => expect(defaultProps.onEmptyTrash).toHaveBeenCalled());
   });
 
   it('should merge and sort files and folders by deletedAt', () => {

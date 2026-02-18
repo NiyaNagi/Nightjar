@@ -28,6 +28,7 @@ export default function FileDetailPanel({
   onToggleFavorite,
   collaborators,
   isFavorite = false,
+  canEdit = true,
 }) {
   const [editingDescription, setEditingDescription] = useState(false);
   const [description, setDescription] = useState('');
@@ -110,9 +111,11 @@ export default function FileDetailPanel({
             <button className="file-detail-action-btn" onClick={() => onToggleFavorite?.(file.id)} data-testid="detail-favorite">
               {isFavorite ? '⭐ Unfavorite' : '☆ Favorite'}
             </button>
-            <button className="file-detail-action-btn file-detail-action-danger" onClick={() => onDelete?.(file.id)} data-testid="detail-delete">
-              🗑️ Delete
-            </button>
+            {canEdit && (
+              <button className="file-detail-action-btn file-detail-action-danger" onClick={() => onDelete?.(file.id)} data-testid="detail-delete">
+                🗑️ Delete
+              </button>
+            )}
           </div>
 
           {/* Metadata */}
@@ -162,7 +165,7 @@ export default function FileDetailPanel({
           <div className="file-detail-section">
             <div className="file-detail-section-header">
               <h5 className="file-detail-section-title">Description</h5>
-              {!editingDescription && (
+              {!editingDescription && canEdit && (
                 <button className="file-detail-edit-btn" onClick={() => setEditingDescription(true)} data-testid="detail-edit-desc">
                   ✏️
                 </button>
@@ -196,21 +199,25 @@ export default function FileDetailPanel({
               {(file.tags || []).map(tag => (
                 <span key={tag} className="file-detail-tag">
                   {tag}
-                  <button onClick={() => handleRemoveTag(tag)} className="file-detail-tag-remove" data-testid={`detail-tag-remove-${tag}`}>✕</button>
+                  {canEdit && (
+                    <button onClick={() => handleRemoveTag(tag)} className="file-detail-tag-remove" data-testid={`detail-tag-remove-${tag}`}>✕</button>
+                  )}
                 </span>
               ))}
-              <div className="file-detail-tag-input-wrap">
-                <input
-                  className="file-detail-tag-input"
-                  value={tagInput}
-                  onChange={e => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  placeholder="Add tag..."
-                  maxLength={50}
-                  data-testid="detail-tag-input"
-                />
-                <button className="file-detail-tag-add" onClick={handleAddTag} data-testid="detail-tag-add">+</button>
-              </div>
+              {canEdit && (
+                <div className="file-detail-tag-input-wrap">
+                  <input
+                    className="file-detail-tag-input"
+                    value={tagInput}
+                    onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                    placeholder="Add tag..."
+                    maxLength={50}
+                    data-testid="detail-tag-input"
+                  />
+                  <button className="file-detail-tag-add" onClick={handleAddTag} data-testid="detail-tag-add">+</button>
+                </div>
+              )}
             </div>
           </div>
 

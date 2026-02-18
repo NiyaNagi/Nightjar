@@ -35,6 +35,7 @@ const identity = require('./identity');
 // OPTIMIZATION: Lazy-load mesh since it creates Hyperswarm at import
 let MeshParticipant = null;
 const { ensureSSLCert, getCertInfo } = require('./ssl-cert');
+const { extractDocumentText } = require('./utils/yjsTextExtraction');
 // OPTIMIZATION: Lazy-load UPnP - it probes the network at require time
 let upnpMapper = null;
 function getUPnPMapper() {
@@ -171,11 +172,15 @@ function sanitizeId(id) {
     if (id.length === 0 || id.length > MAX_ID_LENGTH) return null;
     
     // Only allow safe characters
-    const safePattern = /^[a-zA-Z0-9_\-\.]+$/;
+    const safePattern = /^[a-zA-Z0-9_\-\.:]+$/;
     if (!safePattern.test(id)) return null;
     
     // Reject path traversal
     if (id.includes('..') || id.includes('./') || id.includes('/.')) return null;
+    
+    // Strip leading dots to prevent hidden file creation or directory traversal edge cases
+    id = id.replace(/^\.+/, '');
+    if (id.length === 0) return null;
     
     return id;
 }
@@ -405,19 +410,6 @@ const dbReady = db.open().then(() => {
 
 console.log(`[Sidecar] Initializing LevelDB at ${DB_PATH}...`);
 
-// Add logging to the db.open() promise
-db.open().then(() => {
-    console.log(`[Sidecar] LevelDB opened successfully at ${DB_PATH}`);
-    return true;
-}).catch(e => {
-    if (e.code === 'LEVEL_DATABASE_ALREADY_OPEN') {
-        console.log(`[Sidecar] LevelDB already open at ${DB_PATH}`);
-        return true;
-    }
-    console.error('[Sidecar] Failed to open LevelDB:', e);
-    throw e;
-});
-
 console.log('[Sidecar] Database setup completed, ready to start servers');
 
 // --- P2P Message Protocol ---
@@ -522,7 +514,7 @@ async function persistUpdate(docName, update, origin) {
         if (DEBUG_MODE) console.log(`[Sidecar] Encrypted size: ${encrypted?.length}`);
         
         // Use docName as prefix for proper per-document storage
-        const dbKey = `${docName}:${Date.now().toString()}`;
+        const dbKey = `${docName}:${Date.now().toString()}-${Math.random().toString(36).slice(2, 8)}`;
         await withDbTimeout(db.put(dbKey, encrypted), `put ${dbKey}`);
         if (DEBUG_MODE) console.log(`[Sidecar] Persisted update for document: ${docName} (${update.length} bytes) with key: ${dbKey}`);
         
@@ -586,6 +578,13 @@ async function loadPersistedData(docName, doc, key) {
         
         // Skip if not legacy or p2p data (already handled above)
         if (!isLegacy && !isP2P) continue;
+        
+        // Filter P2P entries: only apply updates belonging to this document
+        // P2P keys have format "p2p:<docName>:<id>" — skip entries for other documents
+        if (isP2P) {
+            const p2pDocName = dbKey.split(':')[1];
+            if (p2pDocName && p2pDocName !== docName) continue;
+        }
         
         if (DEBUG_MODE) console.log(`[Sidecar] Legacy/P2P key: ${dbKey}, isLegacy: ${isLegacy}, isP2P: ${isP2P}`);
         const decrypted = decryptUpdate(value, key);
@@ -1564,6 +1563,65 @@ async function handleMetadataMessage(ws, parsed) {
             ws.send(JSON.stringify({ type: 'document-list', documents: filteredDocuments }));
             break;
         
+        case 'index-documents': {
+            // Index closed documents for search – loads from LevelDB, extracts text
+            const docsToIndex = parsed.documents || [];
+            console.log(`[Sidecar] Indexing ${docsToIndex.length} documents for search...`);
+            const results = [];
+            for (const { id, type } of docsToIndex) {
+                try {
+                    const key = getKeyForDocument(id);
+                    if (!key) { results.push({ docId: id, text: '', type }); continue; }
+                    const ydoc = new Y.Doc();
+                    await loadPersistedData(id, ydoc, key);
+                    const text = extractDocumentText(ydoc, type);
+                    ydoc.destroy();
+                    results.push({ docId: id, text: text || '', type });
+                } catch (e) {
+                    console.warn(`[Sidecar] Index error for ${id}:`, e.message);
+                    results.push({ docId: id, text: '', type });
+                }
+            }
+            ws.send(JSON.stringify({ type: 'index-results', results }));
+            console.log(`[Sidecar] Indexed ${results.length} documents`);
+            break;
+        }
+        
+        case 'search-documents': {
+            // Quick server-side search for a query across indexed text
+            const searchQuery = (parsed.query || '').toLowerCase();
+            const searchLimit = parsed.limit || 50;
+            if (!searchQuery) {
+                ws.send(JSON.stringify({ type: 'search-results', results: [] }));
+                break;
+            }
+            // Load all docs from LevelDB, extract text, and check for substring match
+            const searchDocs = parsed.documents || [];
+            const searchResults = [];
+            for (const { id, type } of searchDocs) {
+                try {
+                    const key = getKeyForDocument(id);
+                    if (!key) continue;
+                    const ydoc = new Y.Doc();
+                    await loadPersistedData(id, ydoc, key);
+                    const text = extractDocumentText(ydoc, type);
+                    ydoc.destroy();
+                    if (text && text.toLowerCase().includes(searchQuery)) {
+                        const idx = text.toLowerCase().indexOf(searchQuery);
+                        const start = Math.max(0, idx - 40);
+                        const end = Math.min(text.length, idx + searchQuery.length + 40);
+                        let snippet = text.slice(start, end).replace(/\n+/g, ' ');
+                        if (start > 0) snippet = '…' + snippet;
+                        if (end < text.length) snippet += '…';
+                        searchResults.push({ docId: id, type, snippet });
+                    }
+                } catch (e) { /* skip */ }
+                if (searchResults.length >= searchLimit) break;
+            }
+            ws.send(JSON.stringify({ type: 'search-results', results: searchResults }));
+            break;
+        }
+        
         case 'toggle-tor':
             const enable = payload?.enable ?? !torEnabled;
             console.log(`[Sidecar] Toggle Tor: ${enable ? 'enabling' : 'disabling'}`);
@@ -1992,7 +2050,12 @@ async function handleMetadataMessage(ws, parsed) {
         // --- Trash Management ---
         case 'list-trash':
             try {
-                const trashItems = await loadTrashList();
+                const trashWsId = workspaceId || payload?.workspaceId;
+                if (!trashWsId) {
+                    ws.send(JSON.stringify({ type: 'trash-list', trash: [], error: 'No workspaceId provided' }));
+                    break;
+                }
+                const trashItems = await loadTrashList(trashWsId);
                 ws.send(JSON.stringify({ type: 'trash-list', trash: trashItems }));
             } catch (err) {
                 console.error('[Sidecar] Failed to list trash:', err);
@@ -2093,19 +2156,39 @@ async function handleMetadataMessage(ws, parsed) {
                         // Folder might already be deleted
                     }
                     
-                    await metadataDb.del(`folder:${payload.folderId}`);
-                    // Also permanently delete documents in this folder
-                    const allDocs = await loadDocumentList();
-                    for (const doc of allDocs) {
-                        if (doc.folderId === payload.folderId) {
-                            await deleteDocumentMetadata(doc.id);
-                            await deleteDocumentData(doc.id);
+                    // Recursively collect all sub-folder IDs to purge
+                    const allFolders = await loadFolderList();
+                    const foldersToPurge = [payload.folderId];
+                    const collectSubFolders = (parentId) => {
+                        for (const folder of allFolders) {
+                            if (folder.parentId === parentId && !foldersToPurge.includes(folder.id)) {
+                                foldersToPurge.push(folder.id);
+                                collectSubFolders(folder.id);
+                            }
                         }
-                    }
+                    };
+                    collectSubFolders(payload.folderId);
                     
-                    // CRITICAL: Also remove from Yjs for P2P sharing
-                    if (purgeWorkspaceId) {
-                        removeFolderFromYjs(purgeWorkspaceId, payload.folderId);
+                    // Delete all folders and their documents
+                    const allDocs = await loadDocumentList();
+                    for (const fid of foldersToPurge) {
+                        // Delete documents belonging to this folder
+                        for (const doc of allDocs) {
+                            if (doc.parentId === fid) {
+                                await deleteDocumentMetadata(doc.id);
+                                await deleteDocumentData(doc.id);
+                            }
+                        }
+                        // Delete the folder record itself
+                        try {
+                            await metadataDb.del(`folder:${fid}`);
+                        } catch (e) {
+                            // Folder might already be deleted
+                        }
+                        // Remove from Yjs for P2P sharing
+                        if (purgeWorkspaceId) {
+                            removeFolderFromYjs(purgeWorkspaceId, fid);
+                        }
                     }
                     
                     metaWss.clients.forEach(client => {
@@ -2335,6 +2418,18 @@ async function handleMetadataMessage(ws, parsed) {
                 }
                 
                 identity.switchIdentity(filename);
+                
+                // Clear stale mappings from previous identity before reinitializing
+                topicToWorkspace.clear();
+                registeredTopicObservers.clear();
+                pendingSyncRequests.clear();
+                awarenessListeners.clear();
+                pendingManifestVerifications.clear();
+                documentKeys.clear();
+                remotePeerAwareness.clear();
+                awarenessThrottles.clear();
+                pendingUpdates.clear();
+                console.log('[Sidecar] Cleared stale maps for identity switch');
                 
                 // Reinitialize P2P with new identity
                 await initializeP2P(true);
@@ -2669,6 +2764,16 @@ async function handleMetadataMessage(ws, parsed) {
                 
                 pendingUpdates.clear();
                 console.log('[Sidecar] Pending updates cleared');
+                
+                registeredTopicObservers.clear();
+                console.log('[Sidecar] Registered topic observers cleared');
+                
+                // 8b. Stop awareness bridging interval
+                if (awarenessCleanupFn) {
+                    awarenessCleanupFn();
+                    awarenessCleanupFn = null;
+                    console.log('[Sidecar] Awareness bridging interval stopped');
+                }
                 
                 // 9. Reset P2P initialized flag and mesh participant
                 p2pInitialized = false;
@@ -3121,12 +3226,18 @@ function setupYjsP2PBridge() {
     
     // Set up local awareness broadcasting to P2P peers
     // Watch existing docs and attach awareness listeners
-    setupAwarenessP2PBridging();
+    // Stop any previously running awareness bridging interval before starting a new one
+    if (awarenessCleanupFn) {
+        awarenessCleanupFn();
+        awarenessCleanupFn = null;
+    }
+    awarenessCleanupFn = setupAwarenessP2PBridging();
 }
 
 // Set up bridging of local awareness changes to P2P peers
 // This ensures that presence/chat updates flow bidirectionally
 const awarenessListeners = new Map(); // roomName -> listener function
+let awarenessCleanupFn = null; // Cleanup function for awareness bridging interval
 
 function setupAwarenessP2PBridging() {
     // Check periodically for new docs (workspace-meta and doc-*) and attach awareness listeners
@@ -4549,16 +4660,9 @@ async function startP2PStack() {
                     }
                 }
             } else {
-                // Legacy protocol: no document ID, apply to all docs (backwards compat)
-                console.log('[Sidecar] Received legacy P2P update (no docId)');
+                // Legacy protocol: no document ID - skip to avoid corrupting all docs
+                console.log('[Sidecar] Received legacy P2P update (no docId) - skipping, cannot determine target document');
                 await withDbTimeout(db.put(`p2p:${Date.now().toString()}`, rawData), 'put legacy p2p');
-
-                if (!sessionKey) return;
-
-                const decrypted = decryptUpdate(rawData, sessionKey);
-                if (decrypted) {
-                    docs.forEach(doc => Y.applyUpdate(doc, decrypted, 'p2p'));
-                }
             }
         });
         
@@ -4893,6 +4997,13 @@ async function shutdown() {
         // Clear pending updates
         pendingUpdates.clear();
         console.log('[Sidecar] Pending updates cleared');
+        
+        // Stop awareness bridging interval
+        if (awarenessCleanupFn) {
+            awarenessCleanupFn();
+            awarenessCleanupFn = null;
+            console.log('[Sidecar] Awareness bridging interval stopped');
+        }
         
         // Close databases
         try {

@@ -4,6 +4,7 @@
 // See docs/INVENTORY_SYSTEM_SPEC.md §11.2.4
 
 const fs = require('fs');
+const fsp = require('fs/promises');
 const path = require('path');
 
 // Configurable base path — set by main.js on startup
@@ -28,8 +29,8 @@ function setBasePath(bp) {
  */
 function sanitizeForFilename(input) {
   if (!input || typeof input !== 'string') return 'unknown';
-  // Remove null bytes, path separators, and traversal patterns
-  return input.replace(/[\x00/\\]/g, '').replace(/\.\./g, '').trim() || 'unknown';
+  // Replace null bytes, path separators, and traversal patterns with '_' to preserve distinctness
+  return input.replace(/[\x00/\\:]/g, '_').replace(/\.\./g, '_').trim() || 'unknown';
 }
 
 /**
@@ -37,14 +38,12 @@ function sanitizeForFilename(input) {
  * @param {string} namespace - 'addresses' or 'saved-addresses'
  * @returns {string} Absolute path to storage directory
  */
-function getStorageDir(namespace) {
+async function getStorageDir(namespace) {
   if (!basePath) {
     throw new Error('InventoryStorage base path not configured');
   }
   const dir = path.join(basePath, 'inventory', namespace);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  await fsp.mkdir(dir, { recursive: true });
   return dir;
 }
 
@@ -55,16 +54,18 @@ function getStorageDir(namespace) {
  * @param {string} requestId
  * @param {string} encryptedBlob - Base64-encoded encrypted data
  */
-function storeAddress(inventorySystemId, requestId, encryptedBlob) {
-  const dir = getStorageDir('addresses');
+async function storeAddress(inventorySystemId, requestId, encryptedBlob) {
+  const dir = await getStorageDir('addresses');
   const filename = `${sanitizeForFilename(inventorySystemId)}_${sanitizeForFilename(requestId)}.json`;
   const filePath = path.join(dir, filename);
-  fs.writeFileSync(filePath, JSON.stringify({
+  const tmpPath = filePath + '.tmp';
+  await fsp.writeFile(tmpPath, JSON.stringify({
     inventorySystemId,
     requestId,
     data: encryptedBlob,
     storedAt: Date.now(),
   }), 'utf8');
+  await fsp.rename(tmpPath, filePath);
   console.log(`[InventoryStorage] Stored address for request ${requestId}`);
 }
 
@@ -74,17 +75,16 @@ function storeAddress(inventorySystemId, requestId, encryptedBlob) {
  * @param {string} requestId
  * @returns {string|null} Encrypted blob or null if not found
  */
-function getAddress(inventorySystemId, requestId) {
-  const dir = getStorageDir('addresses');
+async function getAddress(inventorySystemId, requestId) {
+  const dir = await getStorageDir('addresses');
   const filename = `${sanitizeForFilename(inventorySystemId)}_${sanitizeForFilename(requestId)}.json`;
   const filePath = path.join(dir, filename);
   
-  if (!fs.existsSync(filePath)) return null;
-  
   try {
-    const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const content = JSON.parse(await fsp.readFile(filePath, 'utf8'));
     return content.data;
   } catch (err) {
+    if (err.code === 'ENOENT') return null;
     console.error(`[InventoryStorage] Error reading address ${requestId}:`, err.message);
     return null;
   }
@@ -96,17 +96,19 @@ function getAddress(inventorySystemId, requestId) {
  * @param {string} requestId
  * @returns {boolean} True if deleted
  */
-function deleteAddress(inventorySystemId, requestId) {
-  const dir = getStorageDir('addresses');
+async function deleteAddress(inventorySystemId, requestId) {
+  const dir = await getStorageDir('addresses');
   const filename = `${sanitizeForFilename(inventorySystemId)}_${sanitizeForFilename(requestId)}.json`;
   const filePath = path.join(dir, filename);
   
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  try {
+    await fsp.unlink(filePath);
     console.log(`[InventoryStorage] Deleted address for request ${requestId}`);
     return true;
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;
+    throw err;
   }
-  return false;
 }
 
 /**
@@ -114,18 +116,23 @@ function deleteAddress(inventorySystemId, requestId) {
  * @param {string} inventorySystemId
  * @returns {Array<{requestId: string, data: string, storedAt: number}>}
  */
-function listAddresses(inventorySystemId) {
-  const dir = getStorageDir('addresses');
+async function listAddresses(inventorySystemId) {
+  const dir = await getStorageDir('addresses');
   const prefix = `${sanitizeForFilename(inventorySystemId)}_`;
   const results = [];
   
-  if (!fs.existsSync(dir)) return results;
+  let files;
+  try {
+    files = await fsp.readdir(dir);
+  } catch (err) {
+    if (err.code === 'ENOENT') return results;
+    throw err;
+  }
   
-  const files = fs.readdirSync(dir);
   for (const file of files) {
     if (file.startsWith(prefix) && file.endsWith('.json')) {
       try {
-        const content = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+        const content = JSON.parse(await fsp.readFile(path.join(dir, file), 'utf8'));
         results.push({
           requestId: content.requestId,
           data: content.data,
@@ -145,14 +152,16 @@ function listAddresses(inventorySystemId) {
  * @param {string} addressId - UUID of the saved address
  * @param {string} encryptedBlob - Base64-encoded encrypted data
  */
-function storeSavedAddress(addressId, encryptedBlob) {
-  const dir = getStorageDir('saved-addresses');
+async function storeSavedAddress(addressId, encryptedBlob) {
+  const dir = await getStorageDir('saved-addresses');
   const filePath = path.join(dir, `${sanitizeForFilename(addressId)}.json`);
-  fs.writeFileSync(filePath, JSON.stringify({
+  const tmpPath = filePath + '.tmp';
+  await fsp.writeFile(tmpPath, JSON.stringify({
     addressId,
     data: encryptedBlob,
     storedAt: Date.now(),
   }), 'utf8');
+  await fsp.rename(tmpPath, filePath);
   console.log(`[InventoryStorage] Stored saved address ${addressId}`);
 }
 
@@ -160,17 +169,22 @@ function storeSavedAddress(addressId, encryptedBlob) {
  * Get all saved addresses
  * @returns {Array<{addressId: string, data: string, storedAt: number}>}
  */
-function getSavedAddresses() {
-  const dir = getStorageDir('saved-addresses');
+async function getSavedAddresses() {
+  const dir = await getStorageDir('saved-addresses');
   const results = [];
   
-  if (!fs.existsSync(dir)) return results;
+  let files;
+  try {
+    files = await fsp.readdir(dir);
+  } catch (err) {
+    if (err.code === 'ENOENT') return results;
+    throw err;
+  }
   
-  const files = fs.readdirSync(dir);
   for (const file of files) {
     if (file.endsWith('.json')) {
       try {
-        const content = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+        const content = JSON.parse(await fsp.readFile(path.join(dir, file), 'utf8'));
         results.push({
           addressId: content.addressId,
           data: content.data,
@@ -190,16 +204,18 @@ function getSavedAddresses() {
  * @param {string} addressId
  * @returns {boolean} True if deleted
  */
-function deleteSavedAddress(addressId) {
-  const dir = getStorageDir('saved-addresses');
+async function deleteSavedAddress(addressId) {
+  const dir = await getStorageDir('saved-addresses');
   const filePath = path.join(dir, `${sanitizeForFilename(addressId)}.json`);
   
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  try {
+    await fsp.unlink(filePath);
     console.log(`[InventoryStorage] Deleted saved address ${addressId}`);
     return true;
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;
+    throw err;
   }
-  return false;
 }
 
 module.exports = {

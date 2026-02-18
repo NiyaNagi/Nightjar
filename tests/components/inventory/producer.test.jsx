@@ -90,7 +90,7 @@ beforeEach(() => {
     collaborators: [
       { publicKey: 'myKey', publicKeyBase62: 'myKey', name: 'Me', displayName: 'Me', permission: 'editor', isOnline: true },
     ],
-    userIdentity: { publicKeyBase62: 'myKey', displayName: 'Me', privateKey: new Uint8Array(32), name: 'Me' },
+    userIdentity: { publicKeyBase62: 'myKey', displayName: 'Me', curveSecretKey: new Uint8Array(32), name: 'Me' },
   };
 
   mockSyncResult = {
@@ -333,7 +333,7 @@ const AddressReveal = require('../../../frontend/src/components/inventory/produc
 
 describe('AddressReveal', () => {
   const reveal = { encrypted: 'data', nonce: 'abc' };
-  const identity = { publicKeyBase62: 'myKey', privateKey: new Uint8Array(32) };
+  const identity = { publicKeyBase62: 'myKey', curveSecretKey: new Uint8Array(32) };
 
   beforeEach(() => {
     // Setup mock yInventoryRequests with a request

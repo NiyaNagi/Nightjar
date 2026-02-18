@@ -18,6 +18,7 @@ export default function FileContextMenu({
   onClose,
   onAction,      // (action, item) => void
   isAdmin = false,
+  canEdit = true,
   isBulk = false,        // true when multiple items are selected
   selectedCount = 0,     // number of selected items when bulk
   selectedFileCount = 0, // number of selected files (not folders) when bulk
@@ -84,19 +85,21 @@ export default function FileContextMenu({
           {isBulk ? `Download ${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''}` : 'Download'}
         </button>
       )}
-      {/* Rename — single item only */}
-      {!isBulk && (
+      {/* Rename — single item only, editors+ */}
+      {!isBulk && canEdit && (
         <button className="file-context-item" onClick={() => handleAction('rename')} role="menuitem" data-testid="ctx-rename">
           <span className="file-context-icon">✏️</span> Rename
         </button>
       )}
-      <button className="file-context-item" onClick={() => handleAction('move')} role="menuitem" data-testid="ctx-move">
-        <span className="file-context-icon">📦</span>
-        {isBulk ? `Move ${selectedCount} item${selectedCount !== 1 ? 's' : ''}…` : 'Move to…'}
-      </button>
+      {canEdit && (
+        <button className="file-context-item" onClick={() => handleAction('move')} role="menuitem" data-testid="ctx-move">
+          <span className="file-context-icon">📦</span>
+          {isBulk ? `Move ${selectedCount} item${selectedCount !== 1 ? 's' : ''}…` : 'Move to…'}
+        </button>
+      )}
       <div className="file-context-divider" />
-      {/* Tags — files only */}
-      {(isFile || (isBulk && selectedFileCount > 0)) && (
+      {/* Tags — files only, editors+ */}
+      {canEdit && (isFile || (isBulk && selectedFileCount > 0)) && (
         <button className="file-context-item" onClick={() => handleAction('tags')} role="menuitem" data-testid="ctx-tags">
           <span className="file-context-icon">🏷️</span>
           {isBulk ? `Edit Tags (${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''})` : 'Edit Tags'}
@@ -121,10 +124,12 @@ export default function FileContextMenu({
         </button>
       )}
       <div className="file-context-divider" />
-      <button className="file-context-item file-context-item--danger" onClick={() => handleAction('delete')} role="menuitem" data-testid="ctx-delete">
-        <span className="file-context-icon">🗑️</span>
-        {isBulk ? `Delete ${selectedCount} item${selectedCount !== 1 ? 's' : ''}` : 'Delete'}
-      </button>
+      {canEdit && (
+        <button className="file-context-item file-context-item--danger" onClick={() => handleAction('delete')} role="menuitem" data-testid="ctx-delete">
+          <span className="file-context-icon">🗑️</span>
+          {isBulk ? `Delete ${selectedCount} item${selectedCount !== 1 ? 's' : ''}` : 'Delete'}
+        </button>
+      )}
     </div>
   );
 }

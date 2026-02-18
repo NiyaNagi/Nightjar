@@ -15,7 +15,7 @@ import './CatalogManager.css';
 
 const EMPTY_ITEM = {
   name: '',
-  unit: 'units',
+  unitName: 'units',
   quantityMin: 1,
   quantityMax: '',
   quantityStep: 1,
@@ -46,7 +46,7 @@ export default function CatalogManager() {
       inventorySystemId,
       ...newItem,
       name: newItem.name.trim(),
-      unit: newItem.unit.trim(),
+      unitName: newItem.unitName.trim(),
       sku: newItem.sku?.trim() || '',
       category: newItem.category?.trim() || '',
       description: newItem.description?.trim() || '',
@@ -93,7 +93,7 @@ export default function CatalogManager() {
     const updated = {
       ...items[idx],
       name: editItem.name.trim(),
-      unit: editItem.unit.trim(),
+      unitName: editItem.unitName.trim(),
       sku: editItem.sku?.trim() || '',
       category: editItem.category?.trim() || '',
       description: editItem.description?.trim() || '',
@@ -221,7 +221,7 @@ export default function CatalogManager() {
                     {item.sku && <span className="catalog-item-card__sku">SKU: {item.sku}</span>}
                   </div>
                   <div className="catalog-item-card__details">
-                    <span>Unit: {item.unit}</span>
+                    <span>Unit: {item.unitName}</span>
                     <span>Min: {item.quantityMin?.toLocaleString()}</span>
                     <span>Max: {item.quantityMax != null ? item.quantityMax.toLocaleString() : 'No max'}</span>
                     <span>Step: {item.quantityStep}</span>
@@ -274,8 +274,8 @@ function CatalogItemForm({ item, onChange, onSubmit, submitLabel, onCancel }) {
           Unit *
           <input
             type="text"
-            value={item.unit}
-            onChange={e => handleChange('unit', e.target.value)}
+            value={item.unitName}
+            onChange={e => handleChange('unitName', e.target.value)}
             placeholder="e.g., units, boxes"
           />
         </label>

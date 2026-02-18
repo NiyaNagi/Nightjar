@@ -53,7 +53,8 @@ const SheetSelectionToolbar = ({
     const [isExpanded, setIsExpanded] = useState(false);          // Collapsed by default
     const [isHidden, setIsHidden] = useState(false);              // Hidden when modal open or focus lost
     const toolbarRef = useRef(null);
-    const colorPickerRef = useRef(null);
+    const textColorPickerRef = useRef(null);
+    const bgColorPickerRef = useRef(null);
     const hoverTimeoutRef = useRef(null);
 
     // Check for modal visibility on mount and periodically
@@ -140,7 +141,9 @@ const SheetSelectionToolbar = ({
     // Close menus when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+            const inText = textColorPickerRef.current?.contains(e.target);
+            const inBg = bgColorPickerRef.current?.contains(e.target);
+            if (!inText && !inBg) {
                 setShowColorPicker(null);
             }
             if (showFormatMenu && toolbarRef.current && !toolbarRef.current.contains(e.target)) {
@@ -212,24 +215,48 @@ const SheetSelectionToolbar = ({
         }
     };
 
+    // Read a formatting attribute from the first cell in the current selection
+    const getCellAttrValue = (attr) => {
+        try {
+            if (!workbookRef?.current?.getAllSheets || !selection?.row || !selection?.column) return 0;
+            const sheets = workbookRef.current.getAllSheets();
+            if (!sheets || !sheets.length) return 0;
+            // Use the first (active) sheet's 2D data array
+            const sheetData = sheets[0]?.data;
+            if (!sheetData) return 0;
+            const row = selection.row[0];
+            const col = selection.column[0];
+            const cell = sheetData[row]?.[col];
+            if (!cell) return 0;
+            return cell[attr] ? 1 : 0;
+        } catch (e) {
+            console.warn('[SheetToolbar] Error reading cell attr:', e.message);
+            return 0;
+        }
+    };
+
     // Toggle bold
     const toggleBold = () => {
-        applyFormat('bl', 1); // bl = bold in Fortune Sheet
+        const current = getCellAttrValue('bl');
+        applyFormat('bl', current ? 0 : 1); // bl = bold in Fortune Sheet
     };
 
     // Toggle italic
     const toggleItalic = () => {
-        applyFormat('it', 1); // it = italic
+        const current = getCellAttrValue('it');
+        applyFormat('it', current ? 0 : 1); // it = italic
     };
 
     // Toggle underline
     const toggleUnderline = () => {
-        applyFormat('un', 1); // un = underline (may vary)
+        const current = getCellAttrValue('un');
+        applyFormat('un', current ? 0 : 1); // un = underline
     };
 
     // Toggle strikethrough
     const toggleStrikethrough = () => {
-        applyFormat('cl', 1); // cl = cancelled line / strikethrough
+        const current = getCellAttrValue('cl');
+        applyFormat('cl', current ? 0 : 1); // cl = cancelled line / strikethrough
     };
 
     // Set text color
@@ -357,7 +384,7 @@ const SheetSelectionToolbar = ({
                                         <span className="color-icon text-color">A</span>
                                     </button>
                                     {showColorPicker === 'text' && (
-                                        <div ref={colorPickerRef} className="color-picker-dropdown">
+                                        <div ref={textColorPickerRef} className="color-picker-dropdown">
                                             <div className="color-grid">
                                                 {COLOR_PRESETS.map(color => (
                                                     <button
@@ -381,7 +408,7 @@ const SheetSelectionToolbar = ({
                                         <span className="color-icon bg-color">🎨</span>
                                     </button>
                                     {showColorPicker === 'bg' && (
-                                        <div ref={colorPickerRef} className="color-picker-dropdown">
+                                        <div ref={bgColorPickerRef} className="color-picker-dropdown">
                                             <div className="color-grid">
                                                 {COLOR_PRESETS.map(color => (
                                                     <button

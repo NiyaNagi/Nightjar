@@ -191,7 +191,9 @@ export default function useFileDownload({
             }
           }
           if (downloadLocation) {
-            const filePath = downloadLocation.replace(/[\\/]$/, '') + '/' + name;
+            // Sanitize peer-provided filename to prevent path traversal
+            const safeName = name.replace(/[\/\\]/g, '_').replace(/\.\./g, '_');
+            const filePath = downloadLocation.replace(/[\\/]$/, '') + '/' + safeName;
             // Convert Uint8Array to base64 for IPC transfer
             let base64 = '';
             const chunkSize = 32768;

@@ -204,7 +204,7 @@ describe('validateAddress', () => {
 describe('validateCatalogItem', () => {
   const validItem = {
     name: 'Widget',
-    unit: 'boxes',
+    unitName: 'boxes',
     quantityMin: 1,
     quantityMax: 100,
     quantityStep: 1,
@@ -223,7 +223,7 @@ describe('validateCatalogItem', () => {
   });
 
   it('should require unit', () => {
-    const r = validateCatalogItem({ ...validItem, unit: '' });
+    const r = validateCatalogItem({ ...validItem, unitName: '' });
     expect(r.valid).toBe(false);
     expect(r.errors).toContainEqual(expect.stringMatching(/unit/i));
   });

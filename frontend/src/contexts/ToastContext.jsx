@@ -7,7 +7,7 @@
  * See docs/INVENTORY_SYSTEM_SPEC.md §11.2.4a
  */
 
-import { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect } from 'react';
 
 const ToastContext = createContext(null);
 
@@ -30,6 +30,15 @@ export function useToast() {
 export function ToastProvider({ children }) {
   const [toast, setToast] = useState(null);
   const timeoutRef = useRef(null);
+
+  // Clean up timeout on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const showToast = useCallback((message, type = 'info') => {
     // Clear any existing timeout to prevent stale updates

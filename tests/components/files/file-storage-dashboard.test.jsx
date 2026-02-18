@@ -80,6 +80,14 @@ jest.mock('../../../frontend/src/services/p2p/index.js', () => ({
   })),
 }));
 
+jest.mock('../../../frontend/src/contexts/WorkspaceContext', () => ({
+  useWorkspaces: jest.fn(() => ({
+    canEdit: true,
+    isOwner: false,
+    currentWorkspace: { myPermission: 'editor' },
+  })),
+}));
+
 jest.mock('../../../frontend/src/utils/keyDerivation', () => ({
   getStoredKeyChain: jest.fn(() => ({ workspaceKey: new Uint8Array(32) })),
 }));

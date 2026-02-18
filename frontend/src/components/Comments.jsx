@@ -66,8 +66,11 @@ const Comments = ({
     };
 
     // Clean up orphan comments when document changes (text documents only)
+    // Debounced to avoid accidental deletion during cut-and-paste
     useEffect(() => {
         if (!editor || !ycommentsRef.current || documentType !== 'text') return;
+        
+        let debounceTimer = null;
         
         const checkOrphanComments = () => {
             const currentComments = ycommentsRef.current?.toArray() || [];
@@ -77,27 +80,42 @@ const Comments = ({
             const docText = editor.getText() || '';
             if (!docText) return;
             
-            // Find orphan comments (text was deleted)
-            const orphanIndices = [];
-            currentComments.forEach((comment, index) => {
-                if (comment.selection?.text && !checkCommentTextExists(comment, docText)) {
-                    orphanIndices.push(index);
+            // Collect IDs of orphan comments (text was deleted)
+            const orphanIds = [];
+            currentComments.forEach((comment) => {
+                if (comment.id && comment.selection?.text && !checkCommentTextExists(comment, docText)) {
+                    orphanIds.push(comment.id);
                 }
             });
             
-            // Delete orphan comments in reverse order to preserve indices
-            orphanIndices.reverse().forEach(index => {
-                ycommentsRef.current?.delete(index, 1);
-            });
+            // Delete orphan comments atomically in a single transaction
+            // to avoid concurrent index-based deletions corrupting the array
+            if (orphanIds.length > 0 && ydoc) {
+                ydoc.transact(() => {
+                    // Re-fetch fresh array and reverse-iterate to avoid index shifting
+                    const freshArr = ycommentsRef.current?.toArray() || [];
+                    for (let i = freshArr.length - 1; i >= 0; i--) {
+                        if (orphanIds.includes(freshArr[i].id)) {
+                            ycommentsRef.current?.delete(i, 1);
+                        }
+                    }
+                });
+            }
+        };
+        
+        const debouncedCheck = () => {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(checkOrphanComments, 3000);
         };
         
         // Listen to editor updates
-        editor.on('update', checkOrphanComments);
+        editor.on('update', debouncedCheck);
         
         return () => {
-            editor.off('update', checkOrphanComments);
+            editor.off('update', debouncedCheck);
+            if (debounceTimer) clearTimeout(debounceTimer);
         };
-    }, [editor, documentType]);
+    }, [editor, documentType, ydoc]);
 
     // Initialize Yjs comments array
     useEffect(() => {
@@ -160,7 +178,9 @@ const Comments = ({
     const addReply = (commentId) => {
         if (!replyText.trim() || !ycommentsRef.current) return;
 
-        const commentIndex = comments.findIndex(c => c.id === commentId);
+        // Read directly from Yjs to avoid stale closure
+        const currentComments = ycommentsRef.current.toArray();
+        const commentIndex = currentComments.findIndex(c => c.id === commentId);
         if (commentIndex === -1) return;
 
         const reply = {
@@ -174,13 +194,15 @@ const Comments = ({
 
         // Update the comment with the new reply
         const updatedComment = {
-            ...comments[commentIndex],
-            replies: [...(comments[commentIndex].replies || []), reply]
+            ...currentComments[commentIndex],
+            replies: [...(currentComments[commentIndex].replies || []), reply]
         };
 
-        // Replace the comment in the Yjs array
-        ycommentsRef.current.delete(commentIndex, 1);
-        ycommentsRef.current.insert(commentIndex, [updatedComment]);
+        // Replace the comment in the Yjs array atomically
+        ydoc.transact(() => {
+            ycommentsRef.current.delete(commentIndex, 1);
+            ycommentsRef.current.insert(commentIndex, [updatedComment]);
+        });
 
         setReplyText('');
         setReplyingTo(null);
@@ -188,21 +210,32 @@ const Comments = ({
 
     // Resolve/unresolve a comment
     const toggleResolve = (commentId) => {
-        const commentIndex = comments.findIndex(c => c.id === commentId);
+        if (!ycommentsRef.current) return;
+
+        // Read directly from Yjs to avoid stale closure
+        const currentComments = ycommentsRef.current.toArray();
+        const commentIndex = currentComments.findIndex(c => c.id === commentId);
         if (commentIndex === -1) return;
 
         const updatedComment = {
-            ...comments[commentIndex],
-            resolved: !comments[commentIndex].resolved
+            ...currentComments[commentIndex],
+            resolved: !currentComments[commentIndex].resolved
         };
 
-        ycommentsRef.current.delete(commentIndex, 1);
-        ycommentsRef.current.insert(commentIndex, [updatedComment]);
+        // Replace atomically
+        ydoc.transact(() => {
+            ycommentsRef.current.delete(commentIndex, 1);
+            ycommentsRef.current.insert(commentIndex, [updatedComment]);
+        });
     };
 
     // Delete a comment
     const deleteComment = (commentId) => {
-        const commentIndex = comments.findIndex(c => c.id === commentId);
+        if (!ycommentsRef.current) return;
+
+        // Read directly from Yjs to avoid stale closure
+        const currentComments = ycommentsRef.current.toArray();
+        const commentIndex = currentComments.findIndex(c => c.id === commentId);
         if (commentIndex === -1) return;
 
         ycommentsRef.current.delete(commentIndex, 1);
@@ -215,9 +248,31 @@ const Comments = ({
         // For text documents with TipTap editor
         if (editor && documentType === 'text' && comment.selection.from !== undefined) {
             try {
+                const docText = editor.state.doc.textContent;
+                let from = comment.selection.from;
+                let to = comment.selection.to;
+
+                // Stored positions may be stale after edits — verify and relocate
+                if (comment.selection.text) {
+                    const storedText = comment.selection.text;
+                    // Check if the text still matches at the stored positions
+                    const currentSlice = editor.state.doc.textBetween(from, Math.min(to, editor.state.doc.content.size), '');
+                    if (currentSlice !== storedText) {
+                        // Text moved — search for it in the document
+                        const idx = docText.indexOf(storedText);
+                        if (idx !== -1) {
+                            // +1 because ProseMirror positions are 1-based (doc node offset)
+                            from = idx + 1;
+                            to = from + storedText.length;
+                        } else {
+                            console.warn('Comment text no longer found in document');
+                        }
+                    }
+                }
+
                 editor.chain()
                     .focus()
-                    .setTextSelection({ from: comment.selection.from, to: comment.selection.to })
+                    .setTextSelection({ from, to: Math.min(to, editor.state.doc.content.size) })
                     .scrollIntoView()
                     .run();
                 setSelectedComment(comment.id);

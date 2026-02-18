@@ -66,7 +66,18 @@ export function EntityShareDialog({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [includePassword, setIncludePassword] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [linkError, setLinkError] = useState('');
   
+  // Reset state when the entity changes so stale data isn't shown
+  useEffect(() => {
+    setShareLink('');
+    setQrCodeDataUrl('');
+    setSelectedPermission('viewer');
+    setIncludePassword(true);
+    setIsGenerating(false);
+    setLinkError('');
+  }, [entityId]);
+
   // Get available permission levels for current user
   const availableLevels = getAvailableShareLevels(entityType, entityId);
   const myPermission = getPermission(entityType, entityId);
@@ -84,16 +95,14 @@ export function EntityShareDialog({
     }
   }, [permissionOptions, selectedPermission]);
   
-  // Generate share link when options change
-  useEffect(() => {
-    if (isOpen && entityId && password) {
-      generateLink();
-    }
-  }, [isOpen, entityId, selectedPermission, includePassword, password, generateLink]);
-  
   const generateLink = useCallback(async () => {
-    if (!entityId || !password) return;
+    if (!entityId || !password) {
+      setLinkError(!entityId ? 'Cannot generate link: no entity selected.' : 'Cannot generate link: password is required.');
+      setIsGenerating(false);
+      return;
+    }
     
+    setLinkError('');
     setIsGenerating(true);
     try {
       // For web-hosted workspaces, include the server URL so Electron clients can connect
@@ -125,6 +134,13 @@ export function EntityShareDialog({
       setIsGenerating(false);
     }
   }, [entityType, entityId, selectedPermission, includePassword, password]);
+  
+  // Generate share link when options change
+  useEffect(() => {
+    if (isOpen && entityId && password) {
+      generateLink();
+    }
+  }, [isOpen, entityId, selectedPermission, includePassword, password, generateLink]);
   
   const handleCopy = async () => {
     await copyToClipboard(shareLink);
@@ -218,7 +234,7 @@ export function EntityShareDialog({
           <div className="entity-share__section">
             <label className="entity-share__label">Share Link</label>
             <div className="entity-share__link-box">
-              <code className="entity-share__link" data-testid="share-link-text">{shareLink || 'Generating...'}</code>
+              <code className="entity-share__link" data-testid="share-link-text">{shareLink || linkError || 'Generating...'}</code>
             </div>
           </div>
           

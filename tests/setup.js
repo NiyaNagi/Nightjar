@@ -80,6 +80,24 @@ global.TextDecoder = class {
   }
 };
 
+// Mock window.matchMedia (used by AppSettings theme detection at module load)
+// Guard: only define when window exists (jsdom env, not node env)
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(query => ({
+      matches: query === '(prefers-color-scheme: dark)',
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  });
+}
+
 // Clean up after each test
 afterEach(() => {
   localStorage.clear();

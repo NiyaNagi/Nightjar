@@ -216,6 +216,7 @@ export function FileTransferProvider({
   const pendingRequests = useRef(new Map());
   const seedingRef = useRef(false);
   const seedIntervalRef = useRef(null);
+  const triggerSeedTimeoutRef = useRef(null);
   const bandwidthIntervalRef = useRef(null);
   const bytesThisInterval = useRef({ sent: 0, received: 0 });
   const handlersRegistered = useRef(false);
@@ -259,9 +260,18 @@ export function FileTransferProvider({
     return dbRef.current;
   }, [workspaceId]);
 
-  // Reset DB ref when workspace changes
+  // Reset DB ref and clear pending requests when workspace changes
   useEffect(() => {
+    // Close previous IndexedDB connection
+    if (dbRef.current) {
+      try { dbRef.current.close(); } catch (e) { /* ignore */ }
+    }
     dbRef.current = null;
+    pendingRequests.current.forEach(({ timer, reject }) => {
+      clearTimeout(timer);
+      if (reject) reject(new Error('Workspace changed, request aborted'));
+    });
+    pendingRequests.current.clear();
   }, [workspaceId]);
 
   // ── Chunk serving (incoming chunk-request) ──
@@ -628,9 +638,10 @@ export function FileTransferProvider({
         return false;
       }
 
+      const actualBytesSent = (chunk.encrypted?.byteLength || 0) + (chunk.nonce?.byteLength || 0);
       const encrypted = uint8ToBase64(chunk.encrypted);
       const nonce = uint8ToBase64(chunk.nonce);
-      const bytesSent = encrypted.length + nonce.length;
+      const bytesSent = actualBytesSent;
 
       await peerManager.send(targetPeer, {
         type: CHUNK_MSG_TYPES.SEED,
@@ -744,13 +755,18 @@ export function FileTransferProvider({
     return () => {
       pendingRequests.current.forEach(({ timer }) => clearTimeout(timer));
       pendingRequests.current.clear();
+      if (triggerSeedTimeoutRef.current) clearTimeout(triggerSeedTimeoutRef.current);
     };
   }, []);
 
   // ── Force seed cycle (e.g. when a new peer joins) ──
   const triggerSeedCycle = useCallback(() => {
     if (!seedingRef.current) {
-      setTimeout(() => runSeedCycle(), 1000);
+      if (triggerSeedTimeoutRef.current) clearTimeout(triggerSeedTimeoutRef.current);
+      triggerSeedTimeoutRef.current = setTimeout(() => {
+        triggerSeedTimeoutRef.current = null;
+        runSeedCycle();
+      }, 1000);
     }
   }, [runSeedCycle]);
 
@@ -775,7 +791,7 @@ export function FileTransferProvider({
   }, []);
 
   // ── Context value ──
-  const value = {
+  const value = useMemo(() => ({
     // Chunk transfer
     requestChunkFromPeer,
     announceAvailability,
@@ -790,7 +806,19 @@ export function FileTransferProvider({
     triggerSeedCycle,
     trackReceivedBytes,
     runSeedCycle,
-  };
+  }), [
+    requestChunkFromPeer,
+    announceAvailability,
+    getLocalChunkCount,
+    handleChunkRequest,
+    transferStats,
+    seedingStats,
+    bandwidthHistory,
+    resetStats,
+    triggerSeedCycle,
+    trackReceivedBytes,
+    runSeedCycle,
+  ]);
 
   return (
     <FileTransferContext.Provider value={value}>

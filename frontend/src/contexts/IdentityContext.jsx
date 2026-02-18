@@ -1,7 +1,7 @@
 // frontend/src/contexts/IdentityContext.jsx
 // React context for identity management
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import secureStorage from '../utils/secureStorage';
 import { secureError, secureLog } from '../utils/secureLogger';
 import identityManager from '../utils/identityManager';
@@ -354,6 +354,11 @@ export function IdentityProvider({ children }) {
             
             setIdentity(restored);
             setNeedsOnboarding(false);
+            
+            // Dispatch event to notify other contexts (P2P, WorkspaceContext) that identity changed
+            window.dispatchEvent(new CustomEvent('identity-created', { detail: restored }));
+            secureLog('[Identity] Identity imported, dispatched identity-created event');
+            
             return true;
         } catch (e) {
             secureError('[Identity] Failed to import:', e);
@@ -389,19 +394,19 @@ export function IdentityProvider({ children }) {
     }, []);
     
     // Get current device info from identity
-    const currentDevice = identity?.devices?.find(d => d.isCurrent);
+    const currentDevice = useMemo(() => identity?.devices?.find(d => d.isCurrent), [identity]);
     
     // Get public identity for sharing (uses publicKeyBase62 for consistency with full identity)
-    const publicIdentity = identity ? {
+    const publicIdentity = useMemo(() => identity ? {
         publicKeyBase62: identity.publicKeyBase62,
         handle: identity.handle,
         color: identity.color,
         icon: identity.icon,
         deviceId: currentDevice?.id,
         deviceName: currentDevice?.name
-    } : null;
+    } : null, [identity, currentDevice]);
     
-    const value = {
+    const value = useMemo(() => ({
         identity,
         publicIdentity,
         currentDevice,
@@ -415,7 +420,21 @@ export function IdentityProvider({ children }) {
         importIdentity,
         reloadIdentity: loadIdentity,
         syncFromIdentityManager,
-    };
+    }), [
+        identity,
+        publicIdentity,
+        currentDevice,
+        loading,
+        error,
+        needsOnboarding,
+        createIdentity,
+        updateIdentity,
+        deleteIdentity,
+        exportIdentity,
+        importIdentity,
+        loadIdentity,
+        syncFromIdentityManager,
+    ]);
     
     return (
         <IdentityContext.Provider value={value}>

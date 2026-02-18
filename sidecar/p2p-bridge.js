@@ -157,6 +157,11 @@ class P2PBridge extends EventEmitter {
     ws.on('close', () => {
       this._handleClientDisconnect(ws);
     });
+
+    ws.on('error', (err) => {
+      console.error('[P2PBridge] WebSocket client error:', err.message);
+      this._handleClientDisconnect(ws);
+    });
   }
 
   /**
@@ -505,6 +510,14 @@ class P2PBridge extends EventEmitter {
       this.topics.get(topic)?.delete(ws);
       if (this.topics.get(topic)?.size === 0) {
         this.topics.delete(topic);
+        // Leave Hyperswarm topic when no clients remain (matches _handleLeaveTopic)
+        if (this.hyperswarm) {
+          try {
+            this.hyperswarm.leaveTopic(topic).catch(() => {});
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
       }
     }
 
@@ -590,6 +603,7 @@ class P2PBridge extends EventEmitter {
       this.mdnsBrowser = null;
     }
     
+    this.isInitialized = false;
     this.isSuspended = true;
     this.emit('suspended');
     console.log('[P2PBridge] Hyperswarm suspended — all sync via relay only');
@@ -627,15 +641,19 @@ class P2PBridge extends EventEmitter {
       
       // Re-initialize mDNS
       this._initMDNS();
+      
+      // Only mark as initialized and clear saved state on success
+      this.isInitialized = true;
+      this.isSuspended = false;
+      this._suspendedIdentity = null;
+      this._suspendedTopics = null;
+      this.emit('resumed');
+      console.log('[P2PBridge] Hyperswarm resumed — direct P2P active');
     } catch (err) {
       console.error('[P2PBridge] Error resuming Hyperswarm:', err);
+      // Leave isSuspended=true and preserve saved identity/topics for retry
+      console.warn('[P2PBridge] Resume failed — will remain suspended, retry possible');
     }
-    
-    this.isSuspended = false;
-    this._suspendedIdentity = null;
-    this._suspendedTopics = null;
-    this.emit('resumed');
-    console.log('[P2PBridge] Hyperswarm resumed — direct P2P active');
   }
 
   /**

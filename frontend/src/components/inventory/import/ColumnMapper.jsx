@@ -169,7 +169,7 @@ export default function ColumnMapper({ headers, sampleRows, onMappingComplete, c
         <button
           className="btn-sm btn-primary"
           onClick={handleContinue}
-          disabled={missingRequired.includes('quantity')}
+          disabled={missingRequired.includes('quantity') || (missingRequired.includes('item') && !defaultItem)}
         >
           Continue to Preview →
         </button>

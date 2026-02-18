@@ -42,7 +42,7 @@ const PII_PATTERNS = [
   /handle['":\s]+['"][^'"]+['"]/gi,
   
   // Cryptographic material (keys, secrets, tokens)
-  /\b[A-Fa-f0-9]{64}\b/g, // 32-byte hex keys
+  /(?<=(?:key|secret|private|password|mnemonic|seed|token|signature)['":\s=]{1,6})[A-Fa-f0-9]{64}\b/gi, // 32-byte hex keys only when preceded by sensitive field names
   /\b[A-Za-z0-9+/]{40,}[=]{0,2}\b/g, // Base64 keys (40+ chars with optional padding)
   /\b[A-Za-z0-9]{43,44}\b/g, // Base62 keys
   /(\w+ ){11,23}\w+/g, // Mnemonics (12-24 words)

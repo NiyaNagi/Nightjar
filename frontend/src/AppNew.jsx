@@ -30,6 +30,9 @@ import OnboardingFlow from './components/Onboarding/OnboardingFlow';
 import IdentitySelector from './components/IdentitySelector';
 import LockScreen from './components/LockScreen';
 import NightjarMascot from './components/NightjarMascot';
+import HelpPage from './components/common/HelpPage';
+import SearchPalette from './components/SearchPalette';
+import { handleIndexResults } from './services/SearchIndexCache';
 import { useAutoLock } from './hooks/useAutoLock';
 import identityManager from './utils/identityManager';
 import { useAuthorAttribution } from './hooks/useAuthorAttribution';
@@ -170,6 +173,35 @@ function App() {
         loading: identityLoading,
         syncFromIdentityManager,
     } = useIdentity();
+
+    // Crypto-capable identity for inventory address encryption/decryption.
+    // Extends publicIdentity with a pre-derived Curve25519 encryption key
+    // (32 bytes) — this is the ONLY secret exposed to inventory components.
+    // The full Ed25519 signing key never leaves this scope.
+    const [curveSecretKey, setCurveSecretKey] = useState(null);
+    useEffect(() => {
+        let cancelled = false;
+        if (!userIdentity?.privateKey) { setCurveSecretKey(null); return; }
+        (async () => {
+            try {
+                const { ed25519ToCurve25519Secret } = await import('./utils/addressCrypto');
+                const curve = await ed25519ToCurve25519Secret(userIdentity.privateKey);
+                if (!cancelled) setCurveSecretKey(curve);
+            } catch (err) {
+                console.error('[App] Failed to derive Curve25519 key for inventory:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [userIdentity?.privateKey]);
+
+    const inventoryIdentity = useMemo(() => {
+        if (!publicIdentity) return null;
+        return {
+            ...publicIdentity,
+            curveSecretKey,                              // Uint8Array (32 bytes) — Curve25519 encryption-only key
+            publicKeyHex: userIdentity?.publicKeyHex,   // hex string — for getPublicKeyHex()
+        };
+    }, [publicIdentity, curveSecretKey, userIdentity?.publicKeyHex]);
     
     // --- Workspace & Folder Context ---
     const { 
@@ -219,6 +251,7 @@ function App() {
         name: currentWorkspace.name,
         icon: currentWorkspace.icon,
         color: currentWorkspace.color,
+        createdBy: currentWorkspace.createdBy,
     } : null;
     
     // User profile for workspace-level awareness (Chat, online status)
@@ -259,6 +292,8 @@ function App() {
         isKicked: isUserKicked,
         kickMember: syncKickMember,
         transferOwnership: syncTransferOwnership,
+        updateMemberPermission: syncUpdateMemberPermission,
+        respondToPendingDemotion: syncRespondToPendingDemotion,
         // Inventory Yjs shared types
         yInventorySystems,
         yCatalogItems,
@@ -330,9 +365,13 @@ function App() {
     const [startupComplete, setStartupComplete] = useState(false); // Track if startup identity check is complete
     const [showSyncProgress, setShowSyncProgress] = useState(false); // Show sync progress modal for new workspace joins
     const [syncProgressWorkspaceId, setSyncProgressWorkspaceId] = useState(null); // Track which workspace is syncing
+    const [showHelp, setShowHelp] = useState(false); // Show help/documentation overlay
+    const [helpSection, setHelpSection] = useState(null); // Deep-link to specific help section
+    const [showSearchPalette, setShowSearchPalette] = useState(false); // Cross-app search palette
+    const [expandedFolders, setExpandedFolders] = useState(new Set()); // Lifted from sidebar for search folder-reveal
 
     // --- Auto-Lock Hook ---
-    const { isLocked, setIsLocked, unlock: unlockApp } = useAutoLock();
+    const { isLocked, setIsLocked, lock: lockApp, unlock: unlockApp } = useAutoLock();
 
     // --- Refs ---
     const metaSocketRef = useRef(null);
@@ -488,6 +527,32 @@ function App() {
         }
     }, [syncKickMember, workspaceCollaborators, showToast]);
 
+    // --- Update Member Permission Handler with Toast Feedback ---
+    const handleUpdateMemberPermission = useCallback((publicKey, newPermission, memberName = 'member') => {
+        if (!syncUpdateMemberPermission) return;
+        
+        const result = syncUpdateMemberPermission(publicKey, newPermission);
+        const label = newPermission.charAt(0).toUpperCase() + newPermission.slice(1);
+        
+        if (result === 'pending') {
+            showToast(`Demotion request sent to founding owner ${memberName}`, 'info');
+        } else if (result === true) {
+            showToast(`Changed ${memberName}'s role to ${label}`, 'success');
+        } else {
+            showToast(`Failed to change ${memberName}'s permission`, 'error');
+        }
+    }, [syncUpdateMemberPermission, showToast]);
+
+    // --- Respond to Pending Demotion Handler ---
+    const handleRespondToPendingDemotion = useCallback((accept) => {
+        if (!syncRespondToPendingDemotion) return;
+        
+        const result = syncRespondToPendingDemotion(accept);
+        if (result) {
+            showToast(accept ? 'Demotion accepted' : 'Demotion declined', accept ? 'info' : 'success');
+        }
+    }, [syncRespondToPendingDemotion, showToast]);
+
     // --- Cleanup awareness states on page unload to prevent ghost users ---
     useEffect(() => {
         const handleBeforeUnload = () => {
@@ -538,6 +603,10 @@ function App() {
                 
                 backButtonListener = await App.addListener('backButton', ({ canGoBack }) => {
                     // Priority 1: Close any open modals/dialogs
+                    if (showSearchPalette) {
+                        setShowSearchPalette(false);
+                        return;
+                    }
                     if (showRelaySettings) {
                         setShowRelaySettings(false);
                         return;
@@ -567,12 +636,21 @@ function App() {
                         return;
                     }
                     
-                    // Priority 2: Close active document tab
-                    if (activeDocId && openTabs.length > 0) {
-                        // Close active tab
-                        const newTabs = openTabs.filter(t => t.id !== activeDocId);
-                        setOpenTabs(newTabs);
-                        setActiveDocId(newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null);
+                    // Priority 2: Close active document tab (only if there are open tabs)
+                    if (openTabs.length > 0 && activeDocId) {
+                        setActiveDocId(prevActiveDocId => {
+                            if (!prevActiveDocId) return null;
+                            setOpenTabs(prevTabs => {
+                                if (prevTabs.length === 0) return prevTabs;
+                                const newTabs = prevTabs.filter(t => t.id !== prevActiveDocId);
+                                // Derive next activeDocId from the filtered array
+                                const nextId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+                                // Schedule the activeDocId update (can't set during this updater)
+                                setTimeout(() => setActiveDocId(nextId), 0);
+                                return newTabs;
+                            });
+                            return prevActiveDocId; // keep current until setTimeout fires
+                        });
                         return;
                     }
                     
@@ -600,7 +678,7 @@ function App() {
     }, [
         showRelaySettings, showTorSettings, showCreateWorkspaceDialog, 
         showCreateDocumentDialog, showIdentitySelector, showChangelog, 
-        showComments, activeDocId, openTabs
+        showComments, showSearchPalette, openTabs, activeDocId
     ]);
 
     // --- Sync workspace info from remote (for joined workspaces) ---
@@ -609,6 +687,8 @@ function App() {
     // Flag to prevent feedback loop: when true, we just received a remote update
     // and should not push back to Yjs
     const isProcessingRemoteUpdate = useRef(false);
+    // Timer ref for sync progress auto-hide
+    const syncProgressTimerRef = useRef(null);
     
     // Track previous workspace to detect changes
     const prevWorkspaceIdRef = useRef(currentWorkspaceId);
@@ -637,6 +717,9 @@ function App() {
             setOpenTabs([]);
             setActiveDocId(null);
             
+            // Reset collaborator tracking to prevent stale data from previous workspace
+            setDocumentCollaborators({});
+            
             prevWorkspaceIdRef.current = currentWorkspaceId;
         }
     }, [currentWorkspaceId]);
@@ -664,11 +747,17 @@ function App() {
         // Auto-hide when sync completes
         if (syncPhase === 'complete' && syncProgressWorkspaceId === currentWorkspaceId) {
             // Keep showing briefly to show success
-            setTimeout(() => {
+            syncProgressTimerRef.current = setTimeout(() => {
                 setShowSyncProgress(false);
                 setSyncProgressWorkspaceId(null);
             }, 1500);
         }
+        return () => {
+            if (syncProgressTimerRef.current) {
+                clearTimeout(syncProgressTimerRef.current);
+                syncProgressTimerRef.current = null;
+            }
+        };
     }, [currentWorkspace, currentWorkspaceId, syncPhase, syncProgressWorkspaceId]);
     
     useEffect(() => {
@@ -712,18 +801,35 @@ function App() {
         const { name, icon, color } = currentWorkspace;
         const last = lastSyncedWorkspaceInfo.current;
         
+        // Never push the "Shared Workspace" placeholder to Yjs — it's not a real name.
+        // This default gets set when joining a workspace before the real name arrives via sync.
+        if (name === 'Shared Workspace') {
+            console.log('[WorkspaceSync] Skipping push - "Shared Workspace" is a placeholder, not a real name');
+            return;
+        }
+        
         // Check if this is a local change (not an echo from sync)
         const isLocalChange = !last || 
             (last.name !== name) || 
             (last.icon !== icon) || 
             (last.color !== color);
         
+        // On initial load (!last), only push if we're the owner.
+        // Non-owners should wait for sync to deliver the real name rather than
+        // overwriting it with their stale local copy.
+        if (!last && currentWorkspace.myPermission !== 'owner') {
+            console.log('[WorkspaceSync] Skipping initial push - non-owner should not overwrite workspace info');
+            // Still record what we have so subsequent *real* local changes can be detected
+            lastSyncedWorkspaceInfo.current = { name, icon, color };
+            return;
+        }
+        
         if (isLocalChange && name) {
             console.log('[WorkspaceSync] Pushing local workspace info to Yjs:', { name, icon, color });
             lastSyncedWorkspaceInfo.current = { name, icon, color };
             syncUpdateWorkspaceInfo({ name, icon, color });
         }
-    }, [currentWorkspace?.name, currentWorkspace?.icon, currentWorkspace?.color, syncUpdateWorkspaceInfo]);
+    }, [currentWorkspace?.name, currentWorkspace?.icon, currentWorkspace?.color, currentWorkspace?.myPermission, syncUpdateWorkspaceInfo]);
 
     // --- Initialize session key and metadata connection ---
     useEffect(() => {
@@ -837,6 +943,9 @@ function App() {
                             // Document moves are now synced via Yjs
                             const docId = data.documentId || data.docId;
                             console.log('[App] Document moved via sidecar (handled by Yjs sync):', docId);
+                        } else if (data.type === 'index-results') {
+                            // Search index results from sidecar
+                            handleIndexResults(data);
                         }
                     } catch (e) {
                         console.error('Failed to parse metadata message:', e);
@@ -850,6 +959,8 @@ function App() {
                         reconnectAttempts++;
                         console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
                         reconnectTimer = setTimeout(connect, delay);
+                    } else if (!isCleanedUp) {
+                        console.log('Max reconnect attempts reached. Will retry when tab becomes visible.');
                     }
                 };
 
@@ -866,12 +977,25 @@ function App() {
             }
         };
 
+        // Reset reconnection when tab becomes visible (recovers from max-attempts state)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && !isCleanedUp) {
+                if (reconnectAttempts >= maxReconnectAttempts) {
+                    console.log('Tab visible — resetting reconnect attempts and retrying sidecar connection.');
+                    reconnectAttempts = 0;
+                    connect();
+                }
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         // Start initial connection
         connect();
 
         return () => {
             isCleanedUp = true;
             clearTimeout(reconnectTimer);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (metaSocket && metaSocket.readyState !== WebSocket.CONNECTING) {
                 // Only close if not still connecting (avoids StrictMode double-invoke error)
                 metaSocket.close();
@@ -921,6 +1045,11 @@ function App() {
             return null;
         }
         
+        // Enforce name length limit
+        if (name && name.length > 200) {
+            name = name.slice(0, 200);
+        }
+        
         const docId = generateDocId();
         const document = {
             id: docId,
@@ -940,6 +1069,18 @@ function App() {
         const wsUrl = getWsUrl(workspaceServerUrl);
         console.log(`[App] Creating document ${docId} with wsUrl: ${wsUrl}`);
         const provider = new WebsocketProvider(wsUrl, docId, ydoc);
+        
+        // CRITICAL: Immediately set awareness with user identity to prevent P2P race condition
+        // This ensures publicKey is included in awareness BEFORE any P2P sync happens
+        if (provider.awareness && userProfile) {
+            provider.awareness.setLocalStateField('user', {
+                name: userProfile.name || 'Anonymous',
+                color: userProfile.color || '#6366f1',
+                icon: userProfile.icon || '👤',
+                publicKey: userIdentity?.publicKeyBase62 || null,
+                lastActive: Date.now(),
+            });
+        }
         
         // Debug: Log provider connection status
         provider.on('status', ({ status }) => {
@@ -988,31 +1129,37 @@ function App() {
         showToast(`${typeNames[docType] || 'Document'} created`, 'success');
 
         return docId;
-    }, [currentWorkspaceId, showToast]);
+    }, [currentWorkspaceId, showToast, syncAddDocument, workspaceServerUrl, userProfile, userIdentity]);
 
     const openDocument = useCallback((docId, name, docType = DOC_TYPES.TEXT) => {
-        // Check if already open
-        if (openTabs.find(t => t.id === docId)) {
-            setActiveDocId(docId);
-            return;
-        }
+        // Use functional updater to avoid stale closure on openTabs
+        let alreadyOpen = false;
+        setOpenTabs(prev => {
+            // Check if already open
+            if (prev.find(t => t.id === docId)) {
+                alreadyOpen = true;
+                return prev;
+            }
+            return [...prev, { id: docId, name: name || 'Untitled', docType, hasUnsavedChanges: false }];
+        });
+        setActiveDocId(docId);
+        if (alreadyOpen) return;
 
         // Inventory systems don't get their own Y.Doc — data lives in workspace-level doc
         if (docType === DOC_TYPES.INVENTORY) {
-            setOpenTabs(prev => [...prev, { id: docId, name, docType, hasUnsavedChanges: false }]);
-            setActiveDocId(docId);
             return;
         }
 
         // File storage systems don't get their own Y.Doc — data lives in workspace-level doc
         if (docType === DOC_TYPES.FILE_STORAGE) {
-            setOpenTabs(prev => [...prev, { id: docId, name, docType, hasUnsavedChanges: false }]);
-            setActiveDocId(docId);
             return;
         }
 
-        // Create provider if not exists
-        if (!ydocsRef.current.has(docId)) {
+        // Create provider if not exists — guard against duplicate Y.Doc
+        if (ydocsRef.current.has(docId)) {
+            return;
+        }
+        {
             const ydoc = new Y.Doc();
             // Pass serverUrl for cross-platform sync (Electron joining remote workspace)
             const wsUrl = getWsUrl(workspaceServerUrl);
@@ -1051,15 +1198,8 @@ function App() {
             ydocsRef.current.set(docId, { ydoc, provider, indexeddbProvider, type: docType });
         }
 
-        // Add to tabs
-        setOpenTabs(prev => [...prev, { 
-            id: docId, 
-            name: name || 'Untitled',
-            docType: docType,
-            hasUnsavedChanges: false 
-        }]);
-        setActiveDocId(docId);
-    }, [openTabs, workspaceServerUrl]);
+        // Tab was already added via functional updater above
+    }, [workspaceServerUrl, userProfile, userIdentity]);
 
     // Create an Inventory System — does NOT create a separate Y.Doc
     // Inventory data lives in the workspace-level Y.Doc (see spec §11.2.5)
@@ -1142,7 +1282,7 @@ function App() {
             return existingFileStorage.id;
         }
         const fsId = 'fs-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
-        const resolvedIcon = icon || '�';
+        const resolvedIcon = icon || '📁';
         const fileStorageSystem = {
             id: fsId,
             workspaceId: currentWorkspaceId,
@@ -1188,25 +1328,28 @@ function App() {
     }, [currentWorkspaceId, showToast, publicIdentity, syncAddFileStorageSystem, syncAddDocument, syncedDocuments, openDocument]);
 
     const closeDocument = useCallback((docId) => {
-        const tabIndex = openTabs.findIndex(t => t.id === docId);
-        if (tabIndex === -1) return;
+        setOpenTabs(prev => {
+            const tabIndex = prev.findIndex(t => t.id === docId);
+            if (tabIndex === -1) return prev;
 
-        const newTabs = openTabs.filter(t => t.id !== docId);
-        setOpenTabs(newTabs);
+            const newTabs = prev.filter(t => t.id !== docId);
 
-        if (activeDocId === docId) {
-            if (newTabs.length > 0) {
-                const newIndex = Math.min(tabIndex, newTabs.length - 1);
-                setActiveDocId(newTabs[newIndex].id);
-            } else {
-                setActiveDocId(null);
-            }
-        }
+            setActiveDocId(prevActive => {
+                if (prevActive !== docId) return prevActive;
+                if (newTabs.length > 0) {
+                    const newIndex = Math.min(tabIndex, newTabs.length - 1);
+                    return newTabs[newIndex].id;
+                }
+                return null;
+            });
+
+            return newTabs;
+        });
 
         // Cleanup providers
         const docRef = ydocsRef.current.get(docId);
         if (docRef) {
-            docRef.provider.disconnect();
+            docRef.provider.destroy();
             // Also cleanup IndexedDB provider if exists (web mode)
             if (docRef.indexeddbProvider) {
                 docRef.indexeddbProvider.destroy();
@@ -1214,7 +1357,7 @@ function App() {
             docRef.ydoc.destroy();
             ydocsRef.current.delete(docId);
         }
-    }, [openTabs, activeDocId]);
+    }, []);
 
     const deleteDocument = useCallback((docId) => {
         closeDocument(docId);
@@ -1262,6 +1405,10 @@ function App() {
         // (safe no-op if docId doesn't exist in the map)
         syncUpdateInventorySystem(docId, { name: newName.trim() });
         
+        // Also update file storage Y.Map if this was a file storage system
+        // (safe no-op if docId doesn't exist in the map)
+        syncUpdateFileStorageSystem(docId, { name: newName.trim() });
+        
         // Also update local open tabs
         setOpenTabs(prev => prev.map(tab => 
             tab.id === docId 
@@ -1270,7 +1417,7 @@ function App() {
         ));
         
         showToast('Document renamed', 'success');
-    }, [syncUpdateDocument, syncUpdateInventorySystem, showToast]);
+    }, [syncUpdateDocument, syncUpdateInventorySystem, syncUpdateFileStorageSystem, showToast]);
 
     const copyInviteLink = useCallback(() => {
         if (inviteLink) {
@@ -1375,6 +1522,7 @@ function App() {
                 e.preventDefault();
                 if (openTabs.length > 1) {
                     const currentIndex = openTabs.findIndex(t => t.id === activeDocId);
+                    if (currentIndex === -1) return;
                     const nextIndex = (currentIndex + 1) % openTabs.length;
                     setActiveDocId(openTabs[nextIndex].id);
                 }
@@ -1386,6 +1534,7 @@ function App() {
                 e.preventDefault();
                 if (openTabs.length > 1) {
                     const currentIndex = openTabs.findIndex(t => t.id === activeDocId);
+                    if (currentIndex === -1) return;
                     const prevIndex = (currentIndex - 1 + openTabs.length) % openTabs.length;
                     setActiveDocId(openTabs[prevIndex].id);
                 }
@@ -1403,6 +1552,21 @@ function App() {
             if (isCtrlOrCmd && e.key === '\\' && !isInInput) {
                 e.preventDefault();
                 setSidebarCollapsed(prev => !prev);
+                return;
+            }
+            
+            // F1: Open help
+            if (e.key === 'F1') {
+                e.preventDefault();
+                setHelpSection(null);
+                setShowHelp(prev => !prev);
+                return;
+            }
+            
+            // Ctrl+K: Open search palette (works even in inputs)
+            if (isCtrlOrCmd && e.key === 'k') {
+                e.preventDefault();
+                setShowSearchPalette(prev => !prev);
                 return;
             }
         };
@@ -1763,12 +1927,22 @@ function App() {
                     workspaceMembers={workspaceMembers}
                     onKickMember={handleKickMember}
                     onTransferOwnership={syncTransferOwnership}
+                    onUpdateMemberPermission={handleUpdateMemberPermission}
+                    onRespondToPendingDemotion={handleRespondToPendingDemotion}
                     
                     // Folder props
                     folders={folders}
                     onCreateFolder={createFolder}
                     onDeleteFolder={deleteFolder}
                     onRenameFolder={renameFolder}
+                    expandedFolders={expandedFolders}
+                    onSetExpandedFolders={setExpandedFolders}
+                    
+                    // Search
+                    onOpenSearch={() => setShowSearchPalette(true)}
+                    
+                    // Help
+                    onShowHelp={() => { setHelpSection(null); setShowHelp(true); }}
                 />
             )}
 
@@ -1800,6 +1974,7 @@ function App() {
                             onProfileChange={setUserProfile}
                             isFullscreen={isFullscreen}
                             onToggleFullscreen={toggleFullscreen}
+                            onOpenSearch={() => setShowSearchPalette(true)}
                             documents={documents}
                             folders={folders}
                             collaboratorsByDocument={collaboratorsByDocument}
@@ -1810,6 +1985,15 @@ function App() {
                             <div className="header-actions">
                                 <button
                                     className="tab-bar-btn"
+                                    onClick={() => setShowSearchPalette(true)}
+                                    title="Search everything (Ctrl+K)"
+                                    aria-label="Open search palette"
+                                    data-testid="search-btn-minimal"
+                                >
+                                    🔍
+                                </button>
+                                <button
+                                    className="tab-bar-btn"
                                     onClick={toggleFullscreen}
                                     title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                                 >
@@ -1818,6 +2002,7 @@ function App() {
                                 <UserProfile
                                     userProfile={userProfile}
                                     onProfileChange={setUserProfile}
+                                    onLock={lockApp}
                                 />
                             </div>
                         </div>
@@ -1846,7 +2031,7 @@ function App() {
                             inventorySystemId={activeDocId}
                             workspaceId={currentWorkspaceId}
                             currentWorkspace={currentWorkspace}
-                            userIdentity={publicIdentity}
+                            userIdentity={inventoryIdentity}
                             collaborators={workspaceCollaborators}
                             yInventorySystems={yInventorySystems}
                             yCatalogItems={yCatalogItems}
@@ -2080,16 +2265,20 @@ function App() {
                         if (stateData instanceof Uint8Array) {
                             // New format: Yjs state snapshot
                             const newDoc = new Y.Doc();
-                            Y.applyUpdate(newDoc, stateData);
-                            const fragment = activeDoc.ydoc.get('prosemirror', Y.XmlFragment);
-                            const newFragment = newDoc.get('prosemirror', Y.XmlFragment);
-                            activeDoc.ydoc.transact(() => {
-                                fragment.delete(0, fragment.length);
-                                // Copy content from new doc
-                                newFragment.toArray().forEach(item => {
-                                    fragment.push([item.clone()]);
+                            try {
+                                Y.applyUpdate(newDoc, stateData);
+                                const fragment = activeDoc.ydoc.get('prosemirror', Y.XmlFragment);
+                                const newFragment = newDoc.get('prosemirror', Y.XmlFragment);
+                                activeDoc.ydoc.transact(() => {
+                                    fragment.delete(0, fragment.length);
+                                    // Copy content from new doc
+                                    newFragment.toArray().forEach(item => {
+                                        fragment.push([item.clone()]);
+                                    });
                                 });
-                            });
+                            } finally {
+                                newDoc.destroy();
+                            }
                         } else {
                             // Old format: plain text (fallback)
                             console.log('Rollback to text not supported for ProseMirror');
@@ -2135,6 +2324,14 @@ function App() {
                     }}
                     onCreateKanban={(name, folderId, icon, color) => {
                         createDocument(name || 'Kanban Board', folderId, DOC_TYPES.KANBAN, icon, color);
+                        setShowCreateDocumentDialog(false);
+                    }}
+                    onCreateInventory={(name, folderId, icon, color) => {
+                        createInventorySystem(name || 'Inventory', folderId, icon, color);
+                        setShowCreateDocumentDialog(false);
+                    }}
+                    onCreateFileStorage={(name, folderId, icon, color) => {
+                        createFileStorage(name || 'File Storage', folderId, icon, color);
                         setShowCreateDocumentDialog(false);
                     }}
                     onSuccess={() => setShowCreateDocumentDialog(false)}
@@ -2195,6 +2392,66 @@ function App() {
                     }}
                 />
             )}
+
+            {/* Help & Documentation Overlay */}
+            <HelpPage
+                isOpen={showHelp}
+                onClose={() => setShowHelp(false)}
+                initialSection={helpSection}
+            />
+
+            {/* Cross-App Search Palette */}
+            <SearchPalette
+                show={showSearchPalette}
+                onClose={() => setShowSearchPalette(false)}
+                documents={documents}
+                folders={folders}
+                workspaceCollaborators={workspaceCollaborators}
+                workspaceMembers={Object.values(workspaceMembers || {})}
+                yCatalogItems={yCatalogItems}
+                yStorageFiles={yStorageFiles}
+                yStorageFolders={yStorageFolders}
+                workspaceYdoc={workspaceYdoc}
+                onOpenDocument={openDocument}
+                onNavigateFolder={(folderId) => {
+                    // Expand parent folders to reveal target, then switch sidebar to folder
+                    if (folderId) {
+                        setExpandedFolders(prev => {
+                            const next = new Set(prev);
+                            // Expand the target folder and all its ancestors
+                            const parentChain = [];
+                            let current = folderId;
+                            while (current) {
+                                parentChain.push(current);
+                                const folder = folders.find(f => f.id === current);
+                                current = folder?.parentId || null;
+                            }
+                            parentChain.forEach(id => next.add(id));
+                            return next;
+                        });
+                    }
+                }}
+                onOpenChat={(user) => {
+                    if (user) {
+                        setChatTargetUser(user);
+                    }
+                }}
+                onOpenInventory={(item) => {
+                    // Open inventory dashboard if an inventory item is selected
+                    // Look for inventory doc type in documents
+                    const invDoc = documents.find(d => d.type === 'inventory');
+                    if (invDoc) openDocument(invDoc.id, invDoc.name, 'inventory');
+                }}
+                onOpenFileStorage={(file) => {
+                    // Open file storage dashboard if a file is selected
+                    const fsDoc = documents.find(d => d.type === DOC_TYPES.FILE_STORAGE);
+                    if (fsDoc) openDocument(fsDoc.id, fsDoc.name, DOC_TYPES.FILE_STORAGE);
+                }}
+                isElectronMode={isElectronMode}
+                metaSocketRef={metaSocketRef}
+                ydocsRef={ydocsRef}
+                workspaceName={syncedWorkspaceInfo?.name || currentWorkspace?.name}
+            />
         </div>
         </FileTransferProvider>
         </PresenceProvider>

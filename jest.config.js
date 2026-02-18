@@ -35,7 +35,7 @@ export default {
   // Ignore patterns - use forward slashes for compatibility
   testPathIgnorePatterns: ['node_modules', 'dist', 'integration'],
   transformIgnorePatterns: [
-    'node_modules/(?!(yjs|lib0)/)',
+    'node_modules/(?!(yjs|lib0|y-indexeddb)/)',
   ],
   
   // Verbose output

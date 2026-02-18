@@ -12,6 +12,7 @@ import { useMemo, useCallback, useState } from 'react';
 import FileTypeIcon from './FileTypeIcon';
 import { formatFileSize, getRelativeTime } from '../../utils/fileTypeCategories';
 import { DEFAULT_AUTO_DELETE_DAYS } from '../../utils/fileStorageValidation';
+import { useConfirmDialog } from '../common/ConfirmDialog';
 import './TrashView.css';
 
 export default function TrashView({
@@ -27,7 +28,9 @@ export default function TrashView({
   onEmptyTrash,
 }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   const autoDeleteDays = settings?.autoDeleteDays ?? DEFAULT_AUTO_DELETE_DAYS;
+  const canEdit = role === 'admin' || role === 'collaborator';
 
   const trashedItems = useMemo(() => {
     const files = (trashedFiles || []).map(f => ({ ...f, itemType: 'file' }));
@@ -44,19 +47,39 @@ export default function TrashView({
   const handleRestore = useCallback((item) => {
     if (item.itemType === 'file') onRestoreFile?.(item.id);
     else onRestoreFolder?.(item.id);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
   }, [onRestoreFile, onRestoreFolder]);
 
-  const handlePermanentDelete = useCallback((item) => {
-    const confirmed = window.confirm(`Permanently delete "${item.name}"? This cannot be undone.`);
+  const handlePermanentDelete = useCallback(async (item) => {
+    const confirmed = await confirm({
+      title: 'Delete Forever',
+      message: `Permanently delete "${item.name}"? This cannot be undone.`,
+      confirmText: 'Delete Forever',
+      variant: 'danger'
+    });
     if (!confirmed) return;
     if (item.itemType === 'file') onPermanentlyDeleteFile?.(item.id);
     else onPermanentlyDeleteFolder?.(item.id);
-  }, [onPermanentlyDeleteFile, onPermanentlyDeleteFolder]);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
+  }, [onPermanentlyDeleteFile, onPermanentlyDeleteFolder, confirm]);
 
-  const handleEmptyTrash = useCallback(() => {
-    const confirmed = window.confirm('Permanently delete all items in trash? This cannot be undone.');
+  const handleEmptyTrash = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Empty Trash',
+      message: 'Permanently delete all items in trash? This cannot be undone.',
+      confirmText: 'Empty Trash',
+      variant: 'danger'
+    });
     if (confirmed) onEmptyTrash?.();
-  }, [onEmptyTrash]);
+  }, [onEmptyTrash, confirm]);
 
   const toggleSelect = useCallback((id) => {
     setSelectedIds(prev => {
@@ -74,8 +97,13 @@ export default function TrashView({
     setSelectedIds(new Set());
   }, [selectedIds, trashedItems, handleRestore]);
 
-  const handleBulkDelete = useCallback(() => {
-    const confirmed = window.confirm(`Permanently delete ${selectedIds.size} items?`);
+  const handleBulkDelete = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Delete Items',
+      message: `Permanently delete ${selectedIds.size} items? This cannot be undone.`,
+      confirmText: 'Delete All',
+      variant: 'danger'
+    });
     if (!confirmed) return;
     for (const item of trashedItems) {
       if (selectedIds.has(item.id)) {
@@ -84,17 +112,18 @@ export default function TrashView({
       }
     }
     setSelectedIds(new Set());
-  }, [selectedIds, trashedItems, onPermanentlyDeleteFile, onPermanentlyDeleteFolder]);
+  }, [selectedIds, trashedItems, onPermanentlyDeleteFile, onPermanentlyDeleteFolder, confirm]);
 
   return (
     <div className="trash-view" data-testid="trash-view">
+      {ConfirmDialogComponent}
       <div className="trash-header">
         <div className="trash-header-left">
           <h3 className="trash-title">🗑️ Trash</h3>
           <span className="trash-count">{trashedItems.length} items</span>
         </div>
         <div className="trash-header-right">
-          {selectedIds.size > 0 && (
+          {canEdit && selectedIds.size > 0 && (
             <>
               <button className="trash-btn trash-btn--restore" onClick={handleBulkRestore} data-testid="trash-bulk-restore">
                 Restore ({selectedIds.size})
@@ -155,12 +184,16 @@ export default function TrashView({
                   </span>
                 )}
                 <div className="trash-actions">
-                  <button className="trash-action-btn" onClick={() => handleRestore(item)} title="Restore" data-testid={`trash-restore-${item.id}`}>
-                    ↩️
-                  </button>
-                  <button className="trash-action-btn trash-action-btn--danger" onClick={() => handlePermanentDelete(item)} title="Delete Forever" data-testid={`trash-perm-delete-${item.id}`}>
-                    ❌
-                  </button>
+                  {canEdit && (
+                    <>
+                      <button className="trash-action-btn" onClick={() => handleRestore(item)} title="Restore" data-testid={`trash-restore-${item.id}`}>
+                        ↩️
+                      </button>
+                      <button className="trash-action-btn trash-action-btn--danger" onClick={() => handlePermanentDelete(item)} title="Delete Forever" data-testid={`trash-perm-delete-${item.id}`}>
+                        ❌
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

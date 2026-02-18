@@ -150,7 +150,9 @@ function storeIdentity(identity) {
         devices: identity.devices
     };
     
-    fs.writeFileSync(identityPath, JSON.stringify(storable, null, 2), 'utf-8');
+    const tmpPath = identityPath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(storable, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, identityPath);
     console.log('[Identity] Stored identity at:', identityPath);
     
     return true;
@@ -247,10 +249,15 @@ function validateRecoveryPhrase(mnemonic) {
     }
     
     try {
-        // The stored identity has the mnemonic encrypted
+        // The stored identity's mnemonic is already decrypted by loadIdentity()
         const storedMnemonic = identity.mnemonic;
         
-        // Simple comparison
+        if (!storedMnemonic) {
+            console.error('[Identity] No mnemonic found in stored identity');
+            return false;
+        }
+        
+        // Compare the decrypted stored mnemonic with the provided phrase
         return mnemonic.trim() === storedMnemonic.trim();
     } catch (e) {
         console.error('[Identity] Failed to validate recovery phrase:', e);

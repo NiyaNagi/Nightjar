@@ -63,6 +63,7 @@ function NightjarMascot({
     const rotateTimerRef = useRef(null);
     const fadeTimerRef = useRef(null);
     const holdTimerRef = useRef(null);
+    const innerFadeTimerRef = useRef(null);
     const isHoldingRef = useRef(false);
     
     // Load sayings on mount
@@ -85,7 +86,7 @@ function NightjarMascot({
             clearTimeout(fadeTimerRef.current);
             fadeTimerRef.current = setTimeout(() => {
                 setIsFading(true);
-                setTimeout(() => setIsVisible(false), 300);
+                innerFadeTimerRef.current = setTimeout(() => setIsVisible(false), 300);
             }, fadeTimeout);
         }
     }, [sayings, size, isVisible, fadeTimeout]);
@@ -115,7 +116,7 @@ function NightjarMascot({
             // Start fade timer
             fadeTimerRef.current = setTimeout(() => {
                 setIsFading(true);
-                setTimeout(() => setIsVisible(false), 300);
+                innerFadeTimerRef.current = setTimeout(() => setIsVisible(false), 300);
             }, fadeTimeout);
         } else {
             nextSaying();
@@ -157,6 +158,7 @@ function NightjarMascot({
             clearInterval(rotateTimerRef.current);
             clearTimeout(fadeTimerRef.current);
             clearTimeout(holdTimerRef.current);
+            clearTimeout(innerFadeTimerRef.current);
         };
     }, []);
     

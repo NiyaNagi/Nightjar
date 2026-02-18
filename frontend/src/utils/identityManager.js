@@ -18,6 +18,7 @@
 
 import nacl from 'tweetnacl';
 import { Buffer } from 'buffer';
+import { timingSafeEqual } from './cryptoUtils';
 import {
   MAX_PIN_ATTEMPTS,
   PIN_LENGTH,
@@ -253,7 +254,11 @@ export function listIdentities() {
  * Save identities list
  */
 function saveIdentities(identities) {
-    localStorage.setItem(IDENTITIES_KEY, JSON.stringify(identities));
+    try {
+        localStorage.setItem(IDENTITIES_KEY, JSON.stringify(identities));
+    } catch (err) {
+        console.warn('[IdentityManager] Failed to save identities list (storage quota exceeded?):', err);
+    }
 }
 
 /**
@@ -267,10 +272,14 @@ export function getActiveIdentityId() {
  * Set active identity ID
  */
 function setActiveIdentityId(id) {
-    if (id) {
-        localStorage.setItem(ACTIVE_IDENTITY_KEY, id);
-    } else {
-        localStorage.removeItem(ACTIVE_IDENTITY_KEY);
+    try {
+        if (id) {
+            localStorage.setItem(ACTIVE_IDENTITY_KEY, id);
+        } else {
+            localStorage.removeItem(ACTIVE_IDENTITY_KEY);
+        }
+    } catch (err) {
+        console.warn('[IdentityManager] Failed to set active identity ID (storage quota exceeded?):', err);
     }
 }
 
@@ -373,7 +382,11 @@ export function getLockTimeout() {
  */
 export function setLockTimeout(minutes) {
     if (typeof minutes === 'number' && minutes > 0) {
-        localStorage.setItem(LOCK_TIMEOUT_KEY, String(minutes));
+        try {
+            localStorage.setItem(LOCK_TIMEOUT_KEY, String(minutes));
+        } catch (err) {
+            console.warn('[IdentityManager] Failed to store lock timeout (storage quota exceeded?):', err);
+        }
     }
 }
 
@@ -455,7 +468,11 @@ export async function createIdentity(identityData, pin) {
     
     // Store encrypted identity data
     const encryptedData = encryptData(identityData, encryptionKey);
-    localStorage.setItem(IDENTITY_PREFIX + id, encryptedData);
+    try {
+        localStorage.setItem(IDENTITY_PREFIX + id, encryptedData);
+    } catch (err) {
+        console.warn('[IdentityManager] Failed to store encrypted identity data (storage quota exceeded?):', err);
+    }
     
     // Add to identities list
     const identities = listIdentities();
@@ -503,7 +520,9 @@ export async function unlockIdentity(id, pin) {
     // Verify PIN
     const pinHash = await hashPin(pin, metadata.salt);
     
-    if (pinHash !== metadata.pinHash) {
+    const pinHashBytes = new Uint8Array(Buffer.from(pinHash, 'base64'));
+    const storedHashBytes = new Uint8Array(Buffer.from(metadata.pinHash, 'base64'));
+    if (!timingSafeEqual(pinHashBytes, storedHashBytes)) {
         // Wrong PIN
         metadata.pinAttempts = (metadata.pinAttempts || 0) + 1;
         
@@ -584,16 +603,20 @@ export function updateIdentity(updates) {
     
     const updated = { ...current, ...updates };
     const newEncrypted = encryptData(updated, key);
-    localStorage.setItem(IDENTITY_PREFIX + identityId, newEncrypted);
+    try {
+        localStorage.setItem(IDENTITY_PREFIX + identityId, newEncrypted);
+    } catch (err) {
+        console.warn('[IdentityManager] Failed to update identity data (storage quota exceeded?):', err);
+    }
     
     // Update metadata if handle/icon/color changed
-    if (updates.handle || updates.icon || updates.color) {
+    if (updates.handle !== undefined || updates.icon !== undefined || updates.color !== undefined) {
         const identities = listIdentities();
         const idx = identities.findIndex(i => i.id === identityId);
         if (idx >= 0) {
-            if (updates.handle) identities[idx].handle = updates.handle;
-            if (updates.icon) identities[idx].icon = updates.icon;
-            if (updates.color) identities[idx].color = updates.color;
+            if (updates.handle !== undefined) identities[idx].handle = updates.handle;
+            if (updates.icon !== undefined) identities[idx].icon = updates.icon;
+            if (updates.color !== undefined) identities[idx].color = updates.color;
             saveIdentities(identities);
         }
     }
@@ -700,7 +723,11 @@ export function getScopedKey(key) {
  */
 export function scopedSet(key, value) {
     const scopedKey = getScopedKey(key);
-    localStorage.setItem(scopedKey, JSON.stringify(value));
+    try {
+        localStorage.setItem(scopedKey, JSON.stringify(value));
+    } catch (err) {
+        console.warn('[IdentityManager] Failed to store scoped data (storage quota exceeded?):', err);
+    }
 }
 
 /**

@@ -64,6 +64,8 @@ export default function MyRequests() {
     if (idx === -1) return;
     yInventoryRequests.delete(idx, 1);
     yInventoryRequests.insert(idx, [{ ...items[idx], status: 'cancelled', updatedAt: Date.now() }]);
+    // Terminal state: clean up address reveal
+    ctx.yAddressReveals?.delete(req.id);
     yInventoryAuditLog.push([{
       id: generateId('aud-'),
       inventorySystemId,
@@ -94,6 +96,8 @@ export default function MyRequests() {
     if (idx === -1) return;
     yInventoryRequests.delete(idx, 1);
     yInventoryRequests.insert(idx, [{ ...items[idx], status: 'delivered', deliveredAt: Date.now(), updatedAt: Date.now() }]);
+    // Terminal state: clean up address reveal
+    ctx.yAddressReveals?.delete(req.id);
     yInventoryAuditLog.push([{
       id: generateId('aud-'),
       inventorySystemId,
@@ -159,10 +163,10 @@ export default function MyRequests() {
         const admins = (ctx.collaborators || []).filter(
           c => c.permission === 'owner'
         );
-        if (admins.length > 0 && userIdentity?.privateKey) {
+        if (admins.length > 0 && userIdentity?.curveSecretKey) {
           const senderPubHex = getPublicKeyHex(userIdentity);
           const entries = await encryptAddressForAdmins(
-            addr, admins, userIdentity.privateKey, senderPubHex
+            addr, admins, userIdentity.curveSecretKey, senderPubHex
           );
           ctx.yPendingAddresses?.set(requestId, entries);
         }
@@ -222,6 +226,17 @@ export default function MyRequests() {
       showToast('Invalid quantity', 'error');
       return;
     }
+    const catItem = catalogItems.find(c => c.id === req.catalogItemId);
+    if (catItem) {
+      if (catItem.quantityMin != null && qty < catItem.quantityMin) {
+        showToast(`Minimum quantity is ${catItem.quantityMin}`, 'error');
+        return;
+      }
+      if (catItem.quantityMax != null && qty > catItem.quantityMax) {
+        showToast(`Maximum quantity is ${catItem.quantityMax}`, 'error');
+        return;
+      }
+    }
     const items = yInventoryRequests.toArray();
     const idx = items.findIndex(r => r.id === req.id);
     if (idx === -1) return;
@@ -246,7 +261,7 @@ export default function MyRequests() {
     }]);
     setEditingId(null);
     showToast('Request updated', 'success');
-  }, [editQty, editUrgent, editNotes, yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, userIdentity]);
+  }, [editQty, editUrgent, editNotes, yInventoryRequests, yInventoryAuditLog, inventorySystemId, showToast, userIdentity, catalogItems]);
 
   // Build timeline for a request
   const getTimeline = (req) => {

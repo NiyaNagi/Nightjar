@@ -102,7 +102,7 @@ NODE_ENV=production
 
 ```bash
 # On your server
-git clone https://github.com/yourusername/nightjar.git
+git clone https://github.com/SaoneYanpa/Nightjar.git
 cd nightjar/server/unified
 npm install --production
 npm start

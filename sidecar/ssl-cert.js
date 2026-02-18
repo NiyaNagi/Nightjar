@@ -71,7 +71,7 @@ function ensureSSLCert(certDir) {
       },
       {
         name: 'basicConstraints',
-        cA: true
+        cA: false
       }
     ]);
     
@@ -118,15 +118,24 @@ function getCertInfo(certDir) {
   }
   
   try {
-    const cert = fs.readFileSync(certPath, 'utf8');
-    // Extract basic info (simple regex, not full X.509 parsing)
-    const cnMatch = cert.match(/CN=([^,\n]+)/);
-    const validityMatch = cert.match(/Not After\s*:\s*([^\n]+)/);
+    const certPem = fs.readFileSync(certPath, 'utf8');
+    // PEM is base64-encoded DER, so plain-text regex for CN= can never match.
+    // Use node-forge to parse the certificate properly.
+    let commonName = 'nightjar.local';
+    try {
+      const certObj = forge.pki.certificateFromPem(certPem);
+      const cnField = certObj.subject.getField('CN');
+      if (cnField && cnField.value) {
+        commonName = cnField.value;
+      }
+    } catch (parseErr) {
+      // Fall back to default if parsing fails
+    }
     
     return {
       exists: true,
       path: certPath,
-      commonName: cnMatch ? cnMatch[1] : 'nightjar.local',
+      commonName,
       selfSigned: true
     };
   } catch (err) {

@@ -150,12 +150,53 @@ export function exportDocument(editor, format, filename = 'document') {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Delay revocation to ensure the browser has time to start the download
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Maximum import file size (10 MB) to prevent memory exhaustion
+const MAX_IMPORT_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Escape HTML special characters to prevent XSS when interpolating
+ * user text into HTML strings.
+ */
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
+ * Sanitize HTML by stripping dangerous tags and attributes.
+ * Allows safe formatting tags only.
+ */
+function sanitizeHtml(html) {
+    // Remove <script> tags and their content
+    let safe = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    // Remove event handler attributes (onclick, onerror, onload, etc.)
+    safe = safe.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+    // Remove javascript: URLs in href/src attributes
+    safe = safe.replace(/(href|src|action)\s*=\s*(["'])\s*javascript\s*:[^"']*\2/gi, '$1=$2$2');
+    // Remove <iframe>, <object>, <embed>, <form>, <meta>, <link>, <style> tags
+    safe = safe.replace(/<\/?(iframe|object|embed|form|meta|link|style)\b[^>]*>/gi, '');
+    // Remove data: URLs in src attributes (potential XSS vector)
+    safe = safe.replace(/(src)\s*=\s*(["'])\s*data\s*:[^"']*\2/gi, '$1=$2$2');
+    return safe;
 }
 
 // Import document from file
 export async function importDocument(file, editor) {
     if (!file || !editor) return false;
+    
+    // Bug #109: Reject files that are too large to prevent memory exhaustion
+    if (file.size > MAX_IMPORT_SIZE) {
+        console.error(`Import rejected: file size ${file.size} exceeds limit ${MAX_IMPORT_SIZE}`);
+        return false;
+    }
     
     const text = await file.text();
     const extension = file.name.split('.').pop()?.toLowerCase();
@@ -168,7 +209,8 @@ export async function importDocument(file, editor) {
                 break;
             
             case 'html':
-                editor.commands.setContent(text);
+                // Bug #107: Sanitize HTML to prevent XSS from malicious imports
+                editor.commands.setContent(sanitizeHtml(text));
                 break;
             
             case 'md':
@@ -181,9 +223,9 @@ export async function importDocument(file, editor) {
             
             case 'txt':
             default:
-                // Plain text - wrap in paragraphs
+                // Bug #108: Escape HTML in plain text to prevent XSS injection
                 const paragraphs = text.split('\n\n').map(p => 
-                    `<p>${p.replace(/\n/g, '<br>')}</p>`
+                    `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`
                 ).join('');
                 editor.commands.setContent(paragraphs);
                 break;
@@ -219,13 +261,26 @@ function markdownToHtml(markdown) {
         .replace(/^---$/gm, '<hr>')
         // Bullet lists
         .replace(/^-\s+(.*)$/gm, '<li>$1</li>')
-        // Links
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+        // Ordered lists
+        .replace(/^\d+\.\s+(.*)$/gm, '<li data-list="ol">$1</li>')
+        // Links - sanitize href to prevent javascript: XSS
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+            const trimmedUrl = url.trim().toLowerCase();
+            // Only allow safe URL schemes
+            if (trimmedUrl.startsWith('javascript:') || trimmedUrl.startsWith('data:') || trimmedUrl.startsWith('vbscript:')) {
+                return text; // Strip the link, keep just the text
+            }
+            return `<a href="${url}">${text}</a>`;
+        })
         // Paragraphs (double newlines)
         .replace(/\n\n/g, '</p><p>');
     
-    // Wrap list items
-    html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+    // Wrap consecutive ordered list items in <ol>
+    html = html.replace(/((?:<li data-list="ol">.*?<\/li>\s*)+)/g, (match) => {
+        return '<ol>' + match.replace(/ data-list="ol"/g, '') + '</ol>';
+    });
+    // Wrap consecutive unordered list items in <ul>
+    html = html.replace(/((?:<li>.*?<\/li>\s*)+)/g, '<ul>$1</ul>');
     
     // Wrap in paragraph if not already wrapped
     if (!html.startsWith('<')) {

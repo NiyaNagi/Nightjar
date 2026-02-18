@@ -4,7 +4,7 @@ import SimpleMarkdown from './SimpleMarkdown';
 import { useConfirmDialog } from './common/ConfirmDialog';
 import './Kanban.css';
 
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+const generateId = () => crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
 // Sync timeout - wait for provider to sync before initializing defaults
 const SYNC_TIMEOUT_MS = 10000;
@@ -40,8 +40,16 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         const updateFromYjs = () => {
             const data = ykanban.get('columns');
             if (data) {
-                setColumns(JSON.parse(JSON.stringify(data)));
+                const parsed = JSON.parse(JSON.stringify(data));
+                setColumns(parsed);
                 setIsLoading(false);
+                // Clear editing state if the edited card was removed by a remote change
+                setEditingCard(prev => {
+                    if (prev && !parsed.some(col => col.cards?.some(c => c.id === prev))) {
+                        return null;
+                    }
+                    return prev;
+                });
             } else if (hasSyncedRef.current) {
                 // Only initialize defaults AFTER provider has synced and there's truly no data
                 const defaultColumns = [
@@ -163,6 +171,11 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                 provider.connect();
             }
             
+            // Clear any existing timeout before setting a new one
+            if (syncTimeoutRef.current) {
+                clearTimeout(syncTimeoutRef.current);
+            }
+            
             // Set up timeout again
             syncTimeoutRef.current = setTimeout(() => {
                 if (!hasSyncedRef.current) {
@@ -195,19 +208,40 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         setIsLoading(false);
     }, []);
 
-    const saveToYjs = useCallback((newColumns) => {
-        if (ykanbanRef.current) {
-            ykanbanRef.current.set('columns', JSON.parse(JSON.stringify(newColumns)));
-        }
+    const saveToYjs = useCallback((newColumns, changedColumnId = null) => {
+        if (!ykanbanRef.current) return;
+        const ykanban = ykanbanRef.current;
+        const doc = ykanban.doc;
+        const doSave = () => {
+            if (changedColumnId) {
+                // Only update the specific column that changed
+                const existing = ykanban.get('columns');
+                if (Array.isArray(existing)) {
+                    const idx = existing.findIndex(c => c.id === changedColumnId);
+                    const newCol = newColumns.find(c => c.id === changedColumnId);
+                    if (idx !== -1 && newCol) {
+                        const updated = JSON.parse(JSON.stringify(existing));
+                        updated[idx] = JSON.parse(JSON.stringify(newCol));
+                        ykanban.set('columns', updated);
+                        return;
+                    }
+                }
+            }
+            // Fallback: replace entire array (for adds, deletes, reorders)
+            ykanban.set('columns', JSON.parse(JSON.stringify(newColumns)));
+        };
+        if (doc) doc.transact(doSave);
+        else doSave();
     }, []);
 
     // Column operations
     const addColumn = useCallback(() => {
         if (!newColumnName.trim()) return;
+        if (columns.some(c => c.name.toLowerCase() === newColumnName.trim().toLowerCase())) return;
         const newColumn = {
             id: generateId(),
             name: newColumnName.trim(),
-            color: '#' + Math.floor(Math.random()*16777215).toString(16),
+            color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'),
             cards: []
         };
         const newColumns = [...columns, newColumn];
@@ -225,6 +259,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             variant: 'danger'
         });
         if (!confirmed) return;
+        setEditingColumn(prev => prev === columnId ? null : prev);
         const newColumns = columns.filter(c => c.id !== columnId);
         setColumns(newColumns);
         saveToYjs(newColumns);
@@ -235,7 +270,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             c.id === columnId ? { ...c, name } : c
         );
         setColumns(newColumns);
-        saveToYjs(newColumns);
+        saveToYjs(newColumns, columnId);
         setEditingColumn(null);
     }, [columns, saveToYjs]);
 
@@ -244,7 +279,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             c.id === columnId ? { ...c, color } : c
         );
         setColumns(newColumns);
-        saveToYjs(newColumns);
+        saveToYjs(newColumns, columnId);
     }, [columns, saveToYjs]);
 
     // Card operations
@@ -258,7 +293,9 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             createdAt: Date.now()
         };
         
-        const newColumns = columns.map(c => {
+        const currentColumns = ykanbanRef.current?.get('columns');
+        const base = currentColumns ? JSON.parse(JSON.stringify(currentColumns)) : columns;
+        const newColumns = base.map(c => {
             if (c.id === columnId) {
                 const cards = position === 'top' 
                     ? [newCard, ...c.cards]
@@ -269,7 +306,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         });
         
         setColumns(newColumns);
-        saveToYjs(newColumns);
+        saveToYjs(newColumns, columnId);
         setEditingCard(newCard.id);
     }, [columns, saveToYjs]);
 
@@ -286,7 +323,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             return c;
         });
         setColumns(newColumns);
-        saveToYjs(newColumns);
+        saveToYjs(newColumns, columnId);
     }, [columns, saveToYjs]);
 
     const deleteCard = useCallback(async (columnId, cardId) => {
@@ -307,8 +344,9 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
             return c;
         });
         setColumns(newColumns);
-        saveToYjs(newColumns);
-    }, [columns, saveToYjs, confirm]);
+        saveToYjs(newColumns, columnId);
+        if (editingCard === cardId) setEditingCard(null);
+    }, [columns, saveToYjs, confirm, editingCard]);
 
     // Drag and drop for cards
     const handleDragStart = (e, card, fromColumnId) => {
@@ -336,31 +374,63 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         
         const { card, fromColumnId } = draggedCard;
         
-        const newColumns = columns.map(c => {
-            // Remove from source column
-            if (c.id === fromColumnId) {
-                return {
-                    ...c,
-                    cards: c.cards.filter(cc => cc.id !== card.id)
-                };
-            }
-            return c;
-        }).map(c => {
-            // Add to destination column
-            if (c.id === toColumnId) {
+        if (fromColumnId === toColumnId) {
+            // Same-column reorder: single operation to avoid off-by-one
+            const newColumns = columns.map(c => {
+                if (c.id !== toColumnId) return c;
                 const cards = [...c.cards];
-                if (toIndex !== null) {
-                    cards.splice(toIndex, 0, card);
-                } else {
-                    cards.push(card);
-                }
+                const fromIdx = cards.findIndex(cc => cc.id === card.id);
+                if (fromIdx === -1) return c;
+                const [movedCard] = cards.splice(fromIdx, 1);
+                const insertIdx = toIndex !== null
+                    ? (toIndex > fromIdx ? toIndex - 1 : toIndex)
+                    : cards.length;
+                cards.splice(insertIdx, 0, movedCard);
                 return { ...c, cards };
+            });
+            setColumns(newColumns);
+            saveToYjs(newColumns, toColumnId);
+        } else {
+            // Cross-column move
+            const newColumns = columns.map(c => {
+                if (c.id === fromColumnId) {
+                    return { ...c, cards: c.cards.filter(cc => cc.id !== card.id) };
+                }
+                if (c.id === toColumnId) {
+                    const cards = [...c.cards];
+                    if (toIndex !== null) {
+                        cards.splice(toIndex, 0, card);
+                    } else {
+                        cards.push(card);
+                    }
+                    return { ...c, cards };
+                }
+                return c;
+            });
+            setColumns(newColumns);
+            // Cross-column move: wrap both column updates in a single transaction
+            if (ykanbanRef.current) {
+                const ykanban = ykanbanRef.current;
+                const doc = ykanban.doc;
+                const doSave = () => {
+                    const existing = ykanban.get('columns');
+                    if (Array.isArray(existing)) {
+                        const updated = JSON.parse(JSON.stringify(existing));
+                        const fromIdx = updated.findIndex(c => c.id === fromColumnId);
+                        const toIdx = updated.findIndex(c => c.id === toColumnId);
+                        const newFrom = newColumns.find(c => c.id === fromColumnId);
+                        const newTo = newColumns.find(c => c.id === toColumnId);
+                        if (fromIdx !== -1 && newFrom) updated[fromIdx] = JSON.parse(JSON.stringify(newFrom));
+                        if (toIdx !== -1 && newTo) updated[toIdx] = JSON.parse(JSON.stringify(newTo));
+                        ykanban.set('columns', updated);
+                    } else {
+                        ykanban.set('columns', JSON.parse(JSON.stringify(newColumns)));
+                    }
+                };
+                if (doc) doc.transact(doSave);
+                else doSave();
             }
-            return c;
-        });
-        
-        setColumns(newColumns);
-        saveToYjs(newColumns);
+        }
         setDraggedCard(null);
     };
 
@@ -388,9 +458,13 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         const fromIndex = columns.findIndex(c => c.id === draggedColumn.id);
         const toIndex = columns.findIndex(c => c.id === targetColumnId);
         
+        if (fromIndex === -1 || toIndex === -1) return;
+        
+        // Use the current version of the column, not the stale drag snapshot
+        const currentColumn = columns[fromIndex] || draggedColumn;
         const newColumns = [...columns];
         newColumns.splice(fromIndex, 1);
-        newColumns.splice(toIndex, 0, draggedColumn);
+        newColumns.splice(toIndex, 0, currentColumn);
         
         setColumns(newColumns);
         saveToYjs(newColumns);
@@ -480,12 +554,17 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                                     defaultValue={column.name}
                                     autoFocus
                                     aria-label="Edit column name"
-                                    onBlur={(e) => updateColumnName(column.id, e.target.value)}
+                                    onBlur={(e) => {
+                                        if (!e.target.dataset.cancelled) {
+                                            updateColumnName(column.id, e.target.value);
+                                        }
+                                    }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             updateColumnName(column.id, e.target.value);
                                         }
                                         if (e.key === 'Escape') {
+                                            e.target.dataset.cancelled = 'true';
                                             setEditingColumn(null);
                                         }
                                     }}

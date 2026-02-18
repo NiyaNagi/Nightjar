@@ -35,6 +35,7 @@ export function WorkspaceSyncProvider({ children }) {
     name: currentWorkspace.name,
     icon: currentWorkspace.icon,
     color: currentWorkspace.color,
+    createdBy: currentWorkspace.createdBy,
   } : null;
   
   // User profile for workspace-level awareness

@@ -165,6 +165,10 @@ export function WorkspaceProvider({ children }) {
   // Use ref to always have latest message handler
   const handleSidecarMessageRef = useRef(null);
   
+  // Ref to always have latest workspaces (avoids stale closure in updateWorkspace)
+  const workspacesRef = useRef(workspaces);
+  workspacesRef.current = workspaces;
+  
   // AbortController for canceling pending async operations when switching workspaces
   const abortControllerRef = useRef(null);
   
@@ -276,7 +280,13 @@ export function WorkspaceProvider({ children }) {
         break;
         
       case 'workspace-deleted':
-        setWorkspaces(prev => prev.filter(w => w.id !== data.workspaceId));
+        setWorkspaces(prev => {
+          const remaining = prev.filter(w => w.id !== data.workspaceId);
+          if (data.workspaceId === currentWorkspaceId) {
+            setCurrentWorkspaceId(remaining.length > 0 ? remaining[0].id : null);
+          }
+          return remaining;
+        });
         break;
         
       case 'workspace-joined':
@@ -294,7 +304,7 @@ export function WorkspaceProvider({ children }) {
         setCurrentWorkspaceId(data.workspace.id);
         break;
     }
-  }, []);
+  }, [currentWorkspaceId]);
 
   // Keep ref updated with latest handler
   handleSidecarMessageRef.current = handleSidecarMessage;
@@ -400,6 +410,7 @@ export function WorkspaceProvider({ children }) {
     const maxRetries = 10;
     const baseDelay = 500; // Start with 500ms delay
     let sidecarUnavailable = false; // Track if sidecar appears to be completely unavailable
+    let cleaned = false; // Track if the effect has been cleaned up (unmount)
     
     const connectToSidecar = () => {
       // If sidecar has been determined unavailable, fall back to web mode
@@ -460,8 +471,8 @@ export function WorkspaceProvider({ children }) {
           secureLog('[WorkspaceContext] Disconnected from sidecar');
           setConnected(false);
           
-          // Only attempt reconnection if sidecar was previously working
-          if (!sidecarUnavailable) {
+          // Only attempt reconnection if sidecar was previously working and effect not cleaned up
+          if (!sidecarUnavailable && !cleaned) {
             setTimeout(connectToSidecar, 3000);
           }
         };
@@ -499,6 +510,7 @@ export function WorkspaceProvider({ children }) {
     setTimeout(connectToSidecar, 500);
     
     return () => {
+      cleaned = true;
       if (metaSocket.current) {
         metaSocket.current.close();
       }
@@ -647,12 +659,12 @@ export function WorkspaceProvider({ children }) {
    * @param {Object} updates - Updates to apply
    */
   const updateWorkspace = useCallback(async (workspaceId, updates) => {
-    // Find the current workspace and create full merged object
+    // Find the current workspace from ref to avoid stale closure
     // This ensures fields like joinedBy are preserved in the backend
-    const currentWorkspace = workspaces.find(w => w.id === workspaceId);
-    if (currentWorkspace) {
+    const currentWs = workspacesRef.current.find(w => w.id === workspaceId);
+    if (currentWs) {
       // Send full workspace object to backend for proper merge
-      const fullWorkspace = { ...currentWorkspace, ...updates };
+      const fullWorkspace = { ...currentWs, ...updates };
       sendMessage({ type: 'update-workspace', workspace: fullWorkspace });
     } else {
       // Fallback: send partial updates if workspace not found locally
@@ -663,7 +675,7 @@ export function WorkspaceProvider({ children }) {
     setWorkspaces(prev => prev.map(w => 
       w.id === workspaceId ? { ...w, ...updates } : w
     ));
-  }, [sendMessage, workspaces]);
+  }, [sendMessage]);
 
   /**
    * Delete a workspace (owner OR only member)
@@ -686,14 +698,15 @@ export function WorkspaceProvider({ children }) {
     
     sendMessage({ type: 'delete-workspace', workspaceId });
     
-    // Optimistic removal
-    setWorkspaces(prev => prev.filter(w => w.id !== workspaceId));
-    
-    if (currentWorkspaceId === workspaceId) {
-      const remaining = workspaces.filter(w => w.id !== workspaceId);
-      setCurrentWorkspaceId(remaining.length > 0 ? remaining[0].id : null);
-    }
-  }, [sendMessage, currentWorkspaceId, workspaces]);
+    // Optimistic removal and switch if needed
+    setWorkspaces(prev => {
+      const remaining = prev.filter(w => w.id !== workspaceId);
+      if (currentWorkspaceId === workspaceId) {
+        setCurrentWorkspaceId(remaining.length > 0 ? remaining[0].id : null);
+      }
+      return remaining;
+    });
+  }, [sendMessage, currentWorkspaceId]);
 
   /**
    * Leave a workspace (for editors/viewers - removes local copy only)
@@ -713,15 +726,15 @@ export function WorkspaceProvider({ children }) {
     // Tell sidecar to remove local workspace data (same as delete but for non-owners)
     sendMessage({ type: 'leave-workspace', workspaceId });
     
-    // Optimistic removal from local state
-    setWorkspaces(prev => prev.filter(w => w.id !== workspaceId));
-    
-    // Switch to another workspace if this was the current one
-    if (currentWorkspaceId === workspaceId) {
-      const remaining = workspaces.filter(w => w.id !== workspaceId);
-      setCurrentWorkspaceId(remaining.length > 0 ? remaining[0].id : null);
-    }
-  }, [sendMessage, currentWorkspaceId, workspaces]);
+    // Optimistic removal and switch if needed
+    setWorkspaces(prev => {
+      const remaining = prev.filter(w => w.id !== workspaceId);
+      if (currentWorkspaceId === workspaceId) {
+        setCurrentWorkspaceId(remaining.length > 0 ? remaining[0].id : null);
+      }
+      return remaining;
+    });
+  }, [sendMessage, currentWorkspaceId]);
 
   /**
    * Switch to a different workspace
@@ -772,12 +785,23 @@ export function WorkspaceProvider({ children }) {
     if (existing) {
       // Build updates object for any changed/new properties
       const updates = {};
+      let permissionChanged = null;
       
-      // Update permission if higher
+      // Compare permission levels
       const permHierarchy = { owner: 3, editor: 2, viewer: 1 };
-      if (permHierarchy[permission] > permHierarchy[existing.myPermission]) {
+      const incomingLevel = permHierarchy[permission] || 0;
+      const existingLevel = permHierarchy[existing.myPermission] || 0;
+      
+      if (incomingLevel > existingLevel) {
+        // Upgrade: apply the higher permission
         updates.myPermission = permission;
+        updates.permissionSetAt = Date.now();
+        permissionChanged = 'upgraded';
+      } else if (incomingLevel < existingLevel) {
+        // Downgrade: user already has higher access — don't change it
+        permissionChanged = 'already-higher';
       }
+      // If equal: no change, permissionChanged stays null
       
       // Update serverUrl if provided and different (for cross-platform sharing)
       if (serverUrl && serverUrl !== existing.serverUrl) {
@@ -813,8 +837,8 @@ export function WorkspaceProvider({ children }) {
       }
       
       switchWorkspace(entityId);
-      // Return the updated workspace (merge existing with updates)
-      return { ...existing, ...updates };
+      // Return the updated workspace with permissionChanged flag for toast feedback
+      return { ...existing, ...updates, permissionChanged };
     }
     
     // Determine workspace key from password or embedded key
@@ -941,8 +965,12 @@ export function WorkspaceProvider({ children }) {
    * Used for generating share links with embedded peer info
    * @returns {Promise<{initialized: boolean, ownPublicKey: string|null, connectedPeers: string[], directAddress: Object|null}>}
    */
+  const pendingP2PInfoRef = useRef(null);
   const getP2PInfo = useCallback(() => {
-    return new Promise((resolve) => {
+    // Deduplication guard: if a query is already pending, return the existing promise
+    if (pendingP2PInfoRef.current) return pendingP2PInfoRef.current;
+    
+    const promise = new Promise((resolve) => {
       if (!metaSocket.current || metaSocket.current.readyState !== WebSocket.OPEN) {
         resolve({ initialized: false, ownPublicKey: null, connectedPeers: [], directAddress: null });
         return;
@@ -953,7 +981,9 @@ export function WorkspaceProvider({ children }) {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'p2p-info') {
+            clearTimeout(timeoutId);
             metaSocket.current.removeEventListener('message', handleMessage);
+            pendingP2PInfoRef.current = null;
             resolve({
               initialized: data.initialized || false,
               ownPublicKey: data.ownPublicKey || null,
@@ -977,8 +1007,9 @@ export function WorkspaceProvider({ children }) {
       metaSocket.current.send(JSON.stringify({ type: 'get-p2p-info' }));
       
       // Timeout after 2 seconds
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         metaSocket.current?.removeEventListener('message', handleMessage);
+        pendingP2PInfoRef.current = null;
         resolve({ 
           initialized: false, 
           ownPublicKey: null, 
@@ -994,6 +1025,8 @@ export function WorkspaceProvider({ children }) {
         });
       }, 2000);
     });
+    pendingP2PInfoRef.current = promise;
+    return promise;
   }, []);
 
   // Context value - memoize to avoid unnecessary re-renders

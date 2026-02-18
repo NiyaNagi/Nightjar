@@ -44,10 +44,13 @@ const saveChatState = (state) => {
     }
 };
 
-// Load unread counts from localStorage
-const loadUnreadCounts = (workspaceId) => {
+// Load unread counts from localStorage (identity-scoped)
+const loadUnreadCounts = (workspaceId, identityPublicKey) => {
     try {
-        const saved = localStorage.getItem(`Nightjar-chat-unread-${workspaceId}`);
+        const key = identityPublicKey
+            ? `Nightjar-chat-unread-${workspaceId}-${identityPublicKey}`
+            : `Nightjar-chat-unread-${workspaceId}`;
+        const saved = localStorage.getItem(key);
         if (saved) {
             return JSON.parse(saved);
         }
@@ -57,32 +60,41 @@ const loadUnreadCounts = (workspaceId) => {
     return {}; // channelId -> { count, lastReadTimestamp }
 };
 
-// Save unread counts to localStorage
-const saveUnreadCounts = (workspaceId, counts) => {
+// Save unread counts to localStorage (identity-scoped)
+const saveUnreadCounts = (workspaceId, counts, identityPublicKey) => {
     try {
-        localStorage.setItem(`Nightjar-chat-unread-${workspaceId}`, JSON.stringify(counts));
+        const key = identityPublicKey
+            ? `Nightjar-chat-unread-${workspaceId}-${identityPublicKey}`
+            : `Nightjar-chat-unread-${workspaceId}`;
+        localStorage.setItem(key, JSON.stringify(counts));
     } catch (e) {
         console.error('Failed to save unread counts:', e);
     }
 };
 
-// Load archived/left channels from localStorage
-const loadChannelState = (workspaceId) => {
+// Load archived/left channels from localStorage (identity-scoped)
+const loadChannelState = (workspaceId, identityPublicKey) => {
     try {
-        const saved = localStorage.getItem(`Nightjar-chat-channels-${workspaceId}`);
+        const key = identityPublicKey
+            ? `Nightjar-chat-channels-${workspaceId}-${identityPublicKey}`
+            : `Nightjar-chat-channels-${workspaceId}`;
+        const saved = localStorage.getItem(key);
         if (saved) {
             return JSON.parse(saved);
         }
     } catch (e) {
         console.error('Failed to load channel state:', e);
     }
-    return { archived: [], left: [] }; // archived channelIds, left channelIds
+    return {}; // channelId -> { archived?, left?, leftAt? }
 };
 
-// Save archived/left channels to localStorage
-const saveChannelState = (workspaceId, state) => {
+// Save archived/left channels to localStorage (identity-scoped)
+const saveChannelState = (workspaceId, state, identityPublicKey) => {
     try {
-        localStorage.setItem(`Nightjar-chat-channels-${workspaceId}`, JSON.stringify(state));
+        const key = identityPublicKey
+            ? `Nightjar-chat-channels-${workspaceId}-${identityPublicKey}`
+            : `Nightjar-chat-channels-${workspaceId}`;
+        localStorage.setItem(key, JSON.stringify(state));
     } catch (e) {
         console.error('Failed to save channel state:', e);
     }
@@ -180,12 +192,30 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     const [pendingMentions, setPendingMentions] = useState([]); // [{displayName, publicKey, startIndex}]
     
     // Unread tracking per channel
-    const [unreadCounts, setUnreadCounts] = useState(() => loadUnreadCounts(workspaceId));
+    const [unreadCounts, setUnreadCounts] = useState(() => loadUnreadCounts(workspaceId, userPublicKey));
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
     
     // Archived/left channels
-    const [channelState, setChannelState] = useState(() => loadChannelState(workspaceId));
+    const [channelState, setChannelState] = useState(() => loadChannelState(workspaceId, userPublicKey));
     const [showArchivedSection, setShowArchivedSection] = useState(false);
+    
+    // Reset workspace-scoped state when workspace or identity changes
+    useEffect(() => {
+        setMessages([]);
+        setLocalMessages([]);
+        setChatTabs([{ id: 'general', name: '💬 General', type: 'channel' }]);
+        setUnreadCounts(loadUnreadCounts(workspaceId, userPublicKey));
+        setChannelState(loadChannelState(workspaceId, userPublicKey));
+        setActiveTab('general');
+    }, [workspaceId, userPublicKey]);
+    
+    // Clear mention state when switching tabs to prevent cross-channel pollution
+    useEffect(() => {
+        setShowMentionPopup(false);
+        setMentionQuery('');
+        setMentionStartIndex(-1);
+        setPendingMentions([]);
+    }, [activeTab]);
     
     // Minimize state for chat (start expanded when targetUser provided)
     const [chatState, setChatState] = useState(() => {
@@ -207,14 +237,13 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         return `dm-${sortedKeys[0].slice(0, 12)}-${sortedKeys[1].slice(0, 12)}`;
     }, []);
 
-    // Handle incoming targetUser from parent (e.g., clicked from StatusBar)
+    // Track pending targetUser via ref so we can process it once startDirectMessage is ready
+    const pendingTargetUserRef = useRef(null);
+
+    // Capture targetUser into ref immediately
     useEffect(() => {
         if (targetUser) {
-            startDirectMessage(targetUser);
-            // Expand chat if minimized
-            setChatState(prev => ({ ...prev, isMinimized: false }));
-            // Let parent know we handled it
-            onTargetUserHandled?.();
+            pendingTargetUserRef.current = { targetUser, onTargetUserHandled };
         }
     }, [targetUser, onTargetUserHandled]);
     
@@ -293,7 +322,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     );
     
     // Start a DM with a user - uses publicKey for stable channel ID
-    const startDirectMessage = (user) => {
+    const startDirectMessage = useCallback((user) => {
         // Prefer publicKey for stable tab ID that persists across sessions
         // Fall back to clientId only if publicKey is unavailable (legacy clients)
         if (!user.publicKey) {
@@ -305,26 +334,39 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         const tabId = userPublicKey && user.publicKey 
             ? getDmChannelId(userPublicKey, user.publicKey)
             : `dm-${targetKey.slice(0, 16)}`; // Fallback for legacy clients
-        if (!chatTabs.find(t => t.id === tabId)) {
-            setChatTabs(prev => [...prev, {
+        setChatTabs(prev => {
+            if (prev.find(t => t.id === tabId)) return prev;
+            return [...prev, {
                 id: tabId,
                 name: user.name,
                 type: 'dm',
                 user: { ...user, publicKey: user.publicKey || null }
-            }]);
-        }
+            }];
+        });
         setActiveTab(tabId);
         setShowUserSearch(false);
         setUserSearchQuery('');
         setSelectedUsersForGroup([]);
-    };
+    }, [userPublicKey, getDmChannelId]);
     
+    // Process pending targetUser now that startDirectMessage is defined
+    useEffect(() => {
+        if (pendingTargetUserRef.current && typeof startDirectMessage === 'function') {
+            const { targetUser: pending, onTargetUserHandled: handler } = pendingTargetUserRef.current;
+            pendingTargetUserRef.current = null;
+            startDirectMessage(pending);
+            setChatState(prev => ({ ...prev, isMinimized: false }));
+            handler?.();
+        }
+    }, [targetUser, startDirectMessage]);
+
     // Toggle user selection for group chat
     const toggleUserForGroup = useCallback((user) => {
         setSelectedUsersForGroup(prev => {
-            const isSelected = prev.some(u => u.clientId === user.clientId);
+            const key = user.publicKey || user.clientId;
+            const isSelected = prev.some(u => (u.publicKey || u.clientId) === key);
             if (isSelected) {
-                return prev.filter(u => u.clientId !== user.clientId);
+                return prev.filter(u => (u.publicKey || u.clientId) !== key);
             } else {
                 return [...prev, user];
             }
@@ -335,11 +377,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     const createGroupChat = useCallback((name) => {
         const groupId = `group-${Date.now().toString(36)}`;
         const members = [
-            { clientId: myClientId, name: username, publicKey: userPublicKey },
+            { publicKey: userPublicKey, name: username },
             ...selectedUsersForGroup.map(u => ({
-                clientId: u.clientId,
-                name: u.name,
                 publicKey: u.publicKey,
+                name: u.name,
                 color: u.color
             }))
         ];
@@ -367,7 +408,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         // Send system message
         if (ymessagesRef.current) {
             ymessagesRef.current.push([{
-                id: Date.now().toString(36) + Math.random().toString(36).substring(2, 11),
+                id: crypto.randomUUID(),
                 text: `${username} created the group "${name}"`,
                 username: 'System',
                 timestamp: Date.now(),
@@ -382,7 +423,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         setUserSearchQuery('');
         setSelectedUsersForGroup([]);
         setGroupNameInput('');
-    }, [myClientId, username, userPublicKey, selectedUsersForGroup, ydoc]);
+    }, [username, userPublicKey, selectedUsersForGroup, ydoc]);
     
     // Archive a channel (hide but keep history)
     const archiveChannel = useCallback((channelId) => {
@@ -391,20 +432,20 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 ...prev,
                 [channelId]: { ...prev[channelId], archived: true }
             };
-            saveChannelState(workspaceId, updated);
+            saveChannelState(workspaceId, updated, userPublicKey);
             return updated;
         });
         if (activeTab === channelId) {
             setActiveTab('general');
         }
-    }, [workspaceId, activeTab]);
+    }, [workspaceId, activeTab, userPublicKey]);
     
     // Leave a channel (archive + mark as left)
     const leaveChannel = useCallback((channelId) => {
         // Send system message that user left
         if (ymessagesRef.current) {
             ymessagesRef.current.push([{
-                id: Date.now().toString(36) + Math.random().toString(36).substring(2, 11),
+                id: crypto.randomUUID(),
                 text: `${username} left the chat`,
                 username: 'System',
                 timestamp: Date.now(),
@@ -418,13 +459,13 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 ...prev,
                 [channelId]: { archived: true, left: true, leftAt: Date.now() }
             };
-            saveChannelState(workspaceId, updated);
+            saveChannelState(workspaceId, updated, userPublicKey);
             return updated;
         });
         if (activeTab === channelId) {
             setActiveTab('general');
         }
-    }, [workspaceId, activeTab, username]);
+    }, [workspaceId, activeTab, username, userPublicKey]);
     
     // Unarchive a channel
     const unarchiveChannel = useCallback((channelId) => {
@@ -433,10 +474,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             if (updated[channelId]) {
                 updated[channelId] = { ...updated[channelId], archived: false };
             }
-            saveChannelState(workspaceId, updated);
+            saveChannelState(workspaceId, updated, userPublicKey);
             return updated;
         });
-    }, [workspaceId]);
+    }, [workspaceId, userPublicKey]);
     
     // Delete a channel (only for creator/owner)
     const deleteChannel = useCallback((channelId) => {
@@ -446,13 +487,40 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         setChannelState(prev => {
             const updated = { ...prev };
             delete updated[channelId];
-            saveChannelState(workspaceId, updated);
+            saveChannelState(workspaceId, updated, userPublicKey);
+            return updated;
+        });
+        // Remove from Yjs shared data so deletion syncs to all peers
+        if (ydoc) {
+            const ygroups = ydoc.getMap('chat-groups');
+            if (ygroups.has(channelId)) {
+                ygroups.delete(channelId);
+            }
+            // Remove messages belonging to the deleted channel
+            if (ymessagesRef.current) {
+                const ymessages = ymessagesRef.current;
+                ydoc.transact(() => {
+                    const arr = ymessages.toArray();
+                    // Delete in reverse to avoid index shifting
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        if (arr[i].channel === channelId) {
+                            ymessages.delete(i, 1);
+                        }
+                    }
+                });
+            }
+        }
+        // Clear unread counts for this channel
+        setUnreadCounts(prev => {
+            const updated = { ...prev };
+            delete updated[channelId];
+            saveUnreadCounts(workspaceId, updated, userPublicKey);
             return updated;
         });
         if (activeTab === channelId) {
             setActiveTab('general');
         }
-    }, [workspaceId, activeTab]);
+    }, [workspaceId, activeTab, ydoc, userPublicKey]);
     
     // Close a chat tab
     const closeTab = (tabId, e) => {
@@ -649,6 +717,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             // Skip system messages
             if (msg.type === 'system') continue;
             
+            // Skip notifications when the message's channel is active and window is focused
+            const msgChannel = msg.channel || 'general';
+            if (msgChannel === activeTab && document.hasFocus()) continue;
+            
             // Determine message type for notification
             let messageType = MESSAGE_TYPES.GENERAL_MESSAGE;
             let title = 'Nightjar';
@@ -678,8 +750,14 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 renotify: true,
             });
         }
-    }, [messages, userPublicKey, playForMessageType, notifyForMessageType]);
+    }, [messages, userPublicKey, playForMessageType, notifyForMessageType, activeTab]);
     
+    // Ref to track chatTabs inside observer without causing re-subscribe
+    const chatTabsRef = useRef(chatTabs);
+    useEffect(() => { chatTabsRef.current = chatTabs; }, [chatTabs]);
+    const channelStateRef = useRef(channelState);
+    useEffect(() => { channelStateRef.current = channelState; }, [channelState]);
+
     // Sync group tabs from ydoc (load on mount and observe changes)
     useEffect(() => {
         if (!ydoc) return;
@@ -687,7 +765,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         const ygroups = ydoc.getMap('chat-groups');
         
         const syncGroupTabs = () => {
-            const existingGroupIds = chatTabs.filter(t => t.type === 'group').map(t => t.id);
+            const existingGroupIds = chatTabsRef.current.filter(t => t.type === 'group').map(t => t.id);
             const ygroupEntries = [];
             ygroups.forEach((group, groupId) => {
                 ygroupEntries.push({ id: groupId, ...group });
@@ -696,7 +774,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             // Add any missing group tabs
             ygroupEntries.forEach(group => {
                 // Check if this group is archived/left
-                const state = channelState[group.id];
+                const state = channelStateRef.current[group.id];
                 if (state?.left) return; // Don't auto-add left groups
                 
                 if (!existingGroupIds.includes(group.id)) {
@@ -720,7 +798,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         return () => {
             ygroups.unobserve(syncGroupTabs);
         };
-    }, [ydoc, chatTabs, channelState]);
+    }, [ydoc]);
 
     // Auto-open DM tabs when receiving DM messages from other users
     useEffect(() => {
@@ -764,9 +842,17 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         user: { ...user, publicKey: otherPublicKey }
                     }];
                 });
+                
+                // Clear unread count for the auto-opened DM channel
+                setUnreadCounts(prev => {
+                    const updated = { ...prev };
+                    updated[tabId] = { lastRead: Date.now(), count: 0 };
+                    saveUnreadCounts(workspaceId, updated, userPublicKey);
+                    return updated;
+                });
             }
         });
-    }, [messages, userPublicKey, chatTabs, onlineUsers, workspaceMembers]);
+    }, [messages, userPublicKey, chatTabs, onlineUsers, workspaceMembers, workspaceId]);
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -813,7 +899,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         const mentions = parseMentions(messageText);
 
         const message = {
-            id: Date.now().toString(36) + Math.random().toString(36).substring(2, 11),
+            id: crypto.randomUUID(),
             text: messageText,
             username: username || 'Anonymous',
             color: userColor || '#6366f1',
@@ -847,10 +933,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 ...prev,
                 [channelId]: { lastRead: Date.now(), count: 0 }
             };
-            saveUnreadCounts(workspaceId, updated);
+            saveUnreadCounts(workspaceId, updated, userPublicKey);
             return updated;
         });
-    }, [workspaceId]);
+    }, [workspaceId, userPublicKey]);
     
     // Handle scroll to detect when user scrolls to bottom
     const handleChatScroll = useCallback(() => {
@@ -883,30 +969,36 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         const currentChannel = activeTab === 'general' ? 'general' : activeTab;
         updated[currentChannel] = { lastRead: Date.now(), count: 0 };
         setUnreadCounts(updated);
-        saveUnreadCounts(workspaceId, updated);
-    }, [unreadCounts, activeTab, workspaceId]);
+        saveUnreadCounts(workspaceId, updated, userPublicKey);
+    }, [unreadCounts, activeTab, workspaceId, userPublicKey]);
     
+    // Pre-compute per-channel unread and mention counts in a single pass
+    const { unreadByChannel, mentionsByChannel } = useMemo(() => {
+        const unread = new Map();
+        const mentions = new Map();
+        for (let i = 0; i < messages.length; i++) {
+            const m = messages[i];
+            const ch = m.channel || 'general';
+            const lastRead = unreadCounts[ch]?.lastRead || 0;
+            if (m.timestamp > lastRead && m.senderPublicKey !== userPublicKey && m.type !== 'system') {
+                unread.set(ch, (unread.get(ch) || 0) + 1);
+                if (m.mentions?.some(mention => mention.publicKey === userPublicKey)) {
+                    mentions.set(ch, (mentions.get(ch) || 0) + 1);
+                }
+            }
+        }
+        return { unreadByChannel: unread, mentionsByChannel: mentions };
+    }, [messages, unreadCounts, userPublicKey]);
+
     // Calculate unread count for a channel
     const getChannelUnreadCount = useCallback((channelId) => {
-        const lastRead = unreadCounts[channelId]?.lastRead || 0;
-        return messages.filter(m => 
-            (m.channel || 'general') === channelId && 
-            m.timestamp > lastRead &&
-            m.senderPublicKey !== userPublicKey &&
-            m.type !== 'system'
-        ).length;
-    }, [messages, unreadCounts, userPublicKey]);
+        return unreadByChannel.get(channelId) || 0;
+    }, [unreadByChannel]);
     
     // Check if a channel has unread mentions for current user
     const getChannelMentionCount = useCallback((channelId) => {
-        const lastRead = unreadCounts[channelId]?.lastRead || 0;
-        return messages.filter(m => 
-            (m.channel || 'general') === channelId && 
-            m.timestamp > lastRead &&
-            m.senderPublicKey !== userPublicKey &&
-            m.mentions?.some(mention => mention.publicKey === userPublicKey)
-        ).length;
-    }, [messages, unreadCounts, userPublicKey]);
+        return mentionsByChannel.get(channelId) || 0;
+    }, [mentionsByChannel]);
     
     // Total unread across all channels
     const totalUnread = useMemo(() => {
@@ -978,7 +1070,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         // Detect @mention trigger
         const cursorPos = e.target.selectionStart;
         const textBeforeCursor = value.substring(0, cursorPos);
-        const atMatch = textBeforeCursor.match(/@(\w*)$/);
+        const atMatch = textBeforeCursor.match(/@([\w\s\-.]*)$/);
         
         if (atMatch && atMatch[1].length >= 1) {
             // Show mention popup when @ followed by at least 1 character
@@ -1052,6 +1144,12 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // State for mention popup selection index
     const [mentionIndex, setMentionIndex] = useState(0);
+
+    // Reset mention index when candidates list changes to prevent out-of-bounds
+    useEffect(() => {
+        const candidates = getMentionCandidates();
+        setMentionIndex(prev => candidates.length > 0 ? Math.min(prev, candidates.length - 1) : 0);
+    }, [mentionQuery, onlineUsers, workspaceMembers]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const formatTime = (timestamp) => {
         const date = new Date(timestamp);
@@ -1296,6 +1394,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                             key={tab.id}
                             className="archived-channel-item"
                             onClick={() => {
+                                unarchiveChannel(tab.id);
                                 setActiveTab(tab.id);
                                 setShowArchivedSection(false);
                             }}
@@ -1338,9 +1437,9 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     {/* Selected users for group */}
                     {selectedUsersForGroup.length > 0 && (
                         <div className="selected-users-row">
-                            {selectedUsersForGroup.map(user => (
+                            {selectedUsersForGroup.map((user, index) => (
                                 <span 
-                                    key={user.clientId}
+                                    key={user.publicKey || user.clientId || index}
                                     className="selected-user-chip"
                                     onClick={() => toggleUserForGroup(user)}
                                 >
@@ -1370,11 +1469,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                     : 'No users match your search'}
                             </div>
                         ) : (
-                            filteredUsers.map(user => {
+                            filteredUsers.map((user, index) => {
                                 const isSelected = selectedUsersForGroup.some(u => u.clientId === user.clientId);
                                 return (
                                     <div 
-                                        key={user.clientId}
+                                        key={user.publicKey || user.clientId || index}
                                         className={`user-search-item ${isSelected ? 'selected' : ''}`}
                                         onClick={() => {
                                             if (selectedUsersForGroup.length > 0 || isSelected) {
@@ -1567,16 +1666,20 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             </div>
             
             {/* @Mention autocomplete popup */}
-            {showMentionPopup && (
+            {showMentionPopup && (() => {
+                const candidates = getMentionCandidates();
+                const onlineCandidates = candidates.filter(u => u.isOnline);
+                const offlineCandidates = candidates.filter(u => !u.isOnline);
+                return (
                 <div className="mention-popup" role="listbox" aria-label="Mention users">
-                    {getMentionCandidates().length === 0 ? (
+                    {candidates.length === 0 ? (
                         <div className="mention-empty">No matching users</div>
                     ) : (
                         <>
-                            {getMentionCandidates().filter(u => u.isOnline).length > 0 && (
+                            {onlineCandidates.length > 0 && (
                                 <div className="mention-section-header">Online</div>
                             )}
-                            {getMentionCandidates().filter(u => u.isOnline).map((user, idx) => (
+                            {onlineCandidates.map((user, idx) => (
                                 <div
                                     key={user.publicKey || user.clientId}
                                     className={`mention-item ${mentionIndex === idx ? 'selected' : ''}`}
@@ -1594,11 +1697,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                     <span className="mention-name">{user.name}</span>
                                 </div>
                             ))}
-                            {getMentionCandidates().filter(u => !u.isOnline).length > 0 && (
+                            {offlineCandidates.length > 0 && (
                                 <div className="mention-section-header">Workspace Members</div>
                             )}
-                            {getMentionCandidates().filter(u => !u.isOnline).map((user, idx) => {
-                                const actualIdx = getMentionCandidates().filter(u => u.isOnline).length + idx;
+                            {offlineCandidates.map((user, idx) => {
+                                const actualIdx = onlineCandidates.length + idx;
                                 return (
                                     <div
                                         key={user.publicKey || user.clientId}
@@ -1621,7 +1724,8 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         </>
                     )}
                 </div>
-            )}
+                );
+            })()}
 
             <div className="chat-input-container" role="form" aria-label="Send message form" data-testid="chat-input-container">
                 <input

@@ -80,17 +80,26 @@ export function getChunk(db, fileId, chunkIndex) {
 
 /**
  * Delete all chunks for a file from IndexedDB.
+ * Uses a cursor to find all keys with the fileId prefix,
+ * so orphaned chunks from partial uploads are also cleaned up.
  * @param {IDBDatabase} db 
  * @param {string} fileId 
- * @param {number} chunkCount
+ * @param {number} [chunkCount] - optional, ignored (kept for API compat)
  */
 export function deleteFileChunks(db, fileId, chunkCount) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('chunks', 'readwrite');
     const store = tx.objectStore('chunks');
-    for (let i = 0; i < chunkCount; i++) {
-      store.delete(`${fileId}:${i}`);
-    }
+    const range = IDBKeyRange.bound(`${fileId}:`, `${fileId}:\uffff`);
+    const req = store.openCursor(range);
+    req.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      }
+    };
+    req.onerror = () => reject(req.error);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

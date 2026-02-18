@@ -181,8 +181,8 @@ export default function AdminDashboard({ onNavigate }) {
         // 2. Fallback: decrypt pending address from non-owner requestor
         if (!addr && ctx.yPendingAddresses) {
           const pendingEntries = ctx.yPendingAddresses.get(req.id);
-          if (pendingEntries && userIdentity?.privateKey) {
-            addr = await decryptPendingAddress(pendingEntries, adminHex, userIdentity.privateKey);
+          if (pendingEntries && userIdentity?.curveSecretKey) {
+            addr = await decryptPendingAddress(pendingEntries, adminHex, userIdentity.curveSecretKey);
             if (addr) {
               try {
                 const km = getWorkspaceKeyMaterial(ctx.currentWorkspace, ctx.workspaceId);
@@ -195,9 +195,13 @@ export default function AdminDashboard({ onNavigate }) {
           }
         }
 
-        if (addr && userIdentity?.privateKey) {
-          const reveal = await createAddressReveal(addr, producerHex, userIdentity.privateKey, adminHex);
+        if (addr && userIdentity?.curveSecretKey) {
+          const reveal = await createAddressReveal(addr, producerHex, userIdentity.curveSecretKey, adminHex);
           ctx.yAddressReveals?.set(req.id, { ...reveal, inventorySystemId: ctx.inventorySystemId });
+        } else if (!addr) {
+          console.warn('[AdminDashboard] Address reveal not created — address not found in local store or pending addresses for request', req.id?.slice(0, 8));
+        } else if (!userIdentity?.curveSecretKey) {
+          console.warn('[AdminDashboard] Address reveal not created — admin encryption key not available');
         }
       } catch (err) {
         console.warn('[AdminDashboard] Could not create address reveal:', err);

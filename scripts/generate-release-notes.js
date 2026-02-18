@@ -58,7 +58,7 @@ const TYPE_KEYWORDS = {
 
 function run(cmd) {
     try {
-        return execSync(cmd, { encoding: 'utf8' }).trim();
+        return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
     } catch (e) {
         return '';
     }
@@ -141,7 +141,7 @@ function groupByType(commits) {
 
 function generateMarkdown(version, fromTag, groups, commits) {
     const date = new Date().toISOString().split('T')[0];
-    const repoUrl = 'https://github.com/InyanRock/Nightjar';
+    const repoUrl = 'https://github.com/SaoneYanpa/Nightjar';
     
     let md = `# Nightjar v${version} Release Notes\n\n`;
     md += `**Release Date:** ${date}\n\n`;

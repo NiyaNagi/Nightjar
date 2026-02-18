@@ -94,7 +94,7 @@ export function validateAddress(address) {
 export function validateCatalogItem(item) {
   const errors = [];
   if (!item.name?.trim()) errors.push('Item name is required');
-  if (!item.unit?.trim()) errors.push('Unit type is required (e.g., "units", "boxes", "lbs")');
+  if (!item.unitName?.trim()) errors.push('Unit type is required (e.g., "units", "boxes", "lbs")');
   
   const min = Number(item.quantityMin);
   const max = item.quantityMax != null && item.quantityMax !== '' ? Number(item.quantityMax) : null;
@@ -206,7 +206,7 @@ export function formatRelativeDate(timestamp) {
   const diff = now - timestamp;
 
   // Future dates or very old dates — show absolute date
-  if (diff < 0) return formatDate(timestamp);
+  if (diff < 0) return formatDate(timestamp, { relative: false });
 
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -218,7 +218,7 @@ export function formatRelativeDate(timestamp) {
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return formatDate(timestamp);
+  return formatDate(timestamp, { relative: false });
 }
 
 /**
@@ -227,7 +227,10 @@ export function formatRelativeDate(timestamp) {
  * @returns {string}
  */
 export function generateId(prefix = '') {
-  return prefix + Date.now().toString(36) + Math.random().toString(36).substring(2, 11);
+  const randomBytes = new Uint8Array(8);
+  crypto.getRandomValues(randomBytes);
+  const randomPart = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return prefix + Date.now().toString(36) + randomPart;
 }
 
 /**

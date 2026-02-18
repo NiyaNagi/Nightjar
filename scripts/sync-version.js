@@ -168,10 +168,20 @@ function writePackageJson(packageJson) {
 function getVersionFromGit() {
     try {
         // Try to get the tag that points to current HEAD
-        const tag = execSync('git describe --tags --exact-match HEAD 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null', {
-            encoding: 'utf8',
-            cwd: ROOT_DIR
-        }).trim();
+        let tag;
+        try {
+            tag = execSync('git describe --tags --exact-match HEAD', {
+                encoding: 'utf8',
+                cwd: ROOT_DIR,
+                stdio: ['pipe', 'pipe', 'pipe']
+            }).trim();
+        } catch {
+            tag = execSync('git describe --tags --abbrev=0', {
+                encoding: 'utf8',
+                cwd: ROOT_DIR,
+                stdio: ['pipe', 'pipe', 'pipe']
+            }).trim();
+        }
 
         if (!tag) {
             throw new Error('No git tag found');

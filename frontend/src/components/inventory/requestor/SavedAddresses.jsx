@@ -162,21 +162,35 @@ export default function SavedAddresses({ currentWorkspace }) {
                   <div className="saved-address-card__actions">
                     {!addr.isDefault && (
                       <button className="btn-sm" onClick={async () => {
+                        const snapshot = addresses.map(a => ({ ...a }));
                         try {
                           const km = await getWorkspaceKeyMaterial(currentWorkspace, workspaceId);
-                          // Unmark all others, mark this as default
-                          for (const a of addresses) {
-                            if (a.isDefault) {
-                              await deleteSavedAddress(userIdentity.publicKeyBase62, a.id);
-                              await storeSavedAddress(km, userIdentity.publicKeyBase62, { ...a, isDefault: false });
-                            }
+                          // Delete all affected addresses first
+                          const previousDefaults = addresses.filter(a => a.isDefault);
+                          for (const a of previousDefaults) {
+                            await deleteSavedAddress(userIdentity.publicKeyBase62, a.id);
                           }
                           await deleteSavedAddress(userIdentity.publicKeyBase62, addr.id);
+                          // Then store all updated versions
+                          for (const a of previousDefaults) {
+                            await storeSavedAddress(km, userIdentity.publicKeyBase62, { ...a, isDefault: false });
+                          }
                           await storeSavedAddress(km, userIdentity.publicKeyBase62, { ...addr, isDefault: true });
                           showToast('Default address updated', 'success');
                           await loadAddresses();
                         } catch (err) {
                           showToast('Failed to set default: ' + err.message, 'error');
+                          // Attempt to restore original addresses on failure
+                          try {
+                            const km = await getWorkspaceKeyMaterial(currentWorkspace, workspaceId);
+                            for (const orig of snapshot) {
+                              try { await deleteSavedAddress(userIdentity.publicKeyBase62, orig.id); } catch (_) { /* ignore */ }
+                              await storeSavedAddress(km, userIdentity.publicKeyBase62, orig);
+                            }
+                            await loadAddresses();
+                          } catch (_restoreErr) {
+                            console.error('Failed to restore addresses after set-default error:', _restoreErr);
+                          }
                         }
                       }}>⭐ Set Default</button>
                     )}
@@ -216,7 +230,7 @@ function AddressForm({ addr, onChange }) {
       </label>
       <label>
         Country
-        <select value={country} onChange={e => { h('country', e.target.value); h('state', ''); }}>
+        <select value={country} onChange={e => onChange({ ...addr, country: e.target.value, state: '' })}>
           {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </label>

@@ -30,7 +30,7 @@ export default function ItemDemand({ requests, catalogItems, dateRange }) {
 
   const data = useMemo(() => {
     const [from, to] = dateRange || [0, Date.now()];
-    const inRange = requests.filter(r => (r.requestedAt || 0) >= from && (r.requestedAt || 0) <= to);
+    const inRange = requests.filter(r => (r.requestedAt || r.createdAt || 0) >= from && (r.requestedAt || r.createdAt || 0) <= to);
 
     const byItem = {};
     for (const r of inRange) {

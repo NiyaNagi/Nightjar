@@ -31,19 +31,34 @@ export default function SummaryMetrics({ requests, producerCapacities, dateRange
     const total = inRange.length;
 
     // Previous period (same duration, offset backwards)
-    const duration = to - from;
-    const prevFrom = from - duration;
-    const prevTo = from;
-    const prevRange = requests.filter(r => ts(r) >= prevFrom && ts(r) <= prevTo);
-    const prevTotal = prevRange.length;
+    // For "All Time" (from===0), split data into halves: first half = prev, second half = current
+    const isAllTime = from === 0;
+    let prevRange, prevTotal;
+    let currentRange;
+    if (isAllTime) {
+      const sorted = [...inRange].sort((a, b) => ts(a) - ts(b));
+      const mid = Math.floor(sorted.length / 2);
+      prevRange = sorted.slice(0, mid);
+      prevTotal = prevRange.length;
+      // Use second half as 'current' for meaningful delta comparison
+      currentRange = sorted.slice(mid);
+    } else {
+      const duration = to - from;
+      const prevFrom = from - duration;
+      const prevTo = from;
+      prevRange = requests.filter(r => ts(r) >= prevFrom && ts(r) <= prevTo);
+      prevTotal = prevRange.length;
+      currentRange = inRange;
+    }
 
-    const shipped = inRange.filter(r => r.status === 'shipped' || r.status === 'delivered');
+    const curTotal = currentRange.length;
+    const shipped = currentRange.filter(r => r.status === 'shipped' || r.status === 'delivered');
     const totalUnits = shipped.reduce((s, r) => s + (r.quantity || 0), 0);
     const prevShipped = prevRange.filter(r => r.status === 'shipped' || r.status === 'delivered');
     const prevUnits = prevShipped.reduce((s, r) => s + (r.quantity || 0), 0);
 
     // Avg fulfillment days
-    const fulfilled = inRange.filter(r => r.shippedAt && (r.requestedAt || r.createdAt));
+    const fulfilled = currentRange.filter(r => r.shippedAt && (r.requestedAt || r.createdAt));
     const avgDays = fulfilled.length > 0
       ? fulfilled.reduce((s, r) => s + (r.shippedAt - (r.requestedAt || r.createdAt)) / 86400000, 0) / fulfilled.length
       : 0;
@@ -52,29 +67,29 @@ export default function SummaryMetrics({ requests, producerCapacities, dateRange
       ? prevFulfilled.reduce((s, r) => s + (r.shippedAt - (r.requestedAt || r.createdAt)) / 86400000, 0) / prevFulfilled.length
       : 0;
 
-    const blocked = inRange.filter(r => r.status === 'blocked').length;
+    const blocked = currentRange.filter(r => r.status === 'blocked').length;
     const prevBlocked = prevRange.filter(r => r.status === 'blocked').length;
 
-    const claimed = inRange.filter(r => r.assignedTo).length;
+    const claimed = currentRange.filter(r => r.assignedTo).length;
     const prevClaimed = prevRange.filter(r => r.assignedTo).length;
 
-    const urgent = inRange.filter(r => r.urgent === true).length;
+    const urgent = currentRange.filter(r => r.urgent === true).length;
     const prevUrgent = prevRange.filter(r => r.urgent === true).length;
 
-    const cancelled = inRange.filter(r => r.status === 'cancelled').length;
+    const cancelled = currentRange.filter(r => r.status === 'cancelled').length;
     const prevCancelled = prevRange.filter(r => r.status === 'cancelled').length;
 
     const activeProds = producerCapacities ? Object.keys(producerCapacities).length : 0;
 
     return {
-      totalRequests: { value: total, prev: prevTotal },
+      totalRequests: { value: curTotal, prev: prevTotal },
       totalUnitsShipped: { value: totalUnits, prev: prevUnits },
       avgFulfillmentDays: { value: avgDays, prev: prevAvgDays },
-      blockedRate: { value: total > 0 ? (blocked / total) * 100 : 0, prev: prevTotal > 0 ? (prevBlocked / prevTotal) * 100 : 0 },
+      blockedRate: { value: curTotal > 0 ? (blocked / curTotal) * 100 : 0, prev: prevTotal > 0 ? (prevBlocked / prevTotal) * 100 : 0 },
       activeProducers: { value: activeProds, prev: activeProds },
-      claimRate: { value: total > 0 ? (claimed / total) * 100 : 0, prev: prevTotal > 0 ? (prevClaimed / prevTotal) * 100 : 0 },
-      urgentPercent: { value: total > 0 ? (urgent / total) * 100 : 0, prev: prevTotal > 0 ? (prevUrgent / prevTotal) * 100 : 0 },
-      cancellationRate: { value: total > 0 ? (cancelled / total) * 100 : 0, prev: prevTotal > 0 ? (prevCancelled / prevTotal) * 100 : 0 },
+      claimRate: { value: curTotal > 0 ? (claimed / curTotal) * 100 : 0, prev: prevTotal > 0 ? (prevClaimed / prevTotal) * 100 : 0 },
+      urgentPercent: { value: curTotal > 0 ? (urgent / curTotal) * 100 : 0, prev: prevTotal > 0 ? (prevUrgent / prevTotal) * 100 : 0 },
+      cancellationRate: { value: curTotal > 0 ? (cancelled / curTotal) * 100 : 0, prev: prevTotal > 0 ? (prevCancelled / prevTotal) * 100 : 0 },
     };
   }, [requests, producerCapacities, dateRange]);
 

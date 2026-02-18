@@ -35,7 +35,7 @@ const appIconPath = getAppIconPath();
 
 // Set app user model ID for Windows taskbar icon (must match build.appId in package.json)
 if (process.platform === 'win32') {
-    app.setAppUserModelId('com.inyanrock.Nightjar');
+    app.setAppUserModelId('com.saoneyanpa.Nightjar');
 }
 
 // Cache the logo as base64 for the loading screen
@@ -1316,7 +1316,7 @@ ipcMain.handle('tor:onionAddress', async () => {
 ipcMain.handle('inventory:store-address', async (event, inventorySystemId, requestId, encryptedBlob) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        inventoryStorage.storeAddress(inventorySystemId, requestId, encryptedBlob);
+        await inventoryStorage.storeAddress(inventorySystemId, requestId, encryptedBlob);
         return true;
     } catch (err) {
         console.error('[Inventory] Store address error:', err);
@@ -1327,7 +1327,7 @@ ipcMain.handle('inventory:store-address', async (event, inventorySystemId, reque
 ipcMain.handle('inventory:get-address', async (event, inventorySystemId, requestId) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        return inventoryStorage.getAddress(inventorySystemId, requestId);
+        return await inventoryStorage.getAddress(inventorySystemId, requestId);
     } catch (err) {
         console.error('[Inventory] Get address error:', err);
         return null;
@@ -1337,7 +1337,7 @@ ipcMain.handle('inventory:get-address', async (event, inventorySystemId, request
 ipcMain.handle('inventory:delete-address', async (event, inventorySystemId, requestId) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        return inventoryStorage.deleteAddress(inventorySystemId, requestId);
+        return await inventoryStorage.deleteAddress(inventorySystemId, requestId);
     } catch (err) {
         console.error('[Inventory] Delete address error:', err);
         return false;
@@ -1347,7 +1347,7 @@ ipcMain.handle('inventory:delete-address', async (event, inventorySystemId, requ
 ipcMain.handle('inventory:list-addresses', async (event, inventorySystemId) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        return inventoryStorage.listAddresses(inventorySystemId);
+        return await inventoryStorage.listAddresses(inventorySystemId);
     } catch (err) {
         console.error('[Inventory] List addresses error:', err);
         return [];
@@ -1357,7 +1357,7 @@ ipcMain.handle('inventory:list-addresses', async (event, inventorySystemId) => {
 ipcMain.handle('inventory:store-saved-address', async (event, addressId, encryptedBlob) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        inventoryStorage.storeSavedAddress(addressId, encryptedBlob);
+        await inventoryStorage.storeSavedAddress(addressId, encryptedBlob);
         return true;
     } catch (err) {
         console.error('[Inventory] Store saved address error:', err);
@@ -1368,7 +1368,7 @@ ipcMain.handle('inventory:store-saved-address', async (event, addressId, encrypt
 ipcMain.handle('inventory:get-saved-addresses', async (event) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        return inventoryStorage.getSavedAddresses();
+        return await inventoryStorage.getSavedAddresses();
     } catch (err) {
         console.error('[Inventory] Get saved addresses error:', err);
         return [];
@@ -1378,7 +1378,7 @@ ipcMain.handle('inventory:get-saved-addresses', async (event) => {
 ipcMain.handle('inventory:delete-saved-address', async (event, addressId) => {
     if (!validateSender(event)) throw new Error('Unauthorized IPC sender');
     try {
-        return inventoryStorage.deleteSavedAddress(addressId);
+        return await inventoryStorage.deleteSavedAddress(addressId);
     } catch (err) {
         console.error('[Inventory] Delete saved address error:', err);
         return false;

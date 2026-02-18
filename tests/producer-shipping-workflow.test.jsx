@@ -246,7 +246,7 @@ beforeEach(() => {
       { publicKey: 'producerKey', publicKeyBase62: 'producerKey', name: 'Bob Producer', displayName: 'Bob Producer', permission: 'editor', isOnline: true },
       { publicKey: 'requestorKey', publicKeyBase62: 'requestorKey', name: 'Carol Requestor', displayName: 'Carol Requestor', permission: 'viewer', isOnline: true },
     ],
-    userIdentity: { publicKeyBase62: 'adminKey', displayName: 'Alice Admin', privateKey: new Uint8Array(64), name: 'Alice Admin' },
+    userIdentity: { publicKeyBase62: 'adminKey', displayName: 'Alice Admin', curveSecretKey: new Uint8Array(32), name: 'Alice Admin' },
     onStartChatWith: jest.fn(),
   };
 
@@ -398,7 +398,7 @@ describe('ApprovalQueue — pending address decryption (Bug #2)', () => {
       expect(mockDecryptPendingAddress).toHaveBeenCalledWith(
         pendingEntries,
         'admin-pub-hex-1234',
-        mockCtx.userIdentity.privateKey
+        mockCtx.userIdentity.curveSecretKey
       );
     });
   });
@@ -459,7 +459,7 @@ describe('ApprovalQueue — pending address decryption (Bug #2)', () => {
       expect(mockCreateAddressReveal).toHaveBeenCalledWith(
         expect.objectContaining({ fullName: 'Jane Doe' }),
         'producer-pub-hex-5678',
-        mockCtx.userIdentity.privateKey,
+        mockCtx.userIdentity.curveSecretKey,
         'admin-pub-hex-1234'
       );
     });
@@ -644,7 +644,7 @@ describe('RequestDetail — inline AddressReveal', () => {
     mockCtx.userIdentity = {
       publicKeyBase62: 'producerKey',
       displayName: 'Bob Producer',
-      privateKey: new Uint8Array(64),
+      curveSecretKey: new Uint8Array(32),
       name: 'Bob Producer',
     };
 
@@ -660,12 +660,13 @@ describe('RequestDetail — inline AddressReveal', () => {
     );
 
     // Should render AddressReveal inline (shows decrypted address)
+    // Address appears in both the shipping address summary and the AddressReveal component
     await waitFor(() => {
-      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+      expect(screen.getAllByText('Jane Doe').length).toBeGreaterThanOrEqual(1);
     });
 
-    expect(screen.getByText('456 Oak Ave')).toBeInTheDocument();
-    expect(screen.getByText(/Portland, OR 97201/)).toBeInTheDocument();
+    expect(screen.getAllByText('456 Oak Ave').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Portland, OR 97201/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows shipping providers when AddressReveal is rendered inline', async () => {
@@ -681,7 +682,7 @@ describe('RequestDetail — inline AddressReveal', () => {
     mockCtx.userIdentity = {
       publicKeyBase62: 'producerKey',
       displayName: 'Bob',
-      privateKey: new Uint8Array(64),
+      curveSecretKey: new Uint8Array(32),
       name: 'Bob',
     };
 
@@ -855,7 +856,7 @@ describe('ProducerMyRequests — onMarkShipped handler (Bug #5)', () => {
     mockCtx.userIdentity = {
       publicKeyBase62: 'producerKey',
       displayName: 'Bob Producer',
-      privateKey: new Uint8Array(64),
+      curveSecretKey: new Uint8Array(32),
       name: 'Bob Producer',
     };
   });
@@ -902,9 +903,10 @@ describe('ProducerMyRequests — onMarkShipped handler (Bug #5)', () => {
     fireEvent.click(card);
 
     // RequestDetail should show with AddressReveal inline
+    // Address appears in both the shipping address summary and the AddressReveal component
     await waitFor(() => {
-      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
-      expect(screen.getByText('456 Oak Ave')).toBeInTheDocument();
+      expect(screen.getAllByText('Jane Doe').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('456 Oak Ave').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -950,7 +952,7 @@ describe('ProducerMyRequests — onMarkShipped handler (Bug #5)', () => {
 
 describe('AddressReveal — shipping providers and confirm flow', () => {
   const reveal = MOCK_REVEAL;
-  const identity = { publicKeyBase62: 'producerKey', privateKey: new Uint8Array(64) };
+  const identity = { publicKeyBase62: 'producerKey', curveSecretKey: new Uint8Array(32) };
 
   beforeEach(() => {
     mockCtx.yInventoryRequests = createMockYArray([
@@ -1025,7 +1027,7 @@ describe('AddressReveal — shipping providers and confirm flow', () => {
     render(<AddressReveal requestId="req-ar1" reveal={reveal} identity={identity} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/encrypted address will be permanently deleted/)).toBeInTheDocument();
+      expect(screen.getByText(/encrypted address is automatically deleted/)).toBeInTheDocument();
     });
   });
 
@@ -1071,7 +1073,7 @@ describe('E2E Scenario: Owner-submitted address → approve → producer ships',
       expect(mockCreateAddressReveal).toHaveBeenCalledWith(
         TEST_ADDRESS,
         'producer-pub-hex-5678',
-        mockCtx.userIdentity.privateKey,
+        mockCtx.userIdentity.curveSecretKey,
         'admin-pub-hex-1234'
       );
       expect(mockCtx.yAddressReveals.set).toHaveBeenCalled();
@@ -1147,7 +1149,7 @@ describe('E2E Scenario: Producer views address and ships', () => {
     mockCtx.userIdentity = {
       publicKeyBase62: 'producerKey',
       displayName: 'Bob',
-      privateKey: new Uint8Array(64),
+      curveSecretKey: new Uint8Array(32),
       name: 'Bob',
     };
 
@@ -1163,10 +1165,11 @@ describe('E2E Scenario: Producer views address and ships', () => {
     );
 
     // Should see decrypted address
+    // Address appears in both the shipping address summary and the AddressReveal component
     await waitFor(() => {
-      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
-      expect(screen.getByText('456 Oak Ave')).toBeInTheDocument();
-      expect(screen.getByText(/Portland, OR 97201/)).toBeInTheDocument();
+      expect(screen.getAllByText('Jane Doe').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('456 Oak Ave').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Portland, OR 97201/).length).toBeGreaterThanOrEqual(1);
     });
 
     // Should see shipping providers
@@ -1266,10 +1269,10 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    expect(screen.getByText('🔨 Mark In Progress')).toBeInTheDocument();
+    expect(screen.getByTestId('stage-btn-in_progress')).toBeInTheDocument();
   });
 
-  it('does NOT show Mark In Progress button for in_progress status', () => {
+  it('does NOT show Mark In Progress button as clickable for in_progress status', () => {
     const req = createTestRequest({
       id: 'req-mip2',
       status: 'in_progress',
@@ -1289,10 +1292,12 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    expect(screen.queryByText('🔨 Mark In Progress')).not.toBeInTheDocument();
+    // Button exists but is the active/current stage (disabled)
+    const btn = screen.getByTestId('stage-btn-in_progress');
+    expect(btn).toBeDisabled();
   });
 
-  it('does NOT show Mark In Progress button when onMarkInProgress is not provided', () => {
+  it('stage bar button is safe to click when onMarkInProgress is not provided', () => {
     const req = createTestRequest({
       id: 'req-mip3',
       status: 'approved',
@@ -1311,7 +1316,9 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    expect(screen.queryByText('🔨 Mark In Progress')).not.toBeInTheDocument();
+    // Button renders in stage bar; clicking it should not throw (optional chaining)
+    const btn = screen.getByTestId('stage-btn-in_progress');
+    expect(() => fireEvent.click(btn)).not.toThrow();
   });
 
   it('calls onMarkInProgress with the request when clicked', () => {
@@ -1335,11 +1342,11 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('🔨 Mark In Progress'));
+    fireEvent.click(screen.getByTestId('stage-btn-in_progress'));
     expect(onMarkInProgress).toHaveBeenCalledWith(req);
   });
 
-  it('does NOT show Mark In Progress for admin role', () => {
+  it('stage bar renders for admin role too', () => {
     const req = createTestRequest({
       id: 'req-mip5',
       status: 'approved',
@@ -1347,6 +1354,7 @@ describe('RequestDetail — Mark In Progress button', () => {
       inventorySystemId: 'sys1',
     });
 
+    const onMarkInProgress = jest.fn();
     render(
       <RequestDetail
         request={req}
@@ -1354,11 +1362,13 @@ describe('RequestDetail — Mark In Progress button', () => {
         isProducer={false}
         collaborators={mockCtx.collaborators}
         onClose={jest.fn()}
-        onMarkInProgress={jest.fn()}
+        onMarkInProgress={onMarkInProgress}
       />
     );
 
-    expect(screen.queryByText('🔨 Mark In Progress')).not.toBeInTheDocument();
+    // Admin can also interact with stage bar (canInteractStageBar = isAdmin || isProducer)
+    const btn = screen.getByTestId('stage-btn-in_progress');
+    expect(btn).not.toBeDisabled();
   });
 });
 
@@ -1371,7 +1381,7 @@ describe('ProducerMyRequests — Mark In Progress via RequestDetail', () => {
     mockCtx.userIdentity = {
       publicKeyBase62: 'producerKey',
       displayName: 'Bob Producer',
-      privateKey: new Uint8Array(64),
+      curveSecretKey: new Uint8Array(32),
       name: 'Bob Producer',
     };
   });
@@ -1399,12 +1409,12 @@ describe('ProducerMyRequests — Mark In Progress via RequestDetail', () => {
     // RequestDetail should show with Mark In Progress button (inside the slide panel)
     await waitFor(() => {
       const panel = document.querySelector('.slide-panel__body');
-      expect(within(panel).getByText('🔨 Mark In Progress')).toBeInTheDocument();
+      expect(within(panel).getByTestId('stage-btn-in_progress')).toBeInTheDocument();
     });
 
     // Click Mark In Progress inside the slide panel
     const panel = document.querySelector('.slide-panel__body');
-    fireEvent.click(within(panel).getByText('🔨 Mark In Progress'));
+    fireEvent.click(within(panel).getByTestId('stage-btn-in_progress'));
 
     // Request should be updated to in_progress
     await waitFor(() => {
@@ -1573,7 +1583,7 @@ describe('Edge cases and error handling', () => {
       <AddressReveal
         requestId="req-edge4"
         reveal={MOCK_REVEAL}
-        identity={{ publicKeyBase62: 'wrongKey', privateKey: new Uint8Array(64) }}
+        identity={{ publicKeyBase62: 'wrongKey', curveSecretKey: new Uint8Array(32) }}
       />
     );
 
@@ -1585,7 +1595,7 @@ describe('Edge cases and error handling', () => {
   it('ProducerMyRequests handles empty requests', () => {
     mockCtx.userIdentity = {
       publicKeyBase62: 'producerKey',
-      privateKey: new Uint8Array(64),
+      curveSecretKey: new Uint8Array(32),
       name: 'Bob',
     };
     mockSyncResult.requests = [];

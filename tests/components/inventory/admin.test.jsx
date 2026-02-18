@@ -106,7 +106,7 @@ beforeEach(() => {
       { publicKey: 'key1', publicKeyBase62: 'key1', name: 'Alice', displayName: 'Alice', permission: 'owner', isOnline: true },
       { publicKey: 'key2', publicKeyBase62: 'key2', name: 'Bob', displayName: 'Bob', permission: 'editor', isOnline: false },
     ],
-    userIdentity: { publicKeyBase62: 'key1', displayName: 'Alice', privateKey: new Uint8Array(32) },
+    userIdentity: { publicKeyBase62: 'key1', displayName: 'Alice', curveSecretKey: new Uint8Array(32) },
   };
 
   mockSyncResult = {

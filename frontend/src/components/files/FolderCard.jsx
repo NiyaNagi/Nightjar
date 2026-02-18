@@ -28,6 +28,7 @@ export default function FolderCard({
     } else if (e.ctrlKey || e.metaKey) {
       onSelect?.(folder.id, { ctrl: true, shift: false });
     } else {
+      onSelect?.(folder.id, { ctrl: false, shift: false });
       onClick?.(folder);
     }
   }, [folder, onClick, onSelect]);
@@ -46,7 +47,10 @@ export default function FolderCard({
 
   const handleDragLeave = useCallback((e) => {
     e.preventDefault();
-    setIsDragOver(false);
+    // Only reset if leaving the element itself, not moving between child elements
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragOver(false);
+    }
   }, []);
 
   const handleDrop = useCallback((e) => {
@@ -55,8 +59,14 @@ export default function FolderCard({
     setIsDragOver(false);
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
-      if (data && data.id && (data.type === 'file' || data.type === 'folder')) {
-        onFileDrop?.(data.id, folder.id, data.type);
+      if (data && (data.type === 'file' || data.type === 'folder')) {
+        // Support multi-file drag (ids array) and single drag (id)
+        const ids = data.ids || (data.id ? [data.id] : []);
+        for (const id of ids) {
+          if (id && id !== folder.id) {
+            onFileDrop?.(id, folder.id, data.type);
+          }
+        }
       }
     } catch (err) {
       // Ignore invalid drag data

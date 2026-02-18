@@ -28,7 +28,14 @@ function uint8ArrayToString(arr, encoding = 'utf8') {
 }
 
 // The design doc specifies using a SOCKS5 proxy for all TCP traffic to route it through Tor.
-const torAgent = new SocksProxyAgent('socks5h://127.0.0.1:9050');
+// Lazily instantiated only when connecting to .onion addresses
+let torAgent = null;
+function getTorAgent() {
+  if (!torAgent) {
+    torAgent = new SocksProxyAgent('socks5h://127.0.0.1:9050');
+  }
+  return torAgent;
+}
 
 /**
  * Creates and configures a Libp2p node according to the project's design specification.
@@ -59,7 +66,7 @@ async function createLibp2pNode(onionAddress) {
                 tcpTransport.dial = (ma, options) => {
                     const addr = ma.toString();
                     if (addr.includes('.onion')) {
-                        return originalDial(ma, { ...options, agent: torAgent });
+                        return originalDial(ma, { ...options, agent: getTorAgent() });
                     }
                     return originalDial(ma, options);
                 };

@@ -133,6 +133,8 @@ const TreeItem = React.memo(function TreeItem({
         }
     };
     
+    const renameCancelledRef = React.useRef(false);
+    
     const handleRenameKeyDown = (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -140,6 +142,7 @@ const TreeItem = React.memo(function TreeItem({
         }
         if (e.key === 'Escape') {
             e.preventDefault();
+            renameCancelledRef.current = true;
             onRenameCancel?.();
         }
     };
@@ -205,7 +208,7 @@ const TreeItem = React.memo(function TreeItem({
                 onClick={() => !isRenaming && onSelect(item.id, type)}
                 onDoubleClick={handleDoubleClick}
                 onKeyDown={handleKeyDownItem}
-                onContextMenu={(e) => onContextMenu?.(e, item, type)}
+                onContextMenu={(e) => { e.preventDefault(); onContextMenu?.(e, item, type); }}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -256,7 +259,7 @@ const TreeItem = React.memo(function TreeItem({
                         value={renameValue}
                         onChange={(e) => onRenameChange?.(e.target.value)}
                         onKeyDown={handleRenameKeyDown}
-                        onBlur={() => onRenameSubmit?.()}
+                        onBlur={() => { if (!renameCancelledRef.current) { onRenameSubmit?.(); } renameCancelledRef.current = false; }}
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
                     />
@@ -334,7 +337,7 @@ function WelcomeState({ onCreateWorkspace, onJoinWorkspace }) {
             <div className="sidebar-welcome__icon">
                 <img src="/assets/nightjar-logo.png" alt="Nightjar" />
             </div>
-            <h3 className="sidebar-welcome__title">Welcome to Nahma</h3>
+            <h3 className="sidebar-welcome__title">Welcome to Nightjar</h3>
             <p className="sidebar-welcome__text">
                 Create a workspace to start collaborating on documents securely.
             </p>
@@ -419,12 +422,22 @@ const HierarchicalSidebar = ({
     workspaceMembers = {},
     onKickMember,
     onTransferOwnership,
+    onUpdateMemberPermission,
+    onRespondToPendingDemotion,
     
     // Folder props
     folders = [],
     onCreateFolder,
     onDeleteFolder,
     onRenameFolder,
+    expandedFolders: externalExpandedFolders,
+    onSetExpandedFolders: externalSetExpandedFolders,
+    
+    // Search
+    onOpenSearch,
+    
+    // Help
+    onShowHelp,
 }) => {
     // Permission context
     const { canCreate, canDelete } = usePermissions();
@@ -437,7 +450,10 @@ const HierarchicalSidebar = ({
     const canDeleteInWorkspace = currentWorkspace ? canDelete('workspace', currentWorkspace.id) : false;
     
     // State
-    const [expandedFolders, setExpandedFolders] = useState(new Set());
+    const [internalExpandedFolders, internalSetExpandedFolders] = useState(new Set());
+    // Use lifted state from parent if provided, otherwise use internal state
+    const expandedFolders = externalExpandedFolders || internalExpandedFolders;
+    const setExpandedFolders = externalSetExpandedFolders || internalSetExpandedFolders;
     const [showCreateDocument, setShowCreateDocument] = useState(false);
     const [createInFolderId, setCreateInFolderId] = useState(null);
     const [createDocumentType, setCreateDocumentType] = useState('text');
@@ -516,13 +532,21 @@ const HierarchicalSidebar = ({
         // Don't show context menu for system folders
         if (item.isSystem) return;
         
+        // Don't show context menu if user has no permitted actions
+        if (!canDeleteInWorkspace) return;
+        
+        // Clamp context menu position to viewport bounds
+        const menuWidth = 180;
+        const menuHeight = 150;
+        const clampedX = Math.min(e.clientX, window.innerWidth - menuWidth);
+        const clampedY = Math.min(e.clientY, window.innerHeight - menuHeight);
         setContextMenu({
-            x: e.clientX,
-            y: e.clientY,
+            x: Math.max(0, clampedX),
+            y: Math.max(0, clampedY),
             item,
             type
         });
-    }, []);
+    }, [canDeleteInWorkspace]);
     
     const closeContextMenu = useCallback(() => {
         setContextMenu(null);
@@ -635,18 +659,24 @@ const HierarchicalSidebar = ({
     // Handle document drop onto folder
     const handleDocumentDrop = useCallback((documentId, folderId) => {
         if (onMoveDocument) {
+            // Avoid no-op: check if doc is already in the target folder
+            const doc = documents.find(d => d.id === documentId);
+            if (doc && doc.folderId === folderId) return;
             onMoveDocument(documentId, folderId);
         }
-    }, [onMoveDocument]);
+    }, [onMoveDocument, documents]);
     
     // Handle document drop onto root (out of folder)
     const handleDropOnRoot = useCallback((e) => {
         e.preventDefault();
         const docId = e.dataTransfer.getData('documentId');
         if (docId && onMoveDocument) {
+            // Avoid no-op: check if doc is already at root
+            const doc = documents.find(d => d.id === docId);
+            if (doc && !doc.folderId) return;
             onMoveDocument(docId, null); // null folderId = root
         }
-    }, [onMoveDocument]);
+    }, [onMoveDocument, documents]);
     
     const handleDragOverRoot = useCallback((e) => {
         e.preventDefault();
@@ -823,8 +853,9 @@ const HierarchicalSidebar = ({
                                     type="folder"
                                     isExpanded={isExpanded}
                                     hasChildren={hasChildren}
-                                    onSelect={() => {}}
+                                    onSelect={() => toggleFolder(folder.id)}
                                     onToggle={toggleFolder}
+                                    onContextMenu={handleContextMenu}
                                     onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
                                     onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
                                     onRequestEdit={handleRequestEdit}
@@ -847,6 +878,7 @@ const HierarchicalSidebar = ({
                                                 level={1}
                                                 isSelected={doc.id === activeDocId}
                                                 onSelect={handleSelect}
+                                                onContextMenu={handleContextMenu}
                                                 onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
                                                 onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
                                                 onRequestEdit={handleRequestEdit}
@@ -874,6 +906,7 @@ const HierarchicalSidebar = ({
                                     type="document"
                                     isSelected={doc.id === activeDocId}
                                     onSelect={handleSelect}
+                                    onContextMenu={handleContextMenu}
                                     onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
                                     onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
                                     onRequestEdit={handleRequestEdit}
@@ -894,6 +927,15 @@ const HierarchicalSidebar = ({
             {/* Footer with mascot, app settings and collapse */}
             <div className="hierarchical-sidebar__footer">
                 <NightjarMascot size="mini" autoRotate={false} fadeTimeout={5000} />
+                <button 
+                    type="button"
+                    className="hierarchical-sidebar__help-btn"
+                    onClick={() => onShowHelp?.()}
+                    title="Help & Documentation (F1)"
+                    aria-label="Open help and documentation"
+                >
+                    ?
+                </button>
                 <button 
                     type="button"
                     className="hierarchical-sidebar__settings-btn"
@@ -936,6 +978,8 @@ const HierarchicalSidebar = ({
                     members={workspaceMembers}
                     onKickMember={onKickMember}
                     onTransferOwnership={onTransferOwnership}
+                    onUpdateMemberPermission={onUpdateMemberPermission}
+                    onRespondToPendingDemotion={onRespondToPendingDemotion}
                     onUpdate={onUpdateWorkspace}
                     onDelete={onDeleteWorkspace}
                     onClose={() => setShowWorkspaceSettings(false)}
@@ -956,42 +1000,52 @@ const HierarchicalSidebar = ({
             {/* Context Menu */}
             {contextMenu && (
                 <>
-                    <div className="context-menu-overlay" onClick={closeContextMenu} />
+                    <div className="context-menu-overlay" onClick={closeContextMenu} onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }} />
                     <div
                         className="context-menu"
                         style={{ left: contextMenu.x, top: contextMenu.y }}
                         onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }}
+                        role="menu"
+                        tabIndex={-1}
+                        ref={(el) => el?.focus()}
                     >
-                        <button
-                            type="button"
-                            className="context-menu__item"
-                            onClick={handleEditProperties}
-                        >
-                            <span className="context-menu__icon">🎨</span>
-                            Edit Properties
-                        </button>
-                        <button
-                            type="button"
-                            className="context-menu__item"
-                            onClick={() => {
-                                handleRequestRename(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
-                                closeContextMenu();
-                            }}
-                        >
-                            <span className="context-menu__icon">✏️</span>
-                            Rename
-                        </button>
-                        <button
-                            type="button"
-                            className="context-menu__item context-menu__item--danger"
-                            onClick={() => {
-                                handleRequestDelete(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
-                                closeContextMenu();
-                            }}
-                        >
-                            <span className="context-menu__icon">🗑️</span>
-                            Delete
-                        </button>
+                        {canDeleteInWorkspace && (
+                            <button
+                                type="button"
+                                className="context-menu__item"
+                                onClick={handleEditProperties}
+                            >
+                                <span className="context-menu__icon">🎨</span>
+                                Edit Properties
+                            </button>
+                        )}
+                        {canDeleteInWorkspace && (
+                            <button
+                                type="button"
+                                className="context-menu__item"
+                                onClick={() => {
+                                    handleRequestRename(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
+                                    closeContextMenu();
+                                }}
+                            >
+                                <span className="context-menu__icon">✏️</span>
+                                Rename
+                            </button>
+                        )}
+                        {canDeleteInWorkspace && (
+                            <button
+                                type="button"
+                                className="context-menu__item context-menu__item--danger"
+                                onClick={() => {
+                                    handleRequestDelete(contextMenu.item.id, contextMenu.type, contextMenu.item.name);
+                                    closeContextMenu();
+                                }}
+                            >
+                                <span className="context-menu__icon">🗑️</span>
+                                Delete
+                            </button>
+                        )}
                     </div>
                 </>
             )}

@@ -63,39 +63,51 @@ export default function ProducerMyRequests() {
     const arr = yArr.toArray();
     const idx = arr.findIndex(r => r.id === requestId);
     if (idx === -1) return;
-    const updated = {
-      ...arr[idx],
-      status: 'open',
-      assignedTo: null,
-      assignedAt: null,
-      claimedBy: null,
-      claimedAt: null,
-    };
-    yArr.delete(idx, 1);
-    yArr.insert(idx, [updated]);
-    ctx.yAddressReveals?.delete(requestId);
+    try {
+      const req = arr[idx];
+      // Only allow unclaim if the request hasn't progressed past approval
+      if (!['claimed', 'pending_approval', 'approved'].includes(req.status)) {
+        console.warn(`[MyRequests] Cannot unclaim request with status "${req.status}"`);
+        return;
+      }
+      const updated = {
+        ...req,
+        status: 'open',
+        assignedTo: null,
+        assignedAt: null,
+        claimedBy: null,
+        claimedAt: null,
+        approvedBy: null,
+        approvedAt: null,
+        updatedAt: Date.now(),
+      };
+      yArr.delete(idx, 1);
+      yArr.insert(idx, [updated]);
+      ctx.yAddressReveals?.delete(requestId);
 
-    ctx.yInventoryAuditLog?.push([{
-      id: generateId(),
-      inventorySystemId: ctx.inventorySystemId,
-      timestamp: Date.now(),
-      actorId: myKey,
-      actorRole: 'editor',
-      action: 'request_unclaimed',
-      targetType: 'request',
-      targetId: requestId,
-      summary: `Request ${requestId.slice(0, 8)} unclaimed`,
-    }]);
+      ctx.yInventoryAuditLog?.push([{
+        id: generateId(),
+        inventorySystemId: ctx.inventorySystemId,
+        timestamp: Date.now(),
+        actorId: myKey,
+        actorRole: 'editor',
+        action: 'request_unclaimed',
+        targetType: 'request',
+        targetId: requestId,
+        summary: `Request ${requestId.slice(0, 8)} unclaimed`,
+      }]);
 
-    // Notify the requestor
-    const req = arr[idx];
-    pushNotification(ctx.yInventoryNotifications, {
-      inventorySystemId: ctx.inventorySystemId,
-      recipientId: req.requestedBy,
-      type: 'request_unclaimed',
-      message: `A producer unclaimed your request for ${req.catalogItemName}`,
-      relatedId: requestId,
-    });
+      // Notify the requestor
+      pushNotification(ctx.yInventoryNotifications, {
+        inventorySystemId: ctx.inventorySystemId,
+        recipientId: req.requestedBy,
+        type: 'request_unclaimed',
+        message: `A producer unclaimed your request for ${req.catalogItemName}`,
+        relatedId: requestId,
+      });
+    } catch (err) {
+      console.error('Failed to unclaim request:', err);
+    }
   }, [ctx, myKey]);
 
   const handleMarkInProgress = useCallback((requestId) => {
@@ -128,6 +140,106 @@ export default function ProducerMyRequests() {
       type: 'request_in_progress',
       message: `Your request for ${req.catalogItemName} is now in progress`,
       relatedId: requestId,
+    });
+    // Notify admins
+    const admins = (ctx.collaborators || []).filter(c => c.permission === 'owner');
+    admins.forEach(admin => {
+      const adminKey = admin.publicKeyBase62 || admin.publicKey;
+      if (adminKey && adminKey !== myKey) {
+        pushNotification(ctx.yInventoryNotifications, {
+          inventorySystemId: ctx.inventorySystemId,
+          recipientId: adminKey,
+          type: 'request_in_progress',
+          message: `Request for ${req.catalogItemName} is now in progress`,
+          relatedId: requestId,
+        });
+      }
+    });
+  }, [ctx, myKey]);
+
+  const handleRevertToApproved = useCallback((req) => {
+    const yArr = ctx.yInventoryRequests;
+    if (!yArr) return;
+    const arr = yArr.toArray();
+    const idx = arr.findIndex(r => r.id === req.id);
+    if (idx === -1) return;
+    yArr.delete(idx, 1);
+    yArr.insert(idx, [{ ...arr[idx], status: 'approved', shippedAt: null, inProgressAt: null, trackingNumber: null, updatedAt: Date.now() }]);
+
+    ctx.yInventoryAuditLog?.push([{
+      id: generateId(),
+      inventorySystemId: ctx.inventorySystemId,
+      timestamp: Date.now(),
+      actorId: myKey,
+      actorRole: 'editor',
+      action: 'request_reverted_approved',
+      targetType: 'request',
+      targetId: req.id,
+      summary: `Request ${req.id.slice(0, 8)} reverted to approved by producer`,
+    }]);
+
+    pushNotification(ctx.yInventoryNotifications, {
+      inventorySystemId: ctx.inventorySystemId,
+      recipientId: req.requestedBy,
+      type: 'status_change',
+      message: `Your request for ${req.catalogItemName} was reverted to approved`,
+      relatedId: req.id,
+    });
+    const admins = (ctx.collaborators || []).filter(c => c.permission === 'owner');
+    admins.forEach(admin => {
+      const adminKey = admin.publicKeyBase62 || admin.publicKey;
+      if (adminKey && adminKey !== myKey) {
+        pushNotification(ctx.yInventoryNotifications, {
+          inventorySystemId: ctx.inventorySystemId,
+          recipientId: adminKey,
+          type: 'status_change',
+          message: `Request for ${req.catalogItemName} was reverted to approved`,
+          relatedId: req.id,
+        });
+      }
+    });
+  }, [ctx, myKey]);
+
+  const handleRevertToInProgress = useCallback((req) => {
+    const yArr = ctx.yInventoryRequests;
+    if (!yArr) return;
+    const arr = yArr.toArray();
+    const idx = arr.findIndex(r => r.id === req.id);
+    if (idx === -1) return;
+    yArr.delete(idx, 1);
+    yArr.insert(idx, [{ ...arr[idx], status: 'in_progress', shippedAt: null, trackingNumber: null, updatedAt: Date.now() }]);
+
+    ctx.yInventoryAuditLog?.push([{
+      id: generateId(),
+      inventorySystemId: ctx.inventorySystemId,
+      timestamp: Date.now(),
+      actorId: myKey,
+      actorRole: 'editor',
+      action: 'request_reverted_in_progress',
+      targetType: 'request',
+      targetId: req.id,
+      summary: `Request ${req.id.slice(0, 8)} reverted to in progress by producer`,
+    }]);
+
+    pushNotification(ctx.yInventoryNotifications, {
+      inventorySystemId: ctx.inventorySystemId,
+      recipientId: req.requestedBy,
+      type: 'status_change',
+      message: `Your request for ${req.catalogItemName} was reverted to in progress`,
+      relatedId: req.id,
+    });
+    const admins = (ctx.collaborators || []).filter(c => c.permission === 'owner');
+    admins.forEach(admin => {
+      const adminKey = admin.publicKeyBase62 || admin.publicKey;
+      if (adminKey && adminKey !== myKey) {
+        pushNotification(ctx.yInventoryNotifications, {
+          inventorySystemId: ctx.inventorySystemId,
+          recipientId: adminKey,
+          type: 'status_change',
+          message: `Request for ${req.catalogItemName} was reverted to in progress`,
+          relatedId: req.id,
+        });
+      }
     });
   }, [ctx, myKey]);
 
@@ -250,6 +362,8 @@ export default function ProducerMyRequests() {
                 setRevealRequestId(req.id);
               }
             }}
+            onRevertToApproved={(req) => { handleRevertToApproved(req); setSelectedRequest(null); }}
+            onRevertToInProgress={(req) => { handleRevertToInProgress(req); setSelectedRequest(null); }}
           />
         </SlidePanel>
       )}

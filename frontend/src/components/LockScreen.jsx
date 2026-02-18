@@ -15,6 +15,7 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
     const [error, setError] = useState(null);
     const [unlocking, setUnlocking] = useState(false);
     const [identity, setIdentity] = useState(null);
+    const [remaining, setRemaining] = useState(10);
     
     useEffect(() => {
         // Get the active identity metadata
@@ -45,6 +46,16 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
             onSwitchIdentity?.();
         }
     }, [onSwitchIdentity]);
+
+    // Reset input state when identity changes
+    useEffect(() => {
+        setPin('');
+        setError(null);
+        setUnlocking(false);
+        if (identity) {
+            setRemaining(identityManager.getRemainingAttempts(identity.id));
+        }
+    }, [identity]);
     
     const handleUnlock = async (pinValue) => {
         if (!identity || pinValue.length !== 6) return;
@@ -54,22 +65,25 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
         
         try {
             const result = await identityManager.unlockIdentity(identity.id, pinValue);
+            setPin(''); // Clear PIN from state immediately on success
             onUnlock?.(result.identityData, result.metadata);
         } catch (err) {
             console.error('[LockScreen] Unlock failed:', err);
             setError(err.message);
             setPin('');
+            if (identity) {
+                setRemaining(identityManager.getRemainingAttempts(identity.id));
+            }
             
             // If deleted due to too many attempts
             if (err.message.includes('deleted')) {
+                setIdentity(null);
                 onSwitchIdentity?.();
             }
         } finally {
             setUnlocking(false);
         }
     };
-    
-    const remaining = identity ? identityManager.getRemainingAttempts(identity.id) : 10;
     
     return (
         <div className="lock-screen">
@@ -84,7 +98,7 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
                     <div className="lock-screen__identity">
                         <div 
                             className="lock-screen__identity-icon"
-                            style={{ backgroundColor: identity.color + '20', color: identity.color }}
+                            style={{ backgroundColor: (identity.color || '#888888') + '20', color: identity.color || '#888888' }}
                         >
                             {identity.icon || '👤'}
                         </div>

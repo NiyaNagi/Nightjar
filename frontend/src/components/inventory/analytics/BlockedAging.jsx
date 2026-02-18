@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 
 const AGE_BUCKETS = [
-  { key: '1-3d', label: '1–3 days', min: 1, max: 3, color: '#facc15' },
+  { key: '0-3d', label: '0–3 days', min: 0, max: 3, color: '#facc15' },
   { key: '4-7d', label: '4–7 days', min: 4, max: 7, color: '#f59e0b' },
   { key: '8-14d', label: '8–14 days', min: 8, max: 14, color: '#f97316' },
   { key: '>14d', label: '>14 days', min: 15, max: Infinity, color: '#ef4444' },

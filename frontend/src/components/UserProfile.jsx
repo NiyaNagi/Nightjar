@@ -87,7 +87,7 @@ const saveUserProfile = (profile) => {
     }
 };
 
-const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
+const UserProfile = ({ onProfileChange, initialProfile, userProfile, onLock }) => {
     // Try to get identity context, but don't fail if not available
     let identityContext = { identity: null, publicIdentity: null, deleteIdentity: null };
     try {
@@ -358,6 +358,24 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
 
                     {activeTab === 'security' && identity && (
                         <div className="tab-content security-tab">
+                            {onLock && (
+                                <div className="section">
+                                    <label className="section-label">Lock</label>
+                                    <p className="section-hint">
+                                        Immediately lock the app. You'll need your PIN to unlock.
+                                    </p>
+                                    <button
+                                        className="btn-secondary"
+                                        onClick={() => {
+                                            setIsOpen(false);
+                                            onLock();
+                                        }}
+                                    >
+                                        🔒 Lock App
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="section">
                                 <label className="section-label">Your ID</label>
                                 <div className="id-display">
@@ -530,7 +548,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
                                         <strong>Nightjar</strong>
                                         {' '}
                                         <a 
-                                            href="https://github.com/InyanRock/Nightjar" 
+                                            href="https://github.com/SaoneYanpa/Nightjar" 
                                             target="_blank" 
                                             rel="noopener noreferrer"
                                             className="github-link"
@@ -547,7 +565,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
                                         {isElectron ? (
                                             <>
                                                 <a 
-                                                    href={`https://github.com/InyanRock/Nightjar/releases/tag/v${window.electronAPI?.appVersion || '1.0.0'}`}
+                                                    href={`https://github.com/SaoneYanpa/Nightjar/releases/tag/v${window.electronAPI?.appVersion || '1.0.0'}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="version-link"
@@ -556,7 +574,7 @@ const UserProfile = ({ onProfileChange, initialProfile, userProfile }) => {
                                                 </a>
                                                 {' · '}
                                                 <a 
-                                                    href="https://github.com/InyanRock/Nightjar/releases"
+                                                    href="https://github.com/SaoneYanpa/Nightjar/releases"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="release-notes-link"

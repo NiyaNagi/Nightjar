@@ -670,14 +670,28 @@ export class WebRTCProvider {
   _handleAwarenessMessage(peerId, payload) {
     try {
       const update = JSON.parse(new TextDecoder().decode(payload));
+      const added = [];
+      const updated = [];
+      const removed = [];
+      const states = this.awareness.getStates();
+
       for (const [clientId, state] of Object.entries(update)) {
+        const id = parseInt(clientId);
+        if (id === this.awareness.clientID) continue; // Never overwrite local state
         if (state === null) {
-          this.awareness.setLocalStateField(parseInt(clientId), null);
+          if (states.has(id)) {
+            states.delete(id);
+            removed.push(id);
+          }
         } else {
-          // Apply remote awareness state
-          const states = this.awareness.getStates();
-          states.set(parseInt(clientId), state);
+          const isNew = !states.has(id);
+          states.set(id, state);
+          (isNew ? added : updated).push(id);
         }
+      }
+
+      if (added.length || updated.length || removed.length) {
+        this.awareness.emit('change', [{ added, updated, removed }, 'remote']);
       }
     } catch (e) {
       console.error('[WebRTCProvider] Failed to handle awareness:', e);

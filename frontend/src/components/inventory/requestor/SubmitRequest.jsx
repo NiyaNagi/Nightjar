@@ -7,7 +7,7 @@
  * See docs/INVENTORY_SYSTEM_SPEC.md §6.6.1 (Submit Request View)
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { validateQuantity, validateAddress, generateId, US_STATES, COUNTRIES } from '../../../utils/inventoryValidation';
@@ -60,11 +60,13 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
 
   // Rate limiting: 10 requests/day for non-admins
   const DAILY_LIMIT = 10;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayRequestCount = existingRequests.filter(
-    r => r.requestedBy === userIdentity?.publicKeyBase62 && r.requestedAt >= todayStart.getTime()
-  ).length;
+  const todayRequestCount = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return existingRequests.filter(
+      r => r.requestedBy === userIdentity?.publicKeyBase62 && r.requestedAt >= todayStart.getTime()
+    ).length;
+  }, [existingRequests, userIdentity?.publicKeyBase62]);
   const rateLimitReached = !isOwner && todayRequestCount >= DAILY_LIMIT;
 
   const selectedItem = activeItems.find(i => i.id === selectedItemId);
@@ -115,7 +117,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
       itemId: selectedItem.id,
       itemName: selectedItem.name,
       quantity: qtyNum,
-      unit: selectedItem.unit,
+      unitName: selectedItem.unitName,
       urgent,
       notes: notes.trim(),
     }]);
@@ -147,7 +149,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
         itemId: selectedItem.id,
         itemName: selectedItem.name,
         quantity: qtyNum,
-        unit: selectedItem.unit,
+        unitName: selectedItem.unitName,
         urgent,
         notes: notes.trim(),
       });
@@ -212,10 +214,10 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
           const admins = (collaborators || []).filter(
             c => c.permission === 'owner'
           );
-          if (admins.length > 0 && userIdentity?.privateKey) {
+          if (admins.length > 0 && userIdentity?.curveSecretKey) {
             const senderPubHex = getPublicKeyHex(userIdentity);
             const entries = await encryptAddressForAdmins(
-              address, admins, userIdentity.privateKey, senderPubHex
+              address, admins, userIdentity.curveSecretKey, senderPubHex
             );
             yPendingAddresses.set(requestId, entries);
           }
@@ -223,10 +225,10 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
           const admins = (collaborators || []).filter(
             c => c.permission === 'owner'
           );
-          if (admins.length > 0 && userIdentity?.privateKey) {
+          if (admins.length > 0 && userIdentity?.curveSecretKey) {
             const senderPubHex = getPublicKeyHex(userIdentity);
             const entries = await encryptAddressForAdmins(
-              address, admins, userIdentity.privateKey, senderPubHex
+              address, admins, userIdentity.curveSecretKey, senderPubHex
             );
             yPendingAddresses.set(requestId, entries);
           }
@@ -239,7 +241,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
           catalogItemId: item.itemId,
           catalogItemName: item.itemName,
           quantity: item.quantity,
-          unit: item.unit,
+          unit: item.unitName,
           city: address.city,
           state: address.state,
           country: address.country || 'US',
@@ -371,7 +373,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
                 <div>
                   <strong>{item.name}</strong>
                   <span className="submit-request__item-range">
-                    {item.quantityMin?.toLocaleString()} – {item.quantityMax != null ? item.quantityMax.toLocaleString() : '∞'} {item.unit}
+                    {item.quantityMin?.toLocaleString()} – {item.quantityMax != null ? item.quantityMax.toLocaleString() : '∞'} {item.unitName}
                     {item.quantityStep > 1 && ` (multiples of ${item.quantityStep})`}
                   </span>
                 </div>
@@ -395,7 +397,7 @@ export default function SubmitRequest({ currentWorkspace, isOwner }) {
               max={selectedItem.quantityMax != null ? selectedItem.quantityMax : undefined}
               step={selectedItem.quantityStep}
             />
-            <span className="submit-request__unit">{selectedItem.unit}</span>
+            <span className="submit-request__unit">{selectedItem.unitName}</span>
             {quantity && (
               <span className={`submit-request__validation ${qtyValidation.valid ? 'valid' : 'invalid'}`}>
                 {qtyValidation.valid ? '✅ Valid' : `❌ ${qtyValidation.error}`}

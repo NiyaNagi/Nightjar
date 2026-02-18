@@ -23,6 +23,7 @@ export default function ProducerManagement() {
 
   const requests = sync.requests || [];
   const capacities = sync.producerCapacities || {};
+  const catalogItems = sync.catalogItems || [];
 
   // Build producer list from collaborators who are editors/owners, including admin
   const producers = useMemo(() => {
@@ -44,7 +45,7 @@ export default function ProducerManagement() {
     }
 
     return editors.map(collab => {
-      const key = collab.publicKey;
+      const key = collab.publicKeyBase62 || collab.publicKey;
       const cap = capacities[key];
       const assigned = requests.filter(r => r.assignedTo === key);
       const fulfilled = assigned.filter(r => r.status === 'shipped' || r.status === 'delivered');
@@ -185,13 +186,16 @@ export default function ProducerManagement() {
                       <tr><th>Item</th><th>Stock</th><th>Rate/day</th></tr>
                     </thead>
                     <tbody>
-                      {Object.entries(producer.capacity.items).map(([itemId, cap]) => (
+                      {Object.entries(producer.capacity.items).map(([itemId, cap]) => {
+                        const itemName = catalogItems.find(ci => ci.id === itemId)?.name || itemId;
+                        return (
                         <tr key={itemId}>
-                          <td>{itemId}</td>
+                          <td>{itemName}</td>
                           <td>{cap.currentStock || 0}</td>
                           <td>{cap.capacityPerDay || 0}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

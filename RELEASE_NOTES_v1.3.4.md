@@ -16,24 +16,24 @@
 
 ## 🚀 Features
 
-- Add automatic version sync from git tags ([4d086f4](https://github.com/InyanRock/Nightjar/commit/4d086f4))
+- Add automatic version sync from git tags ([4d086f4](https://github.com/SaoneYanpa/Nightjar/commit/4d086f4))
 
 ## 🐛 Bug Fixes
 
-- UI polish - cancel button contrast, anchored mascot, curved tail ([9d5236b](https://github.com/InyanRock/Nightjar/commit/9d5236b))
-- Sync P2P status between StatusBar and WorkspaceSettings ([88cf34d](https://github.com/InyanRock/Nightjar/commit/88cf34d))
-- Prevent identity item hover effect from being clipped ([46ed058](https://github.com/InyanRock/Nightjar/commit/46ed058))
-- Replace ESM-only uint8arrays with native Buffer + clipboard fallback ([875ff0e](https://github.com/InyanRock/Nightjar/commit/875ff0e))
-- V1.3.1: Fix sidecar not starting in packaged builds (P2P offline) ([6315979](https://github.com/InyanRock/Nightjar/commit/6315979))
-- Fix spreadsheet stuck loading and Windows icon issues ([6d6a4fd](https://github.com/InyanRock/Nightjar/commit/6d6a4fd))
-- Fix duplicate unlock screen and multiple windows bug ([7b32097](https://github.com/InyanRock/Nightjar/commit/7b32097))
+- UI polish - cancel button contrast, anchored mascot, curved tail ([9d5236b](https://github.com/SaoneYanpa/Nightjar/commit/9d5236b))
+- Sync P2P status between StatusBar and WorkspaceSettings ([88cf34d](https://github.com/SaoneYanpa/Nightjar/commit/88cf34d))
+- Prevent identity item hover effect from being clipped ([46ed058](https://github.com/SaoneYanpa/Nightjar/commit/46ed058))
+- Replace ESM-only uint8arrays with native Buffer + clipboard fallback ([875ff0e](https://github.com/SaoneYanpa/Nightjar/commit/875ff0e))
+- V1.3.1: Fix sidecar not starting in packaged builds (P2P offline) ([6315979](https://github.com/SaoneYanpa/Nightjar/commit/6315979))
+- Fix spreadsheet stuck loading and Windows icon issues ([6d6a4fd](https://github.com/SaoneYanpa/Nightjar/commit/6d6a4fd))
+- Fix duplicate unlock screen and multiple windows bug ([7b32097](https://github.com/SaoneYanpa/Nightjar/commit/7b32097))
 
 ## 👥 Contributors
 
-- InyanRock
+- SaoneYanpa
 
 ---
 
-**Full Changelog:** [v1.3.0...v1.3.4](https://github.com/InyanRock/Nightjar/compare/v1.3.0...v1.3.4)
+**Full Changelog:** [v1.3.0...v1.3.4](https://github.com/SaoneYanpa/Nightjar/compare/v1.3.0...v1.3.4)
 
-**Download:** [Releases](https://github.com/InyanRock/Nightjar/releases/tag/v1.3.4)
+**Download:** [Releases](https://github.com/SaoneYanpa/Nightjar/releases/tag/v1.3.4)

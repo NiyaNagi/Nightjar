@@ -58,7 +58,7 @@ export default function AnalyticsDashboard() {
   const requests = useMemo(() => {
     let result = allRequests;
     if (filterItem !== 'all') result = result.filter(r => r.catalogItemId === filterItem);
-    if (filterState !== 'all') result = result.filter(r => r.state === filterState);
+    if (filterState !== 'all') result = result.filter(r => (r.state || '').toUpperCase() === filterState.toUpperCase());
     if (filterStatus !== 'all') result = result.filter(r => r.status === filterStatus);
     return result;
   }, [allRequests, filterItem, filterState, filterStatus]);
@@ -117,7 +117,7 @@ export default function AnalyticsDashboard() {
           State:
           <select value={filterState} onChange={e => setFilterState(e.target.value)}>
             <option value="all">All States</option>
-            {[...new Set(requests.map(r => r.state).filter(Boolean))].sort().map(s => (
+            {[...new Set(allRequests.map(r => r.state).filter(Boolean))].sort().map(s => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>

@@ -286,7 +286,12 @@ export class WebIdentityStore {
       // Fallback to localStorage
       const stored = localStorage.getItem('Nightjar-identity');
       if (stored) {
-        data = JSON.parse(stored);
+        try {
+          data = JSON.parse(stored);
+        } catch (parseErr) {
+          console.warn('[WebIdentityStore] Failed to parse localStorage fallback:', parseErr);
+          return null;
+        }
       }
     }
 

@@ -46,6 +46,9 @@ export function hexToRgb(hex) {
     
     if (hex.length !== 6) return null;
     
+    // Validate that all characters are valid hex digits
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+    
     const num = parseInt(hex, 16);
     if (isNaN(num)) return null;
     
@@ -97,14 +100,29 @@ export function isLightColor(color) {
 }
 
 /**
- * Get optimal text color for a given background
- * Returns white for dark backgrounds, dark gray for light backgrounds
+ * Get adaptive overlay opacity for a color.
+ * Light colors get a stronger dark overlay so white text remains readable.
+ * @param {string} color - Hex color string
+ * @param {number} baseOpacity - Default overlay opacity for dark colors
+ * @returns {number} - Overlay opacity to use
+ */
+export function getOverlayOpacity(color, baseOpacity = 0.3) {
+    const lum = getLuminance(color);
+    if (lum > 0.6) return 0.55;  // Very light colors (yellow, cyan, lime)
+    if (lum > 0.4) return 0.45;  // Medium-light colors
+    return baseOpacity;           // Already dark enough
+}
+
+/**
+ * Get text color for a colored background.
+ * Always returns white — backgrounds are darkened via overlay to ensure contrast.
+ * Returns null for no background color so CSS defaults apply.
  * @param {string} backgroundColor - Hex color of the background
- * @returns {string} - Hex color for text
+ * @returns {string|null} - '#ffffff' or null
  */
 export function getTextColorForBackground(backgroundColor) {
     if (!backgroundColor) return null; // Let CSS handle it
-    return isLightColor(backgroundColor) ? '#1f2937' : '#ffffff';
+    return '#ffffff';
 }
 
 /**
@@ -118,11 +136,9 @@ export function getChipStyleForBackground(backgroundColor) {
         return { textColor: null, chipBg: null };
     }
     
-    const isLight = isLightColor(backgroundColor);
-    
     return {
-        textColor: isLight ? '#1f2937' : '#ffffff',
-        chipBg: isLight ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.5)'
+        textColor: '#ffffff',
+        chipBg: 'rgba(0, 0, 0, 0.5)'
     };
 }
 
@@ -135,8 +151,9 @@ export function getChipStyleForBackground(backgroundColor) {
 export function ensureContrastWithWhite(color, overlayOpacity = 0.3) {
     if (!color) return 'transparent';
     
-    // Return a CSS background with the color and a dark overlay
-    return `linear-gradient(rgba(0, 0, 0, ${overlayOpacity}), rgba(0, 0, 0, ${overlayOpacity})), ${color}`;
+    // Use adaptive overlay: light colors get a stronger overlay for white text
+    const opacity = getOverlayOpacity(color, overlayOpacity);
+    return `linear-gradient(rgba(0, 0, 0, ${opacity}), rgba(0, 0, 0, ${opacity})), ${color}`;
 }
 
 /**
@@ -151,9 +168,13 @@ export function createColorGradient(leftColor, rightColor, overlayOpacity = 0.3)
     if (!leftColor) return ensureContrastWithWhite(rightColor, overlayOpacity);
     if (!rightColor) return ensureContrastWithWhite(leftColor, overlayOpacity);
     
-    // Create gradient with overlay for contrast
+    // Use the stronger adaptive overlay of the two colors
+    const opacity = Math.max(
+        getOverlayOpacity(leftColor, overlayOpacity),
+        getOverlayOpacity(rightColor, overlayOpacity)
+    );
     return `
-        linear-gradient(rgba(0, 0, 0, ${overlayOpacity}), rgba(0, 0, 0, ${overlayOpacity})),
+        linear-gradient(rgba(0, 0, 0, ${opacity}), rgba(0, 0, 0, ${opacity})),
         linear-gradient(to right, ${leftColor}, ${rightColor})
     `;
 }

@@ -461,12 +461,20 @@ describe('FileCard selection', () => {
     expect(onSelect).toHaveBeenCalledWith('f1', { ctrl: false, shift: true });
   });
 
-  it('should pass { ctrl: false, shift: false } on plain click', () => {
+  it('should pass { ctrl: false, shift: false } on plain click without calling onClick', () => {
     const onSelect = jest.fn();
     const onClick = jest.fn();
     render(<FileCard file={file} onSelect={onSelect} onClick={onClick} />);
     fireEvent.click(screen.getByTestId('fs-file-f1'));
     expect(onSelect).toHaveBeenCalledWith('f1', { ctrl: false, shift: false });
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('should call onClick on double-click', () => {
+    const onSelect = jest.fn();
+    const onClick = jest.fn();
+    render(<FileCard file={file} onSelect={onSelect} onClick={onClick} />);
+    fireEvent.doubleClick(screen.getByTestId('fs-file-f1'));
     expect(onClick).toHaveBeenCalledWith(file);
   });
 });
@@ -496,13 +504,13 @@ describe('FolderCard selection', () => {
     expect(onSelect).toHaveBeenCalledWith('folder1', { ctrl: false, shift: true });
   });
 
-  it('should navigate on plain click (no onSelect)', () => {
+  it('should navigate and select on plain click', () => {
     const onClick = jest.fn();
     const onSelect = jest.fn();
     render(<FolderCard folder={folder} onClick={onClick} onSelect={onSelect} />);
     fireEvent.click(screen.getByTestId('fs-folder-folder1'));
     expect(onClick).toHaveBeenCalledWith(folder);
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith('folder1', { ctrl: false, shift: false });
   });
 });
 

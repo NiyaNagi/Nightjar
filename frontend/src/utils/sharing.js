@@ -78,10 +78,11 @@ function base62Encode(bytes) {
 /**
  * Decode Base62 string to bytes
  * @param {string} str - Base62 encoded string
+ * @param {number} [expectedLength] - Expected byte length; result will be left-padded with zeros to this length
  * @returns {Uint8Array} Decoded bytes
  */
-function base62Decode(str) {
-  if (!str || str === '0') return new Uint8Array(0);
+function base62Decode(str, expectedLength) {
+  if (!str || str === '0') return new Uint8Array(expectedLength || 0);
   
   // Count leading zeros
   let leadingZeros = 0;
@@ -112,6 +113,12 @@ function base62Decode(str) {
   // Add leading zeros
   for (let i = 0; i < leadingZeros; i++) {
     bytes.unshift(0);
+  }
+  
+  // Pad to expected length if specified (preserves leading zero bytes lost in BigInt conversion)
+  if (expectedLength && bytes.length < expectedLength) {
+    const padded = new Array(expectedLength - bytes.length).fill(0);
+    return new Uint8Array([...padded, ...bytes]);
   }
   
   return new Uint8Array(bytes);
@@ -416,8 +423,8 @@ export function parseShareLink(link) {
   // Remove any trailing path or query
   encoded = encoded.split('/')[0].split('?')[0];
   
-  // Decode from Base62
-  const payload = base62Decode(encoded);
+  // Decode from Base62 — payload is 20 bytes: 16 (entityId) + 1 (version) + 1 (flags) + 2 (checksum)
+  const payload = base62Decode(encoded, 20);
   
   if (payload.length < 20) {
     throw new Error('Invalid share link: payload too short');
@@ -467,8 +474,15 @@ export function parseShareLink(link) {
         permission = CODE_TO_PERMISSION[permCode];
       }
     } else if (param.startsWith('addr:')) {
-      // Direct P2P address (ip:port)
-      directAddress = decodeURIComponent(param.slice(5));
+      // Direct P2P address (ip:port) — validate format
+      const rawAddr = decodeURIComponent(param.slice(5));
+      // Must match host:port pattern (IPv4, IPv6 in brackets, or hostname)
+      const addrMatch = rawAddr.match(/^(\[[\da-fA-F:]+\]|[\w.-]+):(\d{1,5})$/);
+      if (addrMatch && parseInt(addrMatch[2], 10) <= 65535) {
+        directAddress = rawAddr;
+      } else {
+        console.warn('[Sharing] Ignoring invalid directAddress in share link:', rawAddr);
+      }
     } else if (param.startsWith('peers:')) {
       // Bootstrap peers for P2P connection (legacy WebSocket format)
       bootstrapPeers = decodePeerList(param.slice(6));
@@ -477,7 +491,12 @@ export function parseShareLink(link) {
       hyperswarmPeers = param.slice(6).split(',').filter(p => p.length === 64);
     } else if (param.startsWith('nodes:')) {
       // Mesh relay WebSocket URLs (comma-separated, URL-encoded)
-      meshRelays = param.slice(6).split(',').map(r => decodeURIComponent(r)).filter(Boolean);
+      // Validate scheme — only allow ws:// and wss:// (reject file://, javascript:, etc.)
+      meshRelays = param.slice(6).split(',').map(r => decodeURIComponent(r)).filter(r => {
+        if (!r) return false;
+        const lower = r.toLowerCase();
+        return lower.startsWith('ws:') || lower.startsWith('wss:');
+      });
     } else if (param.startsWith('srv:')) {
       // Sync server URL (for cross-platform workspace joining)
       const rawServerUrl = decodeURIComponent(param.slice(4));
@@ -549,7 +568,12 @@ export async function parseShareLinkAsync(link) {
  */
 export function isValidShareLink(link) {
   try {
-    parseShareLink(link);
+    if (!link) return false;
+    const trimmed = link.trim();
+    // Compressed links require async decompression; parseShareLink will throw on them.
+    // They are structurally valid if they match the compressed prefix.
+    if (isCompressedLink(trimmed)) return true;
+    parseShareLink(trimmed);
     return true;
   } catch {
     return false;

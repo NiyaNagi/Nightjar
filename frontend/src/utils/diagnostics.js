@@ -5,28 +5,32 @@
 let logBuffer = [];
 const MAX_LOGS = 1000;
 
-// Capture console logs
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
+// Guard: only patch console once to prevent stacking on repeated imports
+if (!console._nightjarPatched) {
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+  const originalConsoleWarn = console.warn;
 
-console.log = function(...args) {
-    logBuffer.push({ level: 'log', timestamp: new Date().toISOString(), args: args.map(String) });
-    if (logBuffer.length > MAX_LOGS) logBuffer.shift();
-    originalConsoleLog.apply(console, args);
-};
+  console.log = function(...args) {
+      logBuffer.push({ level: 'log', timestamp: new Date().toISOString(), args: args.map(String) });
+      while (logBuffer.length > MAX_LOGS) logBuffer.shift();
+      originalConsoleLog.apply(console, args);
+  };
 
-console.error = function(...args) {
-    logBuffer.push({ level: 'error', timestamp: new Date().toISOString(), args: args.map(String) });
-    if (logBuffer.length > MAX_LOGS) logBuffer.shift();
-    originalConsoleError.apply(console, args);
-};
+  console.error = function(...args) {
+      logBuffer.push({ level: 'error', timestamp: new Date().toISOString(), args: args.map(String) });
+      while (logBuffer.length > MAX_LOGS) logBuffer.shift();
+      originalConsoleError.apply(console, args);
+  };
 
-console.warn = function(...args) {
-    logBuffer.push({ level: 'warn', timestamp: new Date().toISOString(), args: args.map(String) });
-    if (logBuffer.length > MAX_LOGS) logBuffer.shift();
-    originalConsoleWarn.apply(console, args);
-};
+  console.warn = function(...args) {
+      logBuffer.push({ level: 'warn', timestamp: new Date().toISOString(), args: args.map(String) });
+      while (logBuffer.length > MAX_LOGS) logBuffer.shift();
+      originalConsoleWarn.apply(console, args);
+  };
+
+  console._nightjarPatched = true;
+}
 
 /**
  * Get browser console logs
@@ -83,7 +87,11 @@ export async function generateDiagnosticReport() {
             report.system = { ...report.system, ...electronData.system };
             report.sidecarLogs = electronData.sidecarLogs;
             report.p2pStatus = electronData.p2p;
-            report.identity = electronData.identity;
+            // Sanitize identity data — exclude key material, mnemonics, private keys
+            if (electronData.identity) {
+                const { id, displayName, createdAt, publicKey, ...rest } = electronData.identity;
+                report.identity = { id, displayName, createdAt };
+            }
             report.tor = electronData.tor;
         } catch (err) {
             report.electronData = { error: err.message };

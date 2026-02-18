@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as Y from 'yjs';
 import { addChangelogEntry, loadChangelogSync, saveChangelogSync } from '../utils/changelogStore';
+import { getTextFromFragment } from '../utils/yjsTextExtraction';
 
 // Convert Uint8Array to base64 for storage
 const uint8ToBase64 = (arr) => {
@@ -15,69 +16,6 @@ const uint8ToBase64 = (arr) => {
         return btoa(result);
     } catch (e) {
         console.warn('[ChangelogObserver] Failed to encode state:', e);
-        return '';
-    }
-};
-
-// Helper to get text content from XmlFragment (for text documents)
-const getTextFromFragment = (fragment) => {
-    if (!fragment) return '';
-    try {
-        let text = '';
-        
-        const traverse = (node) => {
-            if (!node) return;
-            
-            if (typeof node === 'string') {
-                text += node;
-                return;
-            }
-            
-            // Y.XmlText - use toString() method
-            if (node.constructor?.name === 'YXmlText' || node.toString !== Object.prototype.toString) {
-                try {
-                    const str = node.toString();
-                    if (str && typeof str === 'string') {
-                        text += str;
-                        return;
-                    }
-                } catch (e) {
-                    // Fall through to other methods
-                }
-            }
-            
-            // XmlText - has _start property (internal structure)
-            if (node._start !== undefined) {
-                let item = node._start;
-                while (item) {
-                    if (item.content && typeof item.content.str === 'string') {
-                        text += item.content.str;
-                    }
-                    item = item.right;
-                }
-                return;
-            }
-            
-            // XmlElement or XmlFragment - has toArray
-            if (typeof node.toArray === 'function') {
-                const children = node.toArray();
-                children.forEach(child => traverse(child));
-                if (node.nodeName && ['paragraph', 'heading', 'blockquote'].includes(node.nodeName)) {
-                    text += '\n';
-                }
-                return;
-            }
-            
-            // Last resort: try to iterate over children
-            if (typeof node.forEach === 'function') {
-                node.forEach(child => traverse(child));
-            }
-        };
-        
-        traverse(fragment);
-        return text.trim();
-    } catch (e) {
-        console.warn('[ChangelogObserver] Failed to extract text from fragment:', e);
         return '';
     }
 };
@@ -209,13 +147,14 @@ export function useChangelogObserver(ydoc, docId, currentUser, documentType = 't
             clearTimeout(debounceTimerRef.current);
             debounceTimerRef.current = setTimeout(async () => {
                 const newContent = getContent();
-                const newStateSize = Y.encodeStateAsUpdate(ydoc).length;
+                const stateUpdate = Y.encodeStateAsUpdate(ydoc);
+                const newStateSize = stateUpdate.length;
 
                 const contentChanged = newContent !== lastContentRef.current;
                 const sizeChanged = newStateSize !== lastStateSizeRef.current;
 
                 if (contentChanged || sizeChanged) {
-                    const stateSnapshot = uint8ToBase64(Y.encodeStateAsUpdate(ydoc));
+                    const stateSnapshot = uint8ToBase64(stateUpdate);
                     const currentDocType = documentTypeRef.current;
 
                     const entry = {

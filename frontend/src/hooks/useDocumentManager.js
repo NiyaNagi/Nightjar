@@ -70,9 +70,19 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
                     setDocuments(prev => prev.filter(d => d.id !== data.docId));
                     // Close tab if open
                     setOpenTabs(prev => prev.filter(t => t.id !== data.docId));
-                    if (activeDocId === data.docId) {
-                        setActiveDocId(openTabs.length > 1 ? openTabs[0].id : null);
-                    }
+                    setActiveDocId(prevActiveDocId => {
+                        if (prevActiveDocId === data.docId) {
+                            // Read current tabs via a synchronous ref-free approach:
+                            // We already filtered the deleted tab above, so pick the first remaining tab
+                            let nextId = null;
+                            setOpenTabs(currentTabs => {
+                                nextId = currentTabs.length > 0 ? currentTabs[0].id : null;
+                                return currentTabs; // no mutation, just reading
+                            });
+                            return nextId;
+                        }
+                        return prevActiveDocId;
+                    });
                 } else if (data.type === 'document-metadata-updated') {
                     setDocuments(prev => prev.map(d => 
                         d.id === data.docId ? { ...d, ...data.metadata } : d
@@ -85,7 +95,7 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
 
         metaSocket.addEventListener('message', handleMessage);
         return () => metaSocket.removeEventListener('message', handleMessage);
-    }, [metaSocket, activeDocId, openTabs]);
+    }, [metaSocket]);
 
     // Create a new document
     const createDocument = useCallback((name) => {
@@ -138,15 +148,12 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
         openDocument(docId, name, encryptionKey);
 
         return docId;
-    }, [metaSocket, setCurrentSessionKey]);
+    }, [metaSocket, setCurrentSessionKey, openDocument]);
 
     // Open a document (create provider if needed)
     const openDocument = useCallback((docId, name, encryptionKey = null) => {
-        // Check if already open in tabs
-        if (openTabs.find(t => t.id === docId)) {
-            setActiveDocId(docId);
-            // Still need to set the key for this document
-            const key = encryptionKey || documentKeysRef.current.get(docId);
+        // Helper to set encryption key on sidecar
+        const sendKey = (key) => {
             if (key && metaSocket && metaSocket.readyState === WebSocket.OPEN) {
                 metaSocket.send(JSON.stringify({ 
                     type: 'set-key', 
@@ -157,9 +164,8 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
                     setCurrentSessionKey(key);
                 }
             }
-            return;
-        }
-        
+        };
+
         // Find the encryption key for this document
         let key = encryptionKey || documentKeysRef.current.get(docId);
         
@@ -171,55 +177,60 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
                 documentKeysRef.current.set(docId, key);
             }
         }
-        
-        // Send the key to the sidecar before creating the provider
-        if (key && metaSocket && metaSocket.readyState === WebSocket.OPEN) {
-            metaSocket.send(JSON.stringify({ 
-                type: 'set-key', 
-                payload: key,
-                docName: docId
-            }));
-            if (setCurrentSessionKey) {
-                setCurrentSessionKey(key);
+
+        // Use functional updater to check current tabs (avoids stale closure)
+        setOpenTabs(prev => {
+            if (prev.find(t => t.id === docId)) {
+                // Already open — just activate and set key
+                setActiveDocId(docId);
+                sendKey(key);
+                return prev; // no change
             }
-        }
 
-        // Create provider if not exists
-        if (!ydocsRef.current.has(docId)) {
-            const ydoc = new Y.Doc();
-            const provider = new WebsocketProvider(getWsUrl(), docId, ydoc);
-            ydocsRef.current.set(docId, { ydoc, provider });
-        }
+            // Send the key to the sidecar before creating the provider
+            sendKey(key);
 
-        // Add to tabs
-        const newTab = {
-            id: docId,
-            name: name || 'Untitled',
-            hasUnsavedChanges: false
-        };
-        setOpenTabs(prev => [...prev, newTab]);
+            // Create provider if not exists
+            if (!ydocsRef.current.has(docId)) {
+                const ydoc = new Y.Doc();
+                const provider = new WebsocketProvider(getWsUrl(), docId, ydoc);
+                ydocsRef.current.set(docId, { ydoc, provider });
+            }
+
+            // Add to tabs
+            const newTab = {
+                id: docId,
+                name: name || 'Untitled',
+                hasUnsavedChanges: false
+            };
+            return [...prev, newTab];
+        });
         setActiveDocId(docId);
-    }, [openTabs, documents, metaSocket, setCurrentSessionKey]);
+    }, [documents, metaSocket, setCurrentSessionKey]);
 
     // Close a document tab
     const closeDocument = useCallback((docId) => {
-        const tabIndex = openTabs.findIndex(t => t.id === docId);
-        if (tabIndex === -1) return;
-
-        // Remove from tabs
-        const newTabs = openTabs.filter(t => t.id !== docId);
-        setOpenTabs(newTabs);
-
-        // Update active tab
-        if (activeDocId === docId) {
-            if (newTabs.length > 0) {
-                // Switch to adjacent tab
-                const newIndex = Math.min(tabIndex, newTabs.length - 1);
-                setActiveDocId(newTabs[newIndex].id);
-            } else {
-                setActiveDocId(null);
-            }
-        }
+        // Use functional updater to avoid stale closure issues with rapid close operations
+        setOpenTabs(prev => {
+            const tabIndex = prev.findIndex(t => t.id === docId);
+            if (tabIndex === -1) return prev;
+            
+            const newTabs = prev.filter(t => t.id !== docId);
+            
+            // Update active tab if needed
+            setActiveDocId(currentActive => {
+                if (currentActive === docId) {
+                    if (newTabs.length > 0) {
+                        const newIndex = Math.min(tabIndex, newTabs.length - 1);
+                        return newTabs[newIndex].id;
+                    }
+                    return null;
+                }
+                return currentActive;
+            });
+            
+            return newTabs;
+        });
 
         // Cleanup provider
         const docRef = ydocsRef.current.get(docId);
@@ -228,7 +239,7 @@ export function useDocumentManager(metaSocket, sessionKey, setCurrentSessionKey)
             docRef.ydoc.destroy();
             ydocsRef.current.delete(docId);
         }
-    }, [openTabs, activeDocId]);
+    }, []);
 
     // Delete a document permanently
     const deleteDocument = useCallback((docId) => {

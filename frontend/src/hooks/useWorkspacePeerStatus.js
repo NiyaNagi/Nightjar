@@ -228,13 +228,18 @@ export function useWorkspacePeerStatus(workspaceId, pollIntervalOverride = null)
         const ws = new WebSocket(`ws://localhost:${META_WS_PORT}`);
         wsRef.current = ws;
         
+        // Track the interval for this specific WebSocket instance
+        // so that onclose only clears its own interval, not a newer one
+        let localPollInterval = null;
+        
         ws.onopen = () => {
             console.log('[PeerStatus] Connected to sidecar');
             // Fetch initial status
             fetchPeerStatus();
             
             // Set up polling interval
-            pollIntervalRef.current = setInterval(fetchPeerStatus, pollIntervalMs);
+            localPollInterval = setInterval(fetchPeerStatus, pollIntervalMs);
+            pollIntervalRef.current = localPollInterval;
         };
         
         ws.onmessage = (event) => {
@@ -287,9 +292,14 @@ export function useWorkspacePeerStatus(workspaceId, pollIntervalOverride = null)
         
         ws.onclose = () => {
             console.log('[PeerStatus] Disconnected from sidecar');
-            if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
+            // Only clear the interval that belongs to THIS WebSocket instance
+            // to avoid clearing a newer interval set by a subsequent effect
+            if (localPollInterval) {
+                clearInterval(localPollInterval);
+                if (pollIntervalRef.current === localPollInterval) {
+                    pollIntervalRef.current = null;
+                }
+                localPollInterval = null;
             }
         };
         

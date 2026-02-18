@@ -139,8 +139,17 @@ export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigrati
       const pinHash = await identityManager.hashPin(deletePin, metadata.salt);
       
       if (pinHash !== metadata.pinHash) {
-        // Increment failed attempts
+        // Increment failed attempts and persist to storage
         metadata.pinAttempts = (metadata.pinAttempts || 0) + 1;
+        // Save updated identities list so pinAttempts is persisted
+        const updatedIdentities = identityManager.listIdentities().map(i =>
+          i.id === metadata.id ? { ...i, pinAttempts: metadata.pinAttempts } : i
+        );
+        try {
+          localStorage.setItem('nightjar_identities', JSON.stringify(updatedIdentities));
+        } catch (err) {
+          console.warn('[IdentitySelector] Failed to persist pinAttempts:', err);
+        }
         const remaining = 5 - metadata.pinAttempts;
         
         if (remaining <= 0) {

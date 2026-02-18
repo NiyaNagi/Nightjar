@@ -125,26 +125,19 @@ function sanitizeObject(obj, seen = new Set()) {
   seen.add(obj);
   
   if (Array.isArray(obj)) {
-    for (let i = 0; i < obj.length; i++) {
-      obj[i] = sanitizeObject(obj[i], seen);
-    }
-    return obj;
+    return obj.map(item => sanitizeObject(item, seen));
   }
   
   const dangerous = ['__proto__', 'constructor', 'prototype'];
-  for (const prop of dangerous) {
-    if (Object.prototype.hasOwnProperty.call(obj, prop)) {
-      delete obj[prop];
-    }
-  }
-  
+  const clone = {};
   for (const key of Object.keys(obj)) {
-    if (typeof obj[key] === 'object' && obj[key] !== null) {
-      obj[key] = sanitizeObject(obj[key], seen);
-    }
+    if (dangerous.includes(key)) continue;
+    clone[key] = (typeof obj[key] === 'object' && obj[key] !== null)
+      ? sanitizeObject(obj[key], seen)
+      : obj[key];
   }
   
-  return obj;
+  return clone;
 }
 
 /**

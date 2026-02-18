@@ -12,7 +12,7 @@
  * - Full transparency (all users see collaborator list)
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useWorkspaces } from './WorkspaceContext';
 
 // Permission hierarchy for comparison
@@ -58,13 +58,22 @@ export function PermissionProvider({ children }) {
   const { workspaces, currentWorkspaceId, currentWorkspace } = useWorkspaces();
   
   // Permission cache: entityId -> { permission, scope, scopeId }
-  const [permissionCache, setPermissionCache] = useState(new Map());
+  // Use a ref so cache reads/writes don't trigger re-renders (cache is an optimization detail)
+  const permissionCacheRef = useRef(new Map());
+  
+  // Version counter to force re-renders when grantPermission updates the cache
+  const [permissionVersion, setPermissionVersion] = useState(0);
   
   // Folder hierarchy cache: folderId -> { parentId, workspaceId }
   const [folderHierarchy, setFolderHierarchy] = useState(new Map());
   
   // Document-to-folder mapping: documentId -> folderId
   const [documentFolders, setDocumentFolders] = useState(new Map());
+
+  // Clear permission cache when workspace data changes
+  useEffect(() => {
+    permissionCacheRef.current = new Map();
+  }, [currentWorkspaceId, currentWorkspace, folderHierarchy, documentFolders]);
 
   /**
    * Update folder hierarchy cache
@@ -123,9 +132,10 @@ export function PermissionProvider({ children }) {
    * @returns {Object} { permission, scope, scopeId }
    */
   const resolveFolderPermission = useCallback((folderId, _visited) => {
+    const cache = permissionCacheRef.current;
     // Check cache first
-    if (permissionCache.has(`folder:${folderId}`)) {
-      return permissionCache.get(`folder:${folderId}`);
+    if (cache.has(`folder:${folderId}`)) {
+      return cache.get(`folder:${folderId}`);
     }
     
     // Get folder info
@@ -142,17 +152,22 @@ export function PermissionProvider({ children }) {
       if (visited.has(folderId)) {
         // Cycle detected - fall back to workspace permission
         const workspacePerm = getWorkspacePermission(folderInfo.workspaceId || currentWorkspaceId);
-        return { permission: workspacePerm, scope: 'workspace', scopeId: folderInfo.workspaceId || currentWorkspaceId };
+        const result = { permission: workspacePerm, scope: 'workspace', scopeId: folderInfo.workspaceId || currentWorkspaceId };
+        cache.set(`folder:${folderId}`, result);
+        return result;
       }
       visited.add(folderId);
       const parentPerm = resolveFolderPermission(folderInfo.parentId, visited);
+      cache.set(`folder:${folderId}`, parentPerm);
       return parentPerm;
     }
     
     // Root folder - use workspace permission
     const workspacePerm = getWorkspacePermission(folderInfo.workspaceId);
-    return { permission: workspacePerm, scope: 'workspace', scopeId: folderInfo.workspaceId };
-  }, [permissionCache, folderHierarchy, getWorkspacePermission, currentWorkspaceId]);
+    const result = { permission: workspacePerm, scope: 'workspace', scopeId: folderInfo.workspaceId };
+    cache.set(`folder:${folderId}`, result);
+    return result;
+  }, [folderHierarchy, getWorkspacePermission, currentWorkspaceId]);
 
   /**
    * Resolve permission for a document
@@ -160,9 +175,10 @@ export function PermissionProvider({ children }) {
    * @returns {Object} { permission, scope, scopeId }
    */
   const resolveDocumentPermission = useCallback((documentId) => {
+    const cache = permissionCacheRef.current;
     // Check cache first
-    if (permissionCache.has(`document:${documentId}`)) {
-      return permissionCache.get(`document:${documentId}`);
+    if (cache.has(`document:${documentId}`)) {
+      return cache.get(`document:${documentId}`);
     }
     
     // Get folder for this document
@@ -170,12 +186,16 @@ export function PermissionProvider({ children }) {
     if (!folderId) {
       // Fallback to workspace permission
       const workspacePerm = getWorkspacePermission(currentWorkspaceId);
-      return { permission: workspacePerm, scope: 'workspace', scopeId: currentWorkspaceId };
+      const result = { permission: workspacePerm, scope: 'workspace', scopeId: currentWorkspaceId };
+      cache.set(`document:${documentId}`, result);
+      return result;
     }
     
     // Use folder permission
-    return resolveFolderPermission(folderId);
-  }, [permissionCache, documentFolders, resolveFolderPermission, getWorkspacePermission, currentWorkspaceId]);
+    const result = resolveFolderPermission(folderId);
+    cache.set(`document:${documentId}`, result);
+    return result;
+  }, [documentFolders, resolveFolderPermission, getWorkspacePermission, currentWorkspaceId]);
 
   /**
    * Get permission for any entity type
@@ -224,21 +244,18 @@ export function PermissionProvider({ children }) {
    */
   const grantPermission = useCallback((entityType, entityId, permission, scope, scopeId) => {
     const key = `${entityType}:${entityId}`;
+    const cache = permissionCacheRef.current;
+    const existing = cache.get(key);
     
-    setPermissionCache(prev => {
-      const newCache = new Map(prev);
-      const existing = newCache.get(key);
-      
-      if (existing) {
-        // Upgrade if new permission is higher
-        const higher = getHigherPermission(existing.permission, permission);
-        newCache.set(key, { permission: higher, scope, scopeId });
-      } else {
-        newCache.set(key, { permission, scope, scopeId });
-      }
-      
-      return newCache;
-    });
+    if (existing) {
+      // Upgrade if new permission is higher
+      const higher = getHigherPermission(existing.permission, permission);
+      cache.set(key, { permission: higher, scope, scopeId });
+    } else {
+      cache.set(key, { permission, scope, scopeId });
+    }
+    // Trigger re-render so consumers see the updated permission
+    setPermissionVersion(v => v + 1);
   }, [getHigherPermission]);
 
   /**
@@ -282,58 +299,54 @@ export function PermissionProvider({ children }) {
     return levels;
   }, [getPermission, isAtLeast]);
 
-  /**
-   * Check if user is owner of current workspace
-   */
-  const isOwner = currentWorkspace?.myPermission === 'owner';
-  
-  /**
-   * Check if user can edit in current workspace
-   */
-  const canEditWorkspace = isAtLeast(currentWorkspace?.myPermission, 'editor');
-
   // Context value - memoized to prevent unnecessary re-renders
-  const value = useMemo(() => ({
-    // Resolution
-    getPermission,
-    getWorkspacePermission,
-    resolveFolderPermission,
-    resolveDocumentPermission,
+  const value = useMemo(() => {
+    // Compute workspace shortcuts inside useMemo to avoid defeating memoization
+    const isOwner = currentWorkspace?.myPermission === 'owner';
+    const canEditWorkspace = isAtLeast(currentWorkspace?.myPermission, 'editor');
     
-    // Action checks
-    canPerformAction,
-    canView,
-    canEdit,
-    canCreate,
-    canDelete,
-    canShare,
-    
-    // Share levels
-    getAvailableShareLevels,
-    
-    // Granting
-    grantPermission,
-    
-    // Hierarchy management
-    updateFolderHierarchy,
-    updateDocumentFolders,
-    
-    // Utilities
-    isAtLeast,
-    getHigherPermission,
-    
-    // Current workspace shortcuts
-    isOwner,
-    canEditWorkspace,
-    
-    // Constants
-    PERMISSION_LEVELS,
-    ACTION_REQUIREMENTS,
-  }), [
+    return {
+      // Resolution
+      getPermission,
+      getWorkspacePermission,
+      resolveFolderPermission,
+      resolveDocumentPermission,
+      
+      // Action checks
+      canPerformAction,
+      canView,
+      canEdit,
+      canCreate,
+      canDelete,
+      canShare,
+      
+      // Share levels
+      getAvailableShareLevels,
+      
+      // Granting
+      grantPermission,
+      
+      // Hierarchy management
+      updateFolderHierarchy,
+      updateDocumentFolders,
+      
+      // Utilities
+      isAtLeast,
+      getHigherPermission,
+      
+      // Current workspace shortcuts
+      isOwner,
+      canEditWorkspace,
+      
+      // Constants
+      PERMISSION_LEVELS,
+      ACTION_REQUIREMENTS,
+    };
+  }, [
     getPermission, getWorkspacePermission, resolveFolderPermission, resolveDocumentPermission,
     canPerformAction, canView, canEdit, canCreate, canDelete, canShare,
     getAvailableShareLevels, grantPermission, updateFolderHierarchy, updateDocumentFolders,
-    isOwner, canEditWorkspace
+    currentWorkspace?.myPermission, isAtLeast, getHigherPermission, permissionVersion
   ]);
 
   return (

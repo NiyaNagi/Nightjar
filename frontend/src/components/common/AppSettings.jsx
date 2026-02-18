@@ -12,6 +12,8 @@ import { useConfirmDialog } from './ConfirmDialog';
 import { useEnvironment, isFeatureAvailable } from '../../hooks/useEnvironment';
 import { useWorkspaces } from '../../contexts/WorkspaceContext';
 import { useWorkspaceSyncContext } from '../../contexts/WorkspaceSyncContext';
+import { useNotificationSounds, NOTIFICATION_SOUNDS } from '../../hooks/useNotificationSounds';
+import NightjarMascot from '../NightjarMascot';
 
 // Default settings values
 const DEFAULT_SETTINGS = {
@@ -24,6 +26,9 @@ const DEFAULT_SETTINGS = {
   lineHeight: 1.6,
   spellCheck: true,
   wordWrap: true,
+  
+  // Privacy / Security
+  lockTimeout: 15, // Auto-lock timeout in minutes
   
   // P2P / Network
   peerStatusPollIntervalMs: 10000, // How often to check peer status (ms)
@@ -115,46 +120,6 @@ const initializeSettings = () => {
 // Run settings initialization immediately
 initializeSettings();
 
-// Load notification settings from localStorage
-const loadNotificationSettings = () => {
-  try {
-    const saved = localStorage.getItem('Nightjar-notification-settings');
-    if (saved) {
-      return { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(saved) };
-    }
-  } catch (e) {
-    console.error('Failed to load notification settings:', e);
-  }
-  return { ...DEFAULT_NOTIFICATION_SETTINGS };
-};
-
-// Default notification settings with all fields
-const DEFAULT_NOTIFICATION_SETTINGS = {
-  enabled: true,
-  soundEnabled: true,
-  soundVolume: 0.5,
-  selectedSound: 'chime',
-  doNotDisturb: false,
-  desktopNotifications: false,
-  showPreview: true,
-  // Per-type sound toggles
-  soundOnDirectMessage: true,
-  soundOnMention: true,
-  soundOnGroupMessage: true,
-  soundOnGeneralMessage: false,
-  defaultChannelSetting: 'all', // 'all', 'mentions', 'muted'
-  channelOverrides: {}, // channelId -> 'all' | 'mentions' | 'muted'
-};
-
-// Save notification settings to localStorage
-const saveNotificationSettings = (settings) => {
-  try {
-    localStorage.setItem('Nightjar-notification-settings', JSON.stringify(settings));
-  } catch (e) {
-    console.error('Failed to save notification settings:', e);
-  }
-};
-
 export default function AppSettings({ isOpen, onClose }) {
   const { isElectron } = useEnvironment();
   const [activeTab, setActiveTab] = useState('general');
@@ -162,6 +127,7 @@ export default function AppSettings({ isOpen, onClose }) {
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const modalRef = useRef(null);
+  const saveTimerRef = useRef(null);
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   
   // Desktop-only settings state (Electron)
@@ -171,8 +137,16 @@ export default function AppSettings({ isOpen, onClose }) {
   const [relaySettings, setRelaySettings] = useState({ port: 4445, maxConnections: 10, announceOnDHT: true });
   const [relayStatus, setRelayStatus] = useState({ running: false, activeConnections: 0 });
   
-  // Notification settings state
-  const [notificationSettings, setNotificationSettings] = useState(loadNotificationSettings);
+  // Notification settings via hook (single source of truth)
+  const { settings: notificationSettings, updateSettings: updateNotificationSettings, testSound } = useNotificationSounds();
+  
+  // Wrapper: update notification settings AND mark the save button as dirty
+  // Notification settings auto-persist via the hook, but the save button should
+  // still light up so the user gets consistent visual feedback.
+  const handleNotificationChange = useCallback((updates) => {
+    updateNotificationSettings(updates);
+    setHasChanges(true);
+  }, [updateNotificationSettings]);
   
   // Factory reset ownership warning state
   const [factoryResetConfirmText, setFactoryResetConfirmText] = useState('');
@@ -237,7 +211,7 @@ export default function AppSettings({ isOpen, onClose }) {
       // Apply visual settings immediately when changed
       if (key === 'theme') {
         applyTheme(value);
-      } else if (['fontSize', 'fontFamily', 'lineHeight'].includes(key)) {
+      } else if (['fontSize', 'fontFamily', 'lineHeight', 'wordWrap', 'spellCheck'].includes(key)) {
         applyEditorSettings(newSettings);
       }
       
@@ -255,11 +229,25 @@ export default function AppSettings({ isOpen, onClose }) {
     applyTheme(settings.theme);
     applyEditorSettings(settings);
     
-    setTimeout(() => {
+    // Clear any previous save feedback timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
       setSaving(false);
       setHasChanges(false);
+      saveTimerRef.current = null;
     }, 300);
   }, [settings]);
+
+  // Cleanup save feedback timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
 
   // Reset to defaults
   const handleReset = useCallback(async () => {
@@ -272,6 +260,8 @@ export default function AppSettings({ isOpen, onClose }) {
     });
     if (confirmed) {
       setSettings({ ...DEFAULT_SETTINGS });
+      applyTheme(DEFAULT_SETTINGS.theme);
+      applyEditorSettings(DEFAULT_SETTINGS);
       setHasChanges(true);
     }
   }, [confirm]);
@@ -537,7 +527,7 @@ export default function AppSettings({ isOpen, onClose }) {
                     min="12"
                     max="24"
                     value={settings.fontSize}
-                    onChange={(e) => updateSetting('fontSize', parseInt(e.target.value))}
+                    onChange={(e) => { const val = parseInt(e.target.value, 10); if (!isNaN(val)) updateSetting('fontSize', val); }}
                     className="app-settings__range"
                   />
                 </div>
@@ -601,9 +591,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.doNotDisturb}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, doNotDisturb: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ doNotDisturb: e.target.checked });
                       }}
                     />
                     <span className="app-settings__toggle-text">🔕 Do Not Disturb</span>
@@ -617,9 +605,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.enabled}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, enabled: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ enabled: e.target.checked });
                       }}
                     />
                     <span className="app-settings__toggle-text">Enable notifications</span>
@@ -633,9 +619,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.soundEnabled}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, soundEnabled: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ soundEnabled: e.target.checked });
                       }}
                       disabled={!notificationSettings.enabled}
                     />
@@ -653,9 +637,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       className="app-settings__select"
                       value={notificationSettings.selectedSound || 'chime'}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, selectedSound: e.target.value };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ selectedSound: e.target.value });
                       }}
                       disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
                     >
@@ -673,12 +655,7 @@ export default function AppSettings({ isOpen, onClose }) {
                     <button
                       type="button"
                       className="app-settings__btn-secondary app-settings__btn-test"
-                      onClick={() => {
-                        const basePath = window.location.protocol === 'file:' ? '.' : '';
-                        const audio = new Audio(`${basePath}/sounds/${notificationSettings.selectedSound || 'chime'}.mp3`);
-                        audio.volume = notificationSettings.soundVolume;
-                        audio.play().catch(() => {});
-                      }}
+                      onClick={() => testSound(notificationSettings.selectedSound || 'chime')}
                       disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
                     >
                       ▶ Test
@@ -695,9 +672,7 @@ export default function AppSettings({ isOpen, onClose }) {
                     step="0.1"
                     value={notificationSettings.soundVolume}
                     onChange={(e) => {
-                      const newSettings = { ...notificationSettings, soundVolume: parseFloat(e.target.value) };
-                      setNotificationSettings(newSettings);
-                      saveNotificationSettings(newSettings);
+                      handleNotificationChange({ soundVolume: parseFloat(e.target.value) });
                     }}
                     className="app-settings__range"
                     disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
@@ -713,9 +688,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.soundOnDirectMessage !== false}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, soundOnDirectMessage: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ soundOnDirectMessage: e.target.checked });
                       }}
                       disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
                     />
@@ -729,9 +702,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.soundOnMention !== false}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, soundOnMention: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ soundOnMention: e.target.checked });
                       }}
                       disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
                     />
@@ -745,9 +716,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.soundOnGroupMessage !== false}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, soundOnGroupMessage: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ soundOnGroupMessage: e.target.checked });
                       }}
                       disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
                     />
@@ -761,9 +730,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.soundOnGeneralMessage === true}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, soundOnGeneralMessage: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ soundOnGeneralMessage: e.target.checked });
                       }}
                       disabled={!notificationSettings.enabled || !notificationSettings.soundEnabled}
                     />
@@ -783,14 +750,10 @@ export default function AppSettings({ isOpen, onClose }) {
                         if (e.target.checked && 'Notification' in window) {
                           Notification.requestPermission().then(permission => {
                             const enabled = permission === 'granted';
-                            const newSettings = { ...notificationSettings, desktopNotifications: enabled };
-                            setNotificationSettings(newSettings);
-                            saveNotificationSettings(newSettings);
+                            handleNotificationChange({ desktopNotifications: enabled });
                           });
                         } else {
-                          const newSettings = { ...notificationSettings, desktopNotifications: e.target.checked };
-                          setNotificationSettings(newSettings);
-                          saveNotificationSettings(newSettings);
+                          handleNotificationChange({ desktopNotifications: e.target.checked });
                         }
                       }}
                       disabled={!notificationSettings.enabled}
@@ -806,9 +769,7 @@ export default function AppSettings({ isOpen, onClose }) {
                       type="checkbox"
                       checked={notificationSettings.showPreview}
                       onChange={(e) => {
-                        const newSettings = { ...notificationSettings, showPreview: e.target.checked };
-                        setNotificationSettings(newSettings);
-                        saveNotificationSettings(newSettings);
+                        handleNotificationChange({ showPreview: e.target.checked });
                       }}
                       disabled={!notificationSettings.enabled || !notificationSettings.desktopNotifications}
                     />
@@ -825,9 +786,7 @@ export default function AppSettings({ isOpen, onClose }) {
                     className="app-settings__select"
                     value={notificationSettings.defaultChannelSetting}
                     onChange={(e) => {
-                      const newSettings = { ...notificationSettings, defaultChannelSetting: e.target.value };
-                      setNotificationSettings(newSettings);
-                      saveNotificationSettings(newSettings);
+                      handleNotificationChange({ defaultChannelSetting: e.target.value });
                     }}
                     disabled={!notificationSettings.enabled}
                   >
@@ -853,21 +812,21 @@ export default function AppSettings({ isOpen, onClose }) {
               <div className="app-settings__section">
                 <h3 className="app-settings__section-title">Auto-Lock</h3>
                 
-                <div className="app-settings__group">
+                <div className="app-settings__field">
                   <label className="app-settings__label" htmlFor="lockTimeout">
                     Lock Timeout
-                    <span className="app-settings__hint">Automatically lock after inactivity</span>
                   </label>
+                  <p className="app-settings__hint">Automatically lock after inactivity</p>
                   <select
                     id="lockTimeout"
                     className="app-settings__select"
-                    value={settings.lockTimeout || 15}
+                    value={settings.lockTimeout ?? 15}
                     onChange={(e) => {
                       const value = parseInt(e.target.value, 10);
                       updateSetting('lockTimeout', value);
                       // Also update the identity manager
                       import('../../utils/identityManager').then(m => {
-                        m.setLockTimeout(value);
+                        (m.default?.setLockTimeout || m.setLockTimeout)?.(value);
                       });
                     }}
                   >
@@ -924,24 +883,21 @@ export default function AppSettings({ isOpen, onClose }) {
               <div className="app-settings__section">
                 <h3 className="app-settings__section-title">P2P Network Settings</h3>
                 
-                <div className="app-settings__control">
-                  <div className="app-settings__control-header">
-                    <label htmlFor="peer-poll-interval">Peer Status Check Interval</label>
-                    <span className="app-settings__control-hint">How often to check for connected peers</span>
-                  </div>
-                  <div className="app-settings__select-wrapper">
-                    <select
-                      id="peer-poll-interval"
-                      value={settings.peerStatusPollIntervalMs}
-                      onChange={(e) => updateSetting('peerStatusPollIntervalMs', parseInt(e.target.value, 10))}
-                    >
-                      <option value="5000">5 seconds (frequent)</option>
-                      <option value="10000">10 seconds (recommended)</option>
-                      <option value="15000">15 seconds</option>
-                      <option value="30000">30 seconds (battery saver)</option>
-                      <option value="60000">60 seconds (minimal)</option>
-                    </select>
-                  </div>
+                <div className="app-settings__field">
+                  <label className="app-settings__label" htmlFor="peer-poll-interval">Peer Status Check Interval</label>
+                  <p className="app-settings__hint">How often to check for connected peers</p>
+                  <select
+                    id="peer-poll-interval"
+                    className="app-settings__select"
+                    value={settings.peerStatusPollIntervalMs}
+                    onChange={(e) => updateSetting('peerStatusPollIntervalMs', parseInt(e.target.value, 10))}
+                  >
+                    <option value="5000">5 seconds (frequent)</option>
+                    <option value="10000">10 seconds (recommended)</option>
+                    <option value="15000">15 seconds</option>
+                    <option value="30000">30 seconds (battery saver)</option>
+                    <option value="60000">60 seconds (minimal)</option>
+                  </select>
                 </div>
                 
                 <div className="app-settings__info-box">
@@ -960,20 +916,20 @@ export default function AppSettings({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div className="app-settings__control">
-                  <div className="app-settings__control-header">
-                    <label htmlFor="download-location">Download Location</label>
-                    <span className="app-settings__control-hint">Where downloaded files are saved on this device</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div className="app-settings__field">
+                  <label className="app-settings__label" htmlFor="download-location">Download Location</label>
+                  <p className="app-settings__hint">Where downloaded files are saved on this device</p>
+                  <div className="app-settings__input-with-btn">
                     <input
                       id="download-location"
                       type="text"
                       readOnly
+                      className="app-settings__input app-settings__input--readonly"
                       value={localStorage.getItem('nightjar_download_location') || 'Not set (will ask on first download)'}
-                      style={{ flex: 1, padding: '6px 10px', background: 'var(--bg-primary, #11111b)', color: 'var(--text-secondary, #a6adc8)', border: '1px solid var(--border-color, #313244)', borderRadius: '6px', fontSize: '13px' }}
                     />
                     <button
+                      type="button"
+                      className="app-settings__btn-secondary"
                       onClick={async () => {
                         if (window.electronAPI?.fileSystem) {
                           const folder = await window.electronAPI.fileSystem.selectFolder({
@@ -986,7 +942,6 @@ export default function AppSettings({ isOpen, onClose }) {
                           }
                         }
                       }}
-                      style={{ padding: '6px 14px', background: 'var(--accent-color, #89b4fa)', color: '#11111b', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap' }}
                     >
                       Change…
                     </button>
@@ -998,7 +953,7 @@ export default function AppSettings({ isOpen, onClose }) {
             {/* Shortcuts Tab */}
             {activeTab === 'shortcuts' && (
               <div className="app-settings__section">
-                <h3 className="app-settings__section-title">Keyboard Shortcuts</h3>
+                <h3 className="app-settings__section-title">Application</h3>
                 
                 <div className="app-settings__shortcuts">
                   <div className="app-settings__shortcut">
@@ -1006,17 +961,38 @@ export default function AppSettings({ isOpen, onClose }) {
                     <span className="app-settings__shortcut-action">New document</span>
                   </div>
                   <div className="app-settings__shortcut">
-                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>S</kbd></span>
-                    <span className="app-settings__shortcut-action">Save document</span>
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></span>
+                    <span className="app-settings__shortcut-action">New folder</span>
                   </div>
                   <div className="app-settings__shortcut">
-                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>
-                    <span className="app-settings__shortcut-action">Undo</span>
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>W</kbd></span>
+                    <span className="app-settings__shortcut-action">Close current tab</span>
                   </div>
                   <div className="app-settings__shortcut">
-                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></span>
-                    <span className="app-settings__shortcut-action">Redo</span>
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Tab</kbd></span>
+                    <span className="app-settings__shortcut-action">Next tab</span>
                   </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Tab</kbd></span>
+                    <span className="app-settings__shortcut-action">Previous tab</span>
+                  </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>,</kbd></span>
+                    <span className="app-settings__shortcut-action">Open settings / changelog</span>
+                  </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>\</kbd></span>
+                    <span className="app-settings__shortcut-action">Toggle sidebar</span>
+                  </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>F1</kbd></span>
+                    <span className="app-settings__shortcut-action">Open help</span>
+                  </div>
+                </div>
+                
+                <h3 className="app-settings__section-title">Text Editing</h3>
+                
+                <div className="app-settings__shortcuts">
                   <div className="app-settings__shortcut">
                     <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>B</kbd></span>
                     <span className="app-settings__shortcut-action">Bold</span>
@@ -1026,20 +1002,44 @@ export default function AppSettings({ isOpen, onClose }) {
                     <span className="app-settings__shortcut-action">Italic</span>
                   </div>
                   <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>U</kbd></span>
+                    <span className="app-settings__shortcut-action">Underline</span>
+                  </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd></span>
+                    <span className="app-settings__shortcut-action">Strikethrough</span>
+                  </div>
+                  <div className="app-settings__shortcut">
                     <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>K</kbd></span>
                     <span className="app-settings__shortcut-action">Insert link</span>
+                  </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>8</kbd></span>
+                    <span className="app-settings__shortcut-action">Bullet list</span>
+                  </div>
+                  <div className="app-settings__shortcut">
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>7</kbd></span>
+                    <span className="app-settings__shortcut-action">Numbered list</span>
                   </div>
                   <div className="app-settings__shortcut">
                     <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>/</kbd></span>
                     <span className="app-settings__shortcut-action">Toggle comment</span>
                   </div>
                   <div className="app-settings__shortcut">
-                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>,</kbd></span>
-                    <span className="app-settings__shortcut-action">Open settings</span>
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>
+                    <span className="app-settings__shortcut-action">Undo</span>
                   </div>
                   <div className="app-settings__shortcut">
-                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>\\</kbd></span>
-                    <span className="app-settings__shortcut-action">Toggle sidebar</span>
+                    <span className="app-settings__shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></span>
+                    <span className="app-settings__shortcut-action">Redo</span>
+                  </div>
+                </div>
+
+                <div className="app-settings__info-box">
+                  <span className="app-settings__info-icon">💾</span>
+                  <div>
+                    <strong>Auto-Save</strong>
+                    <p>Nightjar saves automatically in real-time. No manual save shortcut needed.</p>
                   </div>
                 </div>
               </div>
@@ -1241,28 +1241,24 @@ export default function AppSettings({ isOpen, onClose }) {
             {activeTab === 'about' && (
               <div className="app-settings__section">
                 <div className="app-settings__about">
-                  <div className="app-settings__about-logo">📝</div>
+                  <div className="app-settings__about-logo">
+                    <NightjarMascot size="large" autoRotate={true} rotateInterval={6000} />
+                  </div>
                   <h3 className="app-settings__about-name">Nightjar</h3>
-                  <p className="app-settings__about-version">Version 1.0.0</p>
+                  <p className="app-settings__about-version">Version {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</p>
                   <p className="app-settings__about-desc">
-                    Secure, decentralized collaborative text editor with end-to-end encryption and peer-to-peer sync.
+                    Secure, decentralized collaborative platform with end-to-end encryption and peer-to-peer sync. Documents, spreadsheets, kanban boards, chat, file storage, and inventory — all encrypted and private.
                   </p>
                   
                   <div className="app-settings__about-links">
-                    <a href="https://github.com/Nightjar/Nightjar" target="_blank" rel="noopener noreferrer">
+                    <a href="https://github.com/SaoneYanpa/Nightjar" target="_blank" rel="noopener noreferrer">
                       GitHub Repository
-                    </a>
-                    <a href="https://Nightjar.dev/docs" target="_blank" rel="noopener noreferrer">
-                      Documentation
-                    </a>
-                    <a href="https://Nightjar.dev/support" target="_blank" rel="noopener noreferrer">
-                      Support
                     </a>
                   </div>
 
                   <div className="app-settings__about-credits">
                     <p>Built with ❤️ using React, Yjs, and Hyperswarm</p>
-                    <p className="app-settings__about-license">MIT License</p>
+                    <p className="app-settings__about-license">ISC License</p>
                   </div>
                 </div>
               </div>

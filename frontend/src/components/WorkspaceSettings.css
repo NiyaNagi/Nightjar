@@ -546,6 +546,84 @@
   flex-shrink: 0;
 }
 
+/* Permission dropdown (for owners managing other members) */
+.workspace-settings__permission-select {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary, #e5e7eb);
+  background: var(--bg-secondary, #374151);
+  border: 1px solid var(--border-color, #4b5563);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  appearance: auto;
+}
+
+.workspace-settings__permission-select:hover {
+  border-color: var(--accent-color, #6366f1);
+}
+
+.workspace-settings__permission-select:focus {
+  outline: 2px solid var(--accent-color, #6366f1);
+  outline-offset: 1px;
+}
+
+.workspace-settings__permission-select--self {
+  opacity: 0.8;
+}
+
+/* Pending demotion banner (founding owner) */
+.workspace-settings__pending-demotion {
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  color: #856404;
+  font-size: 13px;
+}
+
+.workspace-settings__pending-demotion p {
+  margin: 0 0 8px 0;
+}
+
+.workspace-settings__pending-demotion-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.workspace-settings__pending-accept {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background: #10b981;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.workspace-settings__pending-accept:hover {
+  background: #059669;
+}
+
+.workspace-settings__pending-decline {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  background: #ef4444;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.workspace-settings__pending-decline:hover {
+  background: #dc2626;
+}
+
 /* Kick button */
 .workspace-settings__kick-btn {
   padding: 4px 8px;

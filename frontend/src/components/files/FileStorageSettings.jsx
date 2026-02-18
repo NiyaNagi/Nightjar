@@ -15,6 +15,7 @@ import {
   DEFAULT_AUTO_DELETE_DAYS,
   DEFAULT_CHUNK_REDUNDANCY_TARGET,
 } from '../../utils/fileStorageValidation';
+import { useConfirmDialog } from '../common/ConfirmDialog';
 import './FileStorageSettings.css';
 
 export default function FileStorageSettings({
@@ -28,12 +29,19 @@ export default function FileStorageSettings({
 }) {
   const [localSettings, setLocalSettings] = useState({});
   const [dirty, setDirty] = useState(false);
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   useEffect(() => {
     if (settings) {
-      setLocalSettings({ ...settings });
-      setDirty(false);
+      setLocalSettings(prev => {
+        // Don't overwrite local edits if the form is dirty
+        if (dirty) return prev;
+        return { ...settings };
+      });
+      // Only reset dirty flag if we actually applied the incoming settings
+      setDirty(prev => prev ? prev : false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
   const handleChange = useCallback((key, value) => {
@@ -46,25 +54,38 @@ export default function FileStorageSettings({
     setDirty(false);
   }, [localSettings, onUpdateSettings]);
 
-  const handleEmptyTrash = useCallback(() => {
-    const confirmed = window.confirm('Permanently delete all items in trash? This cannot be undone.');
+  const handleEmptyTrash = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Empty Trash',
+      message: 'Permanently delete all items in trash? This cannot be undone.',
+      confirmText: 'Empty Trash',
+      variant: 'danger'
+    });
     if (confirmed) onEmptyTrash?.();
-  }, [onEmptyTrash]);
+  }, [onEmptyTrash, confirm]);
 
-  const handleDeleteAll = useCallback(() => {
-    const confirmed = window.confirm(
-      'Delete ALL files and folders permanently? This action cannot be undone and all data will be lost.'
-    );
-    if (confirmed) {
-      const typed = window.prompt('Type DELETE to confirm:');
-      if (typed === 'DELETE') onDeleteAllFiles?.();
-    }
-  }, [onDeleteAllFiles]);
+  const handleDeleteAll = useCallback(async () => {
+    const firstConfirm = await confirm({
+      title: 'Delete All Files',
+      message: 'Delete ALL files and folders permanently? This action cannot be undone and all data will be lost.',
+      confirmText: 'Continue',
+      variant: 'danger'
+    });
+    if (!firstConfirm) return;
+    const finalConfirm = await confirm({
+      title: '⚠️ Final Confirmation',
+      message: 'This is your last chance to cancel. ALL files and folders will be permanently destroyed. Are you absolutely sure?',
+      confirmText: 'Delete Everything',
+      variant: 'danger'
+    });
+    if (finalConfirm) onDeleteAllFiles?.();
+  }, [onDeleteAllFiles, confirm]);
 
   const isAdmin = role === 'admin';
 
   return (
     <div className="settings-view" data-testid="settings-view">
+      {ConfirmDialogComponent}
       <div className="settings-header">
         <h3 className="settings-title">⚙️ Settings</h3>
         {dirty && isAdmin && (

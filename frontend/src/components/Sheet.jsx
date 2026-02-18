@@ -175,7 +175,7 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             const presences = [];
             const currentClientIds = new Set();
             const now = Date.now();
-            const seenNames = new Set(); // Deduplicate by name
+            const seenClientIds = new Set(); // Deduplicate by clientID to avoid hiding distinct users with the same name
             
             states.forEach((state, clientId) => {
                 // Skip ourselves
@@ -191,10 +191,10 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                     return;
                 }
                 
-                // Skip duplicate names (keep first seen, which will be most recent due to Map ordering)
+                // Skip duplicate clientIDs
                 const userName = state.user.name || 'Anonymous';
-                if (seenNames.has(userName)) return;
-                seenNames.add(userName);
+                if (seenClientIds.has(clientId)) return;
+                seenClientIds.add(clientId);
                 
                 currentClientIds.add(clientId);
                 
@@ -337,6 +337,10 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                         console.log('[Sheet] New remote update detected, enabling protection');
                         isReceivingRemoteUpdate.current = true;
                         
+                        // Cancel any pending debounced save from a previous local edit
+                        // to prevent it from firing and overwriting the remote data
+                        debouncedSaveRef.current?.cancel();
+                        
                         // Clear any pending timeout
                         if (pendingRemoteUpdateTimeout.current) {
                             clearTimeout(pendingRemoteUpdateTimeout.current);
@@ -383,14 +387,11 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             }
         };
 
-        ysheet.observe(updateFromYjs);
-        // Also observe deep changes in case values are nested Yjs types
         ysheet.observeDeep(updateFromYjs);
         updateFromYjs();
 
         return () => {
             console.log('[Sheet] Cleanup - unobserving ysheet');
-            ysheet.unobserve(updateFromYjs);
             ysheet.unobserveDeep(updateFromYjs);
             // Clear any pending timeout
             if (pendingRemoteUpdateTimeout.current) {
@@ -513,17 +514,37 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
 
     // Debounced version for onChange (which fires frequently)
     const debouncedSaveToYjs = useMemo(() => {
+        // Cancel any pending call from the previous debounced function
+        debouncedSaveRef.current?.cancel();
         const fn = debounce(saveToYjs, 300);
         debouncedSaveRef.current = fn;
         return fn;
     }, [saveToYjs]);
 
-    // Flush pending saves on unmount and force save current state
+    // Cleanup: cancel pending debounced save on unmount or when debounced fn changes
     useEffect(() => {
         return () => {
+            debouncedSaveToYjs.cancel();
+        };
+    }, [debouncedSaveToYjs]);
+
+    // Flush pending saves on unmount and force save current state
+    useEffect(() => {
+        // Capture the ydoc and ysheet at setup time so cleanup can verify they still match
+        const capturedYdoc = ydoc;
+        const capturedYsheet = ydoc ? ydoc.getMap('sheet-data') : null;
+        return () => {
             console.log('[Sheet] Unmounting - saving current state');
+            // Guard: only save if the current ysheetRef still points to the same
+            // Yjs map we set up with. If the document switched, ysheetRef will
+            // point to the new doc's map, and we must NOT write stale data into it.
+            if (ysheetRef.current !== capturedYsheet) {
+                console.warn('[Sheet] Unmount save skipped - ydoc has changed since setup');
+                debouncedSaveRef.current?.cancel();
+                return;
+            }
             // Try to save using workbook ref first (most accurate)
-            if (workbookRef.current?.getAllSheets && ysheetRef.current && ydoc) {
+            if (workbookRef.current?.getAllSheets && capturedYsheet && capturedYdoc) {
                 try {
                     const finalData = workbookRef.current.getAllSheets();
                     // Convert data to celldata for persistence
@@ -546,8 +567,8 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                         return newSheet;
                     });
                     console.log('[Sheet] Final save on unmount, sheets:', convertedData?.length);
-                    ydoc.transact(() => {
-                        ysheetRef.current.set('sheets', JSON.parse(JSON.stringify(convertedData)));
+                    capturedYdoc.transact(() => {
+                        capturedYsheet.set('sheets', JSON.parse(JSON.stringify(convertedData)));
                     });
                     console.log('[Sheet] Final state saved to Yjs');
                 } catch (e) {
@@ -561,6 +582,12 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
 
     // Handle sheet data changes
     const handleChange = useCallback((newData) => {
+        // Guard against null/undefined data from Fortune Sheet
+        if (!newData || !Array.isArray(newData)) {
+            console.warn('[Sheet] handleChange received invalid data, ignoring:', newData);
+            return;
+        }
+        
         // Increment onChange counter
         onChangeCountRef.current++;
         
@@ -570,17 +597,20 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             let nonEmptyCells = 0;
             let totalCharacters = 0;
             
-            const sheetData = newData[0].data;
-            if (sheetData && Array.isArray(sheetData)) {
-                for (const row of sheetData) {
-                    if (row && Array.isArray(row)) {
-                        for (const cell of row) {
-                            // Check if cell has actual content
-                            if (cell && cell.v !== null && cell.v !== undefined && cell.v !== '') {
-                                nonEmptyCells++;
-                                // Count characters in the cell value
-                                const cellValue = String(cell.v);
-                                totalCharacters += cellValue.length;
+            // Iterate over ALL sheets in the workbook, not just the first
+            for (const sheet of newData) {
+                const sheetData = sheet?.data;
+                if (sheetData && Array.isArray(sheetData)) {
+                    for (const row of sheetData) {
+                        if (row && Array.isArray(row)) {
+                            for (const cell of row) {
+                                // Check if cell has actual content
+                                if (cell && cell.v !== null && cell.v !== undefined && cell.v !== '') {
+                                    nonEmptyCells++;
+                                    // Count characters in the cell value
+                                    const cellValue = String(cell.v);
+                                    totalCharacters += cellValue.length;
+                                }
                             }
                         }
                     }
@@ -614,7 +644,7 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
         setData(newData);
         // Save via debounced function for full data sync
         debouncedSaveToYjs(newData);
-    }, [debouncedSaveToYjs]);
+    }, [debouncedSaveToYjs, onStatsChange]);
 
     // Handle operations for real-time sync (immediate, not debounced)
     const handleOp = useCallback((ops) => {

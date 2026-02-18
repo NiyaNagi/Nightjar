@@ -357,7 +357,7 @@ describe('RequestDetail', () => {
 
   it('shows ⚡ for urgent requests', () => {
     render(<RequestDetail request={req} collaborators={collabs} />);
-    expect(screen.getByText(/⚡/)).toBeInTheDocument();
+    expect(screen.getAllByText(/⚡/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows requestor notes', () => {

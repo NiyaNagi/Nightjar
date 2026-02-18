@@ -80,6 +80,8 @@ export default function BrowseView({
   const [replaceInfo, setReplaceInfo] = useState(null);
   const [showBulkTagDialog, setShowBulkTagDialog] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [renameItem, setRenameItem] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
   const pendingUploadRef = useRef(null);
   const lastSelectedRef = useRef(null);
   const browseItemsRef = useRef(null);
@@ -148,6 +150,7 @@ export default function BrowseView({
           }
           return next;
         }
+        // lastSelected was filtered out – fall through to plain-click
       }
       if (ctrl) {
         // Ctrl-click: toggle single item in existing set
@@ -299,7 +302,7 @@ export default function BrowseView({
       }
 
       // Ctrl+D — bulk download
-      if (isCtrl && e.key === 'd' && selectedItems.size > 0) {
+      if (isCtrl && e.key === 'd' && selectedItems.size > 0 && selectedFileCount > 0) {
         e.preventDefault();
         handleBulkDownload();
         return;
@@ -391,13 +394,7 @@ export default function BrowseView({
           onDownloadFile?.(target.item);
           break;
         case 'rename': {
-          const newName = prompt('Enter new name:', target.item.name);
-          if (newName?.trim()) {
-            const trimmed = newName.trim();
-            if (trimmed.length > 255 || /[\/\\:*?"<>|]/.test(trimmed)) break;
-            if (target.type === 'file') onUpdateFile?.(target.item.id, { name: trimmed });
-            else onUpdateFolder?.(target.item.id, { name: trimmed });
-          }
+          setRenameItem({ type: target.type, item: target.item });
           break;
         }
         case 'move':
@@ -412,13 +409,37 @@ export default function BrowseView({
           if (target.type === 'file') onToggleFavorite?.(target.item.id);
           break;
         case 'delete':
-          if (target.type === 'file') onDeleteFile?.(target.item.id);
-          else onDeleteFolder?.(target.item.id);
+          setConfirmDialog({
+            title: 'Delete Item',
+            message: `Are you sure you want to delete "${target.item.name}"? It will be moved to trash.`,
+            confirmLabel: 'Delete',
+            onConfirm: () => {
+              if (target.type === 'file') onDeleteFile?.(target.item.id);
+              else onDeleteFolder?.(target.item.id);
+              setConfirmDialog(null);
+            },
+          });
           break;
       }
     }
     setContextMenu(null);
   }, [contextMenu, onDownloadFile, onUpdateFile, onUpdateFolder, onDeleteFile, onDeleteFolder, onToggleFavorite, handleBulkDownload, handleBulkMoveRequest, handleBulkFavorite, handleBulkDeleteRequest]);
+
+  // Initialize rename value when rename dialog opens
+  useEffect(() => {
+    if (renameItem) setRenameValue(renameItem.item.name);
+  }, [renameItem]);
+
+  // Handle rename submit
+  const handleRenameSubmit = useCallback(() => {
+    if (!renameItem || !renameValue?.trim()) return;
+    const trimmed = renameValue.trim();
+    if (trimmed.length > 255 || /[\/\\:*?"<>|]/.test(trimmed)) return;
+    if (trimmed === renameItem.item.name) { setRenameItem(null); return; } // No-op if name unchanged
+    if (renameItem.type === 'file') onUpdateFile?.(renameItem.item.id, { name: trimmed });
+    else onUpdateFolder?.(renameItem.item.id, { name: trimmed });
+    setRenameItem(null);
+  }, [renameItem, renameValue, onUpdateFile, onUpdateFolder]);
 
   // Move (supports single and bulk)
   const handleMove = useCallback((id, destFolderId, type) => {
@@ -431,9 +452,31 @@ export default function BrowseView({
 
   // Drop file onto folder
   const handleFileDrop = useCallback((itemId, folderId, type) => {
-    if (type === 'file') onMoveFile?.(itemId, folderId);
-    else if (type === 'folder') onMoveFolder?.(itemId, folderId);
-  }, [onMoveFile, onMoveFolder]);
+    if (type === 'file') {
+      onMoveFile?.(itemId, folderId);
+    } else if (type === 'folder') {
+      // Prevent circular nesting: check if folderId is a descendant of itemId
+      let current = folderId;
+      const visited = new Set();
+      while (current) {
+        if (current === itemId) return; // Would create cycle
+        if (visited.has(current)) break;
+        visited.add(current);
+        const parent = activeFolders.find(f => f.id === current);
+        current = parent?.parentId || null;
+      }
+      onMoveFolder?.(itemId, folderId);
+    }
+    // Clear moved item from selection
+    setSelectedItems(prev => {
+      if (prev.has(itemId)) {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      }
+      return prev;
+    });
+  }, [onMoveFile, onMoveFolder, activeFolders]);
 
   // Sort toggle
   const handleSortChange = useCallback((field) => {
@@ -450,6 +493,7 @@ export default function BrowseView({
   }, [activeFiles]);
 
   const canEdit = role === 'admin' || role === 'collaborator';
+  const isAdmin = role === 'admin';
 
   return (
     <div className="browse-view" data-testid="browse-view">
@@ -536,38 +580,75 @@ export default function BrowseView({
             )}
           </div>
         ) : (
-          <div ref={browseItemsRef} className={`browse-items browse-items--${viewMode}`} data-testid="browse-items">
-            {/* Folders first */}
-            {foldersInFolder.map(folder => (
-              <FolderCard
-                key={folder.id}
-                folder={folder}
-                fileCount={fileCountInFolder(folder.id)}
-                viewMode={viewMode}
-                isSelected={selectedItems.has(folder.id)}
-                onSelect={(id, multi) => handleSelectFile(id, multi)}
-                onClick={(f) => navigateToFolder(f.id)}
-                onContextMenu={handleContextMenu}
-                onFileDrop={handleFileDrop}
-              />
-            ))}
-            {/* Files */}
-            {sortedFiles.map(file => (
-              <FileCard
-                key={file.id}
-                file={file}
-                viewMode={viewMode}
-                chunkAvailability={chunkAvailability}
-                userPublicKey={userPublicKey}
-                isFavorite={favoriteIds?.has(file.id)}
-                isSelected={selectedItems.has(file.id)}
-                onSelect={handleSelectFile}
-                onClick={(f) => setDetailFile(f)}
-                onContextMenu={handleContextMenu}
-                onToggleFavorite={onToggleFavorite}
-              />
-            ))}
-          </div>
+          viewMode === 'table' ? (
+            <table ref={browseItemsRef} className={`browse-items browse-items--${viewMode}`} data-testid="browse-items">
+              <tbody>
+                {/* Folders first */}
+                {foldersInFolder.map(folder => (
+                  <FolderCard
+                    key={folder.id}
+                    folder={folder}
+                    fileCount={fileCountInFolder(folder.id)}
+                    viewMode={viewMode}
+                    isSelected={selectedItems.has(folder.id)}
+                    onSelect={(id, multi) => handleSelectFile(id, multi)}
+                    onClick={(f) => navigateToFolder(f.id)}
+                    onContextMenu={handleContextMenu}
+                    onFileDrop={handleFileDrop}
+                  />
+                ))}
+                {/* Files */}
+                {sortedFiles.map(file => (
+                  <FileCard
+                    key={file.id}
+                    file={file}
+                    viewMode={viewMode}
+                    chunkAvailability={chunkAvailability}
+                    userPublicKey={userPublicKey}
+                    isFavorite={favoriteIds?.has(file.id)}
+                    isSelected={selectedItems.has(file.id)}
+                    onSelect={handleSelectFile}
+                    onClick={(f) => setDetailFile(f)}
+                    onContextMenu={handleContextMenu}
+                    onToggleFavorite={onToggleFavorite}
+                  />
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div ref={browseItemsRef} className={`browse-items browse-items--${viewMode}`} data-testid="browse-items">
+              {/* Folders first */}
+              {foldersInFolder.map(folder => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  fileCount={fileCountInFolder(folder.id)}
+                  viewMode={viewMode}
+                  isSelected={selectedItems.has(folder.id)}
+                  onSelect={(id, multi) => handleSelectFile(id, multi)}
+                  onClick={(f) => navigateToFolder(f.id)}
+                  onContextMenu={handleContextMenu}
+                  onFileDrop={handleFileDrop}
+                />
+              ))}
+              {/* Files */}
+              {sortedFiles.map(file => (
+                <FileCard
+                  key={file.id}
+                  file={file}
+                  viewMode={viewMode}
+                  chunkAvailability={chunkAvailability}
+                  userPublicKey={userPublicKey}
+                  isFavorite={favoriteIds?.has(file.id)}
+                  isSelected={selectedItems.has(file.id)}
+                  onSelect={handleSelectFile}
+                  onClick={(f) => setDetailFile(f)}
+                  onContextMenu={handleContextMenu}
+                  onToggleFavorite={onToggleFavorite}
+                />
+              ))}
+            </div>
+          )
         )}
       </UploadZone>
 
@@ -591,6 +672,7 @@ export default function BrowseView({
         onEditTags={() => setShowBulkTagDialog(true)}
         onToggleFavorite={onToggleFavorite}
         onClear={handleDeselectAll}
+        canEdit={canEdit}
       />
 
       {/* Context Menu */}
@@ -600,7 +682,8 @@ export default function BrowseView({
         target={contextMenu?.target}
         onClose={() => setContextMenu(null)}
         onAction={handleContextAction}
-        isAdmin={role === 'admin'}
+        isAdmin={isAdmin}
+        canEdit={canEdit}
         isBulk={contextMenu?.isBulk || false}
         selectedCount={contextMenu?.isBulk ? selectedItems.size : 0}
         selectedFileCount={contextMenu?.isBulk ? selectedFileCount : 0}
@@ -620,6 +703,7 @@ export default function BrowseView({
         collaborators={collaborators}
         isFavorite={detailFile ? favoriteIds?.has(detailFile.id) : false}
         onStartChatWith={onStartChatWith}
+        canEdit={canEdit}
       />
 
       {/* Folder Create Dialog */}
@@ -668,6 +752,29 @@ export default function BrowseView({
         onConfirm={confirmDialog?.onConfirm}
         onCancel={() => setConfirmDialog(null)}
       />
+
+      {/* Rename Dialog */}
+      {renameItem && (
+        <div className="confirm-dialog-overlay" onClick={(e) => e.target === e.currentTarget && setRenameItem(null)} data-testid="rename-dialog-overlay">
+          <div className="confirm-dialog" role="dialog" aria-labelledby="rename-dialog-title" data-testid="rename-dialog">
+            <h3 id="rename-dialog-title" className="confirm-dialog-title">Rename {renameItem.type === 'file' ? 'File' : 'Folder'}</h3>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleRenameSubmit(); if (e.key === 'Escape') setRenameItem(null); }}
+              autoFocus
+              className="confirm-dialog-input"
+              style={{ width: '100%', padding: '8px', marginTop: '8px', boxSizing: 'border-box', background: 'var(--bg-secondary, #2a2a2a)', color: 'var(--text-primary, #fff)', border: '1px solid var(--border-color, #444)', borderRadius: '4px' }}
+              data-testid="rename-input"
+            />
+            <div className="confirm-dialog-actions" style={{ marginTop: '12px' }}>
+              <button className="confirm-dialog-btn confirm-dialog-btn--cancel" onClick={() => setRenameItem(null)}>Cancel</button>
+              <button className="confirm-dialog-btn confirm-dialog-btn--default" onClick={handleRenameSubmit} disabled={!renameValue?.trim()}>Rename</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

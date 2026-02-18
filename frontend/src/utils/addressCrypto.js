@@ -78,19 +78,24 @@ export function base62ToPublicKeyHex(base62Key) {
  *
  * @param {Object} address            – Plain address object
  * @param {string} recipientPubKeyHex – Recipient's Ed25519 public key (hex)
- * @param {Uint8Array} senderSecretKey – Sender's Ed25519 secret key (64 bytes)
+ * @param {Uint8Array} senderSecretKey – Sender's secret key: 32-byte Curve25519 (use directly)
+ *                                       or 64-byte Ed25519 (auto-converted)
  * @returns {Promise<{ ciphertext: string, nonce: string }>}  Base64-encoded
  */
 export async function encryptAddress(address, recipientPubKeyHex, senderSecretKey) {
   const recipientCurve = await ed25519ToCurve25519Public(recipientPubKeyHex);
-  const senderCurve = await ed25519ToCurve25519Secret(senderSecretKey);
+  // 32-byte key = pre-derived Curve25519, 64-byte = Ed25519 (needs conversion)
+  const senderCurve = senderSecretKey.length === 32
+    ? senderSecretKey
+    : await ed25519ToCurve25519Secret(senderSecretKey);
+  const needsWipe = senderSecretKey.length !== 32;
 
   const plaintext = new TextEncoder().encode(JSON.stringify(address));
   const nonce = nacl.randomBytes(24);
   const ciphertext = nacl.box(plaintext, nonce, recipientCurve, senderCurve);
 
-  // Wipe converted secret key
-  secureWipe(senderCurve);
+  // Only wipe if we derived the Curve25519 key locally (don't wipe caller's key)
+  if (needsWipe) secureWipe(senderCurve);
 
   return {
     ciphertext: encodeBase64(ciphertext),
@@ -104,19 +109,24 @@ export async function encryptAddress(address, recipientPubKeyHex, senderSecretKe
  * @param {string} ciphertextB64      – Base64 ciphertext
  * @param {string} nonceB64           – Base64 nonce
  * @param {string} senderPubKeyHex    – Sender's Ed25519 public key (hex)
- * @param {Uint8Array} recipientSecretKey – Recipient's Ed25519 secret key (64 bytes)
+ * @param {Uint8Array} recipientSecretKey – Recipient's secret key: 32-byte Curve25519 (use directly)
+ *                                          or 64-byte Ed25519 (auto-converted)
  * @returns {Promise<Object>}          – Decrypted address object
  */
 export async function decryptAddress(ciphertextB64, nonceB64, senderPubKeyHex, recipientSecretKey) {
   const senderCurve = await ed25519ToCurve25519Public(senderPubKeyHex);
-  const recipientCurve = await ed25519ToCurve25519Secret(recipientSecretKey);
+  // 32-byte key = pre-derived Curve25519, 64-byte = Ed25519 (needs conversion)
+  const recipientCurve = recipientSecretKey.length === 32
+    ? recipientSecretKey
+    : await ed25519ToCurve25519Secret(recipientSecretKey);
+  const needsWipe = recipientSecretKey.length !== 32;
 
   const ciphertext = decodeBase64(ciphertextB64);
   const nonce = decodeBase64(nonceB64);
   const plaintext = nacl.box.open(ciphertext, nonce, senderCurve, recipientCurve);
 
-  // Wipe converted secret key
-  secureWipe(recipientCurve);
+  // Only wipe if we derived the Curve25519 key locally (don't wipe caller's key)
+  if (needsWipe) secureWipe(recipientCurve);
 
   if (!plaintext) throw new Error('Failed to decrypt address — authentication failed');
   return JSON.parse(new TextDecoder().decode(plaintext));
@@ -174,7 +184,7 @@ export function decryptAdminNotes(encoded, key) {
  *
  * @param {Object} address               – Full address object
  * @param {Array} admins                  – [{ publicKey (base62), permission }]
- * @param {Uint8Array} requestorSecretKey – Requestor's Ed25519 secret key (64 bytes)
+ * @param {Uint8Array} requestorSecretKey – Requestor's secret key (32-byte Curve25519 or 64-byte Ed25519)
  * @param {string} requestorPubKeyHex     – Requestor's Ed25519 public key (hex)
  * @returns {Promise<Array>}              – Array of PendingAddressEntry objects
  */
@@ -198,7 +208,7 @@ export async function encryptAddressForAdmins(address, admins, requestorSecretKe
  *
  * @param {Array} entries            – Array of PendingAddressEntry from Yjs
  * @param {string} adminPubKeyHex   – This admin's Ed25519 public key (hex)
- * @param {Uint8Array} adminSecretKey – This admin's Ed25519 secret key (64 bytes)
+ * @param {Uint8Array} adminSecretKey – This admin's secret key (32-byte Curve25519 or 64-byte Ed25519)
  * @returns {Promise<Object|null>}   – Decrypted address or null
  */
 export async function decryptPendingAddress(entries, adminPubKeyHex, adminSecretKey) {
@@ -224,7 +234,7 @@ export async function decryptPendingAddress(entries, adminPubKeyHex, adminSecret
  *
  * @param {Object} address            – Full address object
  * @param {string} producerPubKeyHex  – Producer's Ed25519 public key (hex)
- * @param {Uint8Array} adminSecretKey – Admin's Ed25519 secret key (64 bytes)
+ * @param {Uint8Array} adminSecretKey – Admin's secret key (32-byte Curve25519 or 64-byte Ed25519)
  * @param {string} adminPubKeyHex     – Admin's Ed25519 public key (hex)
  * @returns {Promise<Object>}         – EncryptedAddressReveal object
  */
@@ -244,7 +254,7 @@ export async function createAddressReveal(address, producerPubKeyHex, adminSecre
  * Decrypt an address reveal as the assigned producer.
  *
  * @param {Object} reveal               – EncryptedAddressReveal from Yjs
- * @param {Uint8Array} producerSecretKey – Producer's Ed25519 secret key (64 bytes)
+ * @param {Uint8Array} producerSecretKey – Producer's secret key (32-byte Curve25519 or 64-byte Ed25519)
  * @returns {Promise<Object>}            – Decrypted address object
  */
 export async function decryptAddressReveal(reveal, producerSecretKey) {

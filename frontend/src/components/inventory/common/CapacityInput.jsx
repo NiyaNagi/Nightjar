@@ -1,7 +1,7 @@
 // frontend/src/components/inventory/common/CapacityInput.jsx
 // Editable stock / rate input for a single catalog item — used by ProducerDashboard
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './CapacityInput.css';
 
 /**
@@ -11,6 +11,12 @@ export default function CapacityInput({ item, capacity, onSave }) {
   const [stock, setStock] = useState(capacity?.currentStock ?? 0);
   const [rate, setRate] = useState(capacity?.capacityPerDay ?? 0);
   const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    setStock(capacity?.currentStock ?? 0);
+    setRate(capacity?.capacityPerDay ?? 0);
+    setDirty(false);
+  }, [capacity]);
 
   const handleSave = useCallback(() => {
     onSave?.(item.id, {

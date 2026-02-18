@@ -3,7 +3,7 @@
 > **Version:** 1.0.0  
 > **Date:** February 15, 2026  
 > **Status:** Draft  
-> **Authors:** Copilot + InyanRock  
+> **Authors:** Copilot + SaoneYanpa  
 > **Depends on:** Nightjar v1.6.0+ (Inventory System baseline)
 
 ---

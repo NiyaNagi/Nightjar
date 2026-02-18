@@ -10,13 +10,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
+import { ensureContrastWithWhite } from '../utils/colorUtils';
 import './WorkspaceSwitcher.css';
 
 // Permission badges
 const PERMISSION_BADGES = {
-  owner: { label: 'Owner', color: '#10b981' },
-  editor: { label: 'Editor', color: '#3b82f6' },
-  viewer: { label: 'Viewer', color: '#6b7280' },
+  owner: { label: 'Owner', color: '#059669' },
+  editor: { label: 'Editor', color: '#2563eb' },
+  viewer: { label: 'Viewer', color: '#4b5563' },
 };
 
 export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, onJoinWorkspace }) {
@@ -85,8 +86,9 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
         data-testid="workspace-selector"
         style={{
           background: currentWorkspace?.color 
-            ? `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), ${currentWorkspace.color}`
-            : undefined
+            ? ensureContrastWithWhite(currentWorkspace.color, 0.3)
+            : undefined,
+          ...(currentWorkspace?.color ? { color: '#ffffff' } : {})
         }}
       >
         <div className="workspace-switcher__current">
@@ -147,8 +149,9 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 data-testid={`workspace-option-${workspace.name.replace(/\s+/g, '-')}`}
                 style={{
                   background: workspace.color 
-                    ? `linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)), ${workspace.color}`
-                    : undefined
+                    ? ensureContrastWithWhite(workspace.color, 0.2)
+                    : undefined,
+                  ...(workspace.color ? { color: '#ffffff' } : {})
                 }}
               >
                 <span className="workspace-switcher__item-icon">
@@ -202,7 +205,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 <div className="workspace-switcher__divider" />
                 <button 
                   className="workspace-switcher__action workspace-switcher__action--danger"
-                  onClick={() => setShowDeleteConfirm(true)}
+                  onClick={() => setShowDeleteConfirm(currentWorkspace.id)}
                 >
                   <span className="workspace-switcher__action-icon">🗑️</span>
                   Delete Workspace
@@ -219,7 +222,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
           <div className="workspace-switcher__confirm-dialog" onClick={e => e.stopPropagation()}>
             <h3>Delete Workspace?</h3>
             <p>
-              This will permanently delete <strong>{currentWorkspace?.name}</strong> and all its documents.
+              This will permanently delete <strong>{workspaces.find(w => w.id === showDeleteConfirm)?.name}</strong> and all its documents.
               This action cannot be undone.
             </p>
             <div className="workspace-switcher__confirm-actions">
@@ -232,8 +235,8 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
               <button 
                 className="workspace-switcher__confirm-btn workspace-switcher__confirm-btn--delete"
                 onClick={async () => {
-                  if (currentWorkspace) {
-                    await deleteWorkspace(currentWorkspace.id);
+                  if (showDeleteConfirm) {
+                    await deleteWorkspace(showDeleteConfirm);
                     setShowDeleteConfirm(false);
                     setIsOpen(false);
                   }

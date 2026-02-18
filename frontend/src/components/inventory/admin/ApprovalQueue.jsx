@@ -108,8 +108,8 @@ export default function ApprovalQueue() {
         // 2. Fallback: decrypt pending address from non-owner requestor
         if (!addr && ctx.yPendingAddresses) {
           const pendingEntries = ctx.yPendingAddresses.get(requestId);
-          if (pendingEntries && ctx.userIdentity?.privateKey) {
-            addr = await decryptPendingAddress(pendingEntries, adminHex, ctx.userIdentity.privateKey);
+          if (pendingEntries && ctx.userIdentity?.curveSecretKey) {
+            addr = await decryptPendingAddress(pendingEntries, adminHex, ctx.userIdentity.curveSecretKey);
             // Store locally for future reference, then clean up pending entry
             if (addr) {
               try {
@@ -123,10 +123,14 @@ export default function ApprovalQueue() {
           }
         }
 
-        if (addr && ctx.userIdentity?.privateKey) {
-          const reveal = await createAddressReveal(addr, producerHex, ctx.userIdentity.privateKey, adminHex);
+        if (addr && ctx.userIdentity?.curveSecretKey) {
+          const reveal = await createAddressReveal(addr, producerHex, ctx.userIdentity.curveSecretKey, adminHex);
           // Attach inventorySystemId so useInventorySync can filter reveals per system
           ctx.yAddressReveals?.set(requestId, { ...reveal, inventorySystemId: ctx.inventorySystemId });
+        } else if (!addr) {
+          console.warn('[ApprovalQueue] Address reveal not created — address not found in local store or pending addresses for request', requestId?.slice(0, 8));
+        } else if (!ctx.userIdentity?.curveSecretKey) {
+          console.warn('[ApprovalQueue] Address reveal not created — admin encryption key not available');
         }
       } catch (err) {
         console.warn('[ApprovalQueue] Could not create address reveal:', err);
@@ -216,6 +220,56 @@ export default function ApprovalQueue() {
     }
     setSelected(new Set());
   };
+
+  // ── Stage transition handlers (admin) for RequestDetail stage bar ──
+
+  const handleMarkInProgress = useCallback((req) => {
+    findAndUpdateRequest(req.id, r => ({ ...r, status: 'in_progress', inProgressAt: Date.now(), updatedAt: Date.now() }));
+    logAudit('request_in_progress', req.id, `Request ${req.id?.slice(0, 8)} marked in progress by admin`);
+    if (req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.requestedBy, type: 'request_in_progress', message: `Your request for ${req.catalogItemName || 'item'} is now in progress`, relatedId: req.id });
+    }
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.assignedTo, type: 'request_in_progress', message: `Request for ${req.catalogItemName || 'item'} is now in progress`, relatedId: req.id });
+    }
+  }, [findAndUpdateRequest, logAudit, ctx.yInventoryNotifications, ctx.inventorySystemId]);
+
+  const handleMarkShipped = useCallback((req, trackingNumber) => {
+    findAndUpdateRequest(req.id, r => {
+      const updates = { ...r, status: 'shipped', shippedAt: Date.now(), updatedAt: Date.now() };
+      if (trackingNumber) updates.trackingNumber = trackingNumber;
+      return updates;
+    });
+    logAudit('request_shipped', req.id, `Request ${req.id?.slice(0, 8)} marked shipped by admin`);
+    if (req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.requestedBy, type: 'request_shipped', message: `Your request for ${req.catalogItemName || 'item'} has been shipped`, relatedId: req.id });
+    }
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.assignedTo, type: 'request_shipped', message: `Request for ${req.catalogItemName || 'item'} has been shipped`, relatedId: req.id });
+    }
+  }, [findAndUpdateRequest, logAudit, ctx.yInventoryNotifications, ctx.inventorySystemId]);
+
+  const handleRevertToApproved = useCallback((req) => {
+    findAndUpdateRequest(req.id, r => ({ ...r, status: 'approved', shippedAt: null, inProgressAt: null, trackingNumber: null, updatedAt: Date.now() }));
+    logAudit('request_reverted_approved', req.id, `Request ${req.id?.slice(0, 8)} reverted to approved by admin`);
+    if (req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.requestedBy, type: 'status_change', message: `Your request for ${req.catalogItemName || 'item'} was reverted to approved`, relatedId: req.id });
+    }
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.assignedTo, type: 'status_change', message: `Request for ${req.catalogItemName || 'item'} was reverted to approved`, relatedId: req.id });
+    }
+  }, [findAndUpdateRequest, logAudit, ctx.yInventoryNotifications, ctx.inventorySystemId]);
+
+  const handleRevertToInProgress = useCallback((req) => {
+    findAndUpdateRequest(req.id, r => ({ ...r, status: 'in_progress', shippedAt: null, trackingNumber: null, updatedAt: Date.now() }));
+    logAudit('request_reverted_in_progress', req.id, `Request ${req.id?.slice(0, 8)} reverted to in progress by admin`);
+    if (req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.requestedBy, type: 'status_change', message: `Your request for ${req.catalogItemName || 'item'} was reverted to in progress`, relatedId: req.id });
+    }
+    if (req.assignedTo && req.assignedTo !== req.requestedBy) {
+      pushNotification(ctx.yInventoryNotifications, { inventorySystemId: ctx.inventorySystemId, recipientId: req.assignedTo, type: 'status_change', message: `Request for ${req.catalogItemName || 'item'} was reverted to in progress`, relatedId: req.id });
+    }
+  }, [findAndUpdateRequest, logAudit, ctx.yInventoryNotifications, ctx.inventorySystemId]);
 
   const getProducerName = (key) => {
     if (!key) return 'Unassigned';
@@ -413,6 +467,10 @@ export default function ApprovalQueue() {
                     onClose={() => setExpandedId(null)}
                     onApprove={() => handleApprove(req.id)}
                     onReject={() => handleReject(req.id)}
+                    onMarkInProgress={() => handleMarkInProgress(req)}
+                    onMarkShipped={(r, tracking) => handleMarkShipped(req, tracking)}
+                    onRevertToApproved={() => handleRevertToApproved(req)}
+                    onRevertToInProgress={() => handleRevertToInProgress(req)}
                   />
                 </div>
               )}

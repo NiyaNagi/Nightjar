@@ -229,6 +229,12 @@ class MeshParticipant extends EventEmitter {
 
     conn.on('error', (err) => {
       console.error(`[Mesh] Connection error: ${err.message}`);
+      this.meshConnections.delete(remoteKey);
+      try {
+        conn.destroy();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
     });
 
     // If we need bootstrap, request it

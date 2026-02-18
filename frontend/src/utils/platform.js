@@ -51,7 +51,14 @@ export const NativeBridge = {
       }
       // For Capacitor, use localStorage with encryption
       const stored = localStorage.getItem('Nightjar_identity');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored) return null;
+      try {
+        return JSON.parse(stored);
+      } catch {
+        console.warn('[NativeBridge] Corrupt identity in localStorage, removing');
+        localStorage.removeItem('Nightjar_identity');
+        return null;
+      }
     },
     
     async store(identity) {

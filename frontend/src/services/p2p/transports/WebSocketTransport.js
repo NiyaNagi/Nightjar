@@ -17,6 +17,8 @@ export class WebSocketTransport extends BaseTransport {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
     this.reconnectDelay = 1000;
+    this.reconnectPending = false;
+    this.intentionalClose = false;
     this.pingInterval = null;
     this.identity = null;
     this.currentTopic = null;
@@ -182,12 +184,26 @@ export class WebSocketTransport extends BaseTransport {
     this._stopPingInterval();
     this.emit('server-disconnected');
     
+    // Skip reconnection if this was a deliberate close (e.g., destroy())
+    if (this.intentionalClose) {
+      console.log('[WebSocketTransport] Intentional close, skipping reconnection');
+      return;
+    }
+    
+    // Guard against double reconnection timers
+    if (this.reconnectPending) {
+      console.log('[WebSocketTransport] Reconnection already pending, skipping');
+      return;
+    }
+    
     if (this.reconnectAttempts < this.maxReconnectAttempts && this.serverUrl) {
       this.reconnectAttempts++;
+      this.reconnectPending = true;
       const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
       console.log(`[WebSocketTransport] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
       
       setTimeout(() => {
+        this.reconnectPending = false;
         this.connectToServer(this.serverUrl).catch((e) => {
           console.warn('[WebSocketTransport] Reconnect failed:', e.message);
         });
@@ -348,6 +364,7 @@ export class WebSocketTransport extends BaseTransport {
    */
   async destroy() {
     this._stopPingInterval();
+    this.intentionalClose = true;
     
     if (this.serverSocket) {
       this.serverSocket.close();

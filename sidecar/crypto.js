@@ -66,8 +66,8 @@ function secureWipe(data) {
         const random = nacl.randomBytes(data.length);
         for (let i = 0; i < data.length; i++) data[i] = random[i];
         for (let i = 0; i < data.length; i++) data[i] = 0;
-    } catch {
-        // Silently fail if data is frozen
+    } catch (err) {
+        console.warn('[Crypto] secureWipe failed (data may be frozen):', err.message);
     }
 }
 

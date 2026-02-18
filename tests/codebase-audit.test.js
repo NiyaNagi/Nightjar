@@ -326,7 +326,7 @@ describe('Codebase Audit: FileCard', () => {
     expect(onSelect).toHaveBeenCalledWith('f1', { ctrl: true, shift: false });
   });
 
-  it('should call onClick and onSelect(false) for normal click to clear selection', () => {
+  it('should call onSelect(false) for normal click to clear selection (onClick requires double-click)', () => {
     const onSelect = jest.fn();
     const onClick = jest.fn();
     render(
@@ -340,7 +340,7 @@ describe('Codebase Audit: FileCard', () => {
       />
     );
     fireEvent.click(screen.getByTestId('fs-file-f1'));
-    expect(onClick).toHaveBeenCalledWith(file);
+    expect(onClick).not.toHaveBeenCalled();
     expect(onSelect).toHaveBeenCalledWith('f1', { ctrl: false, shift: false });
   });
 

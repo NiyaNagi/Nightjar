@@ -116,7 +116,8 @@ export default function EditPropertiesModal({
                                         background: item.type === 'document' && parentFolder?.color && color
                                             ? createColorGradient(parentFolder.color, color, 0.25)
                                             : color ? ensureContrastWithWhite(color, 0.3) : undefined,
-                                        paddingLeft: item.type === 'document' && parentFolder ? '32px' : '12px'
+                                        paddingLeft: item.type === 'document' && parentFolder ? '32px' : '12px',
+                                        ...(color || parentFolder?.color ? { color: '#ffffff' } : {})
                                     }}
                                 >
                                     {item.type === 'document' && <span className="preview-tree-spacer"></span>}
@@ -140,7 +141,8 @@ export default function EditPropertiesModal({
                                         style={{
                                             background: parentFolder?.color && color
                                                 ? createColorGradient(parentFolder.color, color, 0.25)
-                                                : color ? ensureContrastWithWhite(color, 0.3) : undefined
+                                                : color ? ensureContrastWithWhite(color, 0.3) : undefined,
+                                            ...(color || parentFolder?.color ? { color: '#ffffff' } : {})
                                         }}
                                     >
                                         <span className="preview-tab-name">{item.name}</span>

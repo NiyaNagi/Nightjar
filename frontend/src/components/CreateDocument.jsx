@@ -115,6 +115,7 @@ export default function CreateDocumentDialog({
       setColor(null);
       setSelectedFolder(parentFolderId);
       setError('');
+      setIsCreating(false);
     }
   }, [isOpen, defaultType, parentFolderId]);
   

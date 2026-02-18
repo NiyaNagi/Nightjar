@@ -353,7 +353,10 @@ export function loadChangelogSync(docId) {
 
 export function saveChangelogSync(docId, changelog) {
     try {
-        localStorage.setItem('Nightjar-changelog-' + docId, JSON.stringify(changelog));
+        // Limit to most recent 100 entries to prevent unbounded localStorage growth
+        // (matches addChangelogEntryToLocalStorage limit)
+        const trimmed = Array.isArray(changelog) ? changelog.slice(-100) : changelog;
+        localStorage.setItem('Nightjar-changelog-' + docId, JSON.stringify(trimmed));
     } catch (e) {
         console.error('[ChangelogStore] saveChangelogSync failed:', e);
     }

@@ -7,6 +7,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
+import { useToast } from '../contexts/ToastContext';
 import { 
   parseShareLink, 
   parseShareLinkAsync,
@@ -40,6 +41,7 @@ const COLOR_PRESETS = [
 
 export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSuccess }) {
   const { createWorkspace, joinWorkspace } = useWorkspaces();
+  const { showToast } = useToast();
   const modalRef = useRef(null);
   
   const [activeTab, setActiveTab] = useState(mode); // 'create' | 'join'
@@ -203,6 +205,11 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       return;
     }
     
+    if (name.trim().length > 100) {
+      setCreateError('Workspace name must be 100 characters or fewer');
+      return;
+    }
+    
     // Password is optional - if provided, validate it
     if (password) {
       if (password.length < 8) {
@@ -292,6 +299,14 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
         });
         
         if (workspace) {
+          // Show toast for permission changes on re-join
+          if (workspace.permissionChanged === 'upgraded') {
+            const label = workspace.myPermission?.charAt(0).toUpperCase() + workspace.myPermission?.slice(1);
+            showToast(`Permission upgraded to ${label}`, 'success');
+          } else if (workspace.permissionChanged === 'already-higher') {
+            const label = workspace.myPermission?.charAt(0).toUpperCase() + workspace.myPermission?.slice(1);
+            showToast(`You already have ${label} access`, 'info');
+          }
           onSuccess?.(workspace);
           onClose?.();
         }
@@ -324,6 +339,14 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           permission: parsedLink.permission || 'editor',
           serverUrl: parsedLink.serverUrl || null, // For cross-platform workspace sync
         });
+        // Show toast for permission changes on re-join
+        if (workspace?.permissionChanged === 'upgraded') {
+          const label = workspace.myPermission?.charAt(0).toUpperCase() + workspace.myPermission?.slice(1);
+          showToast(`Permission upgraded to ${label}`, 'success');
+        } else if (workspace?.permissionChanged === 'already-higher') {
+          const label = workspace.myPermission?.charAt(0).toUpperCase() + workspace.myPermission?.slice(1);
+          showToast(`You already have ${label} access`, 'info');
+        }
         onSuccess?.(workspace);
         onClose?.();
       } else {
@@ -359,6 +382,14 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           serverUrl: parsedLink.serverUrl || null, // For cross-platform workspace sync
         });
         console.log('[CreateWorkspace] joinWorkspace returned:', workspace);
+        // Show toast for permission changes on re-join
+        if (workspace?.permissionChanged === 'upgraded') {
+          const label = workspace.myPermission?.charAt(0).toUpperCase() + workspace.myPermission?.slice(1);
+          showToast(`Permission upgraded to ${label}`, 'success');
+        } else if (workspace?.permissionChanged === 'already-higher') {
+          const label = workspace.myPermission?.charAt(0).toUpperCase() + workspace.myPermission?.slice(1);
+          showToast(`You already have ${label} access`, 'info');
+        }
         onSuccess?.(workspace);
         onClose?.();
       }
@@ -388,7 +419,18 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
             <button
               type="button"
               className={`create-workspace__tab ${activeTab === 'create' ? 'create-workspace__tab--active' : ''}`}
-              onClick={() => setActiveTab('create')}
+              onClick={() => {
+                setActiveTab('create');
+                // Clear join state
+                setShareLink('');
+                setJoinPassword('');
+                setJoinError('');
+                setParsedLink(null);
+                setLinkValidation(null);
+                setConnectionProgress(null);
+                // Clear create error from previous attempt
+                setCreateError('');
+              }}
               role="tab"
               aria-selected={activeTab === 'create'}
             >
@@ -397,7 +439,16 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
             <button
               type="button"
               className={`create-workspace__tab ${activeTab === 'join' ? 'create-workspace__tab--active' : ''}`}
-              onClick={() => setActiveTab('join')}
+              onClick={() => {
+                setActiveTab('join');
+                // Clear create state
+                setName('');
+                setIcon('📁');
+                setColor('#6366f1');
+                setPassword('');
+                setConfirmPassword('');
+                setCreateError('');
+              }}
               role="tab"
               aria-selected={activeTab === 'join'}
             >

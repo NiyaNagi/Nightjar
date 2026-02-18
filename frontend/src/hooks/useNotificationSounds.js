@@ -9,7 +9,7 @@
  * - Sound preview/test functionality
  */
 
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 // Available notification sounds (royalty-free)
 export const NOTIFICATION_SOUNDS = [
@@ -79,38 +79,167 @@ export const saveNotificationSettings = (settings) => {
     }
 };
 
+// ─── Web Audio API Synthesizer ───────────────────────────────────────────────
+// Generates notification sounds programmatically (no MP3 files required).
+// Each sound is a short (<1s) sequence of oscillator tones with envelopes.
+
+function getOrCreateAudioContext() {
+    // Reuse a single AudioContext across all calls (browsers limit the number)
+    if (!getOrCreateAudioContext._ctx || getOrCreateAudioContext._ctx.state === 'closed') {
+        getOrCreateAudioContext._ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const ctx = getOrCreateAudioContext._ctx;
+    // Resume if suspended (autoplay policy)
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+}
+
+/**
+ * Synthesize and play a notification sound via Web Audio API.
+ * @param {string} soundId - One of the NOTIFICATION_SOUNDS ids
+ * @param {number} volume  - 0..1
+ */
+function synthesizeSound(soundId, volume = 0.5) {
+    const ctx = getOrCreateAudioContext();
+    const t = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = Math.max(0, Math.min(1, volume));
+    masterGain.connect(ctx.destination);
+
+    const play = (type, freq, start, dur, attack = 0.01, release = 0.08) => {
+        const osc = ctx.createOscillator();
+        const env = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        env.gain.setValueAtTime(0, t + start);
+        env.gain.linearRampToValueAtTime(0.4, t + start + attack);
+        env.gain.linearRampToValueAtTime(0, t + start + dur - release);
+        osc.connect(env);
+        env.connect(masterGain);
+        osc.start(t + start);
+        osc.stop(t + start + dur);
+    };
+
+    switch (soundId) {
+        case 'chime':
+            // Two-tone gentle bell
+            play('sine', 830, 0, 0.35, 0.005, 0.2);
+            play('sine', 1100, 0.12, 0.4, 0.005, 0.25);
+            break;
+        case 'pop':
+            // Quick frequency sweep down (bubble pop)
+            {
+                const osc = ctx.createOscillator();
+                const env = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, t);
+                osc.frequency.exponentialRampToValueAtTime(150, t + 0.12);
+                env.gain.setValueAtTime(0.4, t);
+                env.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+                osc.connect(env);
+                env.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.16);
+            }
+            break;
+        case 'ding':
+            // Single clear ding
+            play('sine', 1200, 0, 0.5, 0.003, 0.35);
+            play('sine', 2400, 0, 0.3, 0.003, 0.2);    // harmonic
+            break;
+        case 'bell':
+            // Rich bell with harmonics
+            play('sine', 523, 0, 0.6, 0.003, 0.4);
+            play('sine', 1046, 0, 0.4, 0.003, 0.3);
+            play('sine', 1568, 0, 0.25, 0.003, 0.18);
+            break;
+        case 'subtle':
+            // Soft noise whoosh
+            {
+                const bufferSize = ctx.sampleRate * 0.3;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 2000;
+                filter.Q.value = 0.5;
+                const env = ctx.createGain();
+                env.gain.setValueAtTime(0, t);
+                env.gain.linearRampToValueAtTime(0.2, t + 0.05);
+                env.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+                noise.connect(filter);
+                filter.connect(env);
+                env.connect(masterGain);
+                noise.start(t);
+                noise.stop(t + 0.3);
+            }
+            break;
+        case 'ping':
+            // Digital ping — short high tone
+            play('sine', 1800, 0, 0.15, 0.003, 0.1);
+            play('sine', 2400, 0.02, 0.12, 0.003, 0.08);
+            break;
+        case 'drop':
+            // Descending water drop
+            {
+                const osc = ctx.createOscillator();
+                const env = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1400, t);
+                osc.frequency.exponentialRampToValueAtTime(400, t + 0.25);
+                env.gain.setValueAtTime(0.35, t);
+                env.gain.linearRampToValueAtTime(0.35, t + 0.05);
+                env.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+                osc.connect(env);
+                env.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.36);
+            }
+            break;
+        case 'blip':
+            // Retro game blip — square wave, quick
+            play('square', 880, 0, 0.08, 0.003, 0.03);
+            play('square', 1320, 0.06, 0.08, 0.003, 0.03);
+            break;
+        case 'tap':
+            // Short percussive tap
+            {
+                const osc = ctx.createOscillator();
+                const env = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, t);
+                osc.frequency.exponentialRampToValueAtTime(300, t + 0.06);
+                env.gain.setValueAtTime(0.4, t);
+                env.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+                osc.connect(env);
+                env.connect(masterGain);
+                osc.start(t);
+                osc.stop(t + 0.09);
+            }
+            break;
+        case 'sparkle':
+            // Ascending arpeggio sparkle
+            play('sine', 1200, 0, 0.15, 0.003, 0.08);
+            play('sine', 1600, 0.06, 0.15, 0.003, 0.08);
+            play('sine', 2000, 0.12, 0.15, 0.003, 0.08);
+            play('sine', 2600, 0.18, 0.2, 0.003, 0.12);
+            break;
+        default:
+            // Fallback — simple beep
+            play('sine', 800, 0, 0.2, 0.005, 0.12);
+    }
+}
+
 /**
  * Hook to manage notification sounds
  */
 export function useNotificationSounds() {
     const [settings, setSettings] = useState(loadNotificationSettings);
-    const audioRef = useRef(null);
-    const audioContextRef = useRef(null);
     
-    // Initialize audio element
-    useEffect(() => {
-        // Create audio element if it doesn't exist
-        if (!audioRef.current) {
-            audioRef.current = new Audio();
-            audioRef.current.preload = 'auto';
-        }
-        
-        return () => {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current = null;
-            }
-        };
-    }, []);
-    
-    // Get sound file path
-    const getSoundPath = useCallback((soundId) => {
-        // Use relative path for both web and Electron
-        const basePath = window.location.protocol === 'file:' ? '.' : '';
-        return `${basePath}/sounds/${soundId}.mp3`;
-    }, []);
-    
-    // Play a notification sound
+    // Play a notification sound (synthesized via Web Audio API)
     const playSound = useCallback((soundId = null, volumeOverride = null) => {
         // Check if sounds are enabled and not in DND mode
         if (!settings.enabled || !settings.soundEnabled || settings.doNotDisturb) {
@@ -121,24 +250,11 @@ export function useNotificationSounds() {
         const volume = volumeOverride ?? settings.soundVolume;
         
         try {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-                audioRef.current.src = getSoundPath(sound);
-                audioRef.current.volume = Math.max(0, Math.min(1, volume));
-                
-                const playPromise = audioRef.current.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(err => {
-                        // Autoplay might be blocked - user interaction required
-                        console.debug('[Sounds] Playback blocked:', err.message);
-                    });
-                }
-            }
+            synthesizeSound(sound, volume);
         } catch (err) {
             console.error('[Sounds] Failed to play sound:', err);
         }
-    }, [settings.enabled, settings.soundEnabled, settings.doNotDisturb, settings.selectedSound, settings.soundVolume, getSoundPath]);
+    }, [settings.enabled, settings.soundEnabled, settings.doNotDisturb, settings.selectedSound, settings.soundVolume]);
     
     // Play sound for a specific message type
     const playForMessageType = useCallback((messageType) => {
@@ -171,23 +287,14 @@ export function useNotificationSounds() {
         }
     }, [settings, playSound]);
     
-    // Test/preview a sound
+    // Test/preview a sound (plays regardless of enabled/DND state)
     const testSound = useCallback((soundId) => {
-        // Play immediately regardless of DND for testing
         try {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.currentTime = 0;
-                audioRef.current.src = getSoundPath(soundId);
-                audioRef.current.volume = settings.soundVolume;
-                audioRef.current.play().catch(err => {
-                    console.debug('[Sounds] Test playback blocked:', err.message);
-                });
-            }
+            synthesizeSound(soundId, settings.soundVolume);
         } catch (err) {
             console.error('[Sounds] Failed to test sound:', err);
         }
-    }, [getSoundPath, settings.soundVolume]);
+    }, [settings.soundVolume]);
     
     // Update settings
     const updateSettings = useCallback((updates) => {

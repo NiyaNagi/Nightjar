@@ -121,9 +121,11 @@ const StatusBar = ({
         if (isElectron) {
             if (p2pStatus === 'connected') {
                 // Use activePeers if provided (new behavior), otherwise fall back to onlineCount
+                // Add +1 to include self, consistent with web path
                 const currentActivePeers = activePeers > 0 ? activePeers : onlineCount;
                 if (currentActivePeers > 0) {
-                    return { label: `${currentActivePeers} peer${currentActivePeers !== 1 ? 's' : ''} connected`, className: 'connected' };
+                    const totalOnline = currentActivePeers + 1;
+                    return { label: `${totalOnline} online`, className: 'connected' };
                 }
                 // Connected to P2P but no active peers - show warning
                 return { label: 'Offline copy', className: 'warning' };

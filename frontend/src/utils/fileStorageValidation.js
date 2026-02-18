@@ -146,7 +146,7 @@ export function validateFolderDepth(parentId, allFolders) {
 export function fileExistsInFolder(name, folderId, existingFiles, excludeFileId = null) {
   return existingFiles.some(f =>
     f.name === name &&
-    f.folderId === folderId &&
+    (f.folderId || null) === (folderId || null) &&
     f.id !== excludeFileId &&
     !f.deletedAt
   );

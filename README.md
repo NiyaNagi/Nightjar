@@ -116,9 +116,9 @@ Download the latest version for your platform:
 
 | Platform | Download |
 |----------|----------|
-| **Windows** | [Nightjar Setup.exe](https://github.com/InyanRock/Nightjar/releases/latest) |
-| **macOS** | [Nightjar.dmg](https://github.com/InyanRock/Nightjar/releases/latest) |
-| **Linux** | [Nightjar.AppImage](https://github.com/InyanRock/Nightjar/releases/latest) |
+| **Windows** | [Nightjar Setup.exe](https://github.com/SaoneYanpa/Nightjar/releases/latest) |
+| **macOS** | [Nightjar.dmg](https://github.com/SaoneYanpa/Nightjar/releases/latest) |
+| **Linux** | [Nightjar.AppImage](https://github.com/SaoneYanpa/Nightjar/releases/latest) |
 
 **Requirements:** Windows 10+ / macOS 10.15+ / Ubuntu 20.04+, 4GB RAM, 200MB disk
 
@@ -807,7 +807,7 @@ Built-in protections against common attacks:
 ### Setup
 
 ```bash
-git clone https://github.com/InyanRock/Nightjar.git
+git clone https://github.com/SaoneYanpa/Nightjar.git
 cd Nightjar
 npm install
 npm run dev

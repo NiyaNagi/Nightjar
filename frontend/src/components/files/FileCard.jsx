@@ -21,6 +21,7 @@ export default function FileCard({
   userPublicKey,
   isFavorite = false,
   isSelected = false,
+  selectedFileIds = [],
   onSelect,
   onClick,
   onContextMenu,
@@ -34,9 +35,12 @@ export default function FileCard({
       onSelect?.(file.id, { ctrl: true, shift: false });
     } else {
       onSelect?.(file.id, { ctrl: false, shift: false });
-      onClick?.(file);
     }
-  }, [file, onClick, onSelect]);
+  }, [file, onSelect]);
+
+  const handleDoubleClick = useCallback((e) => {
+    onClick?.(file);
+  }, [file, onClick]);
 
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
@@ -49,10 +53,14 @@ export default function FileCard({
   }, [file.id, onToggleFavorite]);
 
   const handleDragStart = useCallback((e) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'file', id: file.id }));
+    // When this file is part of a multi-selection, carry all selected IDs
+    const idsToMove = isSelected && selectedFileIds.length > 1
+      ? selectedFileIds
+      : [file.id];
+    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'file', ids: idsToMove, id: idsToMove[0] }));
     e.dataTransfer.effectAllowed = 'move';
     onDragStart?.(file);
-  }, [file, onDragStart]);
+  }, [file, onDragStart, isSelected, selectedFileIds]);
 
   const handleCheckbox = useCallback((e) => {
     e.stopPropagation();
@@ -64,10 +72,15 @@ export default function FileCard({
       <tr
         className={`file-table-row ${isSelected ? 'file-table-row--selected' : ''}`}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         draggable
         onDragStart={handleDragStart}
         data-testid={`fs-file-${file.id}`}
+        role="row"
+        aria-selected={isSelected}
+        tabIndex={0}
+        aria-label={`File ${file.name}`}
       >
         <td className="file-table-cell file-table-check">
           <input
@@ -107,10 +120,15 @@ export default function FileCard({
       <div
         className={`file-compact-row ${isSelected ? 'file-compact-row--selected' : ''}`}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         draggable
         onDragStart={handleDragStart}
         data-testid={`fs-file-${file.id}`}
+        role="option"
+        aria-selected={isSelected}
+        tabIndex={0}
+        aria-label={`File ${file.name}, ${formatFileSize(file.sizeBytes)}`}
       >
         <input
           type="checkbox"
@@ -140,10 +158,15 @@ export default function FileCard({
     <div
       className={`file-card ${isSelected ? 'file-card--selected' : ''}`}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
       draggable
       onDragStart={handleDragStart}
       data-testid={`fs-file-${file.id}`}
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={0}
+      aria-label={`File ${file.name}, ${formatFileSize(file.sizeBytes)}`}
     >
       <div className="file-card-header">
         <input

@@ -35,7 +35,7 @@ class RelayServer {
     this.swarmManager.on('awareness-update', (data) => this.handleSwarmAwareness(data));
     
     // Start WebSocket server
-    this.wss = new WebSocket.Server({ port: this.port });
+    this.wss = new WebSocket.Server({ port: this.port, maxPayload: 1024 * 1024 });
     
     this.wss.on('connection', (ws) => {
       const clientId = `client-${++this.clientCounter}`;
@@ -287,7 +287,7 @@ class RelayServer {
     for (const clientId of topicClients) {
       if (clientId !== excludeClientId) {
         const client = this.clients.get(clientId);
-        if (client?.ws.readyState === WebSocket.OPEN) {
+        if (client?.ws.readyState === WebSocket.OPEN && client.identity) {
           client.ws.send(messageStr);
         }
       }

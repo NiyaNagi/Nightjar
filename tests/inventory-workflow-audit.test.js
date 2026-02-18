@@ -117,7 +117,7 @@ jest.mock('../frontend/src/components/inventory/common/RequestDetail', () => ({
 function createMockYArray(initialData = []) {
   const data = [...initialData];
   const observers = [];
-  return {
+  const arr = {
     toArray: () => [...data],
     push: (items) => { data.push(...items); observers.forEach(fn => fn()); },
     delete: (idx, count) => { data.splice(idx, count); observers.forEach(fn => fn()); },
@@ -128,7 +128,9 @@ function createMockYArray(initialData = []) {
     forEach: (fn) => data.forEach(fn),
     _data: data,
     _observers: observers,
+    doc: { transact: (fn) => fn() },
   };
+  return arr;
 }
 
 function createMockYMap(initialData = {}) {
@@ -154,7 +156,7 @@ const makeIdentity = (key = 'user-abc123', extra = {}) => ({
   publicKeyBase62: key,
   displayName: 'TestUser',
   name: 'TestUser',
-  privateKey: new Uint8Array(64),
+  curveSecretKey: new Uint8Array(32),
   ...extra,
 });
 
@@ -660,7 +662,7 @@ describe('AllRequests — functional tests', () => {
     inventorySystemId: 'sys-1',
     workspaceId: 'ws-1',
     currentWorkspace: { id: 'ws-1' },
-    userIdentity: makeIdentity('owner-key', { privateKey: new Uint8Array(64) }),
+    userIdentity: makeIdentity('owner-key', { curveSecretKey: new Uint8Array(32) }),
     collaborators: [
       makeCollaborator('owner-key', 'Admin', 'owner'),
       makeCollaborator('producer-key', 'Producer', 'editor'),

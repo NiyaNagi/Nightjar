@@ -50,12 +50,39 @@ const MiniToolbar = ({ textareaRef, onTextChange }) => {
             lineStart--;
         }
         
+        const lineContent = text.substring(lineStart);
+        
+        // If the line already starts with this prefix, remove it (toggle off)
+        if (lineContent.startsWith(prefix)) {
+            const newText = text.substring(0, lineStart) + lineContent.substring(prefix.length);
+            textarea.value = newText;
+            onTextChange?.(newText);
+            textarea.focus();
+            textarea.setSelectionRange(Math.max(lineStart, start - prefix.length), Math.max(lineStart, start - prefix.length));
+            return;
+        }
+        
+        // Check for a different block prefix that should be replaced rather than stacked
+        const blockPrefixes = ['### ', '## ', '# ', '- [ ] ', '- ', '1. ', '> '];
+        for (const existing of blockPrefixes) {
+            if (lineContent.startsWith(existing)) {
+                const newText = text.substring(0, lineStart) + prefix + lineContent.substring(existing.length);
+                textarea.value = newText;
+                onTextChange?.(newText);
+                textarea.focus();
+                const newCursor = start - existing.length + prefix.length;
+                textarea.setSelectionRange(newCursor, newCursor);
+                return;
+            }
+        }
+        
         const newText = text.substring(0, lineStart) + prefix + text.substring(lineStart);
         
         textarea.value = newText;
         onTextChange?.(newText);
         
         textarea.focus();
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length);
     };
 
     const tools = [

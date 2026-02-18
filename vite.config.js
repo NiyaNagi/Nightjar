@@ -15,6 +15,8 @@ export default defineConfig({
   define: {
     // Polyfill Node.js globals for browser compatibility (needed by Fortune Sheet and bip39)
     global: 'globalThis',
+    // Inject app version from package.json
+    __APP_VERSION__: JSON.stringify(require('./package.json').version),
   },
   optimizeDeps: {
     include: ['yjs', 'y-websocket', 'tweetnacl', 'uint8arrays', '@popperjs/core', '@fortune-sheet/react'],

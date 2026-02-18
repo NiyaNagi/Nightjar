@@ -56,7 +56,6 @@ const KanbanCardEditor = ({ card, onUpdate, onDelete, onClose, onAddComment }) =
                 textareaRef={textareaRef}
                 onTextChange={(text) => {
                     setDescription(text);
-                    onUpdate({ title, description: text, color: color !== '#6366f1' ? color : null });
                 }}
             />
             
@@ -67,7 +66,9 @@ const KanbanCardEditor = ({ card, onUpdate, onDelete, onClose, onAddComment }) =
                 onDragStart={(e) => e.stopPropagation()}
                 onChange={(e) => {
                     setDescription(e.target.value);
-                    onUpdate({ title, description: e.target.value, color: color !== '#6366f1' ? color : null });
+                }}
+                onBlur={() => {
+                    onUpdate({ title, description, color: color !== '#6366f1' ? color : null });
                 }}
                 onKeyDown={(e) => {
                     // Allow Enter key to create new lines - don't let it propagate to parent

@@ -128,6 +128,7 @@ export default function CreateIdentity({ hasExistingIdentity, onComplete, onBack
         } catch (e) {
             console.error('Failed to create identity:', e);
             setPinError('Failed to create identity: ' + e.message);
+        } finally {
             setCreating(false);
         }
     };

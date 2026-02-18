@@ -12,11 +12,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useIdentity } from '../contexts/IdentityContext';
+import { useToast } from '../contexts/ToastContext';
 import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash, BOOTSTRAP_RELAY_NODES } from '../utils/sharing';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { signData, uint8ToBase62 } from '../utils/identity';
 import { isElectron } from '../hooks/useEnvironment';
 import { IconColorPicker } from './common';
+import { useConfirmDialog } from './common/ConfirmDialog';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import './WorkspaceSettings.css';
 
@@ -32,18 +34,18 @@ const EXPIRY_OPTIONS = [
 const PERMISSION_INFO = {
   owner: {
     label: 'Owner',
-    description: 'Full access. Can delete workspace and promote others to owner.',
-    color: '#10b981',
+    description: 'Full access. Can manage members, delete workspace, and promote others to owner.',
+    color: '#059669',
   },
   editor: {
     label: 'Editor',
     description: 'Can create, edit, and delete documents. Can share with editor or viewer access.',
-    color: '#3b82f6',
+    color: '#2563eb',
   },
   viewer: {
     label: 'Viewer',
     description: 'Read-only access. Can view documents but cannot edit.',
-    color: '#6b7280',
+    color: '#4b5563',
   },
 };
 
@@ -54,10 +56,14 @@ export default function WorkspaceSettings({
   onClose,
   onKickMember,
   onTransferOwnership,
+  onUpdateMemberPermission,
+  onRespondToPendingDemotion,
 }) {
   const { updateWorkspace, deleteWorkspace, leaveWorkspace, workspaces, getP2PInfo } = useWorkspaces();
   const { isOwner, canEditWorkspace, getAvailableShareLevels } = usePermissions();
   const { identity: userIdentity } = useIdentity();
+  const { showToast } = useToast();
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
   
   const [name, setName] = useState(workspace?.name || '');
   const [icon, setIcon] = useState(workspace?.icon || '📁');
@@ -84,6 +90,7 @@ export default function WorkspaceSettings({
   const modalRef = useRef(null);
   const validationDebounceTimerRef = useRef(null); // Use ref instead of state for timer
   const copiedLinkTimerRef = useRef(null); // Timer for copied link feedback
+  const isMountedRef = useRef(true); // Track mount state for async handlers
   
   // Auto-detect relay from current server
   // Returns empty string for Electron (dev or production) - uses Hyperswarm DHT, not relays
@@ -113,8 +120,13 @@ export default function WorkspaceSettings({
   
   const effectiveRelayUrl = customRelayUrl || autoDetectedRelay;
   
+  // Track whether there are unsaved changes (used by focus trap)
+  const hasUnsavedChanges = name !== workspace?.name || icon !== workspace?.icon || color !== workspace?.color;
+  
   // Focus trap for modal accessibility
-  useFocusTrap(modalRef, true, { onEscape: onClose });
+  // Disable the focus trap's built-in Escape handling when unsaved changes exist,
+  // because the document-level keydown handler will show a confirm dialog instead.
+  useFocusTrap(modalRef, true, { onEscape: hasUnsavedChanges ? null : onClose });
   
   // Close share menu when clicking outside
   useEffect(() => {
@@ -129,16 +141,37 @@ export default function WorkspaceSettings({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showShareMenu]);
   
+  // Track mount state for async handlers
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
+  
   // Handle Escape key to close modal
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = async (e) => {
       if (e.key === 'Escape') {
+        e.stopPropagation();
+        const hasUnsaved = name !== workspace?.name || icon !== workspace?.icon || color !== workspace?.color;
+        if (hasUnsaved) {
+          const confirmed = await confirm({
+            title: 'Unsaved Changes',
+            message: 'You have unsaved changes. Discard them?',
+            confirmText: 'Discard',
+            cancelText: 'Cancel',
+            variant: 'danger'
+          });
+          if (!confirmed) return;
+        }
+        if (!isMountedRef.current) return;
+        setShowOwnerLeaveConfirm(false);
+        setSelectedNewOwner(null);
         onClose?.();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, name, icon, color, workspace, confirm]);
   
   // Load saved custom relay from localStorage
   useEffect(() => {
@@ -394,6 +427,13 @@ export default function WorkspaceSettings({
           permission: shareLevel,
         });
         break;
+      case 'code': {
+        // Extract just the workspace code/ID from the link
+        const url = new URL(link);
+        const hash = url.hash.slice(1); // Remove leading #
+        textToCopy = hash || workspace.id;
+        break;
+      }
       case 'link':
       default:
         textToCopy = link;
@@ -424,8 +464,13 @@ export default function WorkspaceSettings({
     
     if (!isOwner && !isOnlyMemberLocal) return;
     
-    await deleteWorkspace(workspace.id);
-    onClose?.();
+    try {
+      await deleteWorkspace(workspace.id);
+      onClose?.();
+    } catch (err) {
+      console.error('Failed to delete workspace:', err);
+      showToast?.('Failed to delete workspace. Please try again.', 'error');
+    }
   };
   
   // Leave workspace (editors/viewers only, or owners after transferring)
@@ -438,12 +483,23 @@ export default function WorkspaceSettings({
   const handleOwnerLeave = async () => {
     if (!selectedNewOwner || !onTransferOwnership) return;
     
-    // Transfer ownership first
-    await onTransferOwnership(selectedNewOwner);
+    try {
+      // Transfer ownership first
+      await onTransferOwnership(selectedNewOwner);
+    } catch (err) {
+      console.error('Failed to transfer ownership:', err);
+      showToast?.('Failed to transfer ownership. Please try again.', 'error');
+      return;
+    }
     
-    // Then leave
-    await leaveWorkspace(workspace.id);
-    onClose?.();
+    try {
+      // Then leave
+      await leaveWorkspace(workspace.id);
+      onClose?.();
+    } catch (err) {
+      console.error('Failed to leave workspace after transferring ownership:', err);
+      showToast?.('Ownership transferred but failed to leave. Please try again.', 'error');
+    }
   };
   
   // Kick a member from workspace (owners only)
@@ -473,14 +529,30 @@ export default function WorkspaceSettings({
   
   // Determine leave eligibility
   // - Can't leave if you're the only member
-  // - Owners must transfer ownership first
+  // - Owners must transfer ownership first (unless there are other owners)
   const totalMembers = memberList.length || collaborators.length || 1; // At least 1 (self)
   const isOnlyMember = totalMembers <= 1;
+  const otherOwners = memberList.filter(m => m.permission === 'owner' && m.publicKey !== userIdentity?.publicKeyBase62);
   const nonOwnerMembers = memberList.filter(m => m.permission !== 'owner');
-  const canOwnerLeave = isOwner && !isOnlyMember && nonOwnerMembers.length > 0;
+  // Owner can leave if: there are other owners, OR there are non-owner members to transfer to
+  const canOwnerLeave = isOwner && !isOnlyMember && (otherOwners.length > 0 || nonOwnerMembers.length > 0);
   
   return (
-    <div className="workspace-settings__overlay" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
+    <div className="workspace-settings__overlay" role="presentation" onClick={async (e) => {
+      if (e.target !== e.currentTarget) return;
+      const hasUnsaved = name !== workspace.name || icon !== workspace.icon || color !== workspace.color;
+      if (hasUnsaved) {
+        const confirmed = await confirm({
+          title: 'Unsaved Changes',
+          message: 'You have unsaved changes. Discard them?',
+          confirmText: 'Discard',
+          cancelText: 'Cancel',
+          variant: 'danger'
+        });
+        if (!confirmed) return;
+      }
+      onClose?.();
+    }}>
       <div 
         className="workspace-settings" 
         ref={modalRef}
@@ -490,7 +562,22 @@ export default function WorkspaceSettings({
       >
         <div className="workspace-settings__header">
           <h2 id="workspace-settings-title" className="workspace-settings__title">Workspace Settings</h2>
-          <button className="workspace-settings__close" onClick={onClose} aria-label="Close workspace settings">×</button>
+          <button className="workspace-settings__close" onClick={async () => {
+            const hasUnsaved = name !== workspace.name || icon !== workspace.icon || color !== workspace.color;
+            if (hasUnsaved) {
+              const confirmed = await confirm({
+                title: 'Unsaved Changes',
+                message: 'You have unsaved changes. Discard them?',
+                confirmText: 'Discard',
+                cancelText: 'Cancel',
+                variant: 'danger'
+              });
+              if (!confirmed) return;
+            }
+            setShowOwnerLeaveConfirm(false);
+            setSelectedNewOwner(null);
+            onClose?.();
+          }} aria-label="Close workspace settings">×</button>
         </div>
         
         <div className="workspace-settings__content">
@@ -809,10 +896,42 @@ export default function WorkspaceSettings({
           
           {/* Members list - scrollable container */}
           <div className="workspace-settings__collaborators-container">
+            {/* Pending demotion banner (founding owner only) */}
+            {(() => {
+              const myKey = userIdentity?.publicKeyBase62;
+              const myMember = myKey ? members[myKey] : null;
+              if (myMember?.pendingDemotion && onRespondToPendingDemotion) {
+                const { requestedByName, requestedPermission } = myMember.pendingDemotion;
+                return (
+                  <div className="workspace-settings__pending-demotion">
+                    <p>⚠️ <strong>{requestedByName || 'An owner'}</strong> wants to change your role to <strong>{requestedPermission}</strong>.</p>
+                    <div className="workspace-settings__pending-demotion-actions">
+                      <button
+                        className="workspace-settings__pending-accept"
+                        onClick={() => onRespondToPendingDemotion(true)}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        className="workspace-settings__pending-decline"
+                        onClick={() => onRespondToPendingDemotion(false)}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {/* Members list - uses new members map, keyed by publicKey */}
             {filteredMembers.length > 0 ? (
               <ul className="workspace-settings__collaborators">
-                {filteredMembers.map((member) => (
+                {filteredMembers.map((member) => {
+                  const isSelf = member.publicKey === userIdentity?.publicKeyBase62;
+                  const memberName = member.displayName || member.handle || member.publicKey?.slice(0, 8) || 'Anonymous';
+
+                  return (
                   <li key={member.publicKey} className="workspace-settings__collaborator">
                     <span 
                       className="workspace-settings__collaborator-avatar"
@@ -822,8 +941,8 @@ export default function WorkspaceSettings({
                     </span>
                     <div className="workspace-settings__collaborator-info">
                       <span className="workspace-settings__collaborator-name">
-                        {member.displayName || member.handle || member.publicKey?.slice(0, 8) || 'Anonymous'}
-                        {member.publicKey === userIdentity?.publicKeyBase62 && (
+                        {memberName}
+                        {isSelf && (
                           <span className="workspace-settings__you-badge">(you)</span>
                         )}
                       </span>
@@ -831,15 +950,48 @@ export default function WorkspaceSettings({
                         {member.publicKey?.slice(0, 10)}...
                       </span>
                     </div>
-                    <span 
-                      className="workspace-settings__collaborator-badge"
-                      style={{ backgroundColor: PERMISSION_INFO[member.permission]?.color || '#6b7280' }}
-                    >
-                      {PERMISSION_INFO[member.permission]?.label || 'Viewer'}
-                    </span>
+                    
+                    {/* Permission badge or dropdown */}
+                    {isOwner && !isSelf && onUpdateMemberPermission ? (
+                      <select
+                        className="workspace-settings__permission-select"
+                        value={member.permission || 'viewer'}
+                        onChange={(e) => {
+                          onUpdateMemberPermission(member.publicKey, e.target.value, memberName);
+                        }}
+                        title={`Change ${memberName}'s permission`}
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    ) : isOwner && isSelf && onUpdateMemberPermission ? (
+                      /* Self-demotion: owner can step down */
+                      <select
+                        className="workspace-settings__permission-select workspace-settings__permission-select--self"
+                        value={member.permission || 'viewer'}
+                        onChange={(e) => {
+                          if (e.target.value !== member.permission) {
+                            onUpdateMemberPermission(member.publicKey, e.target.value, memberName);
+                          }
+                        }}
+                        title="Step down from current role"
+                      >
+                        <option value="owner">Owner</option>
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    ) : (
+                      <span 
+                        className="workspace-settings__collaborator-badge"
+                        style={{ backgroundColor: PERMISSION_INFO[member.permission]?.color || '#6b7280' }}
+                      >
+                        {PERMISSION_INFO[member.permission]?.label || 'Viewer'}
+                      </span>
+                    )}
                     
                     {/* Kick button - only for owners, not self */}
-                    {isOwner && member.publicKey !== userIdentity?.publicKeyBase62 && onKickMember && (
+                    {isOwner && !isSelf && onKickMember && (
                       kickingMember === member.publicKey ? (
                         <div className="workspace-settings__kick-confirm">
                           <button 
@@ -868,7 +1020,8 @@ export default function WorkspaceSettings({
                       )
                     )}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             ) : memberList.length > 0 && memberSearch ? (
               <p className="workspace-settings__empty">
@@ -1035,6 +1188,7 @@ export default function WorkspaceSettings({
         </section>
       </div>
     </div>
+    {ConfirmDialogComponent}
   </div>
   );
 }

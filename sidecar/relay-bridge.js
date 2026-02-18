@@ -65,6 +65,9 @@ class RelayBridge {
     // Retry attempt counters for exponential backoff: roomName -> attemptCount
     this.retryAttempts = new Map();
     
+    // Reconnecting flag per room to prevent duplicate reconnect scheduling
+    this.reconnecting = new Set();
+    
     // SOCKS proxy URL for Tor routing (set externally when Tor is enabled)
     this.socksProxy = null;
     
@@ -206,6 +209,7 @@ class RelayBridge {
           reject(err);
         } else {
           console.error(`[RelayBridge] WebSocket error for ${roomName}:`, err.message);
+          // Clean up connection on error (same as close handler)
           this._handleDisconnect(roomName);
         }
       });
@@ -353,11 +357,18 @@ class RelayBridge {
       awareness.on('update', awarenessHandler);
     }
     
-    // Store handlers for cleanup
+    // Store handlers for cleanup (store awareness reference directly to avoid stale refs)
     const conn = this.connections.get(roomName);
     if (conn) {
       conn.updateHandler = updateHandler;
       conn.awarenessHandler = awarenessHandler;
+      conn.awareness = awareness;
+    } else {
+      // Connection was removed during setup — unbind handlers to prevent leaks
+      ydoc.off('update', updateHandler);
+      if (awareness) {
+        awareness.off('update', awarenessHandler);
+      }
     }
   }
 
@@ -374,9 +385,9 @@ class RelayBridge {
       conn.ydoc.off('update', conn.updateHandler);
     }
     
-    // Clean up awareness handler
-    if (conn.awarenessHandler && conn.ydoc?.awareness) {
-      conn.ydoc.awareness.off('update', conn.awarenessHandler);
+    // Clean up awareness handler (use stored awareness ref to avoid stale ydoc.awareness)
+    if (conn.awarenessHandler && conn.awareness) {
+      conn.awareness.off('update', conn.awarenessHandler);
     }
     
     // Close WebSocket if still open
@@ -399,10 +410,18 @@ class RelayBridge {
    * @private
    */
   _scheduleReconnect(roomName, ydoc, relayUrl) {
+    // Prevent duplicate reconnect scheduling from rapid disconnects
+    if (this.reconnecting.has(roomName)) {
+      console.log(`[RelayBridge] Reconnect already scheduled for ${roomName}, skipping duplicate`);
+      return;
+    }
+    
     // Clear any existing retry timeout
     if (this.retryTimeouts.has(roomName)) {
       clearTimeout(this.retryTimeouts.get(roomName));
     }
+    
+    this.reconnecting.add(roomName);
     
     // Get current attempt count and calculate delay
     const attempt = this.retryAttempts.get(roomName) || 0;
@@ -412,11 +431,13 @@ class RelayBridge {
     
     const timeout = setTimeout(() => {
       this.retryTimeouts.delete(roomName);
+      this.reconnecting.delete(roomName);
       
       // Only reconnect if doc still exists
       if (docs.has(roomName)) {
+        const freshDoc = docs.get(roomName);
         console.log(`[RelayBridge] Attempting reconnect for ${roomName} (attempt ${attempt + 1})...`);
-        this.connect(roomName, ydoc, relayUrl)
+        this.connect(roomName, freshDoc, relayUrl)
           .then(() => {
             // Reset retry counter on successful connection
             this.retryAttempts.delete(roomName);
@@ -447,8 +468,9 @@ class RelayBridge {
       this.retryTimeouts.delete(roomName);
     }
     
-    // Clear retry attempt counter
+    // Clear retry attempt counter and reconnecting flag
     this.retryAttempts.delete(roomName);
+    this.reconnecting.delete(roomName);
     
     const conn = this.connections.get(roomName);
     if (!conn) return;
@@ -458,9 +480,9 @@ class RelayBridge {
       conn.ydoc.off('update', conn.updateHandler);
     }
     
-    // Clean up awareness handler
-    if (conn.awarenessHandler && conn.ydoc?.awareness) {
-      conn.ydoc.awareness.off('update', conn.awarenessHandler);
+    // Clean up awareness handler (use stored awareness ref to avoid stale ydoc.awareness)
+    if (conn.awarenessHandler && conn.awareness) {
+      conn.awareness.off('update', conn.awarenessHandler);
     }
     
     // Close WebSocket
@@ -481,6 +503,7 @@ class RelayBridge {
     }
     this.pending.clear();
     this.retryAttempts.clear();
+    this.reconnecting.clear();
   }
 
   /**

@@ -123,7 +123,7 @@ export function PresenceProvider({ children, awareness }) {
     // Update cursor position with optional documentId for per-document filtering
     // Throttled to 100ms to match sidecar and prevent excessive network traffic
     const updateCursorRaw = useCallback((position, documentId = null) => {
-        if (!awareness) return;
+        if (!awareness || !isMountedRef.current) return;
         awareness.setLocalStateField('cursor', position);
         if (documentId) {
             awareness.setLocalStateField('openDocumentId', documentId);
@@ -139,7 +139,7 @@ export function PresenceProvider({ children, awareness }) {
     // Update selection with optional documentId for per-document filtering
     // Throttled to 100ms to match sidecar and prevent excessive network traffic
     const updateSelectionRaw = useCallback((selection, documentId = null) => {
-        if (!awareness) return;
+        if (!awareness || !isMountedRef.current) return;
         awareness.setLocalStateField('selection', selection);
         if (documentId) {
             awareness.setLocalStateField('openDocumentId', documentId);

@@ -80,31 +80,34 @@ export function usePermission(entityType, entityId) {
 /**
  * Check if current user can view an entity
  * @param {string} entityId - Entity ID
+ * @param {string} [entityType='document'] - Entity type
  * @returns {boolean}
  */
-export function useCanView(entityId) {
+export function useCanView(entityId, entityType = 'document') {
   const { canView } = usePermissions();
-  return useMemo(() => canView(entityId), [canView, entityId]);
+  return useMemo(() => canView(entityType, entityId), [canView, entityType, entityId]);
 }
 
 /**
  * Check if current user can edit an entity
  * @param {string} entityId - Entity ID
+ * @param {string} [entityType='document'] - Entity type
  * @returns {boolean}
  */
-export function useCanEdit(entityId) {
+export function useCanEdit(entityId, entityType = 'document') {
   const { canEdit } = usePermissions();
-  return useMemo(() => canEdit(entityId), [canEdit, entityId]);
+  return useMemo(() => canEdit(entityType, entityId), [canEdit, entityType, entityId]);
 }
 
 /**
  * Check if current user can share an entity
  * @param {string} entityId - Entity ID
+ * @param {string} [entityType='document'] - Entity type
  * @returns {boolean}
  */
-export function useCanShare(entityId) {
+export function useCanShare(entityId, entityType = 'document') {
   const { canShare } = usePermissions();
-  return useMemo(() => canShare(entityId), [canShare, entityId]);
+  return useMemo(() => canShare(entityType, entityId), [canShare, entityType, entityId]);
 }
 
 /**
@@ -145,6 +148,9 @@ export function useCanPerform(action, entityType, entityId) {
  */
 export function useMultiplePermissions(entities) {
   const { getPermission, canPerformAction } = usePermissions();
+  // Stabilize dependency: inline arrays create new references every render,
+  // so use a serialized key for comparison instead of the array reference.
+  const entitiesKey = JSON.stringify(entities);
 
   return useMemo(() => {
     const permissions = new Map();
@@ -162,7 +168,8 @@ export function useMultiplePermissions(entities) {
     }
     
     return permissions;
-  }, [entities, getPermission, canPerformAction]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entitiesKey, getPermission, canPerformAction]);
 }
 
 /**

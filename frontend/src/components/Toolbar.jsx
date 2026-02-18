@@ -10,8 +10,8 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
         {
             name: 'history',
             tools: [
-                { label: '↶', title: 'Undo (Ctrl+Z)', ariaLabel: 'Undo', action: () => undoManager.undo(), disabled: !canUndo },
-                { label: '↷', title: 'Redo (Ctrl+Y)', ariaLabel: 'Redo', action: () => undoManager.redo(), disabled: !canRedo },
+                { label: '↶', title: 'Undo (Ctrl+Z)', ariaLabel: 'Undo', action: () => undoManager?.undo(), disabled: !canUndo || !undoManager },
+                { label: '↷', title: 'Redo (Ctrl+Y)', ariaLabel: 'Redo', action: () => undoManager?.redo(), disabled: !canRedo || !undoManager },
             ]
         },
         {
@@ -61,8 +61,8 @@ const Toolbar = ({ editor, undoManager, canUndo, canRedo, onExport, onImport }) 
         {
             name: 'export',
             tools: [
-                { label: '↓', title: 'Export Document', ariaLabel: 'Export Document', action: onExport },
-                { label: '↑', title: 'Import Document', ariaLabel: 'Import Document', action: onImport },
+                { label: '↓', title: 'Export Document', ariaLabel: 'Export Document', action: () => onExport?.() },
+                { label: '↑', title: 'Import Document', ariaLabel: 'Import Document', action: () => onImport?.() },
             ]
         }
     ];

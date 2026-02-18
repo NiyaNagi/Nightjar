@@ -26,7 +26,7 @@ export default function PivotTable({ requests, collaborators, dateRange }) {
 
   const grouped = useMemo(() => {
     const [from, to] = dateRange || [0, Date.now()];
-    const inRange = requests.filter(r => (r.requestedAt || 0) >= from && (r.requestedAt || 0) <= to);
+    const inRange = requests.filter(r => (r.requestedAt || r.createdAt || 0) >= from && (r.requestedAt || r.createdAt || 0) <= to);
 
     const gDef = GROUP_KEYS.find(g => g.key === groupBy);
     if (!gDef) return [];

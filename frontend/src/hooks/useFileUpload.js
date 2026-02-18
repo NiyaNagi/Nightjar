@@ -8,7 +8,7 @@
  * See docs/FILE_STORAGE_SPEC.md §6
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { processFileForUpload } from '../utils/fileChunking';
 import {
   validateFileForUpload,
@@ -57,6 +57,16 @@ export default function useFileUpload({
     return dbRef.current;
   }, [workspaceId]);
 
+  // Close stale IndexedDB connection when workspaceId changes or on unmount
+  useEffect(() => {
+    return () => {
+      if (dbRef.current) {
+        try { dbRef.current.close(); } catch (_) { /* already closed or mock */ }
+        dbRef.current = null;
+      }
+    };
+  }, [workspaceId]);
+
   /**
    * Upload a single file.
    * @param {File} file - browser File object
@@ -70,14 +80,16 @@ export default function useFileUpload({
     const updateStatus = (status, progress = {}) => {
       setUploads(prev => {
         const next = new Map(prev);
+        const existing = next.get(uploadId) || {};
         next.set(uploadId, {
           uploadId,
           fileName: file.name,
           fileSize: file.size,
-          status,
           chunksProcessed: 0,
           totalChunks: 0,
           error: null,
+          ...existing,
+          status,
           ...progress,
         });
         return next;
@@ -156,12 +168,20 @@ export default function useFileUpload({
         fileId,
       });
 
+      addAuditEntry?.({
+        action: 'file_uploaded',
+        fileId,
+        fileName: file.name,
+        sizeBytes: result.totalSize,
+        chunkCount: result.chunkCount,
+      });
+
       return { fileId, uploadId };
     } catch (err) {
       updateStatus(UPLOAD_STATUS.ERROR, { error: err.message });
       throw err;
     }
-  }, [workspaceId, workspaceKey, userPublicKey, createFileRecord, setChunkAvailability, getDb]);
+  }, [workspaceId, workspaceKey, userPublicKey, createFileRecord, setChunkAvailability, addAuditEntry, getDb]);
 
   /**
    * Upload multiple files at once.

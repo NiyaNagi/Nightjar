@@ -97,6 +97,19 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const yChunkAvailabilityRef = useRef(null); // Map of chunk availability
   const yFileAuditLogRef = useRef(null); // Array of file audit log entries
   
+  // Keep a ref to userIdentity so that callbacks inside the main effect
+  // (which captures the initial closure) always see the latest value.
+  const userIdentityRef = useRef(userIdentity);
+  userIdentityRef.current = userIdentity;
+
+  // Keep a ref to userProfile for the same reason
+  const userProfileRef = useRef(userProfile);
+  userProfileRef.current = userProfile;
+
+  // Keep a ref to myPermission for the same reason
+  const myPermissionRef = useRef(myPermission);
+  myPermissionRef.current = myPermission;
+
   // Initialize Yjs sync when workspace changes
   useEffect(() => {
     // Always reset kicked state when workspace changes
@@ -131,6 +144,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     const wsUrl = getWsUrl(serverUrl);
     let cleanedUp = false;
     let keySocket = null;
+    let keySocketReconnecting = false; // Prevent multiple reconnection attempts
     
     // DEBUG: Log connection details
     console.log(`[WorkspaceSync] ========== SYNC INIT ==========`);
@@ -167,6 +181,42 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           };
           keySocket.onerror = (err) => {
             console.warn('[WorkspaceSync] Failed to register workspace key:', err);
+          };
+          keySocket.onclose = (event) => {
+            console.warn(`[WorkspaceSync] Key socket closed (code: ${event.code}, reason: ${event.reason || 'none'})`);
+            // Re-register encryption key after brief delay if not intentionally cleaned up
+            if (!cleanedUp && !keySocketReconnecting) {
+              keySocketReconnecting = true;
+              setTimeout(() => {
+                if (cleanedUp) {
+                  keySocketReconnecting = false;
+                  return;
+                }
+                try {
+                  const reKeyChain = getStoredKeyChain(workspaceId);
+                  if (!reKeyChain?.workspaceKey) {
+                    keySocketReconnecting = false;
+                    return;
+                  }
+                  const reSocket = new WebSocket(`ws://localhost:${META_WS_PORT}`);
+                  reSocket.onopen = () => {
+                    const reKeyBase64 = uint8ArrayToString(reKeyChain.workspaceKey, 'base64');
+                    reSocket.send(JSON.stringify({ type: 'set-key', docName: roomName, payload: reKeyBase64 }));
+                    reSocket.send(JSON.stringify({ type: 'set-key', docName: `workspace-folders:${workspaceId}`, payload: reKeyBase64 }));
+                    console.log(`[WorkspaceSync] Re-registered workspace keys after socket close`);
+                    keySocketReconnecting = false;
+                  };
+                  reSocket.onerror = (e) => {
+                    console.warn('[WorkspaceSync] Re-registration socket error:', e);
+                    keySocketReconnecting = false;
+                  };
+                  keySocket = reSocket;
+                } catch (e) {
+                  console.warn('[WorkspaceSync] Failed to re-register key after close:', e);
+                  keySocketReconnecting = false;
+                }
+              }, 2000);
+            }
           };
         } catch (err) {
           console.warn('[WorkspaceSync] Error creating socket for key registration:', err);
@@ -217,7 +267,6 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       
       // Track failures for remote workspaces
       if (event.status === 'connecting' && connectionFailures > 0 && isRemote) {
-        connectionFailures++;
         if (connectionFailures >= maxFailures) {
           console.warn(`[WorkspaceSync] Remote server unreachable after ${maxFailures} attempts, stopping reconnection`);
           setSyncPhase('failed');
@@ -324,48 +373,11 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     const yChunkAvailability = ydoc.getMap('chunkAvailability');
     const yFileAuditLog = ydoc.getArray('fileAuditLog');
     
-    // Add current user to members map if they have an identity
-    if (userIdentity?.publicKeyBase62 && userProfile) {
-      const myPublicKey = userIdentity.publicKeyBase62;
-      const existingMember = yMembers.get(myPublicKey);
-      const now = Date.now();
-      
-      // Determine permission - use passed permission, workspace creation, or existing value
-      const effectivePermission = myPermission || 
-                                  (initialWorkspaceInfo?.createdBy === myPublicKey ? 'owner' : null) ||
-                                  existingMember?.permission || 
-                                  'viewer';
-      
-      if (!existingMember) {
-        yMembers.set(myPublicKey, {
-          publicKey: myPublicKey,
-          displayName: userProfile.name || 'Anonymous',
-          handle: userProfile.name || '',
-          color: userProfile.color || '#6366f1',
-          icon: userProfile.icon || '👤',
-          permission: effectivePermission,
-          joinedAt: now,
-          lastSeen: now,
-          isOnline: true,
-        });
-      } else {
-        // Update existing member - upgrade permission if new is higher
-        const permHierarchy = { owner: 3, editor: 2, viewer: 1 };
-        const newPerm = (permHierarchy[effectivePermission] || 0) > (permHierarchy[existingMember.permission] || 0)
-          ? effectivePermission
-          : existingMember.permission;
-        
-        yMembers.set(myPublicKey, {
-          ...existingMember,
-          displayName: userProfile.name || existingMember.displayName,
-          color: userProfile.color || existingMember.color,
-          icon: userProfile.icon || existingMember.icon,
-          permission: newPerm,
-          lastSeen: now,
-          isOnline: true,
-        });
-      }
-    }
+    // RACE CONDITION FIX: Self-registration is deferred to the 'synced' handler below.
+    // Before sync, yMembers is empty (persistence hasn't loaded), so reading
+    // existingMember here would always return undefined, causing the owner to
+    // be written with permission:'viewer' instead of their real permission.
+    // See registerSelfInMembers() called inside provider.on('synced').
     
     ydocRef.current = ydoc;
     providerRef.current = provider;
@@ -543,6 +555,54 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       }
     };
     
+    // Self-registration function — MUST run after synced so yMembers is populated
+    const registerSelfInMembers = () => {
+      const identity = userIdentityRef.current;
+      const profile = userProfileRef.current;
+      const permission = myPermissionRef.current;
+      if (!identity?.publicKeyBase62 || !profile) return;
+      const myPublicKey = identity.publicKeyBase62;
+      const existingMember = yMembers.get(myPublicKey);
+      const now = Date.now();
+      
+      // Determine permission - use passed permission, workspace creation, or existing value
+      const effectivePermission = permission || 
+                                  (initialWorkspaceInfo?.createdBy === myPublicKey ? 'owner' : null) ||
+                                  existingMember?.permission || 
+                                  'viewer';
+      
+      console.log(`[WorkspaceSync] registerSelfInMembers - myPermission: ${permission}, createdBy match: ${initialWorkspaceInfo?.createdBy === myPublicKey}, existing: ${existingMember?.permission}, effective: ${effectivePermission}`);
+      
+      if (!existingMember) {
+        yMembers.set(myPublicKey, {
+          publicKey: myPublicKey,
+          displayName: profile.name || 'Anonymous',
+          handle: profile.name || '',
+          color: profile.color || '#6366f1',
+          icon: profile.icon || '👤',
+          permission: effectivePermission,
+          permissionUpdatedAt: now,
+          joinedAt: now,
+          lastSeen: now,
+          isOnline: true,
+        });
+      } else {
+        // Update existing member - use authoritative effectivePermission directly
+        // (no max-hierarchy: server/owner demotions must be respected)
+        const permChanged = effectivePermission !== existingMember.permission;
+        yMembers.set(myPublicKey, {
+          ...existingMember,
+          displayName: profile.name || existingMember.displayName,
+          color: profile.color || existingMember.color,
+          icon: profile.icon || existingMember.icon,
+          permission: effectivePermission,
+          permissionUpdatedAt: permChanged ? now : (existingMember.permissionUpdatedAt || now),
+          lastSeen: now,
+          isOnline: true,
+        });
+      }
+    };
+
     // Wait for initial sync before setting info (to check if remote has data)
     provider.on('synced', () => {
       console.log(`[WorkspaceSync] ========== SYNC RECEIVED ==========`);
@@ -584,6 +644,9 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       // Clean up any duplicate documents/folders in the Yjs arrays (one-time)
       cleanupDuplicates();
       
+      // Register self in members map AFTER sync so yMembers is populated from persistence/peers
+      registerSelfInMembers();
+      
       setSynced(true);
       // Mark sync as complete
       setSyncPhase('complete');
@@ -592,11 +655,13 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       syncDocuments();
       syncFolders();
       syncInfo();
+      syncMembers();
       trySetInitialInfo();
     });
     
     // Also try immediately in case we're already synced
     if (provider.synced) {
+      registerSelfInMembers();
       setSynced(true);
       trySetInitialInfo();
     }
@@ -652,8 +717,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       console.log(`[WorkspaceSync] syncKicked - kicked keys:`, kickedKeys);
       
       // Check if current user is kicked
-      if (userIdentity?.publicKeyBase62) {
-        const myKey = userIdentity.publicKeyBase62;
+      if (userIdentityRef.current?.publicKeyBase62) {
+        const myKey = userIdentityRef.current.publicKeyBase62;
         const amIKicked = yKicked.has(myKey);
         console.log(`[WorkspaceSync] Checking if I'm kicked - my key: "${myKey}", amIKicked: ${amIKicked}`);
         
@@ -684,7 +749,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       const states = provider.awareness.getStates();
       let online = 0;
       const myClientId = provider.awareness.clientID;
-      const myPublicKey = userIdentity?.publicKeyBase62; // Get our own publicKey for self-exclusion
+      const myPublicKey = userIdentityRef.current?.publicKeyBase62; // Get our own publicKey for self-exclusion
       const now = Date.now();
       
       // Track which publicKeys are currently online
@@ -703,8 +768,6 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
             return;
           }
           
-          online++;
-          
           // Use publicKey for deduplication when available, fall back to clientId
           // This ensures clients whose identity hasn't loaded yet still show presence
           const deduplicationKey = publicKey || `client-${clientId}`;
@@ -712,6 +775,9 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           // Skip if we've already processed this identity (same user, different connection)
           if (onlinePublicKeys.has(deduplicationKey)) return;
           onlinePublicKeys.add(deduplicationKey);
+          
+          // Increment AFTER dedup check so multiple connections don't inflate count
+          online++;
           
           // Track which documents this user has open (for tab presence)
           // Support both legacy single openDocumentId and new openDocumentIds array
@@ -743,6 +809,13 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
           const existingMember = yMembers.get(publicKey);
           
           if (!existingMember) {
+            // RACE CONDITION FIX: Only create new member entries from awareness
+            // AFTER sync has completed. Before sync, yMembers is empty so every
+            // peer looks "new" and would be written with permission:'viewer'.
+            // Presence pips still work via the awareness array regardless.
+            if (!provider.synced) {
+              console.log(`[WorkspaceSync] Skipping member creation for ${publicKey.substring(0, 10)}... (awaiting sync)`);
+            } else {
             // New member - add to members map
             yMembers.set(publicKey, {
               publicKey,
@@ -755,6 +828,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
               joinedAt: now,
               isOnline: true,
             });
+            }
           } else if (now - (existingMember.lastSeen || 0) > 2 * AWARENESS_HEARTBEAT_MS) {
             // Update existing member if more than 2 heartbeats since last update
             yMembers.set(publicKey, {
@@ -810,7 +884,7 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     return () => {
       cleanedUp = true;
       // Close key registration socket if still open
-      if (keySocket && keySocket.readyState === WebSocket.OPEN) {
+      if (keySocket && (keySocket.readyState === WebSocket.OPEN || keySocket.readyState === WebSocket.CONNECTING)) {
         keySocket.close();
       }
       // Remove status handler
@@ -840,6 +914,20 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       yKickedRef.current = null;
       yDocFoldersRef.current = null;
       yTrashedDocsRef.current = null;
+      yInfoRef.current = null;
+      yInventorySystemsRef.current = null;
+      yCatalogItemsRef.current = null;
+      yInventoryRequestsRef.current = null;
+      yProducerCapacitiesRef.current = null;
+      yAddressRevealsRef.current = null;
+      yPendingAddressesRef.current = null;
+      yInventoryAuditLogRef.current = null;
+      yInventoryNotificationsRef.current = null;
+      yFileStorageSystemsRef.current = null;
+      yStorageFilesRef.current = null;
+      yStorageFoldersRef.current = null;
+      yChunkAvailabilityRef.current = null;
+      yFileAuditLogRef.current = null;
     };
   }, [workspaceId, serverUrl]);
   
@@ -873,6 +961,53 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     provider.awareness.setLocalStateField('user', updatedUser);
   }, [providerReady, userProfile?.name, userProfile?.color, userProfile?.icon, userIdentity?.publicKeyBase62]);
+  
+  // Re-register self in members when userIdentity or userProfile loads after initial sync.
+  // This fixes the race where identity loads after the 'synced' event has already fired,
+  // leaving the user unregistered in workspace members.
+  useEffect(() => {
+    if (!synced || !userIdentity?.publicKeyBase62 || !userProfile) return;
+    const yMembers = yMembersRef.current;
+    if (!yMembers) return;
+    
+    const myPublicKey = userIdentity.publicKeyBase62;
+    const existingMember = yMembers.get(myPublicKey);
+    const now = Date.now();
+    
+    const effectivePermission = myPermission ||
+      (yInfoRef.current?.get('createdBy') === myPublicKey ? 'owner' : null) ||
+      existingMember?.permission ||
+      'viewer';
+    
+    if (!existingMember) {
+      console.log(`[WorkspaceSync] Late self-registration (identity loaded after sync)`);
+      yMembers.set(myPublicKey, {
+        publicKey: myPublicKey,
+        displayName: userProfile.name || 'Anonymous',
+        handle: userProfile.name || '',
+        color: userProfile.color || '#6366f1',
+        icon: userProfile.icon || '👤',
+        permission: effectivePermission,
+        permissionUpdatedAt: now,
+        joinedAt: now,
+        lastSeen: now,
+        isOnline: true,
+      });
+    } else {
+      // Update profile fields in case they changed
+      const permChanged = effectivePermission !== existingMember.permission;
+      yMembers.set(myPublicKey, {
+        ...existingMember,
+        displayName: userProfile.name || existingMember.displayName,
+        color: userProfile.color || existingMember.color,
+        icon: userProfile.icon || existingMember.icon,
+        permission: effectivePermission,
+        permissionUpdatedAt: permChanged ? now : (existingMember.permissionUpdatedAt || now),
+        lastSeen: now,
+        isOnline: true,
+      });
+    }
+  }, [synced, userIdentity?.publicKeyBase62, userProfile?.name, userProfile?.color, userProfile?.icon, myPermission]);
   
   // Set the currently open document IDs in awareness (for tab presence indicators)
   // Supports both single ID (legacy) and array of IDs (all open documents)
@@ -916,10 +1051,17 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const removeDocument = useCallback((docId) => {
     if (!yDocumentsRef.current) return;
     
-    const docs = yDocumentsRef.current.toArray();
-    const index = docs.findIndex(d => d.id === docId);
-    if (index !== -1) {
-      yDocumentsRef.current.delete(index, 1);
+    const doRemove = () => {
+      const docs = yDocumentsRef.current.toArray();
+      const index = docs.findIndex(d => d.id === docId);
+      if (index !== -1) {
+        yDocumentsRef.current.delete(index, 1);
+      }
+    };
+    if (ydocRef.current) {
+      ydocRef.current.transact(doRemove);
+    } else {
+      doRemove();
     }
   }, []);
   
@@ -1044,27 +1186,32 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const restoreDocument = useCallback((docId) => {
     if (!yTrashedDocsRef.current || !ydocRef.current) return null;
     
-    const trashed = yTrashedDocsRef.current.toArray();
-    const index = trashed.findIndex(d => d.id === docId);
-    if (index === -1) return null;
-    
-    const doc = { ...trashed[index] };
-    delete doc.deletedAt;
-    delete doc.deletedBy;
-    
-    yTrashedDocsRef.current.delete(index, 1);
+    let doc = null;
+    ydocRef.current.transact(() => {
+      const trashed = yTrashedDocsRef.current.toArray();
+      const index = trashed.findIndex(d => d.id === docId);
+      if (index === -1) return;
+      
+      doc = { ...trashed[index] };
+      delete doc.deletedAt;
+      delete doc.deletedBy;
+      
+      yTrashedDocsRef.current.delete(index, 1);
+    });
     return doc;
   }, []);
   
   // Permanently delete document from trash
   const permanentlyDeleteDocument = useCallback((docId) => {
-    if (!yTrashedDocsRef.current) return;
+    if (!yTrashedDocsRef.current || !ydocRef.current) return;
     
-    const trashed = yTrashedDocsRef.current.toArray();
-    const index = trashed.findIndex(d => d.id === docId);
-    if (index !== -1) {
-      yTrashedDocsRef.current.delete(index, 1);
-    }
+    ydocRef.current.transact(() => {
+      const trashed = yTrashedDocsRef.current.toArray();
+      const index = trashed.findIndex(d => d.id === docId);
+      if (index !== -1) {
+        yTrashedDocsRef.current.delete(index, 1);
+      }
+    });
   }, []);
   
   // Update workspace info
@@ -1149,33 +1296,146 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
   const transferOwnership = useCallback((newOwnerPublicKey) => {
     if (!yInfoRef.current || !yMembersRef.current) return false;
     
-    // Update workspace info with new owner
-    yInfoRef.current.set('createdBy', newOwnerPublicKey);
-    
-    // Update the new owner's permission to 'owner'
-    const newOwner = yMembersRef.current.get(newOwnerPublicKey);
-    if (newOwner) {
-      yMembersRef.current.set(newOwnerPublicKey, {
-        ...newOwner,
-        permission: 'owner',
-      });
-    }
-    
-    // Update the current owner's permission to 'editor' (they're leaving anyway, but good for consistency)
-    if (userIdentity?.publicKeyBase62) {
-      const currentOwner = yMembersRef.current.get(userIdentity.publicKeyBase62);
-      if (currentOwner) {
-        yMembersRef.current.set(userIdentity.publicKeyBase62, {
-          ...currentOwner,
-          permission: 'editor',
+    const doc = yInfoRef.current.doc || yMembersRef.current.doc;
+    const doTransfer = () => {
+      const now = Date.now();
+      
+      // Update workspace info with new owner
+      yInfoRef.current.set('createdBy', newOwnerPublicKey);
+      
+      // Update the new owner's permission to 'owner'
+      const newOwner = yMembersRef.current.get(newOwnerPublicKey);
+      if (newOwner) {
+        yMembersRef.current.set(newOwnerPublicKey, {
+          ...newOwner,
+          permission: 'owner',
+          permissionUpdatedAt: now,
+          pendingDemotion: null,
         });
       }
-    }
+      
+      // Demote the current owner to 'editor' so only one owner exists
+      if (userIdentity?.publicKeyBase62) {
+        const currentOwner = yMembersRef.current.get(userIdentity.publicKeyBase62);
+        if (currentOwner) {
+          yMembersRef.current.set(userIdentity.publicKeyBase62, {
+            ...currentOwner,
+            permission: 'editor',
+            permissionUpdatedAt: now,
+            pendingDemotion: null,
+          });
+        }
+      }
+    };
+    
+    if (doc) doc.transact(doTransfer);
+    else doTransfer();
     
     console.log(`[WorkspaceSync] Transferred ownership to ${newOwnerPublicKey}`);
     return true;
   }, [userIdentity?.publicKeyBase62]);
   
+  // Update a member's permission (owner only, supports multi-owner)
+  // For founding owner demotion: sets pendingDemotion instead of writing directly
+  const updateMemberPermission = useCallback((targetPublicKey, newPermission) => {
+    if (!yMembersRef.current || !yInfoRef.current) return false;
+    
+    const validPermissions = ['owner', 'editor', 'viewer'];
+    if (!validPermissions.includes(newPermission)) {
+      console.error(`[WorkspaceSync] Invalid permission: ${newPermission}`);
+      return false;
+    }
+    
+    // Authorization: caller must be an owner
+    if (myPermission !== 'owner') {
+      console.error('[WorkspaceSync] updateMemberPermission: caller is not an owner');
+      return false;
+    }
+    
+    const targetMember = yMembersRef.current.get(targetPublicKey);
+    if (!targetMember) {
+      console.error(`[WorkspaceSync] updateMemberPermission: member not found: ${targetPublicKey}`);
+      return false;
+    }
+    
+    // If permission is the same, no-op
+    if (targetMember.permission === newPermission) return true;
+    
+    const now = Date.now();
+    const foundingOwner = yInfoRef.current.get('createdBy');
+    const isSelf = targetPublicKey === userIdentity?.publicKeyBase62;
+    
+    // Founding owner protection: if demoting the founding owner (and it's not self-demotion),
+    // set a pendingDemotion marker instead of writing directly
+    const permHierarchy = { owner: 3, editor: 2, viewer: 1 };
+    const isDemotion = (permHierarchy[newPermission] || 0) < (permHierarchy[targetMember.permission] || 0);
+    
+    if (targetPublicKey === foundingOwner && isDemotion && !isSelf) {
+      // Get caller's display name for the pending demotion notification
+      const callerMember = yMembersRef.current.get(userIdentity?.publicKeyBase62);
+      const callerName = callerMember?.displayName || callerMember?.handle || 'An owner';
+      
+      yMembersRef.current.set(targetPublicKey, {
+        ...targetMember,
+        lastSeen: now,
+        pendingDemotion: {
+          requestedBy: userIdentity?.publicKeyBase62,
+          requestedByName: callerName,
+          requestedPermission: newPermission,
+          requestedAt: now,
+        },
+      });
+      console.log(`[WorkspaceSync] Pending demotion request for founding owner ${targetPublicKey} → ${newPermission}`);
+      return 'pending';
+    }
+    
+    // Direct permission update for all other cases
+    yMembersRef.current.set(targetPublicKey, {
+      ...targetMember,
+      permission: newPermission,
+      permissionUpdatedAt: now,
+      pendingDemotion: null,
+      lastSeen: now,
+    });
+    
+    console.log(`[WorkspaceSync] Updated permission: ${targetPublicKey} → ${newPermission}`);
+    return true;
+  }, [myPermission, userIdentity?.publicKeyBase62]);
+  
+  // Respond to a pending demotion request (founding owner only)
+  const respondToPendingDemotion = useCallback((accept) => {
+    if (!yMembersRef.current || !userIdentity?.publicKeyBase62) return false;
+    
+    const myKey = userIdentity.publicKeyBase62;
+    const myMember = yMembersRef.current.get(myKey);
+    if (!myMember?.pendingDemotion) return false;
+    
+    const now = Date.now();
+    
+    if (accept) {
+      // Accept: apply the demotion
+      const newPermission = myMember.pendingDemotion.requestedPermission;
+      yMembersRef.current.set(myKey, {
+        ...myMember,
+        permission: newPermission,
+        permissionUpdatedAt: now,
+        pendingDemotion: null,
+        lastSeen: now,
+      });
+      console.log(`[WorkspaceSync] Founding owner accepted demotion → ${newPermission}`);
+    } else {
+      // Decline: clear the pending demotion
+      yMembersRef.current.set(myKey, {
+        ...myMember,
+        pendingDemotion: null,
+        lastSeen: now,
+      });
+      console.log(`[WorkspaceSync] Founding owner declined demotion`);
+    }
+    
+    return true;
+  }, [userIdentity?.publicKeyBase62]);
+
   // Expose ydoc and provider for workspace-level features (e.g., chat)
   const getYdoc = useCallback(() => ydocRef.current, []);
   const getProvider = useCallback(() => providerRef.current, []);
@@ -1229,6 +1489,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     checkIsKicked,
     getOwnerPublicKey,
     transferOwnership,
+    updateMemberPermission,
+    respondToPendingDemotion,
     // Inventory Yjs shared types (refs for direct access by InventoryDashboard)
     yInventorySystems: yInventorySystemsRef.current,
     yCatalogItems: yCatalogItemsRef.current,

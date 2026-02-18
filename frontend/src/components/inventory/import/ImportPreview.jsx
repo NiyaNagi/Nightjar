@@ -30,11 +30,11 @@ export default function ImportPreview({ rows, mapping, catalogItems, onConfirm, 
   const [skipErrors, setSkipErrors] = useState(true);
   const [skipWarnings, setSkipWarnings] = useState(false);
 
-  // Build catalog lookup
+  // Build catalog lookup (lowercased keys to match case-insensitive import logic)
   const catalogLookup = useMemo(() => {
     const m = {};
     for (const ci of (catalogItems || [])) {
-      m[ci.name] = ci;
+      m[ci.name.toLowerCase()] = ci;
     }
     return m;
   }, [catalogItems]);
@@ -172,9 +172,14 @@ export default function ImportPreview({ rows, mapping, catalogItems, onConfirm, 
         <button
           className="btn-sm btn-primary"
           onClick={handleConfirm}
-          disabled={summary.valid + summary.withWarnings === 0}
+          disabled={(
+            (skipErrors ? summary.valid + (skipWarnings ? 0 : summary.withWarnings) : summary.total - (skipWarnings ? summary.withWarnings : 0))
+          ) === 0}
         >
-          Import {summary.valid + (skipWarnings ? 0 : summary.withWarnings)} rows →
+          Import {skipErrors
+            ? summary.valid + (skipWarnings ? 0 : summary.withWarnings)
+            : summary.total - (skipWarnings ? summary.withWarnings : 0)
+          } rows →
         </button>
       </div>
     </div>

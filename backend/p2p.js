@@ -43,7 +43,14 @@ async function ensureModulesLoaded() {
 
 // The design doc specifies using a SOCKS5 proxy for all TCP traffic to route it through Tor.
 // Note: 'socks5h' ensures DNS resolution happens over the proxy, which is crucial for .onion addresses.
-const torAgent = new SocksProxyAgent('socks5h://127.0.0.1:9050');
+// Lazy-initialized to avoid errors when Tor isn't running.
+let _torAgent = null;
+function getTorAgent() {
+    if (!_torAgent) {
+        _torAgent = new SocksProxyAgent('socks5h://127.0.0.1:9050');
+    }
+    return _torAgent;
+}
 
 /**
  * Creates and configures a Libp2p node.
@@ -76,7 +83,7 @@ async function createLibp2pNode(onionAddress) {
                 tcpTransport.dial = (ma, options) => {
                     const addr = ma.toString();
                     if (addr.includes('.onion')) {
-                        return originalDial(ma, { ...options, agent: torAgent });
+                        return originalDial(ma, { ...options, agent: getTorAgent() });
                     }
                     return originalDial(ma, options);
                 };

@@ -172,21 +172,21 @@ const PRODUCER_IDENTITY = {
   publicKeyBase62: 'producerKey456',
   displayName: 'Producer Bob',
   name: 'Producer Bob',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 const REQUESTOR_IDENTITY = {
   publicKeyBase62: 'requestorKey789',
   displayName: 'Requestor Carol',
   name: 'Requestor Carol',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 const ADMIN_IDENTITY = {
   publicKeyBase62: 'adminKey123',
   displayName: 'Admin Alice',
   name: 'Admin Alice',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 const COLLABORATORS = [

@@ -20,6 +20,7 @@ export default function BulkActionBar({
   onEditTags,            // () => void — triggers BulkTagDialog externally
   onToggleFavorite,      // (fileId) => void
   onClear,               // () => void — deselect all
+  canEdit = true,        // false for viewers – hides write actions
 }) {
   const count = selectedItems?.size || 0;
 
@@ -56,11 +57,13 @@ export default function BulkActionBar({
             <span className="bulk-action-btn-label">Download{selectedFileCount > 1 ? ` (${selectedFileCount})` : ''}</span>
           </button>
         )}
-        <button className="bulk-action-btn" onClick={onMove} title="Move selected items" data-testid="bulk-action-move">
-          <span className="bulk-action-btn-icon">📦</span>
-          <span className="bulk-action-btn-label">Move{count > 1 ? ` (${count})` : ''}</span>
-        </button>
-        {hasFiles && (
+        {canEdit && (
+          <button className="bulk-action-btn" onClick={onMove} title="Move selected items" data-testid="bulk-action-move">
+            <span className="bulk-action-btn-icon">📦</span>
+            <span className="bulk-action-btn-label">Move{count > 1 ? ` (${count})` : ''}</span>
+          </button>
+        )}
+        {canEdit && hasFiles && (
           <button className="bulk-action-btn" onClick={onEditTags} title="Edit tags on selected files" data-testid="bulk-action-tags">
             <span className="bulk-action-btn-icon">🏷️</span>
             <span className="bulk-action-btn-label">Tags{selectedFileCount > 1 ? ` (${selectedFileCount})` : ''}</span>
@@ -78,10 +81,12 @@ export default function BulkActionBar({
             <span className="bulk-action-btn-label">Favorite</span>
           </button>
         )}
-        <button className="bulk-action-btn bulk-action-btn--danger" onClick={onDelete} title="Delete selected items" data-testid="bulk-action-delete">
-          <span className="bulk-action-btn-icon">🗑️</span>
-          <span className="bulk-action-btn-label">Delete{count > 1 ? ` (${count})` : ''}</span>
-        </button>
+        {canEdit && (
+          <button className="bulk-action-btn bulk-action-btn--danger" onClick={onDelete} title="Delete selected items" data-testid="bulk-action-delete">
+            <span className="bulk-action-btn-icon">🗑️</span>
+            <span className="bulk-action-btn-label">Delete{count > 1 ? ` (${count})` : ''}</span>
+          </button>
+        )}
       </div>
     </div>
   );

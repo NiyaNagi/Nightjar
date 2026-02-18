@@ -37,7 +37,7 @@ const ADJECTIVES = [
   'vivid', 'warm', 'waving', 'western', 'white', 'wild', 'willing', 'wind',
   'winter', 'wise', 'wistful', 'wonder', 'wooden', 'yellow', 'young', 'zealous',
   'zenith', 'zephyr', 'amber', 'arctic', 'autumn', 'bliss', 'bloom', 'breezy',
-  'cedar', 'cherry', 'chill', 'coral', 'cozy', 'crisp', 'dawn', 'dew'
+  'cedar', 'cherry', 'chill', 'coral', 'cozy', 'crisp', 'dusky', 'dew'
 ];
 
 // Curated noun list (256 entries = 8 bits entropy each)

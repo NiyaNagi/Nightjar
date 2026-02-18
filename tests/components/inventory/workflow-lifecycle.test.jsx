@@ -170,21 +170,21 @@ const ADMIN_IDENTITY = {
   publicKeyBase62: 'adminKey123',
   displayName: 'Admin Alice',
   name: 'Admin Alice',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 const PRODUCER_IDENTITY = {
   publicKeyBase62: 'producerKey456',
   displayName: 'Producer Bob',
   name: 'Producer Bob',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 const REQUESTOR_IDENTITY = {
   publicKeyBase62: 'requestorKey789',
   displayName: 'Requestor Carol',
   name: 'Requestor Carol',
-  privateKey: new Uint8Array(32),
+  curveSecretKey: new Uint8Array(32),
 };
 
 const COLLABORATORS = [
@@ -746,7 +746,7 @@ describe('Multi-User Concurrency', () => {
     unmount();
 
     // Another producer sees both too
-    const PRODUCER2 = { publicKeyBase62: 'producer2Key', displayName: 'Producer Dan', name: 'Producer Dan', privateKey: new Uint8Array(32) };
+    const PRODUCER2 = { publicKeyBase62: 'producer2Key', displayName: 'Producer Dan', name: 'Producer Dan', curveSecretKey: new Uint8Array(32) };
     setContext(PRODUCER2);
     refreshSync();
     render(<OpenRequests />);
@@ -770,7 +770,7 @@ describe('Multi-User Concurrency', () => {
 
     // Now open requests list should be empty
     refreshSync();
-    const PRODUCER2 = { publicKeyBase62: 'producer2Key', displayName: 'Producer Dan', name: 'Producer Dan', privateKey: new Uint8Array(32) };
+    const PRODUCER2 = { publicKeyBase62: 'producer2Key', displayName: 'Producer Dan', name: 'Producer Dan', curveSecretKey: new Uint8Array(32) };
     setContext(PRODUCER2);
     render(<OpenRequests />);
     expect(screen.getByText('0 available')).toBeInTheDocument();

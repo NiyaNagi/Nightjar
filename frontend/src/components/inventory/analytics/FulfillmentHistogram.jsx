@@ -85,7 +85,7 @@ export default function FulfillmentHistogram({ requests, dateRange, targetDays =
             }}
           />
           <ReferenceLine
-            x="3-4 days"
+            x={BUCKETS.find(b => targetDays < b.max)?.label || BUCKETS[BUCKETS.length - 1].label}
             stroke="var(--accent-color)"
             strokeDasharray="4 4"
             label={{ value: `${targetDays}d target`, position: 'top', fill: 'var(--accent-color)', fontSize: 11 }}
