@@ -23,8 +23,8 @@ RUN npm ci --prefer-offline --ignore-scripts
 # Relative URLs resolve correctly at any mount point:
 #   /          → ./assets/foo.js → /assets/foo.js
 #   /toot/     → ./assets/foo.js → /toot/assets/foo.js
-# Heap capped at 768MB — should be fine with swap on low-memory VPS.
-RUN NODE_OPTIONS="--max-old-space-size=768" npx vite build --base="./"
+# Image is built on GitHub Actions (7GB+ RAM), so give Node plenty of heap.
+RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --base="./"
 
 # --- Stage 2: Production server ---
 FROM node:20-alpine
