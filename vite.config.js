@@ -17,6 +17,8 @@ export default defineConfig({
     global: 'globalThis',
     // Inject app version from package.json
     __APP_VERSION__: JSON.stringify(require('./package.json').version),
+    // Inject VITE_GITHUB_PAT for bug report modal (loaded from .env)
+    'process.env.VITE_GITHUB_PAT': JSON.stringify(process.env.VITE_GITHUB_PAT || ''),
   },
   optimizeDeps: {
     include: ['yjs', 'y-websocket', 'tweetnacl', 'uint8arrays', '@popperjs/core', '@fortune-sheet/react'],

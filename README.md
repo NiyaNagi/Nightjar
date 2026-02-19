@@ -44,6 +44,9 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - Full formatting: bold, italic, underline, strikethrough, highlight
 - Headings, lists, blockquotes, code blocks
 - Tables with resizable columns
+- **Floating selection toolbar** — bubble menu appears on text selection with formatting, link, and inline comment actions
+- **Version history with rollback** — timeline slider, diff viewer, author attribution, rollback to any state, configurable retention
+- **Auto-save** — debounced (1s) with duplicate-save prevention and retry on concurrent writes
 - Import/export: Markdown, HTML, JSON, plain text
 
 ### 📊 Spreadsheets
@@ -66,6 +69,9 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - **CSV/XLSX import**: Smart column auto-mapping with validation preview
 - **Encrypted addresses**: End-to-end encrypted shipping address handling (AES-GCM)
 - **Catalog management**: Define item catalog with categories
+- **Onboarding wizard**: 4-step setup — name & configure → define catalog → invite participants → import data
+- **Shipping provider integration**: PirateShip, Shippo, EasyPost, USPS, UPS, FedEx with URL launchers and address formatters
+- **Carrier auto-detection**: Auto-detects carrier from tracking number patterns with clickable tracking links
 - **Analytics dashboard**: 15-component suite — fulfillment histograms, pipeline funnel, pivot table, US state heatmap, producer leaderboard, response time charts, status transitions, demand trends, inflow/outflow analysis, blocked request aging, units shipped by type, and summary metrics with date range and export controls
 - **Audit logging**: Complete history of all inventory operations
 
@@ -73,17 +79,21 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - **Full dashboard**: Browse, search, mesh view, recent files, favorites, trash, downloads, and audit log
 - **P2P file transfer**: End-to-end encrypted chunk-based transfer with seeding, bandwidth sampling, and progress tracking
 - **Bulk operations**: Multi-select, tag, move, and delete across files and folders
+- **Lasso selection**: Rubber-band drag-select for file/folder cards (Ctrl+drag for additive)
 - **Upload & download**: Drag-and-drop upload zones, download bars, file detail panels
 - **Organization**: Folder creation, breadcrumb navigation, grid/list view toggle
 - **Storage metrics**: Per-workspace storage usage with visual breakdown
 
 ### �👥 Real-Time Collaboration
 - **Live cursor tracking** with collaborator names and colors
+- **Author attribution** — color-coded contributor tracking with per-character authorship
+- **Deterministic identity colors** — consistent avatar colors across all devices via publicKey hash
 - **Document-level presence pips** showing who has each document open *(Enhanced in v1.5+)*
 - **Focused state indicators** with glowing effect for active documents
 - **Presence indicators** showing who's online with last-seen timestamps
+- **Collaborator flyout** — click any avatar to view profile, start direct chat, or follow their cursor
 - **Real-time commenting** on text selections, spreadsheet cells, and document sections
-- **Built-in secure chat** with direct messaging and workspace channels
+- **Built-in secure chat** with direct messaging, workspace channels, and inline markdown rendering
 - **Conflict-free editing** using Yjs CRDT for automatic merge resolution
 - **Permission-based access**: Owner, Editor, Viewer with granular controls
 - **Member management**: Real-time member list, activity tracking, instant kick/ban
@@ -96,18 +106,66 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - **Visual indicators** with unread counts and badges
 
 ### 📁 Organization
-- Workspaces to separate projects
-- Nested folder hierarchy
-- Drag-and-drop document management
+- **Workspace switcher** with permission badges (Owner/Editor/Viewer) and quick-create
+- **Hierarchical sidebar** — workspace → folder → document tree with color gradients, context menus, and inline renaming
+- **Icon & color picker** — emoji icons (8 categories) and color palette (20 presets) for workspaces, folders, and documents
+- **Breadcrumb navigation** — visual path with permission-aware access levels
+- **Search palette** — fuzzy search across 7 categories (people, documents, folders, inventory, files, chat, content) with instant + async full-text phases
+- Nested folder hierarchy with drag-and-drop reordering
 
 ### 🔗 Sharing
 - **Cryptographically signed** invite links with Ed25519 signatures
 - **Time-limited invitations** (maximum 24 hours, configurable expiry)
 - **Fragment-based encryption** - keys embedded in URL fragment, never sent to servers
 - **QR codes** for easy mobile sharing
+- **Join-with-link modal** — paste `nightjar://` links or short codes with real-time validation and password field
+- **Entity-level sharing** — share workspaces, folders, or individual documents with per-entity permission tiers
 - **Granular permissions**: Owner, Editor, Viewer
 - **Instant revocation** - kick members and invalidate their access immediately
 - **Workspace deletion** with secure data wiping
+
+### 🔑 Identity & Security
+- **Multiple identity management** — hold multiple cryptographic identities on one device with PIN unlock per identity
+- **Identity QR transfer** — generate QR code with encrypted identity data and 4-digit PIN for device-to-device migration (5-minute expiry)
+- **Encrypted backup & restore** — XSalsa20-Poly1305 encrypted identity + workspace backup files, downloadable and restorable
+- **User profile** — emoji icon picker (60+ icons), color picker, display name, recovery phrase reveal, diagnostic report copy
+- **Memorable passwords** — human-friendly adjective-noun generator for workspace keys (8+ bits entropy per word)
+- **Encrypted local storage** — defense-in-depth NaCl secretbox encryption for browser localStorage with session-scoped keys
+- **Auto-lock timeout** — configurable idle timeout with lock screen
+
+### ⚙️ App Settings
+- **Theme**: Light, dark, and system-auto modes
+- **Editor**: Font family, font size, line height, spell check, word wrap
+- **Notifications**: 10 sound choices, volume slider, per-message-type toggles, Do Not Disturb
+- **Privacy**: Auto-lock timeout configuration, encryption info display
+- **Network**: Peer status poll interval, Tor configuration, relay toggle
+
+### 📖 Built-in Help
+- **In-app documentation** — full wiki-style overlay with sidebar table of contents
+- **Deep-linkable sections** covering getting started, identity, workspaces, documents, sharing, collaboration, chat, file storage, inventory, keyboard shortcuts, and troubleshooting
+
+### 🐛 Bug Reporting
+- **One-click bug reports** — creates GitHub issues automatically via API
+- **Auto-populated context** — title from active document/workspace, last 20 UI actions, inline diagnostic data
+- **Screenshot capture** — captures app state with download button on success screen
+- **Privacy-aware logging** — auto-strips PII (emails, IPs, names) before capture; separate secure logger redacts keys/secrets
+
+### 🛡️ Error Handling
+- **Global error boundary** — catches React rendering crashes with user-friendly error screen, "Copy Diagnostics" button, and reload/reset options
+- **Automatic data migration** — schema migration from flat format to workspace-based format with key re-derivation
+- **Toast notifications** — ephemeral success/error/info messages across all components
+- **Keyboard accessibility** — focus trap across all modals (Tab/Shift+Tab cycling, Escape to close)
+
+### 🐦 Nightjar Mascot
+- Animated bird companion with random sayings in speech bubbles
+- Large mode for empty states (auto-rotating), mini mode next to settings icon
+- Click to advance, click-and-hold to pause
+
+### 📊 Status Bar
+- P2P connection status, Tor mode indicator, word/character/cell counts
+- Collaborator avatars with click-to-chat flyout
+- Active peers, relay status, sync phase indicators
+- Sync verification and force-full-sync controls
 
 ### 🌐 Privacy & Networking
 - Tor hidden service support (Electron)
@@ -849,6 +907,12 @@ npm run test:e2e:smoke      # Quick smoke tests
 ---
 
 ## Changelog
+
+### v1.7.7 - README Feature Audit, Release Notes & Documentation
+- **Documentation**: Comprehensive README feature audit — 30+ previously undocumented features added
+- **New sections**: Identity & Security, App Settings, Built-in Help, Bug Reporting, Error Handling, Mascot, Status Bar
+- **Enhanced sections**: Rich Text Editor (selection toolbar, version history, auto-save), Collaboration (author attribution, flyouts), Organization (search palette, sidebar details), Sharing (join-with-link, entity-level), Inventory (onboarding wizard, shipping providers, tracking)
+- **Testing**: 129 suites, 3,790 tests (0 failures)
 
 ### v1.7.5 - Analytics, History Sanitization & Account Migration
 - **New Feature**: ProducerResponseTime — per-producer average claim/start/ship time bar charts

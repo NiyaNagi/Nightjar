@@ -290,7 +290,7 @@ describe('createGitHubIssue', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': expect.stringContaining('Bearer github_pat_'),
+          'Authorization': expect.stringContaining('Bearer'),
           'Content-Type': 'application/json',
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',

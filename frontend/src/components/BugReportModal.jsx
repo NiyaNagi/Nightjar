@@ -20,11 +20,11 @@ import { getLogs } from '../utils/logger';
 import { useToast } from '../contexts/ToastContext';
 import './BugReportModal.css';
 
-// CRITICAL TODO: Move this PAT to an external proxy service (e.g. Cloudflare Worker)
-// to avoid shipping credentials in the client code. This is a fine-grained PAT scoped
-// to niyanagi/nightjar with Issues read/write permission ONLY. No code, releases, or
-// other repo access. Replace before shipping to public users.
-const GITHUB_PAT = 'REDACTED_PAT';
+// Load PAT from environment variable. In development, create a .env file at the
+// project root with VITE_GITHUB_PAT=your_token. In production builds, inject via
+// CI or move to an external proxy service (e.g. Cloudflare Worker) to avoid
+// shipping credentials in the client bundle.
+const GITHUB_PAT = (typeof process !== 'undefined' && process.env?.VITE_GITHUB_PAT) || '';
 const GITHUB_API_URL = 'https://api.github.com/repos/niyanagi/nightjar/issues';
 const MAX_ACTION_CHARS = 2000;
 const MAX_RECENT_ACTIONS = 20;
