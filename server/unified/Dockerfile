@@ -1,9 +1,9 @@
 # =============================================================================
 # Multi-stage Dockerfile for Nightjar Unified Server
-# 
-# Build args:
-#   BASE_PATH  - Vite base path for asset URLs (default: './' for root deploy)
-#                Set to '/toot/' for sub-path deployment
+#
+# Builds frontend with relative base ('./') so the same image works at any
+# mount path.  The Express server's runtime BASE_PATH env var handles route
+# prefixing and request stripping — Vite just needs relative asset URLs.
 # =============================================================================
 
 # --- Stage 1: Build frontend ---
@@ -19,12 +19,12 @@ COPY vite.config.js ./
 # --ignore-scripts skips the Electron-specific postinstall (setup-tor, electron-builder)
 RUN npm ci --prefer-offline --ignore-scripts
 
-# Build arg for Vite base path
-ARG BASE_PATH=./
-
-# Build frontend with the specified base path
-# Cap heap at 512MB to avoid OOM on low-memory VPS instances
-RUN NODE_OPTIONS="--max-old-space-size=512" npx vite build --base="${BASE_PATH}"
+# Build frontend with relative base path ('./').
+# Relative URLs resolve correctly at any mount point:
+#   /          → ./assets/foo.js → /assets/foo.js
+#   /toot/     → ./assets/foo.js → /toot/assets/foo.js
+# Heap capped at 768MB — should be fine with swap on low-memory VPS.
+RUN NODE_OPTIONS="--max-old-space-size=768" npx vite build --base="./"
 
 # --- Stage 2: Production server ---
 FROM node:20-alpine

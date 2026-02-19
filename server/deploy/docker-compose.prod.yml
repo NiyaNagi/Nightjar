@@ -22,11 +22,10 @@ services:
   # Accessible at night-jar.co/signal, /health, /api/mesh/*, /yjs/*
   # --------------------------------------------------------------------------
   nightjar-relay:
+    image: nightjar:latest
     build:
       context: ../..
       dockerfile: server/unified/Dockerfile
-      args:
-        BASE_PATH: "./"
     container_name: nightjar-relay
     restart: unless-stopped
     ports:
@@ -49,12 +48,13 @@ services:
   # Accessible at night-jar.co/toot (with BASE_PATH=/toot)
   # --------------------------------------------------------------------------
   nightjar-private:
-    build:
-      context: ../..
-      dockerfile: server/unified/Dockerfile
-      args:
-        # Vite builds assets with /toot/ prefix so URLs resolve correctly
-        BASE_PATH: "/toot/"
+    # Re-uses the same image built by nightjar-relay — no second build needed.
+    # Only the runtime BASE_PATH env var differs; Express prefixes routes and
+    # strips it from incoming requests.  Vite's relative './' base resolves
+    # correctly because the browser resolves ./assets/… relative to /toot/.
+    image: nightjar:latest
+    depends_on:
+      - nightjar-relay
     container_name: nightjar-private
     restart: unless-stopped
     ports:
