@@ -12,24 +12,16 @@
 
 import { useState, useMemo } from 'react';
 import { formatFileSize, getRelativeTime } from '../../utils/fileTypeCategories';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import './MeshView.css';
-
-/**
- * Dynamically import Recharts. In test environments, this will be mocked.
- */
-let AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer;
-try {
-  const recharts = require('recharts');
-  AreaChart = recharts.AreaChart;
-  Area = recharts.Area;
-  XAxis = recharts.XAxis;
-  YAxis = recharts.YAxis;
-  CartesianGrid = recharts.CartesianGrid;
-  Tooltip = recharts.Tooltip;
-  ResponsiveContainer = recharts.ResponsiveContainer;
-} catch {
-  // Recharts not available — bandwidth chart will show fallback
-}
 
 /** Time range options for bandwidth chart */
 const TIME_RANGES = [

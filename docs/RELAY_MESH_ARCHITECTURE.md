@@ -190,7 +190,7 @@ const announcement = { type: "workspace-announce", topicHash, token, nodeId };
 Share links embed known relay nodes:
 
 ```
-nightjar://w/ABC123#k:key&perm:e&nodes:relay1.nightjar.io,relay2.nightjar.io
+nightjar://w/ABC123#k:key&perm:e&nodes:relay1.nightjar.co,relay2.nightjar.co
 ```
 
 **Bootstrap flow:**
@@ -204,10 +204,10 @@ nightjar://w/ABC123#k:key&perm:e&nodes:relay1.nightjar.io,relay2.nightjar.io
 │     Link contains: workspace ID + encryption key + relay nodes              │
 │                                                                              │
 │  2. CLIENT PARSES LINK                                                       │
-│     Extracts: nodes:relay1.nightjar.io,relay2.nightjar.io                   │
+│     Extracts: nodes:relay1.nightjar.co,relay2.nightjar.co                   │
 │                                                                              │
 │  3. CLIENT CONNECTS TO EMBEDDED NODES                                        │
-│     WebSocket → wss://relay1.nightjar.io                                    │
+│     WebSocket → wss://relay1.nightjar.co                                    │
 │     Sends: { type: "bootstrap-request", nodeId: "my-node-id" }              │
 │                                                                              │
 │  4. RELAY RESPONDS WITH ROUTING TABLE                                        │
@@ -232,9 +232,9 @@ For users without a share link (creating first workspace):
 
 ```javascript
 const BOOTSTRAP_NODES = [
-  "wss://relay1.nightjar.io",
-  "wss://relay2.nightjar.io",
-  "wss://relay3.nightjar.io"
+  "wss://relay1.nightjar.co",
+  "wss://relay2.nightjar.co",
+  "wss://relay3.nightjar.co"
 ];
 ```
 
@@ -269,7 +269,7 @@ PUBLIC_URL=https://my-relay.example.com  # Announced to mesh
 
 # Mesh participation
 MESH_ENABLED=true           # Join public mesh (false for private)
-MESH_BOOTSTRAP=relay1.nightjar.io,relay2.nightjar.io
+MESH_BOOTSTRAP=relay1.nightjar.co,relay2.nightjar.co
 
 # Private mode authentication
 AUTH_ENABLED=false          # Require auth tokens
@@ -444,9 +444,9 @@ export const WORKSPACE_TOPIC_PREFIX = "nightjar-workspace:";
 
 // Bootstrap
 export const BOOTSTRAP_NODES = [
-  "wss://relay1.nightjar.io",
-  "wss://relay2.nightjar.io",
-  "wss://relay3.nightjar.io"
+  "wss://relay1.nightjar.co",
+  "wss://relay2.nightjar.co",
+  "wss://relay3.nightjar.co"
 ];
 
 // Timeouts

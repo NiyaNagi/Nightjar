@@ -364,29 +364,20 @@ describe('§3 — Stage bar (admin)', () => {
 // ============================================================
 
 describe('§4 — Stage bar (producer)', () => {
-  it('renders interactive stage bar for producer', () => {
+  it('hides stage bar for producer (producers use AddressReveal stage buttons)', () => {
     mockCtx.userIdentity = { publicKeyBase62: 'producerKey', displayName: 'Bob Producer', curveSecretKey: new Uint8Array(32) };
     renderDetail({ request: makeRequest({ status: 'approved' }), isProducer: true });
-    expect(screen.getByTestId('stage-bar')).toBeInTheDocument();
-    expect(screen.getByTestId('stage-btn-in_progress')).toBeEnabled();
+    expect(screen.queryByTestId('stage-bar')).not.toBeInTheDocument();
   });
 
-  it('clicking "In Progress" calls onMarkInProgress for producer', () => {
+  it('stage transitions are handled by AddressReveal, not stage bar', () => {
     mockCtx.userIdentity = { publicKeyBase62: 'producerKey', displayName: 'Bob Producer', curveSecretKey: new Uint8Array(32) };
     const onMarkInProgress = jest.fn();
     const req = makeRequest({ status: 'approved' });
     renderDetail({ request: req, isProducer: true, onMarkInProgress });
-    fireEvent.click(screen.getByTestId('stage-btn-in_progress'));
-    expect(onMarkInProgress).toHaveBeenCalledWith(req);
-  });
-
-  it('clicking "Approved" from in_progress calls onRevertToApproved for producer', () => {
-    mockCtx.userIdentity = { publicKeyBase62: 'producerKey', displayName: 'Bob Producer', curveSecretKey: new Uint8Array(32) };
-    const onRevertToApproved = jest.fn();
-    const req = makeRequest({ status: 'in_progress', inProgressAt: Date.now() });
-    renderDetail({ request: req, isProducer: true, onRevertToApproved });
-    fireEvent.click(screen.getByTestId('stage-btn-approved'));
-    expect(onRevertToApproved).toHaveBeenCalledWith(req);
+    // Stage bar buttons should not exist for producers
+    expect(screen.queryByTestId('stage-btn-in_progress')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage-btn-shipped')).not.toBeInTheDocument();
   });
 });
 
@@ -464,22 +455,12 @@ describe('§7 — Backward transitions', () => {
     expect(onRevertToApproved).toHaveBeenCalledWith(req);
   });
 
-  it('producer can revert from shipped to in_progress', () => {
+  it('producer revert is now handled by AddressReveal stage buttons, not stage bar', () => {
     mockCtx.userIdentity = { publicKeyBase62: 'producerKey', displayName: 'Bob Producer', curveSecretKey: new Uint8Array(32) };
-    const onRevertToInProgress = jest.fn();
     const req = makeRequest({ status: 'shipped', shippedAt: Date.now() });
-    renderDetail({ request: req, isProducer: true, onRevertToInProgress });
-    fireEvent.click(screen.getByTestId('stage-btn-in_progress'));
-    expect(onRevertToInProgress).toHaveBeenCalledWith(req);
-  });
-
-  it('producer can revert from shipped to approved', () => {
-    mockCtx.userIdentity = { publicKeyBase62: 'producerKey', displayName: 'Bob Producer', curveSecretKey: new Uint8Array(32) };
-    const onRevertToApproved = jest.fn();
-    const req = makeRequest({ status: 'shipped', shippedAt: Date.now() });
-    renderDetail({ request: req, isProducer: true, onRevertToApproved });
-    fireEvent.click(screen.getByTestId('stage-btn-approved'));
-    expect(onRevertToApproved).toHaveBeenCalledWith(req);
+    renderDetail({ request: req, isProducer: true, onRevertToInProgress: jest.fn() });
+    // Stage bar is hidden for producers
+    expect(screen.queryByTestId('stage-bar')).not.toBeInTheDocument();
   });
 });
 
@@ -504,13 +485,12 @@ describe('§8 — Forward transitions', () => {
     expect(onMarkShipped).toHaveBeenCalledWith(req, '');
   });
 
-  it('producer can move from approved to in_progress', () => {
+  it('producer forward transition is now handled by AddressReveal stage buttons', () => {
     mockCtx.userIdentity = { publicKeyBase62: 'producerKey', displayName: 'Bob Producer', curveSecretKey: new Uint8Array(32) };
-    const onMarkInProgress = jest.fn();
     const req = makeRequest({ status: 'approved' });
-    renderDetail({ request: req, isProducer: true, onMarkInProgress });
-    fireEvent.click(screen.getByTestId('stage-btn-in_progress'));
-    expect(onMarkInProgress).toHaveBeenCalledWith(req);
+    renderDetail({ request: req, isProducer: true, onMarkInProgress: jest.fn() });
+    // Stage bar is hidden for producers; they use AddressReveal buttons instead
+    expect(screen.queryByTestId('stage-btn-in_progress')).not.toBeInTheDocument();
   });
 });
 
@@ -721,8 +701,10 @@ describe('§13 — Accessibility & test IDs', () => {
     expect(bar).toHaveAttribute('aria-label', 'Fulfillment stage');
   });
 
-  it('close button has aria-label', () => {
+  it('header is removed (SlidePanel provides close button)', () => {
     renderDetail({ request: makeRequest({ status: 'approved' }) });
-    expect(screen.getByLabelText('Close')).toBeInTheDocument();
+    // Close button and header h3 removed — SlidePanel provides these
+    expect(document.querySelector('.request-detail__close')).toBeNull();
+    expect(document.querySelector('.request-detail__header')).toBeNull();
   });
 });

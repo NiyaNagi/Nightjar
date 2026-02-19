@@ -25,6 +25,7 @@ const PIPELINE_STAGES = [
   { key: 'claimed', label: 'Claimed', color: '#8b5cf6' },
   { key: 'pending_approval', label: 'Pending', color: '#a78bfa' },
   { key: 'approved', label: 'Approved', color: '#22c55e' },
+  { key: 'in_progress', label: 'In Progress', color: '#10b981' },
   { key: 'shipped', label: 'Shipped', color: '#14b8a6' },
   { key: 'delivered', label: 'Delivered', color: '#06b6d4' },
   { key: 'blocked', label: 'Blocked', color: '#f59e0b' },

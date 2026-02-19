@@ -14,14 +14,14 @@ The relay server is the rendezvous point for Nightjar clients that cannot connec
 | **relay** | ❌ | ✅ DHT | Lightweight relay — just routes connections |
 | **private** | ✅ SQLite | ❌ | Isolated — no public mesh participation |
 
-For a public relay at `relay.night-jar.io`, use **relay** mode.
+For a public relay at `relay.night-jar.co`, use **relay** mode.
 
 ---
 
 ## Prerequisites
 
 - A VPS with a public IP (Ubuntu 22.04+ recommended)
-- A domain name with DNS pointing to the VPS (e.g., `relay.night-jar.io`)
+- A domain name with DNS pointing to the VPS (e.g., `relay.night-jar.co`)
 - Docker and Docker Compose installed
 - Ports 80 and 443 open (for Caddy auto-TLS)
 - Port 3000 open internally (Nightjar server)
@@ -77,7 +77,7 @@ cd Nightjar
 Create `/etc/caddy/Caddyfile`:
 
 ```caddyfile
-relay.night-jar.io {
+relay.night-jar.co {
     # Reverse proxy to Nightjar server
     reverse_proxy localhost:3000
 
@@ -104,10 +104,10 @@ sudo systemctl status caddy
 cd /opt/Nightjar/server/unified
 
 # Relay mode (lightweight, no persistence)
-PUBLIC_URL=wss://relay.night-jar.io docker compose --profile relay up -d
+PUBLIC_URL=wss://relay.night-jar.co docker compose --profile relay up -d
 
 # Or host mode (with encrypted persistence) — starts by default
-PUBLIC_URL=wss://relay.night-jar.io docker compose up -d
+PUBLIC_URL=wss://relay.night-jar.co docker compose up -d
 ```
 
 ### Option B: Docker Run
@@ -119,7 +119,7 @@ docker run -d \
   --name nightjar-relay \
   --restart unless-stopped \
   -e NIGHTJAR_MODE=relay \
-  -e PUBLIC_URL=wss://relay.night-jar.io \
+  -e PUBLIC_URL=wss://relay.night-jar.co \
   -e NODE_ENV=production \
   -p 3000:3000 \
   nightjar-server
@@ -137,7 +137,7 @@ npm run build
 cd ../server/unified
 
 # Start
-PUBLIC_URL=wss://relay.night-jar.io NIGHTJAR_MODE=relay node index.js
+PUBLIC_URL=wss://relay.night-jar.co NIGHTJAR_MODE=relay node index.js
 ```
 
 ---
@@ -149,7 +149,7 @@ PUBLIC_URL=wss://relay.night-jar.io NIGHTJAR_MODE=relay node index.js
 curl http://localhost:3000/health
 
 # External health check (after DNS propagates)
-curl https://relay.night-jar.io/health
+curl https://relay.night-jar.co/health
 ```
 
 Expected response:
@@ -170,7 +170,7 @@ Expected response:
 npm i -g wscat
 
 # Test signaling endpoint
-wscat -c wss://relay.night-jar.io/signal
+wscat -c wss://relay.night-jar.co/signal
 # Should receive: {"type":"welcome","peerId":"...","serverTime":...}
 ```
 
@@ -194,7 +194,7 @@ Wait for DNS propagation (usually < 5 minutes).
 |----------|---------|-------------|
 | `PORT` | `3000` | Server port |
 | `NIGHTJAR_MODE` | `host` | Server mode: `host`, `relay`, or `private` |
-| `PUBLIC_URL` | (none) | WebSocket URL for mesh announcements (e.g., `wss://relay.night-jar.io`) |
+| `PUBLIC_URL` | (none) | WebSocket URL for mesh announcements (e.g., `wss://relay.night-jar.co`) |
 | `STATIC_PATH` | `../../frontend/dist` | Path to built React app |
 | `DB_PATH` | `./data/Nightjar.db` | SQLite database path (host/private modes) |
 | `MAX_PEERS_PER_ROOM` | `100` | Max concurrent users per workspace |
@@ -212,16 +212,16 @@ docker logs -f nightjar-relay
 ### Health check endpoint
 ```bash
 # Returns JSON with room count, uptime, mode
-curl -s https://relay.night-jar.io/health | jq .
+curl -s https://relay.night-jar.co/health | jq .
 ```
 
 ### Mesh status
 ```bash
 # View mesh network status
-curl -s https://relay.night-jar.io/api/mesh/status | jq .
+curl -s https://relay.night-jar.co/api/mesh/status | jq .
 
 # View top relay nodes
-curl -s https://relay.night-jar.io/api/mesh/relays | jq .
+curl -s https://relay.night-jar.co/api/mesh/relays | jq .
 ```
 
 ---
@@ -264,7 +264,7 @@ docker logs nightjar-relay
 ### WebSocket connections fail
 ```bash
 # Check if Caddy is proxying correctly
-curl -v https://relay.night-jar.io/health
+curl -v https://relay.night-jar.co/health
 
 # Check Caddy logs
 sudo journalctl -u caddy -f

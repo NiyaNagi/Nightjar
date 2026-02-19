@@ -78,6 +78,31 @@ export function useWorkspacePeerStatus(workspaceId, pollIntervalOverride = null)
     const pollIntervalRef = useRef(null);
     const retryTimeoutRef = useRef(null);
     const mountedRef = useRef(true);
+    const verifyTimeoutRef = useRef(null);
+    
+    // Safety timeout: if syncStatus stays 'verifying' for 30s, transition to 'failed'
+    useEffect(() => {
+        if (syncStatus === 'verifying') {
+            verifyTimeoutRef.current = setTimeout(() => {
+                if (mountedRef.current) {
+                    console.warn('[PeerStatus] Verification timed out after 30s');
+                    setSyncStatus('failed');
+                }
+            }, 30000);
+        } else {
+            // Clear timeout when status changes away from verifying
+            if (verifyTimeoutRef.current) {
+                clearTimeout(verifyTimeoutRef.current);
+                verifyTimeoutRef.current = null;
+            }
+        }
+        return () => {
+            if (verifyTimeoutRef.current) {
+                clearTimeout(verifyTimeoutRef.current);
+                verifyTimeoutRef.current = null;
+            }
+        };
+    }, [syncStatus]);
     
     // Fetch peer status from sidecar
     const fetchPeerStatus = useCallback(() => {

@@ -174,17 +174,7 @@ export default function RequestDetail({
 
   return (
     <div className="request-detail" data-testid="request-detail">
-      {/* Header */}
-      <div className="request-detail__header">
-        <h3>
-          {request.urgent && '⚡ '}Request #{request.id?.slice(4, 10)}
-        </h3>
-        {onClose && (
-          <button className="request-detail__close" onClick={onClose} aria-label="Close">✕</button>
-        )}
-      </div>
-
-      {/* Status banner */}
+      {/* Status banner (header removed — SlidePanel provides the title) */}
       <div className={`request-detail__status-banner request-detail__status-banner--${request.status}`}>
         <StatusBadge status={request.status} />
         {request.urgent && <span className="request-detail__urgent-flag">⚡ Urgent</span>}
@@ -264,33 +254,31 @@ export default function RequestDetail({
         </div>
       </div>
 
-      {/* Shipping section — tracking & fulfillment info */}
-      {(request.trackingNumber || showStageBar) && (
+      {/* Shipping section — only shown when there's a tracking number */}
+      {request.trackingNumber && (
         <div className="request-detail__section">
           <div className="request-detail__section-title">Shipping</div>
           <div className="request-detail__grid">
-            {request.trackingNumber && (
-              <div className="request-detail__field request-detail__field--full">
-                <span className="request-detail__label">Tracking #</span>
-                <span className="request-detail__value">
-                  {(() => {
-                    const carrier = parseTrackingNumber(request.trackingNumber);
-                    const url = carrier?.url || genericTrackingUrl(request.trackingNumber);
-                    return (
-                      <a href={url} target="_blank" rel="noopener noreferrer" className="request-detail__tracking-link">
-                        {carrier ? `${carrier.icon} ${carrier.carrier}: ` : ''}{request.trackingNumber} ↗
-                      </a>
-                    );
-                  })()}
-                </span>
-              </div>
-            )}
+            <div className="request-detail__field request-detail__field--full">
+              <span className="request-detail__label">Tracking #</span>
+              <span className="request-detail__value">
+                {(() => {
+                  const carrier = parseTrackingNumber(request.trackingNumber);
+                  const url = carrier?.url || genericTrackingUrl(request.trackingNumber);
+                  return (
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="request-detail__tracking-link">
+                      {carrier ? `${carrier.icon} ${carrier.carrier}: ` : ''}{request.trackingNumber} ↗
+                    </a>
+                  );
+                })()}
+              </span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Interactive Stage Bar — Approved ↔ In Progress ↔ Shipped */}
-      {showStageBar && (
+      {/* Interactive Stage Bar — shown for admins only, producers use AddressReveal buttons */}
+      {showStageBar && !isProducer && (
         <div className="request-detail__stage-section">
           {/* Early timeline checkmarks */}
           {earlyTimelineEntries.length > 0 && (
@@ -390,8 +378,8 @@ export default function RequestDetail({
           </>
         )}
 
-        {/* Producer: inline AddressReveal when approved/in_progress */}
-        {isProducer && (request.status === 'approved' || request.status === 'in_progress') && (
+        {/* Producer: inline AddressReveal when approved/in_progress/shipped */}
+        {isProducer && ['approved', 'in_progress', 'shipped'].includes(request.status) && (
           <>
             {addressReveals?.[request.id] ? (
               <div className="request-detail__address-reveal-inline">
@@ -399,12 +387,16 @@ export default function RequestDetail({
                   requestId={request.id}
                   reveal={addressReveals[request.id]}
                   identity={ctxIdentity}
+                  request={request}
                   onShipped={() => onMarkShipped?.(request)}
+                  onMarkInProgress={() => onMarkInProgress?.(request)}
+                  onRevertToApproved={() => onRevertToApproved?.(request)}
+                  onRevertToInProgress={() => onRevertToInProgress?.(request)}
                   onClose={onClose}
                   embedded
                 />
               </div>
-            ) : (
+            ) : request.status !== 'shipped' ? (
               <div className="request-detail__ship-form">
                 <p className="request-detail__no-reveal">
                   ⏳ Address reveal pending — the reveal hasn't synced yet.
@@ -420,7 +412,7 @@ export default function RequestDetail({
                 </label>
                 <button className="btn-primary" onClick={() => onMarkShipped?.(request, trackingNumber)}>📦 Mark as Shipped</button>
               </div>
-            )}
+            ) : null}
           </>
         )}
 

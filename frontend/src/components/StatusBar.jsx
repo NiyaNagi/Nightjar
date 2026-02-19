@@ -43,38 +43,31 @@ const StatusBar = ({
     const [expandedChip, setExpandedChip] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
     const [flyoutPosition, setFlyoutPosition] = useState({ x: 0, y: 0 });
-    const [showTorMenu, setShowTorMenu] = useState(false);
-    const [showSyncDetails, setShowSyncDetails] = useState(false);
+    const [showNetworkPopover, setShowNetworkPopover] = useState(false);
     const containerRef = useRef(null);
-    const torMenuRef = useRef(null);
-    const syncMenuRef = useRef(null);
+    const networkPopoverRef = useRef(null);
     const [maxVisible, setMaxVisible] = useState(5);
 
-    // Close tor menu when clicking outside
+    // Close network popover when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (torMenuRef.current && !torMenuRef.current.contains(e.target)) {
-                setShowTorMenu(false);
-            }
-            if (syncMenuRef.current && !syncMenuRef.current.contains(e.target)) {
-                setShowSyncDetails(false);
+            if (networkPopoverRef.current && !networkPopoverRef.current.contains(e.target)) {
+                setShowNetworkPopover(false);
             }
         };
-        if (showTorMenu || showSyncDetails) {
+        if (showNetworkPopover) {
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
-    }, [showTorMenu, showSyncDetails]);
+    }, [showNetworkPopover]);
 
     // Handle clicking on a collaborator
     const handleCollaboratorClick = (collab, event) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        // Position flyout above the avatar (status bar is at bottom)
-        // Flyout is approximately 200px tall
         const flyoutHeight = 200;
         setFlyoutPosition({
             x: Math.min(rect.left, window.innerWidth - 220),
-            y: Math.max(10, rect.top - flyoutHeight - 10) // Position above, with minimum 10px from top
+            y: Math.max(10, rect.top - flyoutHeight - 10)
         });
         setSelectedUser(collab);
     };
@@ -84,280 +77,255 @@ const StatusBar = ({
         const updateMaxVisible = () => {
             if (containerRef.current) {
                 const containerWidth = containerRef.current.offsetWidth;
-                // Each chip is about 32px, plus some padding
                 const chipWidth = 36;
                 const available = Math.max(1, Math.floor(containerWidth / chipWidth) - 1);
                 setMaxVisible(available);
             }
         };
-        
         updateMaxVisible();
         window.addEventListener('resize', updateMaxVisible);
         return () => window.removeEventListener('resize', updateMaxVisible);
     }, []);
 
-    // Connection status - unified across platforms with detailed peer info
+    // ── Unified connection status ──
     const getConnectionStatus = () => {
-        // Show sync phase if not complete
         if (syncPhase && syncPhase !== 'complete' && syncPhase !== 'idle') {
-            if (syncPhase === 'connecting') {
-                return { label: 'Connecting...', className: 'connecting' };
-            }
-            if (syncPhase === 'awaiting-peers') {
-                return { label: 'Finding peers...', className: 'connecting' };
-            }
-            if (syncPhase === 'receiving-metadata' || syncPhase === 'receiving-documents') {
-                return { label: 'Syncing...', className: 'syncing' };
-            }
-            if (syncPhase === 'failed') {
-                return { label: 'Sync failed', className: 'error' };
-            }
-            if (syncPhase === 'expired') {
-                return { label: 'Link expired', className: 'error' };
-            }
+            if (syncPhase === 'connecting') return { label: 'Connecting...', className: 'connecting', icon: '⟳' };
+            if (syncPhase === 'awaiting-peers') return { label: 'Finding peers...', className: 'connecting', icon: '⟳' };
+            if (syncPhase === 'receiving-metadata' || syncPhase === 'receiving-documents') return { label: 'Syncing...', className: 'syncing', icon: '↻' };
+            if (syncPhase === 'failed') return { label: 'Sync failed', className: 'error', icon: '✗' };
+            if (syncPhase === 'expired') return { label: 'Link expired', className: 'error', icon: '✗' };
         }
-        
-        // Electron mode: use p2pStatus from sidecar
         if (isElectron) {
             if (p2pStatus === 'connected') {
-                // Use activePeers if provided (new behavior), otherwise fall back to onlineCount
-                // Add +1 to include self, consistent with web path
                 const currentActivePeers = activePeers > 0 ? activePeers : onlineCount;
                 if (currentActivePeers > 0) {
                     const totalOnline = currentActivePeers + 1;
-                    return { label: `${totalOnline} online`, className: 'connected' };
+                    return { label: `${totalOnline} online`, className: 'connected', icon: '●' };
                 }
-                // Connected to P2P but no active peers - show warning
-                return { label: 'Offline copy', className: 'warning' };
+                return { label: 'Offline copy', className: 'warning', icon: '○' };
             }
-            if (p2pStatus === 'connecting') {
-                return { label: 'Connecting...', className: 'connecting' };
-            }
-            return { label: 'Offline', className: 'offline' };
+            if (p2pStatus === 'connecting') return { label: 'Connecting...', className: 'connecting', icon: '⟳' };
+            return { label: 'Offline', className: 'offline', icon: '○' };
         }
-        
-        // Web mode: use workspaceConnected/workspaceSynced and onlineCount from Y.js sync
-        // Consider connected if:
-        // 1. WebSocket is connected (workspaceConnected), OR
-        // 2. Sync phase completed (syncPhase === 'complete'), OR
-        // 3. Provider synced (workspaceSynced)
         if (workspaceConnected || syncPhase === 'complete' || workspaceSynced) {
-            // Use onlineCount from awareness for web mode
-            if (onlineCount > 0) {
-                return { label: `${onlineCount + 1} online`, className: 'connected' };
-            }
-            return { label: 'Connected', className: 'connected' };
+            if (onlineCount > 0) return { label: `${onlineCount + 1} online`, className: 'connected', icon: '●' };
+            return { label: 'Connected', className: 'connected', icon: '●' };
         }
-        
-        return { label: 'Offline', className: 'offline' };
+        return { label: 'Offline', className: 'offline', icon: '○' };
     };
 
-    // Get sync verification status display
+    // ── Sync verification display ──
     const getSyncStatusDisplay = () => {
         switch (syncStatus) {
-            case 'verified':
-                return { icon: '✓', label: 'Synced', className: 'sync-verified' };
-            case 'verifying':
-                return { icon: '⟳', label: 'Verifying...', className: 'sync-verifying' };
-            case 'syncing':
-                return { icon: '↻', label: 'Syncing...', className: 'sync-syncing' };
-            case 'incomplete':
-                return { 
-                    icon: '⚠', 
-                    label: `${(syncDetails?.missingDocuments || 0) + (syncDetails?.missingFolders || 0)} missing`, 
-                    className: 'sync-incomplete' 
-                };
-            case 'failed':
-                return { icon: '✗', label: 'Sync failed', className: 'sync-failed' };
-            case 'no-peers':
-                return { icon: '○', label: 'No peers', className: 'sync-no-peers' };
-            case 'retrying':
-                return { icon: '↻', label: 'Retrying...', className: 'sync-retrying' };
-            default:
-                return { icon: '○', label: '', className: 'sync-idle' };
+            case 'verified': return { icon: '✓', label: 'Synced', className: 'sync-verified' };
+            case 'verifying': return { icon: '⟳', label: 'Verifying...', className: 'sync-verifying' };
+            case 'syncing': return { icon: '↻', label: 'Syncing...', className: 'sync-syncing' };
+            case 'incomplete': return { 
+                icon: '⚠', 
+                label: `${(syncDetails?.missingDocuments || 0) + (syncDetails?.missingFolders || 0)} missing`, 
+                className: 'sync-incomplete' 
+            };
+            case 'failed': return { icon: '✗', label: 'Sync failed', className: 'sync-failed' };
+            case 'no-peers': return { icon: '○', label: 'No peers', className: 'sync-no-peers' };
+            case 'retrying': return { icon: '↻', label: 'Retrying...', className: 'sync-retrying' };
+            default: return null;
         }
-    };
-
-    // Format IP for display (show only for Electron)
-    const getIPDisplay = () => {
-        if (!isElectron || !publicIP) return null;
-        // Truncate long IPs for display
-        return publicIP.length > 15 ? publicIP.substring(0, 12) + '...' : publicIP;
     };
 
     const connectionStatus = getConnectionStatus();
-    const ipDisplay = getIPDisplay();
+    const syncDisplay = getSyncStatusDisplay();
     const visibleCollabs = collaborators?.slice(0, maxVisible) || [];
     const hiddenCollabs = collaborators?.slice(maxVisible) || [];
-
-    // Handle Tor button click - show popup menu
-    const handleTorClick = () => {
-        setShowTorMenu(!showTorMenu);
-    };
-
-    const handleTorToggle = () => {
-        onToggleTor?.();
-        setShowTorMenu(false);
-    };
-
-    const handleTorSettingsClick = () => {
-        onOpenTorSettings?.();
-        setShowTorMenu(false);
-    };
 
     return (
         <div className="status-bar-bottom">
             <div className="status-section left">
-                {/* Tor toggle - Electron only */}
-                {isElectron && isFeatureAvailable('tor') && (
-                    <div className="tor-control" ref={torMenuRef}>
-                        <button 
-                            type="button"
-                            className={`tor-toggle ${torEnabled ? 'enabled' : 'disabled'} ${p2pStatus}`}
-                            onClick={handleTorClick}
-                            title="Tor P2P options"
-                            aria-label="Tor P2P options"
-                        >
-                            <span className="tor-icon">🧅</span>
-                            <span className="tor-label">{torEnabled ? 'ON' : 'OFF'}</span>
-                        </button>
-                        
-                        {/* Tor popup menu */}
-                        {showTorMenu && (
-                            <div className="tor-menu" role="menu">
-                                <button type="button" className="tor-menu-item" onClick={handleTorToggle} role="menuitem">
-                                    <span className="menu-icon">{torEnabled ? '⏹️' : '▶️'}</span>
-                                    <span>{torEnabled ? 'Disconnect from Tor' : 'Connect to Tor'}</span>
-                                </button>
-                                <button type="button" className="tor-menu-item" onClick={handleTorSettingsClick} role="menuitem">
-                                    <span className="menu-icon">⚙️</span>
-                                    <span>Tor Settings...</span>
-                                </button>
+                {/* ── Unified SyncChip: single clickable chip with network popover ── */}
+                <div className="sync-chip-wrapper" ref={networkPopoverRef}>
+                    <button 
+                        type="button"
+                        className={`sync-chip ${connectionStatus.className}`}
+                        onClick={() => setShowNetworkPopover(!showNetworkPopover)}
+                        data-testid="sync-status"
+                        data-synced={workspaceSynced ? 'true' : 'false'}
+                        data-phase={syncPhase}
+                        title="Network & sync status — click for details"
+                        role="status"
+                        aria-live="polite"
+                        aria-label={`Connection: ${connectionStatus.label}${syncDisplay ? `, Sync: ${syncDisplay.label}` : ''}`}
+                    >
+                        <span className="sync-chip-dot" aria-hidden="true">{connectionStatus.icon}</span>
+                        <span className="sync-chip-label">{connectionStatus.label}</span>
+                        {syncDisplay && (
+                            <span className={`sync-chip-badge ${syncDisplay.className}`} title={`Sync: ${syncDisplay.label}`}>
+                                {syncDisplay.icon}
+                            </span>
+                        )}
+                        {relayConnected && <span className="sync-chip-relay" title="Relay connected">📡</span>}
+                        {isElectron && torEnabled && <span className="sync-chip-tor" title="Tor enabled">🧅</span>}
+                        <span className="sync-chip-arrow" aria-hidden="true">▾</span>
+                    </button>
+
+                    {/* ── Network popover ── */}
+                    {showNetworkPopover && (
+                        <div className="network-popover" role="menu">
+                            <div className="network-popover-header">
+                                <span className="network-popover-title">⚙ Network Settings</span>
+                            </div>
+                            
+                            {/* Connection details */}
+                            <div className="network-popover-section">
+                                <div className="network-popover-row">
+                                    <span className="network-row-label">Status</span>
+                                    <span className={`network-row-value ${connectionStatus.className}`}>
+                                        {connectionStatus.icon} {connectionStatus.label}
+                                    </span>
+                                </div>
+                                {publicIP && (
+                                    <div className="network-popover-row">
+                                        <span className="network-row-label">Public IP</span>
+                                        <span className="network-row-value">{publicIP}</span>
+                                    </div>
+                                )}
+                                <div className="network-popover-row">
+                                    <span className="network-row-label">Peers</span>
+                                    <span className="network-row-value">
+                                        {activePeers} active / {totalSeenPeers || totalCollaborators} total
+                                    </span>
+                                </div>
+                                {relayConnected && (
+                                    <div className="network-popover-row">
+                                        <span className="network-row-label">Relay</span>
+                                        <span className="network-row-value connected">📡 Connected</span>
+                                    </div>
+                                )}
+                                {meshStatus?.running && (
+                                    <div className="network-popover-row">
+                                        <span className="network-row-label">Mesh</span>
+                                        <span className="network-row-value">
+                                            {meshStatus.connectedPeers || 0} peers, {meshStatus.knownRelays || 0} relays
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sync verification details */}
+                            {syncDisplay && (
+                                <div className="network-popover-section">
+                                    <div className="network-popover-row">
+                                        <span className="network-row-label">Sync</span>
+                                        <span className={`network-row-value ${syncDisplay.className}`}>
+                                            {syncDisplay.icon} {syncDisplay.label}
+                                        </span>
+                                    </div>
+                                    {syncDetails && (
+                                        <>
+                                            <div className="network-popover-row">
+                                                <span className="network-row-label">Documents</span>
+                                                <span className="network-row-value">{syncDetails.documentCount || 0}</span>
+                                            </div>
+                                            <div className="network-popover-row">
+                                                <span className="network-row-label">Folders</span>
+                                                <span className="network-row-value">{syncDetails.folderCount || 0}</span>
+                                            </div>
+                                            {(syncDetails.missingDocuments > 0 || syncDetails.missingFolders > 0) && (
+                                                <div className="network-popover-row warning">
+                                                    <span className="network-row-label">Missing</span>
+                                                    <span className="network-row-value">{syncDetails.missingDocuments} docs, {syncDetails.missingFolders} folders</span>
+                                                </div>
+                                            )}
+                                            {syncDetails.lastVerified && (
+                                                <div className="network-popover-row">
+                                                    <span className="network-row-label">Verified</span>
+                                                    <span className="network-row-value">{new Date(syncDetails.lastVerified).toLocaleTimeString()}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Tor toggle - inside popover for Electron */}
+                            {isElectron && isFeatureAvailable('tor') && (
+                                <div className="network-popover-section">
+                                    <button 
+                                        type="button" 
+                                        className="network-action-btn"
+                                        onClick={() => { onToggleTor?.(); }}
+                                        role="menuitem"
+                                    >
+                                        <span className="menu-icon">🧅</span>
+                                        <span>{torEnabled ? 'Disconnect from Tor' : 'Connect to Tor'}</span>
+                                        <span className={`tor-status-pill ${torEnabled ? 'on' : 'off'}`}>
+                                            {torEnabled ? 'ON' : 'OFF'}
+                                        </span>
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="network-action-btn"
+                                        onClick={() => { onOpenTorSettings?.(); setShowNetworkPopover(false); }}
+                                        role="menuitem"
+                                    >
+                                        <span className="menu-icon">⚙️</span>
+                                        <span>Tor Settings...</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="network-popover-section network-popover-actions">
                                 {onOpenRelaySettings && (
-                                    <button type="button" className="tor-menu-item" onClick={() => { onOpenRelaySettings(); setShowTorMenu(false); }} role="menuitem">
+                                    <button 
+                                        type="button" 
+                                        className="network-action-btn"
+                                        onClick={() => { onOpenRelaySettings(); setShowNetworkPopover(false); }}
+                                        role="menuitem"
+                                    >
                                         <span className="menu-icon">📡</span>
                                         <span>Relay Settings...</span>
                                     </button>
                                 )}
+                                {activePeers === 0 && !relayConnected && onRequestSync && (
+                                    <button 
+                                        type="button"
+                                        className={`network-action-btn ${isRetrying ? 'retrying' : ''}`}
+                                        onClick={() => { onRequestSync(); }}
+                                        disabled={isRetrying}
+                                        role="menuitem"
+                                    >
+                                        <span className="menu-icon">{isRetrying ? '⟳' : '↻'}</span>
+                                        <span>Retry Connection</span>
+                                    </button>
+                                )}
+                                {onVerifySyncState && (
+                                    <button 
+                                        type="button" 
+                                        className="network-action-btn"
+                                        onClick={() => { onVerifySyncState(); setShowNetworkPopover(false); }}
+                                        role="menuitem"
+                                    >
+                                        <span className="menu-icon">🔍</span>
+                                        <span>Verify Sync</span>
+                                    </button>
+                                )}
+                                {onForceFullSync && (
+                                    <button 
+                                        type="button" 
+                                        className="network-action-btn primary"
+                                        onClick={() => { onForceFullSync(); setShowNetworkPopover(false); }}
+                                        role="menuitem"
+                                    >
+                                        <span className="menu-icon">↻</span>
+                                        <span>Force Full Sync</span>
+                                    </button>
+                                )}
                             </div>
-                        )}
-                    </div>
-                )}
-                
-                {/* Connection status - shown on all platforms */}
-                <div 
-                    className={`connection-status ${connectionStatus.className}`}
-                    data-testid="sync-status"
-                    data-synced={workspaceSynced ? 'true' : 'false'}
-                    data-phase={syncPhase}
-                    title={[
-                        publicIP ? `IP: ${publicIP}` : null,
-                        (totalSeenPeers > 0 || totalCollaborators > 0) 
-                            ? `${activePeers} active / ${totalSeenPeers || totalCollaborators} total peers` 
-                            : null,
-                        relayConnected ? 'Relay connected' : null,
-                        meshStatus?.running 
-                            ? `Mesh: ${meshStatus.connectedPeers || 0} peers, ${meshStatus.knownRelays || 0} relays` 
-                            : null,
-                    ].filter(Boolean).join(' · ') || 'Connection status'}
-                    role="status"
-                    aria-live="polite"
-                    aria-label={`Connection status: ${connectionStatus.label}`}
-                >
-                    <span className="status-dot" aria-hidden="true"></span>
-                    <span>{connectionStatus.label}</span>
-                    {ipDisplay && (
-                        <span className="ip-display" title={`Your public IP: ${publicIP}`}>
-                            ({ipDisplay})
-                        </span>
-                    )}
-                    {relayConnected && (
-                        <span className="relay-indicator" title="Connected to relay server">📡</span>
-                    )}
-                    {activePeers === 0 && !relayConnected && onRequestSync && (
-                        <button 
-                            className={`retry-sync-btn ${isRetrying ? 'retrying' : ''}`}
-                            onClick={onRequestSync}
-                            disabled={isRetrying}
-                            title="Retry connecting to peers"
-                        >
-                            {isRetrying ? '⟳' : '↻'}
-                        </button>
+                        </div>
                     )}
                 </div>
-                
-                {/* Sync verification status indicator */}
-                {syncStatus && syncStatus !== 'idle' && (
-                    <div 
-                        className="sync-status-control" 
-                        ref={syncMenuRef}
-                    >
-                        <button
-                            type="button"
-                            className={`sync-status-btn ${getSyncStatusDisplay().className}`}
-                            onClick={() => setShowSyncDetails(!showSyncDetails)}
-                            title="Sync verification status - click for details"
-                        >
-                            <span className="sync-icon">{getSyncStatusDisplay().icon}</span>
-                            <span className="sync-label">{getSyncStatusDisplay().label}</span>
-                        </button>
-                        
-                        {/* Sync details popover */}
-                        {showSyncDetails && (
-                            <div className="sync-details-menu" role="menu">
-                                <div className="sync-details-header">
-                                    <span className="sync-details-title">Sync Status</span>
-                                    <span className={`sync-details-status ${getSyncStatusDisplay().className}`}>
-                                        {getSyncStatusDisplay().icon} {syncStatus}
-                                    </span>
-                                </div>
-                                <div className="sync-details-body">
-                                    <div className="sync-detail-row">
-                                        <span>Documents:</span>
-                                        <span>{syncDetails?.documentCount || 0}</span>
-                                    </div>
-                                    <div className="sync-detail-row">
-                                        <span>Folders:</span>
-                                        <span>{syncDetails?.folderCount || 0}</span>
-                                    </div>
-                                    {(syncDetails?.missingDocuments > 0 || syncDetails?.missingFolders > 0) && (
-                                        <div className="sync-detail-row warning">
-                                            <span>Missing:</span>
-                                            <span>{syncDetails.missingDocuments} docs, {syncDetails.missingFolders} folders</span>
-                                        </div>
-                                    )}
-                                    {syncDetails?.lastVerified && (
-                                        <div className="sync-detail-row">
-                                            <span>Last verified:</span>
-                                            <span>{new Date(syncDetails.lastVerified).toLocaleTimeString()}</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="sync-details-actions">
-                                    {onVerifySyncState && (
-                                        <button 
-                                            type="button" 
-                                            className="sync-action-btn"
-                                            onClick={() => { onVerifySyncState(); setShowSyncDetails(false); }}
-                                        >
-                                            <span>🔍</span> Verify Sync
-                                        </button>
-                                    )}
-                                    {onForceFullSync && (
-                                        <button 
-                                            type="button" 
-                                            className="sync-action-btn primary"
-                                            onClick={() => { onForceFullSync(); setShowSyncDetails(false); }}
-                                        >
-                                            <span>↻</span> Force Full Sync
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-                
+
+                {/* Collaborators */}
                 {collaborators && collaborators.length > 0 && (
                     <div className="collaborators" ref={containerRef} data-testid="collaborator-list">
                         {visibleCollabs.map((collab, idx) => (

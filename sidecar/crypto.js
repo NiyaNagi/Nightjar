@@ -165,7 +165,8 @@ function decryptUpdate(packed, key) {
         }
         
         const update = padded.slice(4, 4 + originalLength);
-        console.log(`[Crypto] Decrypted successfully: ${originalLength} bytes`);
+        // Use debug level to prevent filling log buffer with routine decrypt messages
+        console.debug(`[Crypto] Decrypted successfully: ${originalLength} bytes`);
 
         return update;
     } catch (e) {

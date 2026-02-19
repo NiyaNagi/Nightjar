@@ -418,11 +418,11 @@ describe('RequestDetail', () => {
     expect(screen.queryByText('Cancel Request')).not.toBeInTheDocument();
   });
 
-  it('calls onClose when close button clicked', () => {
+  it('close button is handled by SlidePanel (not rendered in RequestDetail)', () => {
     const onClose = jest.fn();
     render(<RequestDetail request={req} collaborators={collabs} onClose={onClose} />);
-    fireEvent.click(screen.getByText('✕'));
-    expect(onClose).toHaveBeenCalled();
+    // Header with close button removed — SlidePanel provides close button
+    expect(document.querySelector('.request-detail__close')).toBeNull();
   });
 
   it('renders timeline entries for dates present on request', () => {

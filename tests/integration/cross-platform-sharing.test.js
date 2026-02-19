@@ -187,7 +187,7 @@ async function testAllPlatformsGenerateValidLinks() {
  */
 async function testWebEmbedServerUrl() {
     const entityId = randomHex(32);
-    const serverUrl = 'https://sync.nightjar.io';
+    const serverUrl = 'https://sync.nightjar.co';
     
     const link = mockSharing.generateShareLink({
         entityType: 'workspace',
@@ -217,7 +217,7 @@ async function testWebToElectron() {
         entityType: 'workspace',
         entityId,
         permission: 'editor',
-        serverUrl: 'https://sync.nightjar.io',
+        serverUrl: 'https://sync.nightjar.co',
     });
     
     // "Parse" on Electron
@@ -226,7 +226,7 @@ async function testWebToElectron() {
     assert.equal(parsed.entityType, 'workspace');
     assert.equal(parsed.entityId, entityId);
     assert.equal(parsed.permission, 'editor');
-    assert.equal(parsed.serverUrl, 'https://sync.nightjar.io');
+    assert.equal(parsed.serverUrl, 'https://sync.nightjar.co');
 }
 
 /**
@@ -260,7 +260,7 @@ async function testWebToIOS() {
         entityType: 'folder',
         entityId,
         permission: 'editor',
-        serverUrl: 'https://sync.nightjar.io',
+        serverUrl: 'https://sync.nightjar.co',
     });
     
     const parsed = mockSharing.parseShareLink(link);
@@ -299,14 +299,14 @@ async function testAndroidToElectron() {
         entityType: 'document',
         entityId,
         permission: 'editor',
-        serverUrl: 'https://relay.nightjar.io',
+        serverUrl: 'https://relay.nightjar.co',
     });
     
     const parsed = mockSharing.parseShareLink(link);
     
     assert.equal(parsed.entityType, 'document');
     assert.equal(parsed.entityId, entityId);
-    assert.equal(parsed.serverUrl, 'https://relay.nightjar.io');
+    assert.equal(parsed.serverUrl, 'https://relay.nightjar.co');
 }
 
 /**
@@ -504,10 +504,10 @@ async function testSpecialCharacterPasswordsCrossPlatform() {
  */
 async function testServerUrlPreservation() {
     const serverUrls = [
-        'https://sync.nightjar.io',
+        'https://sync.nightjar.co',
         'https://relay.example.com',
         'http://localhost:8080',
-        'wss://websocket.nightjar.io',
+        'wss://websocket.nightjar.co',
     ];
     
     const entityId = randomHex(32);

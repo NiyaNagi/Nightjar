@@ -137,6 +137,16 @@ export default function AppSettings({ isOpen, onClose }) {
   const [relaySettings, setRelaySettings] = useState({ port: 4445, maxConnections: 10, announceOnDHT: true });
   const [relayStatus, setRelayStatus] = useState({ running: false, activeConnections: 0 });
   
+  // Relay bridge state (connecting THROUGH public relay, not acting AS relay)
+  const [relayBridgeEnabled, setRelayBridgeEnabled] = useState(() => {
+    return localStorage.getItem('Nightjar_relay_bridge_enabled') === 'true';
+  });
+  const [relayBridgeStatus, setRelayBridgeStatus] = useState({ connectedRooms: 0 });
+  const [customRelayUrl, setCustomRelayUrl] = useState(() => {
+    return localStorage.getItem('Nightjar_custom_relay_url') || '';
+  });
+  const [relayBridgeSaved, setRelayBridgeSaved] = useState(false);
+  
   // Notification settings via hook (single source of truth)
   const { settings: notificationSettings, updateSettings: updateNotificationSettings, testSound } = useNotificationSounds();
   
@@ -443,6 +453,37 @@ export default function AppSettings({ isOpen, onClose }) {
       }
     }
   };
+
+  // Toggle relay bridge (connecting THROUGH a public relay for cross-platform sync)
+  const handleToggleRelayBridge = useCallback(async (enable) => {
+    const newEnabled = typeof enable === 'boolean' ? enable : !relayBridgeEnabled;
+    setRelayBridgeEnabled(newEnabled);
+    localStorage.setItem('Nightjar_relay_bridge_enabled', newEnabled.toString());
+
+    if (window.sidecarWs && window.sidecarWs.readyState === WebSocket.OPEN) {
+      try {
+        const customRelays = customRelayUrl.trim() ? [customRelayUrl.trim()] : [];
+        window.sidecarWs.send(JSON.stringify({
+          type: newEnabled ? 'relay-bridge:enable' : 'relay-bridge:disable',
+          payload: { customRelays },
+        }));
+      } catch (err) {
+        console.error('Failed to toggle relay bridge:', err);
+      }
+    }
+  }, [relayBridgeEnabled, customRelayUrl]);
+
+  // Save custom relay URL
+  const handleSaveCustomRelay = useCallback(() => {
+    localStorage.setItem('Nightjar_custom_relay_url', customRelayUrl.trim());
+    setRelayBridgeSaved(true);
+    setTimeout(() => setRelayBridgeSaved(false), 2000);
+
+    // If relay bridge is already enabled, reconnect with new URL
+    if (relayBridgeEnabled) {
+      handleToggleRelayBridge(true);
+    }
+  }, [customRelayUrl, relayBridgeEnabled, handleToggleRelayBridge]);
 
   return (
     <div 
@@ -913,6 +954,57 @@ export default function AppSettings({ isOpen, onClose }) {
                   <div>
                     <strong>Relay Fallback</strong>
                     <p>When no direct P2P peers are available, Nightjar will automatically attempt to connect via relay servers for sync.</p>
+                  </div>
+                </div>
+
+                {/* Connect through Public Relay */}
+                <h3 className="app-settings__section-title" style={{ marginTop: '1.5rem' }}>Connect through Public Relay</h3>
+                
+                <div className="app-settings__info-box" style={{ background: 'var(--color-warning-bg, #fff3cd)', borderColor: 'var(--color-warning-border, #ffc107)' }}>
+                  <span className="app-settings__info-icon">⚠️</span>
+                  <div>
+                    <strong>Public Relay Connection</strong>
+                    <p>When enabled, your encrypted document data is routed through a public relay server to reach peers you can&apos;t connect to directly. All data remains end-to-end encrypted — the relay cannot read your content.</p>
+                  </div>
+                </div>
+
+                <div className="app-settings__field">
+                  <label className="app-settings__toggle">
+                    <input
+                      type="checkbox"
+                      checked={relayBridgeEnabled}
+                      onChange={() => handleToggleRelayBridge()}
+                    />
+                    <span className="app-settings__toggle-label">
+                      Route traffic through public relay
+                    </span>
+                  </label>
+                  <p className="app-settings__hint">
+                    {relayBridgeEnabled
+                      ? `Connected — ${relayBridgeStatus.connectedRooms || 0} room(s) routed through relay`
+                      : 'Disabled — using direct peer-to-peer connections only'}
+                  </p>
+                </div>
+
+                <div className="app-settings__field">
+                  <label className="app-settings__label" htmlFor="custom-relay-url">Custom Relay Server (optional)</label>
+                  <p className="app-settings__hint">Add your own relay server URL. Leave blank to use the default public relay.</p>
+                  <div className="app-settings__input-with-btn">
+                    <input
+                      id="custom-relay-url"
+                      type="text"
+                      className="app-settings__input"
+                      placeholder="wss://relay.night-jar.co"
+                      value={customRelayUrl}
+                      onChange={(e) => setCustomRelayUrl(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="app-settings__btn-secondary"
+                      onClick={handleSaveCustomRelay}
+                    >
+                      {relayBridgeSaved ? '✓ Saved' : 'Save'}
+                    </button>
                   </div>
                 </div>
 

@@ -843,7 +843,7 @@ describe('RequestDetail — getAddress fix', () => {
     );
 
     // The component should still render without the address
-    expect(screen.getByText(/Request #/)).toBeInTheDocument();
+    expect(screen.getByText(/Request Info/)).toBeInTheDocument();
   });
 });
 
@@ -983,7 +983,7 @@ describe('AddressReveal — shipping providers and confirm flow', () => {
   });
 
   it('mark shipped button is disabled until confirmation checkbox is checked', async () => {
-    render(<AddressReveal requestId="req-ar1" reveal={reveal} identity={identity} />);
+    render(<AddressReveal requestId="req-ar1" reveal={reveal} identity={identity} request={{ id: 'req-ar1', status: 'in_progress' }} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Mark Shipped/)).toBeInTheDocument();
@@ -1138,7 +1138,7 @@ describe('E2E Scenario: Producer views address and ships', () => {
   it('producer sees decrypted address and shipping providers in RequestDetail', async () => {
     const req = createTestRequest({
       id: 'req-e2e3',
-      status: 'approved',
+      status: 'in_progress',
       assignedTo: 'producerKey',
       inventorySystemId: 'sys1',
       catalogItemName: 'Widget',
@@ -1248,7 +1248,7 @@ describe('E2E Scenario: Bulk approve with address reveals', () => {
 // ============================================================
 
 describe('RequestDetail — Mark In Progress button', () => {
-  it('shows Mark In Progress button for approved status when onMarkInProgress is provided', () => {
+  it('shows Mark In Progress button for approved status when onMarkInProgress is provided', async () => {
     const req = createTestRequest({
       id: 'req-mip1',
       status: 'approved',
@@ -1256,6 +1256,7 @@ describe('RequestDetail — Mark In Progress button', () => {
       inventorySystemId: 'sys1',
     });
 
+    mockSyncResult.addressReveals = { 'req-mip1': MOCK_REVEAL };
     const onMarkInProgress = jest.fn();
     render(
       <RequestDetail
@@ -1269,10 +1270,12 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    expect(screen.getByTestId('stage-btn-in_progress')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-in-progress')).toBeInTheDocument();
+    });
   });
 
-  it('does NOT show Mark In Progress button as clickable for in_progress status', () => {
+  it('does NOT show Mark In Progress button for in_progress status (shows ship button instead)', async () => {
     const req = createTestRequest({
       id: 'req-mip2',
       status: 'in_progress',
@@ -1280,6 +1283,7 @@ describe('RequestDetail — Mark In Progress button', () => {
       inventorySystemId: 'sys1',
     });
 
+    mockSyncResult.addressReveals = { 'req-mip2': MOCK_REVEAL };
     render(
       <RequestDetail
         request={req}
@@ -1292,12 +1296,14 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    // Button exists but is the active/current stage (disabled)
-    const btn = screen.getByTestId('stage-btn-in_progress');
-    expect(btn).toBeDisabled();
+    // In AddressReveal, in_progress shows ship button, not in-progress button
+    await waitFor(() => {
+      expect(screen.queryByTestId('ar-btn-in-progress')).not.toBeInTheDocument();
+      expect(screen.getByTestId('ar-btn-ship')).toBeInTheDocument();
+    });
   });
 
-  it('stage bar button is safe to click when onMarkInProgress is not provided', () => {
+  it('does not render Mark In Progress button when onMarkInProgress is not provided', () => {
     const req = createTestRequest({
       id: 'req-mip3',
       status: 'approved',
@@ -1305,6 +1311,7 @@ describe('RequestDetail — Mark In Progress button', () => {
       inventorySystemId: 'sys1',
     });
 
+    mockSyncResult.addressReveals = { 'req-mip3': MOCK_REVEAL };
     render(
       <RequestDetail
         request={req}
@@ -1316,12 +1323,11 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    // Button renders in stage bar; clicking it should not throw (optional chaining)
-    const btn = screen.getByTestId('stage-btn-in_progress');
-    expect(() => fireEvent.click(btn)).not.toThrow();
+    // Without onMarkInProgress, the AddressReveal in-progress button is absent
+    expect(screen.queryByTestId('ar-btn-in-progress')).not.toBeInTheDocument();
   });
 
-  it('calls onMarkInProgress with the request when clicked', () => {
+  it('calls onMarkInProgress with the request when clicked', async () => {
     const req = createTestRequest({
       id: 'req-mip4',
       status: 'approved',
@@ -1329,6 +1335,7 @@ describe('RequestDetail — Mark In Progress button', () => {
       inventorySystemId: 'sys1',
     });
 
+    mockSyncResult.addressReveals = { 'req-mip4': MOCK_REVEAL };
     const onMarkInProgress = jest.fn();
     render(
       <RequestDetail
@@ -1342,7 +1349,10 @@ describe('RequestDetail — Mark In Progress button', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('stage-btn-in_progress'));
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-in-progress')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('ar-btn-in-progress'));
     expect(onMarkInProgress).toHaveBeenCalledWith(req);
   });
 
@@ -1398,6 +1408,7 @@ describe('ProducerMyRequests — Mark In Progress via RequestDetail', () => {
     });
 
     mockSyncResult.requests = [req];
+    mockSyncResult.addressReveals = { 'req-mipd1': MOCK_REVEAL };
     mockCtx.yInventoryRequests = createMockYArray([req]);
 
     render(<ProducerMyRequests />);
@@ -1406,15 +1417,15 @@ describe('ProducerMyRequests — Mark In Progress via RequestDetail', () => {
     const card = screen.getByText('#req-mi').closest('.pmr-card');
     fireEvent.click(card);
 
-    // RequestDetail should show with Mark In Progress button (inside the slide panel)
+    // RequestDetail should show with Mark In Progress button via AddressReveal (inside the slide panel)
     await waitFor(() => {
       const panel = document.querySelector('.slide-panel__body');
-      expect(within(panel).getByTestId('stage-btn-in_progress')).toBeInTheDocument();
+      expect(within(panel).getByTestId('ar-btn-in-progress')).toBeInTheDocument();
     });
 
     // Click Mark In Progress inside the slide panel
     const panel = document.querySelector('.slide-panel__body');
-    fireEvent.click(within(panel).getByTestId('stage-btn-in_progress'));
+    fireEvent.click(within(panel).getByTestId('ar-btn-in-progress'));
 
     // Request should be updated to in_progress
     await waitFor(() => {

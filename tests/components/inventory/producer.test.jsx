@@ -380,8 +380,12 @@ describe('AddressReveal', () => {
     });
   });
 
-  it('has mark shipped button (disabled until confirmed)', async () => {
-    render(<AddressReveal requestId="req-reveal1" reveal={reveal} identity={identity} />);
+  it('has mark shipped button (disabled until confirmed) when in_progress', async () => {
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-reveal1', status: 'in_progress', catalogItemName: 'Widget', quantity: 50 }),
+    ]);
+
+    render(<AddressReveal requestId="req-reveal1" reveal={reveal} identity={identity} request={{ id: 'req-reveal1', status: 'in_progress' }} />);
     
     await waitFor(() => {
       expect(screen.getByText(/Mark Shipped/)).toBeInTheDocument();
@@ -392,7 +396,11 @@ describe('AddressReveal', () => {
   });
 
   it('enables mark shipped when confirmation checkbox is checked', async () => {
-    render(<AddressReveal requestId="req-reveal1" reveal={reveal} identity={identity} />);
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-reveal1', status: 'in_progress', catalogItemName: 'Widget', quantity: 50 }),
+    ]);
+
+    render(<AddressReveal requestId="req-reveal1" reveal={reveal} identity={identity} request={{ id: 'req-reveal1', status: 'in_progress' }} />);
     
     await waitFor(() => {
       expect(screen.getByText(/Mark Shipped/)).toBeInTheDocument();

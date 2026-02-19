@@ -54,7 +54,7 @@ export default function ProducerResponseTime({ requests, collaborators, dateRang
     }
 
     const nameMap = {};
-    for (const c of collaborators) {
+    for (const c of (collaborators || [])) {
       nameMap[c.publicKey] = c.displayName || c.publicKey?.slice(0, 8);
     }
 

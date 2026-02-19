@@ -131,6 +131,7 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
     const onChangeCountRef = useRef(0);         // Count onChange calls to skip the first one after mount
     const isReceivingRemoteUpdate = useRef(false); // Track when we're applying a remote update (to skip saving)
     const pendingRemoteUpdateTimeout = useRef(null); // Timeout to clear the remote update flag
+    const queuedLocalSaveRef = useRef(null); // Queue local saves during remote update window instead of dropping them
     
     // Custom presence overlays (Fortune Sheet's API is unreliable)
     const [presenceOverlays, setPresenceOverlays] = useState([]);
@@ -337,9 +338,11 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                         console.log('[Sheet] New remote update detected, enabling protection');
                         isReceivingRemoteUpdate.current = true;
                         
-                        // Cancel any pending debounced save from a previous local edit
-                        // to prevent it from firing and overwriting the remote data
-                        debouncedSaveRef.current?.cancel();
+                        // Queue any pending local save instead of canceling it
+                        // so we can replay it after the protection window closes
+                        if (debouncedSaveRef.current) {
+                            debouncedSaveRef.current.cancel();
+                        }
                         
                         // Clear any pending timeout
                         if (pendingRemoteUpdateTimeout.current) {
@@ -347,10 +350,17 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                         }
                         
                         // Clear the flag after a delay that exceeds the debounce delay (300ms)
-                        // This ensures we don't overwrite remote changes with pending local debounced saves
+                        // Then replay any queued local save that was interrupted
                         pendingRemoteUpdateTimeout.current = setTimeout(() => {
                             isReceivingRemoteUpdate.current = false;
                             console.log('[Sheet] Remote update window closed, saves enabled');
+                            // Replay queued local save if one was interrupted
+                            if (queuedLocalSaveRef.current) {
+                                console.log('[Sheet] Replaying queued local save');
+                                const queuedData = queuedLocalSaveRef.current;
+                                queuedLocalSaveRef.current = null;
+                                debouncedSaveRef.current?.(queuedData);
+                            }
                         }, 350);
                     }
                     
@@ -494,8 +504,12 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             // Debug: log what we're saving
             const cellCount = convertedData?.[0]?.celldata?.length || 0;
             
-            // Use version number to track our saves and distinguish from remote updates
-            const newVersion = Date.now();
+            // Use composite version to avoid collisions between peers
+            // TODO: Migrate to cell-level CRDT (Yjs Y.Map per cell) to eliminate
+            // the JSON-blob full-sheet replacement strategy. This would give true
+            // conflict-free merging at the cell granularity and remove the need
+            // for the remote-update protection window entirely.
+            const newVersion = `${ydoc.clientID}-${Date.now()}`;
             lastSavedVersion.current = newVersion;
             
             console.log('[Sheet] saveToYjs - saving', cellCount, 'cells, version:', newVersion);
@@ -632,11 +646,11 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                 return;
             }
             
-            // CRITICAL: Skip saving if we're in the middle of receiving a remote update
-            // When setData() is called with remote data, Fortune Sheet fires onChange with its
-            // internal merged/stale state. If we save that back, we overwrite the remote update!
+            // During the remote update protection window, queue local edits
+            // instead of dropping them. They'll be replayed when the window closes.
             if (isReceivingRemoteUpdate.current) {
-                console.log('[Sheet] Skipping save - receiving remote update (would overwrite remote data)');
+                console.log('[Sheet] Queueing local save - receiving remote update (will replay after window closes)');
+                queuedLocalSaveRef.current = newData;
                 setData(newData);
                 return;
             }

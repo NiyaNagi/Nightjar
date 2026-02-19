@@ -1,10 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load .env files so VITE_GITHUB_PAT (and any other env vars) are available
+  // The empty prefix '' loads ALL env vars, not just VITE_-prefixed ones
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
   root: 'frontend',
   base: './',  // Use relative paths for Electron file:// protocol compatibility
   plugins: [
@@ -18,7 +23,7 @@ export default defineConfig({
     // Inject app version from package.json
     __APP_VERSION__: JSON.stringify(require('./package.json').version),
     // Inject VITE_GITHUB_PAT for bug report modal (loaded from .env)
-    'process.env.VITE_GITHUB_PAT': JSON.stringify(process.env.VITE_GITHUB_PAT || ''),
+    'process.env.VITE_GITHUB_PAT': JSON.stringify(env.VITE_GITHUB_PAT || ''),
   },
   optimizeDeps: {
     include: ['yjs', 'y-websocket', 'tweetnacl', 'uint8arrays', '@popperjs/core', '@fortune-sheet/react'],
@@ -69,4 +74,5 @@ export default defineConfig({
       },
     },
   },
+  };
 })

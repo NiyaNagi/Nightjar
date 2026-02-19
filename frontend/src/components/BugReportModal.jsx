@@ -20,11 +20,13 @@ import { getLogs } from '../utils/logger';
 import { useToast } from '../contexts/ToastContext';
 import './BugReportModal.css';
 
-// Load PAT from environment variable. In development, create a .env file at the
-// project root with VITE_GITHUB_PAT=your_token. In production builds, inject via
-// CI or move to an external proxy service (e.g. Cloudflare Worker) to avoid
-// shipping credentials in the client bundle.
-const GITHUB_PAT = (typeof process !== 'undefined' && process.env?.VITE_GITHUB_PAT) || '';
+// Load PAT from environment variable lazily so tests can set it after import.
+// In development, create a .env file at the project root with VITE_GITHUB_PAT=your_token.
+// In production builds, inject via CI or move to an external proxy service
+// (e.g. Cloudflare Worker) to avoid shipping credentials in the client bundle.
+function getGitHubPAT() {
+  return (typeof process !== 'undefined' && process.env?.VITE_GITHUB_PAT) || '';
+}
 const GITHUB_API_URL = 'https://api.github.com/repos/niyanagi/nightjar/issues';
 const MAX_ACTION_CHARS = 2000;
 const MAX_RECENT_ACTIONS = 20;
@@ -155,7 +157,7 @@ export async function createGitHubIssue(title, body) {
     method: 'POST',
     headers: {
       'Accept': 'application/vnd.github+json',
-      'Authorization': `Bearer ${GITHUB_PAT}`,
+      'Authorization': `Bearer ${getGitHubPAT()}`,
       'Content-Type': 'application/json',
       'X-GitHub-Api-Version': '2022-11-28',
     },
@@ -190,6 +192,7 @@ function downloadDataUrl(dataUrl, filename) {
 export default function BugReportModal({ isOpen, onClose, context }) {
   const modalRef = useRef(null);
   const titleRef = useRef(null);
+  const prevIsOpenRef = useRef(false);
   const { showToast } = useToast();
 
   const [title, setTitle] = useState('');
@@ -227,9 +230,12 @@ export default function BugReportModal({ isOpen, onClose, context }) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isSubmitting, onClose]);
 
-  // Reset form state when modal opens, auto-populate title from context
+  // Reset form state only when modal first opens (rising edge)
   useEffect(() => {
-    if (isOpen) {
+    const wasOpen = prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+
+    if (isOpen && !wasOpen) {
       setTitle(generateDefaultTitle(context));
       setDescription('');
       setSubmitted(false);
@@ -240,6 +246,15 @@ export default function BugReportModal({ isOpen, onClose, context }) {
       setDiagnosticStatus('idle');
     }
   }, [isOpen, context]);
+
+  // Update title when context changes while modal is already open
+  // (e.g. user switches document). Never touches description.
+  useEffect(() => {
+    if (isOpen && prevIsOpenRef.current) {
+      setTitle(generateDefaultTitle(context));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context]);
 
   const captureScreenshot = useCallback(async () => {
     setScreenshotStatus('capturing');
@@ -282,6 +297,11 @@ export default function BugReportModal({ isOpen, onClose, context }) {
     if (!title.trim()) {
       showToast('Please enter a bug title', 'error');
       titleRef.current?.focus();
+      return;
+    }
+
+    if (!getGitHubPAT()) {
+      showToast('Bug reporting is not available — missing API token', 'error');
       return;
     }
 

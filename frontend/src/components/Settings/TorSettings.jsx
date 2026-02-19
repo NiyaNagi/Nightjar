@@ -295,7 +295,8 @@ export function TorSettings({ isOpen, onClose }) {
           <section className="settings-section">
             <h3>Mobile Relay</h3>
             <p className="section-description">
-              For mobile devices, you can connect through a relay server
+              For mobile devices, connect through a public relay server for cross-platform sync.
+              All data remains end-to-end encrypted — the relay cannot read your content.
             </p>
             
             <label className="relay-toggle">
@@ -311,7 +312,7 @@ export function TorSettings({ isOpen, onClose }) {
               <div className="relay-url-input">
                 <input
                   type="text"
-                  placeholder="wss://relay.example.com"
+                  placeholder="wss://relay.night-jar.co"
                   value={relayUrl}
                   onChange={e => setRelayUrl(e.target.value)}
                 />

@@ -147,6 +147,7 @@ export default function AnalyticsDashboard() {
             requests={requests}
             dateRange={dateRange}
             granularity={granularity}
+            catalogItems={catalogItems}
           />
         </div>
 

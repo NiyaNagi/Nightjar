@@ -47,6 +47,7 @@ const BACKOFF_INITIAL_DELAY = 1000; // Start with 1 second
 const BACKOFF_MAX_DELAY = 60000; // Max 60 seconds
 const BACKOFF_MULTIPLIER = 2; // Double each time
 const BACKOFF_JITTER = 0.3; // 30% jitter
+const BACKOFF_MAX_RETRIES = 15; // Stop retrying after 15 attempts (~8.5 hours cumulative)
 
 /**
  * RelayBridge - Manages connections to public relay servers
@@ -137,6 +138,10 @@ class RelayBridge {
     this.pending.delete(roomName);
     // Graceful degradation: relay is unreachable, continue with direct Hyperswarm P2P
     console.warn(`[RelayBridge] All relay nodes unreachable for ${roomName} — falling back to direct P2P`);
+    
+    // Increment attempt counter BEFORE scheduling reconnect so backoff increases
+    const currentAttempt = this.retryAttempts.get(roomName) || 0;
+    this.retryAttempts.set(roomName, currentAttempt + 1);
     
     // Schedule a background retry so we auto-connect when relay comes online
     if (relays.length > 0) {
@@ -425,6 +430,15 @@ class RelayBridge {
     
     // Get current attempt count and calculate delay
     const attempt = this.retryAttempts.get(roomName) || 0;
+    
+    // Cap retries to prevent infinite reconnect loops (e.g. DNS failures)
+    if (attempt >= BACKOFF_MAX_RETRIES) {
+      console.warn(`[RelayBridge] Max retries (${BACKOFF_MAX_RETRIES}) reached for ${roomName}, giving up`);
+      this.reconnecting.delete(roomName);
+      this.retryAttempts.delete(roomName);
+      return;
+    }
+    
     const delay = this._calculateBackoffDelay(attempt);
     
     console.log(`[RelayBridge] Scheduling reconnect for ${roomName} in ${delay}ms (attempt ${attempt + 1})`);

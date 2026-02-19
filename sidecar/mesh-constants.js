@@ -64,7 +64,7 @@ function getWorkspaceTopicHex(workspaceId) {
  * Hyperswarm P2P if the relay is unreachable.
  */
 const BOOTSTRAP_NODES = [
-  'wss://relay.night-jar.io'
+  'wss://relay.night-jar.co'
 ];
 
 /**

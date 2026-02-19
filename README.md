@@ -161,11 +161,11 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 - Large mode for empty states (auto-rotating), mini mode next to settings icon
 - Click to advance, click-and-hold to pause
 
-### 📊 Status Bar
-- P2P connection status, Tor mode indicator, word/character/cell counts
-- Collaborator avatars with click-to-chat flyout
-- Active peers, relay status, sync phase indicators
-- Sync verification and force-full-sync controls
+### 📊 Status Bar *(Redesigned in v1.7.8)*
+- **Unified SyncChip** — single clickable button showing connection dot, peer count, sync badge (✓/⚠/⟳), relay (📡) and Tor (🧅) indicators
+- **Network Popover** — expandable panel with connection details, sync verification status, Tor toggle, and action buttons (Relay Settings, Retry, Verify Sync, Force Full Sync)
+- Word/character/cell counts and collaborator avatars with click-to-chat flyout
+- Accessible: `role="status"`, `aria-live="polite"`, keyboard navigable
 
 ### 🌐 Privacy & Networking
 - Tor hidden service support (Electron)
@@ -577,7 +577,7 @@ Desktop clients (Electron) participate in the mesh by default to improve peer di
 When you create a share link, Nightjar can embed known relay nodes to help recipients find peers:
 
 ```
-nightjar://w/abc123#p:password&perm:e&nodes:wss%3A%2F%2Frelay1.nightjar.io,wss%3A%2F%2Frelay2.nightjar.io
+nightjar://w/abc123#p:password&perm:e&nodes:wss%3A%2F%2Frelay1.nightjar.co,wss%3A%2F%2Frelay2.nightjar.co
 ```
 
 This allows new users to bootstrap into the mesh even if they haven't discovered any relays yet.
@@ -594,7 +594,7 @@ PUBLIC_URL=wss://relay.your-domain.com docker compose --profile relay up -d
 PUBLIC_URL=wss://your-domain.com docker compose up -d
 ```
 
-The default public relay is `wss://relay.night-jar.io`. Clients will automatically connect when available, and gracefully fall back to direct Hyperswarm P2P if the relay is unreachable.
+The default public relay is `wss://relay.night-jar.co`. Clients will automatically connect when available, and gracefully fall back to direct Hyperswarm P2P if the relay is unreachable.
 
 **Full step-by-step deployment guide:** [docs/RELAY_DEPLOYMENT_GUIDE.md](docs/RELAY_DEPLOYMENT_GUIDE.md)
 
@@ -908,6 +908,19 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.8 - Sync Root Cause Fix, Unified StatusBar & Analytics Enhancement
+- **Critical Fix**: Files not appearing without Force Full Sync — peer-identity handler now sends sync-request for ALL shared workspace topics (DHT-discovered peers were previously skipped)
+- **Critical Fix**: "Verifying…" stuck forever — added 30s safety timeout in both sidecar and frontend; transitions to `failed` if no peer responds
+- **Critical Fix**: Relay bridge infinite reconnect loop — fixed backoff counter never incrementing, added `BACKOFF_MAX_RETRIES = 15` cap, changed guards to use `relayBridgeEnabled` flag
+- **Bug Fix**: PAT missing in bug reports — `vite.config.js` now uses `loadEnv()` to correctly read `.env` files at build time
+- **Bug Fix**: Invisible pie chart buttons on analytics — added explicit CSS for `.id-view-toggle` button variants
+- **Bug Fix**: "Chart library not available" on Mesh bandwidth — replaced CommonJS `require('recharts')` with ES import
+- **Enhancement**: Unified StatusBar SyncChip — replaced 4 separate indicators with single chip + expandable network popover (connection, sync, Tor toggle, actions)
+- **Enhancement**: Per-stage cumulative inflow chart — pipeline stage lines, per-item quantity lines, interactive toggleable legend
+- **Performance**: syncMembers debounce (100ms), crypto log downgrade (`console.debug`), awareness broadcast dedup, fallback Yjs size validation
+- **Infrastructure**: Relay URL migration (`night-jar.io` → `night-jar.co`), relay bridge IPC handlers, build script `clean:release` step
+- **Testing**: 132 suites, 3,876 tests (0 failures) — 67 new tests, 12 updated test files
+
 ### v1.7.7 - README Feature Audit, Release Notes & Documentation
 - **Documentation**: Comprehensive README feature audit — 30+ previously undocumented features added
 - **New sections**: Identity & Security, App Settings, Built-in Help, Bug Reporting, Error Handling, Mascot, Status Bar
@@ -934,7 +947,7 @@ npm run test:e2e:smoke      # Quick smoke tests
 - **Enhancement**: Relay bridge graceful fallback — logs warning and schedules background retry instead of stopping sync
 - **Enhancement**: Tor SOCKS proxy support for relay WebSocket connections (relay-bridge.js)
 - **Enhancement**: P2P bridge suspend/resume — tears down Hyperswarm UDP when Tor is active (relay-only mode) to prevent IP leakage
-- **Enhancement**: Default BOOTSTRAP_NODES now includes `wss://relay.night-jar.io`
+- **Enhancement**: Default BOOTSTRAP_NODES now includes `wss://relay.night-jar.co`
 - **Critical Fix**: `getMap('info')` → `getMap('workspaceInfo')` — fixes workspace metadata never persisting via Yjs
 - **Bug Fix**: Duplicate Yjs observer guard prevents registering update observers more than once per workspace
 - **Bug Fix**: Sync exchange guard prevents redundant sync-state-request messages on duplicate join-topic events

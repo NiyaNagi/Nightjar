@@ -35,7 +35,7 @@ ENV DB_PATH=/app/server/unified/data/nightjar.db
 ENV NIGHTJAR_MODE=host
 
 # Public URL for mesh announcements (required to be discoverable)
-# Example: wss://relay1.nightjar.io or wss://your-domain.com
+# Example: wss://relay1.nightjar.co or wss://your-domain.com
 ENV PUBLIC_URL=
 
 EXPOSE 3000

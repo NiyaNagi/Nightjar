@@ -228,6 +228,84 @@
   text-align: center;
 }
 
+/* ── Stage Transition Buttons ── */
+.ar-stage-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ar-stage-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s;
+}
+
+.ar-stage-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.ar-stage-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ar-stage-btn--forward {
+  background: var(--accent-color, #646cff);
+  color: #fff;
+}
+
+.ar-stage-btn--ship {
+  background: var(--accent-color, #646cff);
+  color: #fff;
+}
+
+.ar-stage-btn--ship:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ar-stage-btn--back {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.88rem;
+  padding: 10px;
+}
+
+.ar-stage-btn--back:hover {
+  background: var(--hover-bg);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+/* ── Unclaim Button — high visibility ── */
+.ar-unclaim-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--error-color, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ar-unclaim-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 /* Request info summary (visible in standalone mode, hidden when embedded) */
 .ar-request-info {
   background: var(--bg-tertiary);
@@ -274,11 +352,4 @@
 .ar-notes-input:focus {
   outline: none;
   border-color: var(--accent-color);
-}
-
-.ar-unclaim-btn {
-  width: 100%;
-  margin-top: 10px;
-  padding: 8px 12px;
-  font-size: 0.85rem;
 }

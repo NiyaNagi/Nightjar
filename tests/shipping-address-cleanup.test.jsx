@@ -309,9 +309,9 @@ describe('AddressReveal — embedded prop', () => {
     });
   });
 
-  it('still shows shipping providers and mark-shipped when embedded', async () => {
+  it('still shows shipping providers and stage buttons when embedded with in_progress status', async () => {
     mockCtx.yInventoryRequests = createMockYArray([
-      createTestRequest({ id: 'req-4', status: 'approved', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+      createTestRequest({ id: 'req-4', status: 'in_progress', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
     ]);
 
     render(
@@ -319,7 +319,11 @@ describe('AddressReveal — embedded prop', () => {
         requestId="req-4"
         reveal={MOCK_REVEAL}
         identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-4', status: 'in_progress' }}
         onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
         onClose={jest.fn()}
         embedded
       />
@@ -744,7 +748,8 @@ describe('E2E: Producer sees address exactly once via RequestDetail', () => {
 
     // Ship With providers should still be available
     expect(screen.getByText('PirateShip')).toBeInTheDocument();
-    expect(screen.getByText('📦 Mark Shipped')).toBeInTheDocument();
+    // Approved status → shows "Mark In Progress" button inside AddressReveal stage buttons
+    expect(screen.getByTestId('ar-btn-in-progress')).toBeInTheDocument();
   });
 });
 
@@ -754,7 +759,7 @@ describe('E2E: Producer sees address exactly once via RequestDetail', () => {
 describe('AddressReveal — mark shipped flow', () => {
   it('enables Mark Shipped button only after confirmation checkbox', async () => {
     mockCtx.yInventoryRequests = createMockYArray([
-      createTestRequest({ id: 'req-ms1', status: 'approved', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+      createTestRequest({ id: 'req-ms1', status: 'in_progress', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
     ]);
 
     render(
@@ -762,7 +767,11 @@ describe('AddressReveal — mark shipped flow', () => {
         requestId="req-ms1"
         reveal={MOCK_REVEAL}
         identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-ms1', status: 'in_progress' }}
         onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
         onClose={jest.fn()}
         embedded
       />
@@ -786,7 +795,7 @@ describe('AddressReveal — mark shipped flow', () => {
   it('calls onShipped callback after marking shipped', async () => {
     const onShipped = jest.fn();
     const yArr = createMockYArray([
-      createTestRequest({ id: 'req-ms2', status: 'approved', catalogItemId: 'cat1', catalogItemName: 'Widget', requestedBy: 'requestorKey' }),
+      createTestRequest({ id: 'req-ms2', status: 'in_progress', catalogItemId: 'cat1', catalogItemName: 'Widget', requestedBy: 'requestorKey' }),
     ]);
     mockCtx.yInventoryRequests = yArr;
     mockCtx.yInventoryAuditLog = createMockYArray([]);
@@ -797,7 +806,11 @@ describe('AddressReveal — mark shipped flow', () => {
         requestId="req-ms2"
         reveal={MOCK_REVEAL}
         identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-ms2', status: 'in_progress' }}
         onShipped={onShipped}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
         onClose={jest.fn()}
         embedded
       />
@@ -820,7 +833,7 @@ describe('AddressReveal — mark shipped flow', () => {
 
   it('allows entering tracking number before shipping', async () => {
     mockCtx.yInventoryRequests = createMockYArray([
-      createTestRequest({ id: 'req-ms3', status: 'approved', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+      createTestRequest({ id: 'req-ms3', status: 'in_progress', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
     ]);
 
     render(
@@ -828,7 +841,11 @@ describe('AddressReveal — mark shipped flow', () => {
         requestId="req-ms3"
         reveal={MOCK_REVEAL}
         identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-ms3', status: 'in_progress' }}
         onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
         onClose={jest.fn()}
         embedded
       />
@@ -952,10 +969,382 @@ describe('AddressReveal CSS — all classes have rules', () => {
       '.ar-decrypt-label',
       '.ar-notes-input',
       '.ar-unclaim-btn',
+      '.ar-stage-buttons',
+      '.ar-stage-btn',
+      '.ar-stage-btn--forward',
+      '.ar-stage-btn--ship',
+      '.ar-stage-btn--back',
     ];
 
     for (const cls of requiredClasses) {
       expect(cssSource).toContain(cls);
     }
+  });
+});
+
+// ============================================================
+// §11 — Round 2: RequestDetail header removed (SlidePanel provides title)
+// ============================================================
+describe('RequestDetail — Round 2: no duplicate header', () => {
+  it('does not render its own h3 header (SlidePanel provides it)', () => {
+    const req = createTestRequest({
+      id: 'req-hdr1',
+      status: 'approved',
+      assignedTo: 'producerKey',
+      catalogItemId: 'cat1',
+      catalogItemName: 'Widget',
+      city: 'Portland',
+      state: 'OR',
+    });
+
+    render(
+      <RequestDetail
+        request={req}
+        isAdmin={false}
+        isProducer={true}
+        collaborators={mockCtx.collaborators}
+        onClose={jest.fn()}
+        onMarkShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+      />
+    );
+
+    // The internal h3 "Request #..." header should be removed
+    const h3s = document.querySelectorAll('h3');
+    const requestH3 = Array.from(h3s).find(h => h.textContent.includes('Request #'));
+    expect(requestH3).toBeUndefined();
+  });
+
+  it('does not render the close button (SlidePanel provides it)', () => {
+    const req = createTestRequest({
+      id: 'req-hdr2',
+      status: 'approved',
+      assignedTo: 'producerKey',
+      catalogItemId: 'cat1',
+      catalogItemName: 'Widget',
+    });
+
+    render(
+      <RequestDetail
+        request={req}
+        isAdmin={false}
+        isProducer={true}
+        collaborators={mockCtx.collaborators}
+        onClose={jest.fn()}
+        onMarkShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+      />
+    );
+
+    expect(document.querySelector('.request-detail__close')).toBeNull();
+  });
+});
+
+// ============================================================
+// §12 — Round 2: Shipping section hidden when no tracking number
+// ============================================================
+describe('RequestDetail — Round 2: shipping section visibility', () => {
+  it('hides Shipping section when no tracking number', () => {
+    const req = createTestRequest({
+      id: 'req-ship-vis1',
+      status: 'approved',
+      catalogItemId: 'cat1',
+      catalogItemName: 'Widget',
+    });
+
+    render(
+      <RequestDetail
+        request={req}
+        isAdmin={true}
+        collaborators={mockCtx.collaborators}
+        onClose={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByText('Shipping')).not.toBeInTheDocument();
+  });
+
+  it('shows Shipping section when tracking number exists', () => {
+    const req = createTestRequest({
+      id: 'req-ship-vis2',
+      status: 'shipped',
+      trackingNumber: '1Z999TEST',
+      catalogItemId: 'cat1',
+      catalogItemName: 'Widget',
+    });
+
+    render(
+      <RequestDetail
+        request={req}
+        isAdmin={true}
+        collaborators={mockCtx.collaborators}
+        onClose={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText('Shipping')).toBeInTheDocument();
+    expect(screen.getByText(/1Z999TEST/)).toBeInTheDocument();
+  });
+});
+
+// ============================================================
+// §13 — Round 2: Stage bar hidden for producers
+// ============================================================
+describe('RequestDetail — Round 2: stage bar hidden for producers', () => {
+  it('does not render the stage bar when isProducer=true', () => {
+    const req = createTestRequest({
+      id: 'req-stage1',
+      status: 'approved',
+      assignedTo: 'producerKey',
+      catalogItemId: 'cat1',
+      catalogItemName: 'Widget',
+    });
+
+    mockSyncResult.addressReveals = { 'req-stage1': MOCK_REVEAL };
+
+    render(
+      <RequestDetail
+        request={req}
+        isAdmin={false}
+        isProducer={true}
+        collaborators={mockCtx.collaborators}
+        onClose={jest.fn()}
+        onMarkShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('stage-bar')).not.toBeInTheDocument();
+  });
+
+  it('still renders the stage bar for admins', () => {
+    const req = createTestRequest({
+      id: 'req-stage2',
+      status: 'approved',
+      assignedTo: 'producerKey',
+      catalogItemId: 'cat1',
+      catalogItemName: 'Widget',
+    });
+
+    render(
+      <RequestDetail
+        request={req}
+        isAdmin={true}
+        isProducer={false}
+        collaborators={mockCtx.collaborators}
+        onClose={jest.fn()}
+        onMarkShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('stage-bar')).toBeInTheDocument();
+  });
+});
+
+// ============================================================
+// §14 — Round 2: AddressReveal stage transition buttons
+// ============================================================
+describe('AddressReveal — Round 2: stage transition buttons', () => {
+  it('shows "Mark In Progress" button when status=approved', async () => {
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-stg1', status: 'approved', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+    ]);
+
+    render(
+      <AddressReveal
+        requestId="req-stg1"
+        reveal={MOCK_REVEAL}
+        identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-stg1', status: 'approved' }}
+        onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+        onClose={jest.fn()}
+        embedded
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-in-progress')).toBeInTheDocument();
+    });
+    expect(screen.getByText('🔨 Mark In Progress')).toBeInTheDocument();
+    // No "Mark Shipped" in approved state
+    expect(screen.queryByTestId('ar-btn-ship')).not.toBeInTheDocument();
+  });
+
+  it('calls onMarkInProgress when clicking the button', async () => {
+    const onMarkInProgress = jest.fn();
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-stg2', status: 'approved', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+    ]);
+
+    render(
+      <AddressReveal
+        requestId="req-stg2"
+        reveal={MOCK_REVEAL}
+        identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-stg2', status: 'approved' }}
+        onShipped={jest.fn()}
+        onMarkInProgress={onMarkInProgress}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+        onClose={jest.fn()}
+        embedded
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-in-progress')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('ar-btn-in-progress'));
+    expect(onMarkInProgress).toHaveBeenCalled();
+  });
+
+  it('shows "Mark Shipped" and "Back to Approved" when status=in_progress', async () => {
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-stg3', status: 'in_progress', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+    ]);
+
+    render(
+      <AddressReveal
+        requestId="req-stg3"
+        reveal={MOCK_REVEAL}
+        identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-stg3', status: 'in_progress' }}
+        onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+        onClose={jest.fn()}
+        embedded
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-ship')).toBeInTheDocument();
+    });
+    expect(screen.getByText('📦 Mark Shipped')).toBeInTheDocument();
+    expect(screen.getByTestId('ar-btn-back-approved')).toBeInTheDocument();
+    expect(screen.getByText('← Back to Approved')).toBeInTheDocument();
+    // No "Mark In Progress" in in_progress state
+    expect(screen.queryByTestId('ar-btn-in-progress')).not.toBeInTheDocument();
+  });
+
+  it('shows "Back to In Progress" and "Back to Approved" when status=shipped', async () => {
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-stg4', status: 'shipped', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+    ]);
+
+    render(
+      <AddressReveal
+        requestId="req-stg4"
+        reveal={MOCK_REVEAL}
+        identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-stg4', status: 'shipped' }}
+        onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+        onClose={jest.fn()}
+        embedded
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-back-in-progress')).toBeInTheDocument();
+    });
+    expect(screen.getByText('← Back to In Progress')).toBeInTheDocument();
+    expect(screen.getByTestId('ar-btn-back-approved')).toBeInTheDocument();
+    expect(screen.getByText('← Back to Approved')).toBeInTheDocument();
+    // No forward buttons in shipped state
+    expect(screen.queryByTestId('ar-btn-in-progress')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ar-btn-ship')).not.toBeInTheDocument();
+  });
+
+  it('calls onRevertToApproved when clicking back button', async () => {
+    const onRevertToApproved = jest.fn();
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-stg5', status: 'in_progress', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+    ]);
+
+    render(
+      <AddressReveal
+        requestId="req-stg5"
+        reveal={MOCK_REVEAL}
+        identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-stg5', status: 'in_progress' }}
+        onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={onRevertToApproved}
+        onRevertToInProgress={jest.fn()}
+        onClose={jest.fn()}
+        embedded
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ar-btn-back-approved')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('ar-btn-back-approved'));
+    expect(onRevertToApproved).toHaveBeenCalled();
+  });
+
+  it('hides tracking/notes inputs when status=shipped', async () => {
+    mockCtx.yInventoryRequests = createMockYArray([
+      createTestRequest({ id: 'req-stg6', status: 'shipped', catalogItemId: 'cat1', catalogItemName: 'Widget' }),
+    ]);
+
+    render(
+      <AddressReveal
+        requestId="req-stg6"
+        reveal={MOCK_REVEAL}
+        identity={PRODUCER_IDENTITY}
+        request={{ id: 'req-stg6', status: 'shipped' }}
+        onShipped={jest.fn()}
+        onMarkInProgress={jest.fn()}
+        onRevertToApproved={jest.fn()}
+        onRevertToInProgress={jest.fn()}
+        onClose={jest.fn()}
+        embedded
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    });
+
+    // Tracking and notes inputs should be hidden when shipped
+    expect(screen.queryByPlaceholderText('e.g., 1Z999AA10123456784')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Any shipping notes...')).not.toBeInTheDocument();
+  });
+});
+
+// ============================================================
+// §15 — Round 2: Unclaim button has improved visibility
+// ============================================================
+describe('AddressReveal — Round 2: unclaim button styling', () => {
+  it('has high-visibility styling in the CSS', () => {
+    const fs = require('fs');
+    const cssSource = fs.readFileSync(
+      require('path').join(__dirname, '..', 'frontend', 'src', 'components', 'inventory', 'producer', 'AddressReveal.css'),
+      'utf8'
+    );
+
+    // Should have error-color styling for visibility
+    const unclaimSection = cssSource.substring(cssSource.indexOf('.ar-unclaim-btn'));
+    expect(unclaimSection).toContain('rgba(239, 68, 68');
+    expect(unclaimSection).toContain('font-weight: 600');
   });
 });

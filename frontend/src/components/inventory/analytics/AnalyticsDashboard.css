@@ -266,6 +266,35 @@
   gap: 4px;
 }
 
+/* Analytics toggle buttons (Pie / Treemap) */
+.id-view-toggle .btn-sm {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #313244);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.id-view-toggle .btn-primary {
+  background: var(--accent-color, #6366f1);
+  color: #fff;
+  border-color: var(--accent-color, #6366f1);
+}
+
+.id-view-toggle .btn-secondary {
+  background: var(--bg-tertiary, #1e1e2e);
+  color: var(--text-secondary, #a6adc8);
+  border-color: var(--border-color, #313244);
+}
+
+.id-view-toggle .btn-secondary:hover {
+  background: var(--bg-hover, #313244);
+  color: var(--text-primary, #cdd6f4);
+}
+
 /* Pipeline funnel */
 .pipeline-funnel {
   width: 100%;

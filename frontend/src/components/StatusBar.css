@@ -768,6 +768,217 @@
     background: var(--accent-hover, #6d28d9);
 }
 
+/* ── Unified SyncChip ── */
+.sync-chip-wrapper {
+    position: relative;
+}
+
+.sync-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--surface-2, #2d2d44);
+    border: 1px solid var(--border-color, #3d3d5c);
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--text-primary, #e4e4e7);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.sync-chip:hover {
+    background: var(--surface-3, #3d3d5c);
+    border-color: var(--accent-color, #7c3aed);
+}
+
+.sync-chip:focus-visible {
+    outline: 2px solid var(--accent-color, #7c3aed);
+    outline-offset: 2px;
+}
+
+.sync-chip.connected {
+    border-color: var(--success-color, #22c55e);
+}
+
+.sync-chip.connecting,
+.sync-chip.syncing {
+    border-color: var(--warning-color, #f59e0b);
+}
+
+.sync-chip.error {
+    border-color: var(--error-color, #ef4444);
+}
+
+.sync-chip-dot {
+    font-size: 0.65rem;
+}
+
+.sync-chip.connected .sync-chip-dot { color: var(--success-color, #22c55e); }
+.sync-chip.connecting .sync-chip-dot,
+.sync-chip.syncing .sync-chip-dot { color: var(--warning-color, #f59e0b); animation: pulse 1.5s infinite; }
+.sync-chip.error .sync-chip-dot { color: var(--error-color, #ef4444); }
+.sync-chip.warning .sync-chip-dot { color: var(--warning-color, #f59e0b); }
+.sync-chip.offline .sync-chip-dot { color: var(--text-secondary, #71717a); }
+
+.sync-chip-label {
+    font-weight: 600;
+}
+
+.sync-chip-badge {
+    font-size: 0.7rem;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: var(--surface-3, #3d3d5c);
+}
+
+.sync-chip-badge.sync-verified { color: var(--success-color, #22c55e); }
+.sync-chip-badge.sync-verifying,
+.sync-chip-badge.sync-syncing { color: var(--info-color, #3b82f6); animation: spin 1s linear infinite; }
+.sync-chip-badge.sync-incomplete { color: var(--warning-color, #f59e0b); }
+.sync-chip-badge.sync-failed { color: var(--error-color, #ef4444); }
+.sync-chip-badge.sync-no-peers { opacity: 0.6; }
+
+.sync-chip-relay,
+.sync-chip-tor {
+    font-size: 0.75rem;
+}
+
+.sync-chip-arrow {
+    font-size: 0.55rem;
+    opacity: 0.6;
+    margin-left: -2px;
+}
+
+/* ── Network Popover ── */
+.network-popover {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    background: var(--surface-2, #2a2a3e);
+    border: 1px solid var(--border-color, #3a3a4e);
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+    min-width: 280px;
+    max-width: 340px;
+    z-index: var(--z-popover);
+    overflow: hidden;
+}
+
+.network-popover-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color, #3a3a4e);
+    background: var(--surface-3, #1e1e2e);
+}
+
+.network-popover-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.network-popover-section {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color, #3a3a4e);
+}
+
+.network-popover-section:last-child {
+    border-bottom: none;
+}
+
+.network-popover-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 16px;
+    font-size: 0.8rem;
+}
+
+.network-row-label {
+    color: var(--text-secondary, #a1a1aa);
+}
+
+.network-row-value {
+    color: var(--text-primary, #e4e4e7);
+    font-weight: 500;
+}
+
+.network-row-value.connected { color: var(--success-color, #22c55e); }
+.network-row-value.connecting { color: var(--warning-color, #f59e0b); }
+.network-row-value.error { color: var(--error-color, #ef4444); }
+.network-row-value.sync-verified { color: var(--success-color, #22c55e); }
+.network-row-value.sync-verifying { color: var(--info-color, #3b82f6); }
+.network-row-value.sync-incomplete { color: var(--warning-color, #f59e0b); }
+.network-row-value.sync-failed { color: var(--error-color, #ef4444); }
+.network-row-value.sync-no-peers { opacity: 0.6; }
+
+.network-popover-row.warning .network-row-value {
+    color: var(--warning-color, #f59e0b);
+}
+
+/* Network popover action buttons */
+.network-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary, #fff);
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.network-action-btn:hover {
+    background: var(--surface-3, #3a3a4e);
+}
+
+.network-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.network-action-btn .menu-icon {
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.network-action-btn.primary {
+    color: var(--accent-color, #7c3aed);
+    font-weight: 600;
+}
+
+.network-action-btn.retrying .menu-icon {
+    animation: spin 1s linear infinite;
+}
+
+/* Tor status pill inside popover */
+.tor-status-pill {
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.tor-status-pill.on {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--success-color, #22c55e);
+}
+
+.tor-status-pill.off {
+    background: var(--surface-3, #3d3d5c);
+    color: var(--text-secondary, #a1a1aa);
+}
+
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }

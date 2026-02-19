@@ -123,6 +123,8 @@ function setupFailedFetch(statusCode = 422, message = 'Validation Failed') {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
+  // Ensure the lazy PAT getter returns a value for submission tests
+  process.env.VITE_GITHUB_PAT = 'test-pat-for-jest';
   mockGetLogs.mockReturnValue([
     { level: 'behavior', timestamp: '2025-01-01T12:00:00Z', category: 'editor', event: 'opened file' },
     { level: 'behavior', timestamp: '2025-01-01T12:01:00Z', category: 'editor', event: 'saved file' },

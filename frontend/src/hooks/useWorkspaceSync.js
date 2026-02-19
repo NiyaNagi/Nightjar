@@ -693,14 +693,20 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     };
     
     // Sync members map (keyed by publicKey for deduplication)
+    // Debounced to prevent 500+/sec React state updates from awareness heartbeat writes
+    let syncMembersTimer = null;
     const syncMembers = () => {
       if (cleanedUp) return; // Prevent state updates after cleanup
-      const membersObj = {};
-      yMembers.forEach((value, key) => {
-        membersObj[key] = value;
-      });
-      setMembers(membersObj);
-      console.log(`[WorkspaceSync] syncMembers called, count: ${Object.keys(membersObj).length}`);
+      if (syncMembersTimer) clearTimeout(syncMembersTimer);
+      syncMembersTimer = setTimeout(() => {
+        if (cleanedUp) return;
+        const membersObj = {};
+        yMembers.forEach((value, key) => {
+          membersObj[key] = value;
+        });
+        setMembers(membersObj);
+        console.log(`[WorkspaceSync] syncMembers called, count: ${Object.keys(membersObj).length}`);
+      }, 100);
     };
     
     // Sync kicked map and check if current user is kicked
@@ -883,6 +889,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     // Cleanup on workspace change
     return () => {
       cleanedUp = true;
+      // Clear debounce timer for syncMembers
+      if (syncMembersTimer) clearTimeout(syncMembersTimer);
       // Close key registration socket if still open
       if (keySocket && (keySocket.readyState === WebSocket.OPEN || keySocket.readyState === WebSocket.CONNECTING)) {
         keySocket.close();

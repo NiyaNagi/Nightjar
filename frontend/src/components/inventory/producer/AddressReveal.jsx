@@ -13,9 +13,9 @@ import { useToast } from '../../../contexts/ToastContext';
 import './AddressReveal.css';
 
 /**
- * @param {{ requestId: string, reveal: Object, identity: Object, onShipped: Function, onClose: Function }} props
+ * @param {{ requestId: string, reveal: Object, identity: Object, request?: Object, onShipped: Function, onMarkInProgress?: Function, onRevertToApproved?: Function, onRevertToInProgress?: Function, onClose: Function, embedded?: boolean }} props
  */
-export default function AddressReveal({ requestId, reveal, identity, onShipped, onClose, embedded = false }) {
+export default function AddressReveal({ requestId, reveal, identity, request, onShipped, onMarkInProgress, onRevertToApproved, onRevertToInProgress, onClose, embedded = false }) {
   const ctx = useInventory();
   const { showToast } = useToast();
   const [address, setAddress] = useState(null);
@@ -238,47 +238,105 @@ export default function AddressReveal({ requestId, reveal, identity, onShipped, 
       )}
 
       <div className="ar-ship-section">
-        <label className="ar-tracking-label">
-          Tracking Number (optional)
-          <input
-            type="text"
-            className="ar-tracking-input"
-            value={trackingNumber}
-            onChange={e => setTrackingNumber(e.target.value)}
-            placeholder="e.g., 1Z999AA10123456784"
-          />
-        </label>
+        {/* Tracking & notes — only when not yet shipped */}
+        {(!request || request.status !== 'shipped') && (
+          <>
+            <label className="ar-tracking-label">
+              Tracking Number (optional)
+              <input
+                type="text"
+                className="ar-tracking-input"
+                value={trackingNumber}
+                onChange={e => setTrackingNumber(e.target.value)}
+                placeholder="e.g., 1Z999AA10123456784"
+              />
+            </label>
 
-        <label className="ar-tracking-label">
-          Notes (optional)
-          <textarea
-            className="ar-notes-input"
-            value={shippingNotes}
-            onChange={e => setShippingNotes(e.target.value)}
-            placeholder="Any shipping notes..."
-            rows={2}
-          />
-        </label>
+            <label className="ar-tracking-label">
+              Notes (optional)
+              <textarea
+                className="ar-notes-input"
+                value={shippingNotes}
+                onChange={e => setShippingNotes(e.target.value)}
+                placeholder="Any shipping notes..."
+                rows={2}
+              />
+            </label>
+          </>
+        )}
 
-        <label className="ar-confirm-label">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={e => setConfirmed(e.target.checked)}
-          />
-          I've recorded the shipping info and am ready to mark this as shipped
-        </label>
+        {/* Stage transition buttons */}
+        <div className="ar-stage-buttons" data-testid="ar-stage-buttons">
+          {/* Forward: Approved → In Progress */}
+          {request?.status === 'approved' && onMarkInProgress && (
+            <button
+              className="ar-stage-btn ar-stage-btn--forward"
+              onClick={onMarkInProgress}
+              data-testid="ar-btn-in-progress"
+            >
+              🔨 Mark In Progress
+            </button>
+          )}
+
+          {/* Forward: In Progress → Shipped (with confirm) */}
+          {request?.status === 'in_progress' && (
+            <>
+              <label className="ar-confirm-label">
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={e => setConfirmed(e.target.checked)}
+                />
+                I've recorded the shipping info and am ready to mark this as shipped
+              </label>
+              <button
+                className="ar-stage-btn ar-stage-btn--ship"
+                disabled={!confirmed || shipping}
+                onClick={handleMarkShipped}
+                data-testid="ar-btn-ship"
+              >
+                {shipping ? 'Processing…' : '📦 Mark Shipped'}
+              </button>
+            </>
+          )}
+
+          {/* Backward: In Progress → Approved */}
+          {request?.status === 'in_progress' && onRevertToApproved && (
+            <button
+              className="ar-stage-btn ar-stage-btn--back"
+              onClick={onRevertToApproved}
+              data-testid="ar-btn-back-approved"
+            >
+              ← Back to Approved
+            </button>
+          )}
+
+          {/* Backward: Shipped → In Progress */}
+          {request?.status === 'shipped' && onRevertToInProgress && (
+            <button
+              className="ar-stage-btn ar-stage-btn--back"
+              onClick={onRevertToInProgress}
+              data-testid="ar-btn-back-in-progress"
+            >
+              ← Back to In Progress
+            </button>
+          )}
+
+          {/* Backward: Shipped → Approved */}
+          {request?.status === 'shipped' && onRevertToApproved && (
+            <button
+              className="ar-stage-btn ar-stage-btn--back"
+              onClick={onRevertToApproved}
+              data-testid="ar-btn-back-approved"
+            >
+              ← Back to Approved
+            </button>
+          )}
+        </div>
 
         <button
-          className="ar-ship-btn"
-          disabled={!confirmed || shipping}
-          onClick={handleMarkShipped}
-        >
-          {shipping ? 'Processing…' : '📦 Mark Shipped'}
-        </button>
-
-        <button
-          className="ar-unclaim-btn btn-sm btn-secondary"
+          className="ar-unclaim-btn"
+          data-testid="ar-unclaim-btn"
           onClick={() => {
             const yArr = ctx.yInventoryRequests;
             if (yArr) {

@@ -157,7 +157,7 @@ When sharing from mobile:
 
 Example mobile-generated link:
 ```
-Nightjar://w/abc123#k:base64key&perm:e&srv:https%3A%2F%2Fapp.Nightjar.io
+Nightjar://w/abc123#k:base64key&perm:e&srv:https%3A%2F%2Fapp.nightjar.co
 ```
 
 ### Identity Storage

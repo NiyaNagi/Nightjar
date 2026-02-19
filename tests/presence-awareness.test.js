@@ -116,15 +116,17 @@ describe('Source-code contract: sidecar/index.js', () => {
     expect(src).toContain('broadcastAwarenessUpdate(capturedWorkspaceId, capturedTopicHex, fullPayload)');
   });
 
-  test('pushes awareness on peer-joined', () => {
-    expect(src).toContain('Broadcast awareness');
-    expect(src).toContain('broadcastAwareness(topic,');
-    expect(src).toMatch(/peer-joined.*push awareness|push awareness.*peer-joined/is);
+  test('pushes awareness on peer-joined via sync-state-request handler', () => {
+    // Awareness is now broadcast via the sync-state-request handler when a peer joins
+    // (handleSyncStateRequest sends awareness state), not duplicated in peer-joined
+    expect(src).toContain('Broadcast awareness state to all P2P peers');
+    expect(src).toContain('broadcastAwareness(topicHex,');
   });
 
-  test('peer-joined awareness push has 500 ms delay', () => {
-    // setTimeout inside peer-joined handler
-    expect(src).toMatch(/setTimeout\(\s*\(\)\s*=>\s*\{[\s\S]*?broadcastAwareness[\s\S]*?\},\s*500\)/);
+  test('peer-joined triggers sync-request which includes awareness', () => {
+    // peer-joined sends sync-request, which triggers handleSyncStateRequest,
+    // which sends awareness state
+    expect(src).toMatch(/peer-joined.*sendSyncRequest/s);
   });
 });
 

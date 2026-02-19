@@ -54,7 +54,7 @@ const RATE_LIMIT_MAX = 50;
 // - relay: Signaling only + mesh participation, no persistence
 // - private: Full features, no mesh (for private deployments)
 const SERVER_MODE = process.env.NIGHTJAR_MODE || SERVER_MODES.HOST;
-const PUBLIC_URL = process.env.PUBLIC_URL || null; // e.g., wss://relay1.nightjar.io
+const PUBLIC_URL = process.env.PUBLIC_URL || null; // e.g., wss://relay1.nightjar.co
 
 // Mesh participation: enabled for host and relay modes, disabled for private
 const MESH_ENABLED = SERVER_MODE !== SERVER_MODES.PRIVATE;

@@ -1,10 +1,10 @@
-﻿console.log('[Sidecar] Starting up...');
+console.log('[Sidecar] Starting up...');
 const startTime = Date.now();
 
 // Debug mode - reduces verbose logging in hot paths for better performance
 const DEBUG_MODE = process.env.NIGHTJAR_DEBUG === 'true';
 
-// Add global error handlers — use graceful shutdown instead of hard exit
+// Add global error handlers � use graceful shutdown instead of hard exit
 // to ensure databases are flushed, UPnP ports unmapped, and connections closed
 let _fatalShutdownTriggered = false;
 process.on('uncaughtException', (error) => {
@@ -597,7 +597,7 @@ async function loadPersistedData(docName, doc, key) {
         if (!isLegacy && !isP2P) continue;
         
         // Filter P2P entries: only apply updates belonging to this document
-        // P2P keys have format "p2p:<docName>:<id>" — skip entries for other documents
+        // P2P keys have format "p2p:<docName>:<id>" � skip entries for other documents
         if (isP2P) {
             const p2pDocName = dbKey.split(':')[1];
             if (p2pDocName && p2pDocName !== docName) continue;
@@ -977,7 +977,7 @@ async function persistMetadataFromYjs(workspaceId, metaDoc) {
                 docsPersisted++;
             }
         }
-        console.log(`[P2P-SYNC-PERSIST] ✓ Persisted ${docsPersisted} documents to LevelDB`);
+        console.log(`[P2P-SYNC-PERSIST] ? Persisted ${docsPersisted} documents to LevelDB`);
         
         // 2. Persist folder metadata
         const yFolders = metaDoc.getMap('folders');
@@ -997,7 +997,7 @@ async function persistMetadataFromYjs(workspaceId, metaDoc) {
                 foldersPersisted++;
             }
         }
-        console.log(`[P2P-SYNC-PERSIST] ✓ Persisted ${foldersPersisted} folders to LevelDB`);
+        console.log(`[P2P-SYNC-PERSIST] ? Persisted ${foldersPersisted} folders to LevelDB`);
         
         // 3. Update workspace name from Yjs if present
         const yInfo = metaDoc.getMap('workspaceInfo');
@@ -1010,7 +1010,7 @@ async function persistMetadataFromYjs(workspaceId, metaDoc) {
                     if (existing.name !== syncedName && syncedName !== 'Shared Workspace') {
                         existing.name = syncedName;
                         await saveWorkspaceMetadata(workspaceId, existing);
-                        console.log(`[P2P-SYNC-PERSIST] ✓ Updated workspace name to: ${syncedName}`);
+                        console.log(`[P2P-SYNC-PERSIST] ? Updated workspace name to: ${syncedName}`);
                     }
                 }
             } catch (wsErr) {
@@ -1040,7 +1040,7 @@ async function persistMetadataFromYjs(workspaceId, metaDoc) {
         
         console.log(`[P2P-SYNC-PERSIST] ==========================================`);
     } catch (err) {
-        console.error(`[P2P-SYNC-PERSIST] ✗ Error persisting metadata:`, err.message);
+        console.error(`[P2P-SYNC-PERSIST] ? Error persisting metadata:`, err.message);
         console.log(`[P2P-SYNC-PERSIST] ==========================================`);
     }
 }
@@ -1184,9 +1184,9 @@ async function migrateWorkspaceServerUrls() {
     await metadataDbReady;
     
     const fakeRelayPatterns = [
-        'relay1.nightjar.io',
-        'relay2.nightjar.io',
-        'relay3.nightjar.io'
+        'relay1.nightjar.co',
+        'relay2.nightjar.co',
+        'relay3.nightjar.co'
     ];
     
     let migrationCount = 0;
@@ -1582,7 +1582,7 @@ async function handleMetadataMessage(ws, parsed) {
             break;
         
         case 'index-documents': {
-            // Index closed documents for search – loads from LevelDB, extracts text
+            // Index closed documents for search � loads from LevelDB, extracts text
             const docsToIndex = parsed.documents || [];
             console.log(`[Sidecar] Indexing ${docsToIndex.length} documents for search...`);
             const results = [];
@@ -1629,8 +1629,8 @@ async function handleMetadataMessage(ws, parsed) {
                         const start = Math.max(0, idx - 40);
                         const end = Math.min(text.length, idx + searchQuery.length + 40);
                         let snippet = text.slice(start, end).replace(/\n+/g, ' ');
-                        if (start > 0) snippet = '…' + snippet;
-                        if (end < text.length) snippet += '…';
+                        if (start > 0) snippet = '�' + snippet;
+                        if (end < text.length) snippet += '�';
                         searchResults.push({ docId: id, type, snippet });
                     }
                 } catch (e) { /* skip */ }
@@ -1658,7 +1658,7 @@ async function handleMetadataMessage(ws, parsed) {
                 // RELAY-ONLY MODE: Suspend Hyperswarm to prevent IP leakage via UDP DHT.
                 // All sync will go through the relay server (routed via Tor SOCKS proxy).
                 if (p2pBridge && p2pBridge.isInitialized) {
-                    console.log('[Sidecar] Entering relay-only mode — suspending Hyperswarm (IP privacy)');
+                    console.log('[Sidecar] Entering relay-only mode � suspending Hyperswarm (IP privacy)');
                     p2pBridge.suspend().catch(err => {
                         console.error('[Sidecar] Error suspending P2P bridge:', err);
                     });
@@ -1681,7 +1681,7 @@ async function handleMetadataMessage(ws, parsed) {
                 
                 // Resume Hyperswarm connections (direct P2P)
                 if (p2pBridge && p2pBridge.isSuspended) {
-                    console.log('[Sidecar] Exiting relay-only mode — resuming Hyperswarm');
+                    console.log('[Sidecar] Exiting relay-only mode � resuming Hyperswarm');
                     p2pBridge.resume().catch(err => {
                         console.error('[Sidecar] Error resuming P2P bridge:', err);
                     });
@@ -1773,7 +1773,7 @@ async function handleMetadataMessage(ws, parsed) {
                             
                             // Register for Yjs P2P bridging - CRITICAL for responding to sync requests
                             registerWorkspaceTopic(wsData.id, wsData.topicHash);
-                            console.log('[Sidecar] ✓ Registered workspace topic for P2P bridging');
+                            console.log('[Sidecar] ? Registered workspace topic for P2P bridging');
                         } catch (joinErr) {
                             console.error('[Sidecar] Failed to join workspace topic:', joinErr);
                         }
@@ -1930,9 +1930,9 @@ async function handleMetadataMessage(ws, parsed) {
                                         console.log(`[Sidecar] Queued sync-request for ${peerKey.slice(0, 16)}...`);
                                     }
                                     await p2pBridge.connectToPeer(peerKey);
-                                    console.log(`[Sidecar] âœ“ Connected to bootstrap peer: ${peerKey.slice(0, 16)}...`);
+                                    console.log(`[Sidecar] ✓ Connected to bootstrap peer: ${peerKey.slice(0, 16)}...`);
                                 } catch (e) {
-                                    console.error(`[Sidecar] âœ— Failed to connect to peer ${peerKey.slice(0, 16)}:`, e.message);
+                                    console.error(`[Sidecar] ✗ Failed to connect to peer ${peerKey.slice(0, 16)}:`, e.message);
                                 }
                             }
                             
@@ -1953,10 +1953,10 @@ async function handleMetadataMessage(ws, parsed) {
                                 }, 500); // Short delay for connection to register
                             }
                         } else {
-                            console.warn('[Sidecar] âš  No bootstrap peers provided');
+                            console.warn('[Sidecar] ⚠ No bootstrap peers provided');
                         }
                     } else {
-                        console.error('[Sidecar] âœ— Cannot join P2P: P2P not initialized or bridge not ready');
+                        console.error('[Sidecar] ✗ Cannot join P2P: P2P not initialized or bridge not ready');
                     }
                     
                     ws.send(JSON.stringify({ type: 'workspace-joined', workspace: joinWsData }));
@@ -2405,6 +2405,121 @@ async function handleMetadataMessage(ws, parsed) {
             }
             break;
         
+        // --- Relay Bridge Management (Connect THROUGH public relay) ---
+        case 'relay-bridge:enable':
+            try {
+                relayBridgeEnabled = true;
+                console.log('[Sidecar] Relay bridge enabled by user');
+                
+                // Optionally set custom relay URLs
+                const { customRelays } = parsed.payload || {};
+                if (customRelays && Array.isArray(customRelays) && customRelays.length > 0) {
+                    // Store custom relays for relay-bridge to use
+                    process.env.RELAY_OVERRIDE = customRelays[0];
+                    console.log(`[Sidecar] Custom relay URL set: ${customRelays[0]}`);
+                }
+                
+                // Connect all active workspace docs through the relay
+                for (const [roomName, doc] of docs) {
+                    if (roomName.startsWith('workspace-meta:') || roomName.startsWith('doc-')) {
+                        try {
+                            await relayBridge.connect(roomName, doc);
+                        } catch (connectErr) {
+                            console.warn(`[Sidecar] Relay connect for ${roomName} failed:`, connectErr.message);
+                        }
+                    }
+                }
+                
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:status',
+                    enabled: true,
+                    connectedRooms: relayBridge.connections.size,
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to enable relay bridge:', err);
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:status',
+                    enabled: false,
+                    error: err.message,
+                }));
+            }
+            break;
+        
+        case 'relay-bridge:disable':
+            try {
+                relayBridgeEnabled = false;
+                console.log('[Sidecar] Relay bridge disabled by user');
+                
+                // Disconnect all relay connections
+                if (relayBridge) {
+                    relayBridge.disconnectAll();
+                }
+                
+                // Clear any custom relay override
+                delete process.env.RELAY_OVERRIDE;
+                
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:status',
+                    enabled: false,
+                    connectedRooms: 0,
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to disable relay bridge:', err);
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:status',
+                    enabled: false,
+                    error: err.message,
+                }));
+            }
+            break;
+        
+        case 'relay-bridge:status':
+            try {
+                const connectedRooms = relayBridge ? relayBridge.connections.size : 0;
+                const rooms = relayBridge
+                    ? Array.from(relayBridge.connections.keys()).map(room => ({
+                        room,
+                        status: relayBridge.connections.get(room)?.status || 'unknown',
+                    }))
+                    : [];
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:status',
+                    enabled: relayBridgeEnabled,
+                    connectedRooms,
+                    rooms,
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to get relay bridge status:', err);
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:status',
+                    enabled: relayBridgeEnabled,
+                    connectedRooms: 0,
+                    error: err.message,
+                }));
+            }
+            break;
+        
+        case 'relay-bridge:getConfig':
+            try {
+                const { BOOTSTRAP_NODES: bootstrapNodes } = require('./mesh-constants');
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:config',
+                    defaultRelays: bootstrapNodes,
+                    customRelay: process.env.RELAY_OVERRIDE || null,
+                    enabled: relayBridgeEnabled,
+                }));
+            } catch (err) {
+                console.error('[Sidecar] Failed to get relay bridge config:', err);
+                ws.send(JSON.stringify({
+                    type: 'relay-bridge:config',
+                    defaultRelays: [],
+                    customRelay: null,
+                    enabled: relayBridgeEnabled,
+                    error: err.message,
+                }));
+            }
+            break;
+        
         // --- Identity Management ---
         case 'list-identities':
             try {
@@ -2560,7 +2675,7 @@ async function handleMetadataMessage(ws, parsed) {
                 }
                 
                 // Try relay as fallback if no direct peers
-                if (syncAttempts === 0 && relayBridge) {
+                if (syncAttempts === 0 && relayBridgeEnabled) {
                     const roomName = `workspace-meta:${syncWsId}`;
                     const doc = docs.get(roomName);
                     if (doc) {
@@ -2879,9 +2994,9 @@ async function startServers() {
                 }
                 
                 if (upnpStatus.enabled) {
-                    console.log('[Sidecar] âœ“ UPnP auto-configuration successful');
+                    console.log('[Sidecar] ✓ UPnP auto-configuration successful');
                 } else {
-                    console.log('[Sidecar] âš  UPnP unavailable - manual port forwarding may be required');
+                    console.log('[Sidecar] ⚠ UPnP unavailable - manual port forwarding may be required');
                 }
             })(),
             new Promise(resolve => setTimeout(() => {
@@ -3231,7 +3346,7 @@ function setupYjsP2PBridge() {
     // CRITICAL FIX: When a peer joins a topic (via DHT discovery or direct connect),
     // send them an explicit sync-request so we get THEIR state too.
     // Without this, peers discovered via DHT (not lastKnownPeers) never trigger
-    // a bidirectional sync — they only get OUR state via the sync-state-request handler.
+    // a bidirectional sync � they only get OUR state via the sync-state-request handler.
     hyperswarm.on('peer-joined', ({ peerId, topic }) => {
         const workspaceId = topicToWorkspace.get(topic);
         if (workspaceId) {
@@ -3390,7 +3505,7 @@ async function handleSyncStateRequest(peerId, topicHex) {
         // Find the workspace ID for this topic
         const workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            console.warn(`[P2P-SYNC-STATE] ✗ Unknown topic - not registered`);
+            console.warn(`[P2P-SYNC-STATE] ? Unknown topic - not registered`);
             return;
         }
         
@@ -3405,9 +3520,9 @@ async function handleSyncStateRequest(peerId, topicHex) {
                 // Use getYDoc to create proper WSSharedDoc with awareness
                 doc = getYDoc(roomName);
                 await loadPersistedData(roomName, doc, key);
-                console.log(`[P2P-SYNC-STATE] ✓ Loaded doc from persistence`);
+                console.log(`[P2P-SYNC-STATE] ? Loaded doc from persistence`);
             } else {
-                console.warn(`[P2P-SYNC-STATE] ✗ Doc not found and no key for: ${roomName}`);
+                console.warn(`[P2P-SYNC-STATE] ? Doc not found and no key for: ${roomName}`);
                 return;
             }
         }
@@ -3426,7 +3541,7 @@ async function handleSyncStateRequest(peerId, topicHex) {
         const messageStr = JSON.stringify(message);
         p2pBridge.hyperswarm.sendSyncState(peerId, topicHex, messageStr);
         
-        console.log(`[P2P-SYNC-STATE] ✓ Sent workspace-meta state to ${peerId.slice(0, 16)}...`);
+        console.log(`[P2P-SYNC-STATE] ? Sent workspace-meta state to ${peerId.slice(0, 16)}...`);
         
         // CRITICAL: Also send awareness state so joining peer sees who's online
         if (doc.awareness) {
@@ -3440,7 +3555,7 @@ async function handleSyncStateRequest(peerId, topicHex) {
                         documentId: null
                     };
                     p2pBridge.hyperswarm.broadcastAwareness(topicHex, JSON.stringify(awarenessPayload));
-                    console.log(`[P2P-SYNC-STATE] ✓ Sent awareness state (${allClients.length} clients) to ${peerId.slice(0, 16)}...`);
+                    console.log(`[P2P-SYNC-STATE] ? Sent awareness state (${allClients.length} clients) to ${peerId.slice(0, 16)}...`);
                 }
             } catch (awarenessErr) {
                 console.error(`[P2P-SYNC-STATE] Error sending awareness:`, awarenessErr.message);
@@ -3453,7 +3568,7 @@ async function handleSyncStateRequest(peerId, topicHex) {
         
         console.log(`[P2P-SYNC-STATE] ==========================================`);
     } catch (err) {
-        console.error(`[P2P-SYNC-STATE] ✗ Error:`, err.message);
+        console.error(`[P2P-SYNC-STATE] ? Error:`, err.message);
         console.log(`[P2P-SYNC-STATE] ==========================================`);
     }
 }
@@ -3480,7 +3595,24 @@ async function syncAllDocumentsForWorkspace(peerId, topicHex, workspaceId, metaD
             
             // If doc not in memory, try to load from persistence
             if (!contentDoc) {
-                const key = getKeyForDocument(docId);
+                let key = getKeyForDocument(docId);
+                
+                // If no key registered yet, try to extract from docMeta.encryptionKey
+                if (!key && docMeta.encryptionKey) {
+                    try {
+                        if (!uint8arraysLoaded) {
+                            await loadUint8Arrays();
+                        }
+                        const base64Key = docMeta.encryptionKey.replace(/-/g, '+').replace(/_/g, '/');
+                        const keyBytes = uint8ArrayFromString(base64Key, 'base64');
+                        documentKeys.set(docId, keyBytes);
+                        key = keyBytes;
+                        console.log(`[P2P-SYNC-STATE] Registered key from docMeta for document ${docId}`);
+                    } catch (keyErr) {
+                        console.error(`[P2P-SYNC-STATE] Failed to extract key from docMeta for ${docId}:`, keyErr.message);
+                    }
+                }
+                
                 if (key) {
                     contentDoc = getYDoc(docId);
                     await loadPersistedData(docId, contentDoc, key);
@@ -3499,11 +3631,11 @@ async function syncAllDocumentsForWorkspace(peerId, topicHex, workspaceId, metaD
                     update: Buffer.from(docUpdate).toString('base64')
                 };
                 p2pBridge.hyperswarm.sendSyncState(peerId, topicHex, JSON.stringify(docMessage));
-                console.log(`[P2P-SYNC-STATE] ✓ Sent document ${docId} (${docUpdate.length} bytes)`);
+                console.log(`[P2P-SYNC-STATE] ? Sent document ${docId} (${docUpdate.length} bytes)`);
             }
         }
         
-        console.log(`[P2P-SYNC-STATE] ✓ Finished syncing all document contents`);
+        console.log(`[P2P-SYNC-STATE] ? Finished syncing all document contents`);
     } catch (err) {
         console.error(`[P2P-SYNC-STATE] Error syncing documents:`, err.message);
     }
@@ -3520,10 +3652,10 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
         // Find the workspace ID for this topic
         let workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            // CRITICAL FIX: Fallback lookup — same pattern as handleP2PSyncMessage.
+            // CRITICAL FIX: Fallback lookup � same pattern as handleP2PSyncMessage.
             // Without this, full state payloads are silently dropped when
             // sync-state arrives before autoRejoinWorkspaces registers the topic.
-            console.warn(`[P2P-SYNC-STATE] ⚠ Unknown topic - attempting fallback lookup...`);
+            console.warn(`[P2P-SYNC-STATE] ? Unknown topic - attempting fallback lookup...`);
             try {
                 const workspaces = await loadWorkspaceList();
                 for (const ws of workspaces) {
@@ -3531,7 +3663,7 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
                     if (canonicalHash === topicHex) {
                         workspaceId = ws.id;
                         registerWorkspaceTopic(ws.id, topicHex);
-                        console.log(`[P2P-SYNC-STATE] ✓ Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
+                        console.log(`[P2P-SYNC-STATE] ? Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
                         break;
                     }
                 }
@@ -3540,7 +3672,7 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
             }
             
             if (!workspaceId) {
-                console.warn(`[P2P-SYNC-STATE] ✗ Unknown topic - not registered and fallback failed`);
+                console.warn(`[P2P-SYNC-STATE] ? Unknown topic - not registered and fallback failed`);
                 return;
             }
         }
@@ -3551,9 +3683,9 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
             const message = JSON.parse(data);
             roomName = message.roomName;
             updateData = Buffer.from(message.update, 'base64');
-            console.log(`[P2P-SYNC-STATE] ✓ Parsed state for room: ${roomName}, size: ${updateData.length}`);
+            console.log(`[P2P-SYNC-STATE] ? Parsed state for room: ${roomName}, size: ${updateData.length}`);
         } catch (e) {
-            console.error(`[P2P-SYNC-STATE] ✗ Failed to parse state message:`, e.message);
+            console.error(`[P2P-SYNC-STATE] ? Failed to parse state message:`, e.message);
             return;
         }
         
@@ -3593,20 +3725,20 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
             return;
         }
         
-        console.log(`[P2P-SYNC-STATE] ✓ Applied full state to ${roomName}`);
+        console.log(`[P2P-SYNC-STATE] ? Applied full state to ${roomName}`);
         
         // Also persist the update if we have a key
         const key = getKeyForDocument(roomName);
         if (key) {
             persistUpdate(roomName, updateData, 'p2p');
-            console.log(`[P2P-SYNC-STATE] ✓ Persisted update for ${roomName}`);
+            console.log(`[P2P-SYNC-STATE] ? Persisted update for ${roomName}`);
         }
         
         // Also broadcast to local WebSocket clients so they get the sync
         const wss = require('y-websocket/bin/utils').docs;
         if (wss) {
             // The doc is already in the shared docs Map, so local clients will get the update
-            console.log(`[P2P-SYNC-STATE] ✓ Local WebSocket clients will receive the update`);
+            console.log(`[P2P-SYNC-STATE] ? Local WebSocket clients will receive the update`);
         }
         
         // CRITICAL: Persist document/folder metadata from P2P sync to local LevelDB
@@ -3617,7 +3749,7 @@ async function handleSyncStateReceived(peerId, topicHex, data) {
         
         console.log(`[P2P-SYNC-STATE] ==========================================`);
     } catch (err) {
-        console.error(`[P2P-SYNC-STATE] ✗ Error:`, err.message);
+        console.error(`[P2P-SYNC-STATE] ? Error:`, err.message);
         console.log(`[P2P-SYNC-STATE] ==========================================`);
     }
 }
@@ -3687,7 +3819,7 @@ function handleSyncManifestRequest(peerId, topicHex) {
     try {
         const workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            console.warn(`[P2P-MANIFEST] ✗ Unknown topic`);
+            console.warn(`[P2P-MANIFEST] ? Unknown topic`);
             return;
         }
         
@@ -3697,7 +3829,7 @@ function handleSyncManifestRequest(peerId, topicHex) {
         p2pBridge.hyperswarm.sendSyncManifest(peerId, topicHex, manifest);
         console.log(`[P2P-MANIFEST] ==========================================`);
     } catch (err) {
-        console.error(`[P2P-MANIFEST] ✗ Error:`, err.message);
+        console.error(`[P2P-MANIFEST] ? Error:`, err.message);
     }
 }
 
@@ -3710,7 +3842,7 @@ async function handleSyncManifestReceived(peerId, topicHex, remoteManifest) {
     try {
         const workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            console.warn(`[P2P-MANIFEST] ✗ Unknown topic`);
+            console.warn(`[P2P-MANIFEST] ? Unknown topic`);
             return;
         }
         
@@ -3720,7 +3852,7 @@ async function handleSyncManifestReceived(peerId, topicHex, remoteManifest) {
         const comparison = compareSyncManifests(localManifest, remoteManifest);
         
         if (comparison.isSynced) {
-            console.log(`[P2P-MANIFEST] ✓ Sync verified - all documents present`);
+            console.log(`[P2P-MANIFEST] ? Sync verified - all documents present`);
             
             // Clear any pending verification for this workspace
             const pending = pendingManifestVerifications.get(workspaceId);
@@ -3732,8 +3864,8 @@ async function handleSyncManifestReceived(peerId, topicHex, remoteManifest) {
             // Notify frontend of successful sync
             broadcastSyncStatus(workspaceId, 'verified', localManifest);
         } else {
-            console.log(`[P2P-MANIFEST] ⚠ Missing documents: ${comparison.missingDocumentIds.length}`);
-            console.log(`[P2P-MANIFEST] ⚠ Missing folders: ${comparison.missingFolderIds.length}`);
+            console.log(`[P2P-MANIFEST] ? Missing documents: ${comparison.missingDocumentIds.length}`);
+            console.log(`[P2P-MANIFEST] ? Missing folders: ${comparison.missingFolderIds.length}`);
             
             // Union merge: request missing documents from this peer
             if (comparison.missingDocumentIds.length > 0) {
@@ -3756,7 +3888,7 @@ async function handleSyncManifestReceived(peerId, topicHex, remoteManifest) {
         
         console.log(`[P2P-MANIFEST] ==========================================`);
     } catch (err) {
-        console.error(`[P2P-MANIFEST] ✗ Error:`, err.message);
+        console.error(`[P2P-MANIFEST] ? Error:`, err.message);
     }
 }
 
@@ -3769,7 +3901,7 @@ async function handleDocumentsRequest(peerId, topicHex, documentIds) {
     try {
         const workspaceId = topicToWorkspace.get(topicHex);
         if (!workspaceId) {
-            console.warn(`[P2P-DOCS-REQUEST] ✗ Unknown topic`);
+            console.warn(`[P2P-DOCS-REQUEST] ? Unknown topic`);
             return;
         }
         
@@ -3792,16 +3924,16 @@ async function handleDocumentsRequest(peerId, topicHex, documentIds) {
                         update: Buffer.from(docUpdate).toString('base64')
                     };
                     p2pBridge.hyperswarm.sendSyncState(peerId, topicHex, JSON.stringify(docMessage));
-                    console.log(`[P2P-DOCS-REQUEST] ✓ Sent document ${docId} (${docUpdate.length} bytes)`);
+                    console.log(`[P2P-DOCS-REQUEST] ? Sent document ${docId} (${docUpdate.length} bytes)`);
                 }
             } catch (docErr) {
-                console.error(`[P2P-DOCS-REQUEST] ✗ Failed to send ${docId}:`, docErr.message);
+                console.error(`[P2P-DOCS-REQUEST] ? Failed to send ${docId}:`, docErr.message);
             }
         }
         
         console.log(`[P2P-DOCS-REQUEST] ==========================================`);
     } catch (err) {
-        console.error(`[P2P-DOCS-REQUEST] ✗ Error:`, err.message);
+        console.error(`[P2P-DOCS-REQUEST] ? Error:`, err.message);
     }
 }
 
@@ -3861,6 +3993,21 @@ function requestManifestVerification(workspaceId, topicHex) {
     } else {
         console.log(`[P2P-MANIFEST] Sent manifest requests to ${requestsSent} peer(s)`);
         broadcastSyncStatus(workspaceId, 'verifying', { requestsSent });
+        
+        // Safety timeout: if we don't get a verification response within 30s,
+        // transition to 'failed' so the UI doesn't show "Verifying..." forever
+        const verifyTimeoutKey = `verify-timeout:${workspaceId}`;
+        if (global[verifyTimeoutKey]) clearTimeout(global[verifyTimeoutKey]);
+        global[verifyTimeoutKey] = setTimeout(() => {
+            delete global[verifyTimeoutKey];
+            // Only broadcast 'failed' if we're still in 'verifying' state
+            // (a successful response would have already changed it)
+            const pending = pendingManifestVerifications?.get(workspaceId);
+            if (pending) {
+                console.warn(`[P2P-MANIFEST] Verification timeout for ${workspaceId.slice(0, 8)}... — no peer responded in 30s`);
+                broadcastSyncStatus(workspaceId, 'failed', { reason: 'timeout' });
+            }
+        }, 30000);
     }
 }
 
@@ -3896,7 +4043,7 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
         if (!workspaceId) {
             // Fallback: try to find workspace by topic hash from LevelDB
             // This handles the case where P2P messages arrive before autoRejoinWorkspaces completes
-            console.warn(`[P2P-SYNC] ⚠ Unknown topic - attempting fallback lookup...`);
+            console.warn(`[P2P-SYNC] ? Unknown topic - attempting fallback lookup...`);
             try {
                 const workspaces = await loadWorkspaceList();
                 for (const ws of workspaces) {
@@ -3905,7 +4052,7 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
                         workspaceId = ws.id;
                         // Register topic for future messages
                         registerWorkspaceTopic(ws.id, topicHex);
-                        console.log(`[P2P-SYNC] ✓ Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
+                        console.log(`[P2P-SYNC] ? Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
                         break;
                     }
                 }
@@ -3914,13 +4061,13 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
             }
             
             if (!workspaceId) {
-                console.warn(`[P2P-SYNC] ✗ Unknown topic - not registered and fallback failed`);
+                console.warn(`[P2P-SYNC] ? Unknown topic - not registered and fallback failed`);
                 console.warn(`[P2P-SYNC] Known topics: ${Array.from(topicToWorkspace.keys()).map(t => t.slice(0, 8)).join(', ')}`);
                 return;
             }
         }
         
-        console.log(`[P2P-SYNC] âœ“ Topic maps to workspace: ${workspaceId.slice(0, 16)}...`);
+        console.log(`[P2P-SYNC] ✓ Topic maps to workspace: ${workspaceId.slice(0, 16)}...`);
         
         // Parse the message (new format includes roomName + update)
         let roomName, updateData;
@@ -3928,12 +4075,12 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
             const message = JSON.parse(data);
             roomName = message.roomName;
             updateData = Buffer.from(message.update, 'base64');
-            console.log(`[P2P-SYNC] âœ“ Parsed new format - room: ${roomName}`);
+            console.log(`[P2P-SYNC] ✓ Parsed new format - room: ${roomName}`);
         } catch (e) {
             // Fallback to old format (just base64 update for workspace-meta)
             roomName = `workspace-meta:${workspaceId}`;
             updateData = typeof data === 'string' ? Buffer.from(data, 'base64') : data;
-            console.log(`[P2P-SYNC] âš  Using fallback format - room: ${roomName}`);
+            console.log(`[P2P-SYNC] ⚠ Using fallback format - room: ${roomName}`);
         }
         
         console.log(`[P2P-SYNC] Update size: ${updateData?.length} bytes`);
@@ -3960,20 +4107,26 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
         let doc = docs.get(roomName);
         if (!doc) {
             doc = getYDoc(roomName);
-            console.log(`[P2P-SYNC] âœ“ Created new Yjs doc for: ${roomName}`);
+            console.log(`[P2P-SYNC] ✓ Created new Yjs doc for: ${roomName}`);
         } else {
-            console.log(`[P2P-SYNC] âœ“ Found existing Yjs doc for: ${roomName}`);
+            console.log(`[P2P-SYNC] ✓ Found existing Yjs doc for: ${roomName}`);
         }
         
         // Apply the update with 'p2p' origin to prevent re-broadcasting
         try {
+            // Validate updateData before applying to prevent "Integer out of Range" errors
+            // from malformed fallback-format messages (e.g. raw base64 that isn't a valid Yjs update)
+            if (!updateData || updateData.length < 2) {
+                console.warn(`[P2P-SYNC] Skipping invalid update (too small: ${updateData?.length || 0} bytes)`);
+                return;
+            }
             Y.applyUpdate(doc, updateData, 'p2p');
         } catch (applyErr) {
-            console.error('[P2P-SYNC] Failed to apply update:', applyErr.message);
+            console.warn('[P2P-SYNC] Failed to apply update (possible malformed data):', applyErr.message);
             return;
         }
         
-        console.log(`[P2P-SYNC] âœ“ Successfully applied update to ${roomName}`);
+        console.log(`[P2P-SYNC] ✓ Successfully applied update to ${roomName}`);
         
         // Also persist the update if we have a key
         const key = getKeyForDocument(roomName);
@@ -3990,7 +4143,7 @@ async function handleP2PSyncMessage(peerId, topicHex, data) {
         
         console.log(`[P2P-SYNC] ==========================================`);
     } catch (err) {
-        console.error('[P2P-SYNC] ✗ Error handling sync:', err.message);
+        console.error('[P2P-SYNC] ? Error handling sync:', err.message);
         console.error('[P2P-SYNC] Stack:', err.stack);
         console.log(`[P2P-SYNC] ==========================================`);
     }
@@ -4009,7 +4162,7 @@ async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
         if (!workspaceId) {
             // Fallback: try to find workspace by topic hash from LevelDB
             // This handles the case where P2P awareness arrives before autoRejoinWorkspaces completes
-            console.warn(`[P2P-AWARENESS] ⚠ Unknown topic ${topicHex?.slice(0, 16)}... - attempting fallback lookup...`);
+            console.warn(`[P2P-AWARENESS] ? Unknown topic ${topicHex?.slice(0, 16)}... - attempting fallback lookup...`);
             try {
                 const workspaces = await loadWorkspaceList();
                 for (const ws of workspaces) {
@@ -4018,7 +4171,7 @@ async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
                         workspaceId = ws.id;
                         // Register topic for future messages
                         registerWorkspaceTopic(ws.id, topicHex);
-                        console.log(`[P2P-AWARENESS] ✓ Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
+                        console.log(`[P2P-AWARENESS] ? Fallback found workspace ${ws.id.slice(0, 16)}... - registered topic`);
                         break;
                     }
                 }
@@ -4027,7 +4180,7 @@ async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
             }
             
             if (!workspaceId) {
-                console.warn(`[P2P-AWARENESS] ✗ Unknown topic - not registered and fallback failed`);
+                console.warn(`[P2P-AWARENESS] ? Unknown topic - not registered and fallback failed`);
                 console.warn(`[P2P-AWARENESS] Known topics: ${Array.from(topicToWorkspace.keys()).map(t => t.slice(0, 8)).join(', ')}`);
                 return;
             }
@@ -4083,7 +4236,7 @@ async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
                         userKeys: Object.keys(state?.user || {})
                     });
                 });
-                console.log(`[P2P-AWARENESS] ✓ Applied awareness update from ${peerId.slice(0, 8)}... to ${roomName}`);
+                console.log(`[P2P-AWARENESS] ? Applied awareness update from ${peerId.slice(0, 8)}... to ${roomName}`);
                 console.log(`[P2P-AWARENESS] States after apply:`, JSON.stringify(statesSummary));
             } else {
                 console.log(`[P2P-AWARENESS] Doc not found for awareness: ${roomName}`);
@@ -4127,7 +4280,7 @@ async function handleP2PAwarenessUpdate(peerId, topicHex, state) {
 // Broadcast a Yjs update to all P2P peers for a workspace
 function broadcastYjsUpdate(workspaceId, topicHex, update, roomName) {
     if (!p2pInitialized || !p2pBridge.hyperswarm) {
-        console.log(`[P2P-BROADCAST] âœ— Skipped - P2P not initialized`);
+        console.log(`[P2P-BROADCAST] ✗ Skipped - P2P not initialized`);
         return;
     }
     
@@ -4151,10 +4304,10 @@ function broadcastYjsUpdate(workspaceId, topicHex, update, roomName) {
         console.log(`[P2P-BROADCAST] Connected peers: ${connectedPeers.length}`);
         
         p2pBridge.hyperswarm.broadcastSync(topicHex, messageStr);
-        console.log(`[P2P-BROADCAST] âœ“ Broadcast complete`);
+        console.log(`[P2P-BROADCAST] ✓ Broadcast complete`);
         console.log(`[P2P-BROADCAST] ==========================================`);
     } catch (err) {
-        console.error('[P2P-BROADCAST] âœ— Error:', err.message);
+        console.error('[P2P-BROADCAST] ✗ Error:', err.message);
         console.log(`[P2P-BROADCAST] ==========================================`);
     }
 }
@@ -4218,7 +4371,7 @@ function registerWorkspaceTopic(workspaceId, topicHex) {
         });
     }
     
-    // Set up doc observer to broadcast updates — but only ONCE per workspace
+    // Set up doc observer to broadcast updates � but only ONCE per workspace
     // This function is called from 6+ locations; without the guard, each call
     // stacks a new doc.on('update') listener causing 2-3x duplicate P2P broadcasts.
     const roomName = `workspace-meta:${workspaceId}`;
@@ -4256,18 +4409,38 @@ function setupPeerPersistence() {
                 for (const topicHex of pendingTopics) {
                     try {
                         hyperswarm.sendSyncRequest(peerId, topicHex);
-                        console.log(`[Sidecar] ✓ Sent pending sync-request to ${peerId.slice(0, 16)}... for topic ${topicHex.slice(0, 16)}...`);
+                        console.log(`[Sidecar] ? Sent pending sync-request to ${peerId.slice(0, 16)}... for topic ${topicHex.slice(0, 16)}...`);
                     } catch (e) {
-                        console.error(`[Sidecar] ✗ Failed to send pending sync-request:`, e.message);
+                        console.error(`[Sidecar] ? Failed to send pending sync-request:`, e.message);
                     }
                 }
                 // Clear pending requests for this peer
                 pendingSyncRequests.delete(peerId);
             }
             
+            // CRITICAL FIX: Send sync-request for ALL topics this peer shares with us,
+            // not just pending ones. DHT-discovered peers are not in pendingSyncRequests
+            // so they would never get an explicit sync-request after authentication.
+            const conn = hyperswarm.connections.get(peerId);
+            if (conn && conn.topics) {
+                for (const topicHex of conn.topics) {
+                    // Skip topics we already sent a pending sync-request for
+                    if (pendingTopics && pendingTopics.has(topicHex)) continue;
+                    
+                    const workspaceId = topicToWorkspace.get(topicHex);
+                    if (!workspaceId) continue;
+                    
+                    try {
+                        hyperswarm.sendSyncRequest(peerId, topicHex);
+                        console.log(`[Sidecar] Sent post-auth sync-request to ${peerId.slice(0, 16)}... for workspace ${workspaceId.slice(0, 8)}...`);
+                    } catch (e) {
+                        console.warn(`[Sidecar] Failed to send post-auth sync-request:`, e.message);
+                    }
+                }
+            }
+            
             // Find all workspaces this peer might be connected to
             // by checking which topics they're in
-            const conn = hyperswarm.connections.get(peerId);
             if (!conn) return;
             
             for (const topicHex of conn.topics) {
@@ -4282,37 +4455,14 @@ function setupPeerPersistence() {
         }
     });
     
-    // When a peer joins a topic, persist them and push awareness
+    // When a peer joins a topic, persist them
+    // NOTE: Awareness broadcasting is handled by handleSyncStateRequest when the peer
+    // sends a sync-request, so we don't duplicate it here.
     hyperswarm.on('peer-joined', async ({ peerId, topic }) => {
         try {
             const workspaceId = topicToWorkspace.get(topic);
             if (workspaceId) {
                 await updateWorkspacePeers(workspaceId, peerId, true);
-                
-                // Push full awareness to ALL peers after a short delay
-                // This ensures the new peer (and all existing peers) get
-                // the complete presence picture after the topic handshake settles
-                setTimeout(() => {
-                    try {
-                        const roomName = `workspace-meta:${workspaceId}`;
-                        const doc = docs.get(roomName);
-                        if (doc && doc.awareness) {
-                            const allClients = Array.from(doc.awareness.getStates().keys());
-                            if (allClients.length > 0) {
-                                const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(doc.awareness, allClients);
-                                const awarenessPayload = {
-                                    type: 'awareness-protocol',
-                                    update: Buffer.from(awarenessUpdate).toString('base64'),
-                                    documentId: null
-                                };
-                                p2pBridge.hyperswarm.broadcastAwareness(topic, JSON.stringify(awarenessPayload));
-                                console.log(`[Sidecar] Broadcast awareness (${allClients.length} clients) to all peers on peer-joined for ${workspaceId.slice(0, 16)}...`);
-                            }
-                        }
-                    } catch (awarenessErr) {
-                        console.error('[Sidecar] Error broadcasting awareness on peer-joined:', awarenessErr.message);
-                    }
-                }, 500);
             }
         } catch (err) {
             console.error('[Sidecar] Failed to persist peer on join:', err);
@@ -4432,7 +4582,7 @@ async function autoRejoinWorkspaces() {
                     }
                     
                     // Also try relay as fallback for fresh sync
-                    if (relayBridge) {
+                    if (relayBridgeEnabled) {
                         const roomName = `workspace-meta:${ws.id}`;
                         const doc = docs.get(roomName);
                         if (doc) {
@@ -4450,13 +4600,13 @@ async function autoRejoinWorkspaces() {
         // Schedule sync verification for all workspaces after a delay
         // This ensures we detect and recover any missing data after initial sync
         if (workspacesToVerify.length > 0) {
-            console.log(`[Sidecar] Scheduling sync verification for ${workspacesToVerify.length} workspace(s) in 30s...`);
+            console.log(`[Sidecar] Scheduling sync verification for ${workspacesToVerify.length} workspace(s) in 5s...`);
             setTimeout(() => {
                 for (const { workspaceId, topicHash } of workspacesToVerify) {
                     // Check if local metadata seems sparse (possible incomplete sync)
                     checkAndRecoverSparse(workspaceId, topicHash);
                 }
-            }, 30000);
+            }, 5000);
         }
     } catch (err) {
         console.error('[Sidecar] Auto-rejoin failed:', err);
@@ -4883,7 +5033,7 @@ docs.on('doc-added', async (doc, docName) => {
                                 broadcastYjsUpdate(workspaceId, topicHex, update);
                             }
                         });
-                        console.log(`[Sidecar] ✓ Registered deferred P2P observer for ${docName}`);
+                        console.log(`[Sidecar] ? Registered deferred P2P observer for ${docName}`);
                     } else {
                         console.log(`[Sidecar] Deferred P2P observer already registered for ${docName}, skipping`);
                     }
@@ -4892,7 +5042,7 @@ docs.on('doc-added', async (doc, docName) => {
             }
             
             if (!foundTopic) {
-                console.warn(`[Sidecar] ⚠ No topic registered for workspace ${workspaceId.slice(0, 16)}... - P2P broadcast will not work until topic is registered`);
+                console.warn(`[Sidecar] ? No topic registered for workspace ${workspaceId.slice(0, 16)}... - P2P broadcast will not work until topic is registered`);
                 // Try to register topic from workspace metadata
                 try {
                     const wsMetadata = await loadWorkspaceMetadata(workspaceId);

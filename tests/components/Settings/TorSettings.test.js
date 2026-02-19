@@ -294,7 +294,7 @@ describe('TorSettings', () => {
       const checkbox = document.querySelector('input[type="checkbox"]');
       fireEvent.click(checkbox);
       
-      expect(screen.getByPlaceholderText('wss://relay.example.com')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('wss://relay.night-jar.co')).toBeInTheDocument();
     });
 
     test('saves relay settings to localStorage', () => {
@@ -303,7 +303,7 @@ describe('TorSettings', () => {
       const checkbox = document.querySelector('input[type="checkbox"]');
       fireEvent.click(checkbox);
       
-      const urlInput = screen.getByPlaceholderText('wss://relay.example.com');
+      const urlInput = screen.getByPlaceholderText('wss://relay.night-jar.co');
       fireEvent.change(urlInput, { target: { value: 'wss://my-relay.com' } });
       
       fireEvent.click(screen.getByText('Save'));
