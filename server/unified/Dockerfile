@@ -23,7 +23,8 @@ RUN npm ci --prefer-offline --ignore-scripts
 ARG BASE_PATH=./
 
 # Build frontend with the specified base path
-RUN npx vite build --base="${BASE_PATH}"
+# Cap heap at 512MB to avoid OOM on low-memory VPS instances
+RUN NODE_OPTIONS="--max-old-space-size=512" npx vite build --base="${BASE_PATH}"
 
 # --- Stage 2: Production server ---
 FROM node:20-alpine
