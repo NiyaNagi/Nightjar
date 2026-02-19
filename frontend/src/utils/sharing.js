@@ -34,6 +34,7 @@
 import { secureError, secureWarn } from './secureLogger';
 import { signData, verifySignature, uint8ToBase62, base62ToUint8 } from './identity';
 import { isElectron } from '../hooks/useEnvironment';
+import { getBasePath } from './websocket';
 
 // Import types for reference
 // import type { EntityType, Permission, EntityTypeCode, PermissionCode } from '../types/workspace';
@@ -929,7 +930,8 @@ export function generateInviteLink(options) {
   // Build the invite link using current host
   const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
   const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
-  const link = `${protocol}//${host}/invite/${token}`;
+  const basePath = getBasePath();
+  const link = `${protocol}//${host}${basePath}/invite/${token}`;
   
   // Return both the link and the data to store server-side
   return {
@@ -1364,7 +1366,7 @@ export async function getMeshRelaysForSharing(limit = 5) {
       }
     } else {
       // Web environment - query the server API
-      const response = await fetch('/api/mesh/relays?limit=' + limit);
+      const response = await fetch(getBasePath() + '/api/mesh/relays?limit=' + limit);
       if (response.ok) {
         const data = await response.json();
         if (data.relays && Array.isArray(data.relays)) {
@@ -1427,7 +1429,7 @@ function getBootstrapRelayNodes() {
   
   // Browser production - auto-detect relay from current server
   if (protocol === 'http:' || protocol === 'https:') {
-    const origin = window.location.origin;
+    const origin = window.location.origin + getBasePath();
     return [convertHttpToWs(origin)];
   }
   

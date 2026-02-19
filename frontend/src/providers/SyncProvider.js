@@ -60,10 +60,11 @@ export function isNode() {
  */
 export function getDefaultSignalingUrl() {
   if (typeof window !== 'undefined') {
-    // Use same host as the web app
+    // Use same host as the web app, with BASE_PATH for sub-path deployments
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    return `${protocol}//${host}/signal`;
+    const basePath = (window.__NIGHTJAR_BASE_PATH__) || '';
+    return `${protocol}//${host}${basePath}/signal`;
   }
   return 'ws://localhost:4444';
 }

@@ -25,7 +25,7 @@ import { nanoid } from 'nanoid';
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { MeshParticipant } from './mesh.mjs';
 import { SERVER_MODES } from './mesh-constants.mjs';
@@ -1482,14 +1482,36 @@ app.post(BASE_PATH + '/api/invites/:token/use', (req, res) => {
 // Static files (React app)
 app.use(BASE_PATH || '/', express.static(STATIC_PATH));
 
+// Read index.html and inject BASE_PATH as a runtime global variable
+// so the frontend knows its deployment path (e.g., '/toot') for URL construction
+const indexHtmlPath = join(STATIC_PATH, 'index.html');
+let injectedIndexHtml = null;
+if (existsSync(indexHtmlPath)) {
+  let rawHtml = readFileSync(indexHtmlPath, 'utf8');
+  // Inject BASE_PATH before </head> so it's available before any app code runs
+  const basepathScript = `<script>window.__NIGHTJAR_BASE_PATH__="${BASE_PATH || ''}";</script>`;
+  injectedIndexHtml = rawHtml.replace('</head>', basepathScript + '</head>');
+  console.log(`[SPA] Injected BASE_PATH="${BASE_PATH || ''}" into index.html`);
+} else {
+  console.warn(`[SPA] index.html not found at ${indexHtmlPath} — SPA fallback will fail`);
+}
+
 // SPA fallback
 app.get(BASE_PATH + '/*', (req, res) => {
-  res.sendFile(join(STATIC_PATH, 'index.html'));
+  if (injectedIndexHtml) {
+    res.type('html').send(injectedIndexHtml);
+  } else {
+    res.sendFile(indexHtmlPath);
+  }
 });
 if (BASE_PATH) {
   // Also catch exact BASE_PATH without trailing slash
   app.get(BASE_PATH, (req, res) => {
-    res.sendFile(join(STATIC_PATH, 'index.html'));
+    if (injectedIndexHtml) {
+      res.type('html').send(injectedIndexHtml);
+    } else {
+      res.sendFile(indexHtmlPath);
+    }
   });
 }
 

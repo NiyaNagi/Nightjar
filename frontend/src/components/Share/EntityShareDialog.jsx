@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { generateShareLink } from '../../utils/sharing';
+import { getBasePath } from '../../utils/websocket';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { isElectron } from '../../hooks/useEnvironment';
@@ -106,7 +107,7 @@ export function EntityShareDialog({
     setIsGenerating(true);
     try {
       // For web-hosted workspaces, include the server URL so Electron clients can connect
-      const serverUrl = !isElectron() ? window.location.origin : undefined;
+      const serverUrl = !isElectron() ? window.location.origin + getBasePath() : undefined;
       
       const link = generateShareLink({
         entityType,

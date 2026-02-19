@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { generateShareLink, parseShareLink, isValidShareLink, copyToClipboard as copyToClipboardUtil, readFromClipboard, createNewDocument } from '../../utils/sharing';
+import { getBasePath } from '../../utils/websocket';
 import { generatePassword, validatePassword } from '../../utils/passwordGenerator';
 import { deriveKey } from '../../utils/keyDerivation';
 import { useCopyFeedback } from '../../hooks/useCopyFeedback';
@@ -81,7 +82,7 @@ export function ShareDialog({
       let link;
       
       // For web-hosted workspaces, include the server URL so Electron clients can connect
-      const serverUrl = !isElectron() ? window.location.origin : undefined;
+      const serverUrl = !isElectron() ? window.location.origin + getBasePath() : undefined;
       
       if (usePassword) {
         // Option B: Password-protected (password embedded in QR for easy scanning)

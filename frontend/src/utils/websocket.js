@@ -15,6 +15,15 @@
 import { isElectron } from '../hooks/useEnvironment';
 import { YJS_WS_PORT, META_WS_PORT, WEB_SERVER_PORT } from '../config/constants';
 
+/**
+ * Get the deployment base path (e.g., '/toot' for sub-path deployments).
+ * Injected by the server at runtime via <script> tag in index.html.
+ * Returns empty string for root deployments.
+ */
+export function getBasePath() {
+  return (typeof window !== 'undefined' && window.__NIGHTJAR_BASE_PATH__) || '';
+}
+
 // Global P2P configuration (set by P2PContext)
 let globalP2PConfig = {
   enabled: false,
@@ -104,7 +113,8 @@ export function getYjsWebSocketUrl(serverUrl = null) {
         } else {
             const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
             const host = window.location.host || `localhost:${WEB_SERVER_PORT}`;
-            url = `${wsProtocol}//${host}`;
+            const basePath = getBasePath();
+            url = `${wsProtocol}//${host}${basePath}`;
         }
     }
     console.log(`[WebSocket] getYjsWebSocketUrl() => ${url} (isElectron: ${isElectronMode})`);
@@ -131,7 +141,7 @@ export function getApiBaseUrl() {
     if (isElectron()) {
         return `http://localhost:${WEB_SERVER_PORT}`;
     }
-    return window.location.origin;
+    return window.location.origin + getBasePath();
 }
 
 /**

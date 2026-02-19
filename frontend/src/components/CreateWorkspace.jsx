@@ -17,6 +17,7 @@ import {
   validateSignedInvite
 } from '../utils/sharing';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { getBasePath } from '../utils/websocket';
 import './CreateWorkspace.css';
 
 const EMOJI_OPTIONS = [
@@ -145,7 +146,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       if (parsed?.token) {
         // Fetch invite data from server
         try {
-          const response = await fetch(`/api/invites/${parsed.token}`);
+          const response = await fetch(`${getBasePath()}/api/invites/${parsed.token}`);
           if (response.ok) {
             const inviteData = await response.json();
             setParsedLink({
@@ -325,7 +326,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
         }
         
         // Mark invite as used
-        const useResponse = await fetch(`/api/invites/${parsedLink.token}/use`, {
+        const useResponse = await fetch(`${getBasePath()}/api/invites/${parsedLink.token}/use`, {
           method: 'POST',
         });
         

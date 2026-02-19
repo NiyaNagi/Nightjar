@@ -17,6 +17,7 @@ import { generateShareLink, generateShareMessage, compressShareLink, generateSig
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { signData, uint8ToBase62 } from '../utils/identity';
 import { isElectron } from '../hooks/useEnvironment';
+import { getBasePath } from '../utils/websocket';
 import { IconColorPicker } from './common';
 import { useConfirmDialog } from './common/ConfirmDialog';
 import { useFocusTrap } from '../hooks/useFocusTrap';
@@ -107,7 +108,7 @@ export default function WorkspaceSettings({
     // Fallback: convert current origin to WebSocket URL
     if (typeof window !== 'undefined' && window.location.origin) {
       const protocol = window.location.protocol;
-      const origin = window.location.origin;
+      const origin = window.location.origin + getBasePath();
       if (protocol === 'https:') {
         return origin.replace(/^https:/, 'wss:');
       }
