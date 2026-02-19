@@ -27,12 +27,16 @@ RUN npm ci --prefer-offline --ignore-scripts
 RUN NODE_OPTIONS="--max-old-space-size=4096" npx vite build --base="./"
 
 # --- Stage 2: Production server ---
-FROM node:20-alpine
+# Use Debian slim (glibc) — Alpine uses musl which lacks native prebuilds
+# for hyperswarm/udx-native/sodium-native etc.
+FROM node:20-slim
 
 WORKDIR /app
 
-# Install dependencies for better-sqlite3 and hyperswarm
-RUN apk add --no-cache python3 make g++
+# Install build tools for native modules (better-sqlite3, udx-native, sodium-native)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy server package files and install deps
 COPY server/unified/package*.json ./server/unified/
@@ -74,7 +78,7 @@ EXPOSE 3000
 WORKDIR /app/server/unified
 
 # Run as non-root
-RUN addgroup -S nightjar && adduser -S nightjar -G nightjar
+RUN groupadd -r nightjar && useradd -r -g nightjar nightjar
 RUN chown -R nightjar:nightjar /app
 USER nightjar
 
