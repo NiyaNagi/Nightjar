@@ -2058,6 +2058,33 @@ app.get((BASE_PATH || '') + '/join/*', (req, res) => {
   }
 });
 
+// =============================================================================
+// PWA Manifest — served dynamically so start_url and icon paths honour BASE_PATH.
+// Registered BEFORE express.static so it takes priority over the static file.
+// =============================================================================
+app.get((BASE_PATH || '') + '/manifest.json', (_req, res) => {
+  const manifestPath = join(STATIC_PATH, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const prefix = BASE_PATH || '';
+    // Ensure the PWA opens the app, not the landing page
+    manifest.start_url = prefix + '/';
+    manifest.scope    = prefix + '/';
+    // Rewrite icon src paths to include BASE_PATH
+    if (manifest.icons) {
+      manifest.icons = manifest.icons.map(icon => ({
+        ...icon,
+        src: prefix + '/' + icon.src.replace(/^\.?\//, ''),
+      }));
+    }
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Content-Type', 'application/manifest+json');
+    res.json(manifest);
+  } else {
+    res.status(404).type('text').send('Manifest not found');
+  }
+});
+
 // Static files (React app)
 // index: false prevents express.static from serving the raw index.html for
 // directory requests — the SPA fallback below serves the injected version
