@@ -1,0 +1,94 @@
+{
+  "generated": "2026-02-20T06:20:31.502Z",
+  "resolution": "1920x1080",
+  "format": "webp",
+  "quality": 85,
+  "screenshots": [
+    {
+      "id": "workspace-overview",
+      "title": "Workspace Overview",
+      "description": "Your encrypted home base — folders, documents, and quick actions at a glance",
+      "category": "workspaces",
+      "filename": "workspace-overview.webp",
+      "sizeKB": 46,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "text-editor",
+      "title": "Rich Text Editor",
+      "description": "Collaborative real-time editing with formatting, headings, lists, and code blocks",
+      "category": "documents",
+      "filename": "text-editor.webp",
+      "sizeKB": 91,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "spreadsheet",
+      "title": "Spreadsheet",
+      "description": "Full-featured spreadsheet with formulas, formatting, and real-time collaboration",
+      "category": "documents",
+      "filename": "spreadsheet.webp",
+      "sizeKB": 69,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "kanban-board",
+      "title": "Kanban Board",
+      "description": "Visual task management with drag-and-drop cards, tags, and assignees",
+      "category": "documents",
+      "filename": "kanban-board.webp",
+      "sizeKB": 74,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "chat-panel",
+      "title": "Team Chat",
+      "description": "End-to-end encrypted team messaging — right inside your workspace",
+      "category": "collaboration",
+      "filename": "chat-panel.webp",
+      "sizeKB": 81,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "inventory-list",
+      "title": "Inventory Management",
+      "description": "Track products, stock levels, and locations with real-time search and filters",
+      "category": "inventory",
+      "filename": "inventory-list.webp",
+      "sizeKB": 71,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "sharing-panel",
+      "title": "Sharing & Invites",
+      "description": "Share your workspace via encrypted invite links or scannable QR codes",
+      "category": "sharing",
+      "filename": "sharing-panel.webp",
+      "sizeKB": 34,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "help-page",
+      "title": "Built-in Help",
+      "description": "Comprehensive documentation and keyboard shortcuts — always one keystroke away",
+      "category": "navigation",
+      "filename": "help-page.webp",
+      "sizeKB": 60,
+      "width": 1920,
+      "height": 1080
+    }
+  ],
+  "stats": {
+    "total": 8,
+    "captured": 8,
+    "failed": 0,
+    "totalSizeKB": 526
+  }
+}

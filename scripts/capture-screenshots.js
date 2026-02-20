@@ -290,7 +290,11 @@ async function main() {
 
   // Start sidecar with demo data
   console.log('\n📡 Starting sidecar with demo data...');
-  const sidecar = spawn('node', [SIDECAR_PATH, demoDir], {
+  const isWindows = process.platform === 'win32';
+  // Quote paths on Windows to handle spaces in directory names
+  const sidecarArg = isWindows ? `"${SIDECAR_PATH}"` : SIDECAR_PATH;
+  const demoDirArg = isWindows ? `"${demoDir}"` : demoDir;
+  const sidecar = spawn('node', [sidecarArg, demoDirArg], {
     cwd: PROJECT_ROOT,
     env: {
       ...process.env,
@@ -304,7 +308,7 @@ async function main() {
       YJS_WEBSOCKET_SECURE_PORT: String(PORTS.WSS),
     },
     stdio: ['pipe', 'pipe', 'pipe'],
-    shell: process.platform === 'win32',
+    shell: isWindows,
   });
 
   let sidecarReady = false;

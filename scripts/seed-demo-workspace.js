@@ -274,7 +274,10 @@ async function waitForPort(port, timeout = 60000) {
 
 function startSidecar(storagePath) {
   const isWindows = process.platform === 'win32';
-  const proc = spawn('node', [SIDECAR_PATH, storagePath], {
+  // Quote paths on Windows to handle spaces in directory names
+  const sidecarArg = isWindows ? `"${SIDECAR_PATH}"` : SIDECAR_PATH;
+  const storageArg = isWindows ? `"${storagePath}"` : storagePath;
+  const proc = spawn('node', [sidecarArg, storageArg], {
     cwd: PROJECT_ROOT,
     env: {
       ...process.env,
@@ -563,6 +566,7 @@ function generateOnboardingContent() {
 
 // ── Main seed function ──────────────────────────────────────────────────────
 async function main() {
+  let seedResult = {};
   const outputDir = process.argv.includes('--output-dir')
     ? process.argv[process.argv.indexOf('--output-dir') + 1]
     : DEFAULT_OUTPUT;
@@ -637,12 +641,11 @@ async function main() {
     const workspaceId = wsResult.workspace?.id || wsId;
     console.log(`  ✅ Workspace created: ${workspaceId}`);
 
-    // Set encryption key
+    // Set encryption key (sidecar expects 'set-key' with base64 payload)
     await client.sendAndWait({
-      type: 'set-encryption-key',
-      entityId: workspaceId,
-      key: wsKey
-    }, 'encryption-key-set');
+      type: 'set-key',
+      payload: wsKey
+    }, 'key-set');
 
     // ── Create folders ──
     console.log('\n📁 Creating folders...');
@@ -697,10 +700,10 @@ async function main() {
         }
       }, 'document-created');
       await client.sendAndWait({
-        type: 'set-encryption-key',
-        entityId: docId,
-        key: docKey
-      }, 'encryption-key-set');
+        type: 'set-key',
+        payload: docKey,
+        docName: docId
+      }, 'key-set');
       console.log(`  ✅ Text: ${doc.name}`);
     }
 
@@ -726,10 +729,10 @@ async function main() {
         }
       }, 'document-created');
       await client.sendAndWait({
-        type: 'set-encryption-key',
-        entityId: docId,
-        key: docKey
-      }, 'encryption-key-set');
+        type: 'set-key',
+        payload: docKey,
+        docName: docId
+      }, 'key-set');
       console.log(`  ✅ Sheet: ${doc.name}`);
     }
 
@@ -754,10 +757,10 @@ async function main() {
         }
       }, 'document-created');
       await client.sendAndWait({
-        type: 'set-encryption-key',
-        entityId: docId,
-        key: docKey
-      }, 'encryption-key-set');
+        type: 'set-key',
+        payload: docKey,
+        docName: docId
+      }, 'key-set');
       console.log(`  ✅ Kanban: ${doc.name}`);
     }
 
@@ -791,6 +794,7 @@ async function main() {
       JSON.stringify(manifest, null, 2)
     );
     console.log('\n📝 Seed manifest written to seed-manifest.json');
+    seedResult = { documentCount: manifest.documentCount, itemCount: inventoryData?.items?.length || 0, requestCount: inventoryData?.requests?.length || 0 };
 
   } finally {
     // Cleanup
@@ -813,8 +817,8 @@ async function main() {
   console.log('\n✅ Demo workspace seeded successfully!');
   console.log(`   Storage: ${outputDir}`);
   console.log(`   Workspace: Toybox Manufacturing Co.`);
-  console.log(`   Content: ${manifest?.documentCount || 0} documents, 5 folders`);
-  console.log(`   Inventory: ${inventoryData?.items?.length || 0} items, ${inventoryData?.requests?.length || 0} requests`);
+  console.log(`   Content: ${seedResult.documentCount || 0} documents, 5 folders`);
+  console.log(`   Inventory: ${seedResult.itemCount || 0} items, ${seedResult.requestCount || 0} requests`);
 }
 
 main().catch(err => {

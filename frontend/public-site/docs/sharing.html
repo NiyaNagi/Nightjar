@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Loadingâ€¦ â€” Nightjar Docs</title>
+  <title>Loading… — Nightjar Docs</title>
   <meta name="description" content="Nightjar documentation section">
   <link rel="icon" href="/nightjar-64.png" type="image/png">
   <link rel="stylesheet" href="docs.css">
@@ -17,7 +17,7 @@
       Nightjar Docs
     </a>
     <div class="topbar-breadcrumb" id="breadcrumb">
-      <a href="/docs/">Docs</a><span class="sep">â€º</span><span id="breadcrumb-title">â€¦</span>
+      <a href="/docs/">Docs</a><span class="sep">›</span><span id="breadcrumb-title">…</span>
     </div>
     <div class="topbar-links">
       <a href="/">Home</a>
@@ -29,19 +29,19 @@
   <div class="docs-layout">
     <nav class="docs-sidebar" id="sidebar"></nav>
     <main class="docs-content" id="content">
-      <p style="color:var(--text-dim)">Loadingâ€¦</p>
+      <p style="color:var(--text-dim)">Loading…</p>
     </main>
   </div>
 
   <div class="docs-footer">
-    Nightjar Â· <a href="https://github.com/NiyaNagi/Nightjar" target="_blank" rel="noopener">Open Source</a> Â· Built by <a href="https://github.com/NiyaNagi" target="_blank" rel="noopener">NiyaNagi</a>
+    Nightjar · <a href="https://github.com/NiyaNagi/Nightjar" target="_blank" rel="noopener">Open Source</a> · Built by <a href="https://github.com/NiyaNagi" target="_blank" rel="noopener">NiyaNagi</a>
   </div>
 
   <script>
     const CONTENT_BASE = '/content';
     const SCREENSHOT_BASE = '/screenshots';
 
-    // Derive section ID from filename: "editor.html" â†’ "editor"
+    // Derive section ID from filename: "editor.html" → "editor"
     function getSectionId() {
       const path = window.location.pathname;
       const file = path.split('/').pop() || '';
@@ -65,7 +65,7 @@
         case 'steps':
           return `<ol>${(block.items || []).map(i => `<li>${escapeHTML(i)}</li>`).join('')}</ol>`;
         case 'tip':
-          return `<div class="tip-box"><span class="icon">ðŸ’¡</span><p>${escapeHTML(block.text)}</p></div>`;
+          return `<div class="tip-box"><span class="icon">💡</span><p>${escapeHTML(block.text)}</p></div>`;
         case 'shortcuts':
           return `<div class="shortcuts-table">${(block.items || []).map(item =>
             `<div class="shortcut-row">
@@ -83,6 +83,13 @@
                  onerror="this.parentElement.style.display='none'">
             ${block.caption ? `<figcaption>${escapeHTML(block.caption)}</figcaption>` : ''}
           </figure>`;
+        case 'code':
+          const codeId = 'code-' + Math.random().toString(36).slice(2, 8);
+          return `<div class="code-block">
+            ${block.lang ? `<div class="code-block-header"><span class="code-block-lang">${escapeHTML(block.lang)}</span><button class="code-block-copy" onclick="navigator.clipboard.writeText(document.getElementById('${codeId}').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})">Copy</button></div>` : ''}
+            <pre><code id="${codeId}">${escapeHTML(block.text)}</code></pre>
+            ${block.caption ? `<div class="code-block-caption">${escapeHTML(block.caption)}</div>` : ''}
+          </div>`;
         default:
           return '';
       }
@@ -124,7 +131,7 @@
 
       // Update page title
       const plainTitle = data.title.replace(/^[^\s]+\s/, '');
-      document.title = `${plainTitle} â€” Nightjar Docs`;
+      document.title = `${plainTitle} — Nightjar Docs`;
       document.getElementById('breadcrumb-title').textContent = plainTitle;
 
       // Render content
@@ -139,10 +146,10 @@
         const next = idx < sections.length - 1 ? sections[idx + 1] : null;
         html += '<div class="docs-nav">';
         if (prev) {
-          html += `<a href="${prev.id}.html"><span class="label">â† Previous</span><span class="title">${escapeHTML(prev.title)}</span></a>`;
+          html += `<a href="${prev.id}.html"><span class="label">← Previous</span><span class="title">${escapeHTML(prev.title)}</span></a>`;
         }
         if (next) {
-          html += `<a href="${next.id}.html" class="next"><span class="label">Next â†’</span><span class="title">${escapeHTML(next.title)}</span></a>`;
+          html += `<a href="${next.id}.html" class="next"><span class="label">Next →</span><span class="title">${escapeHTML(next.title)}</span></a>`;
         }
         html += '</div>';
       }
@@ -153,4 +160,3 @@
   </script>
 </body>
 </html>
-

@@ -81,6 +81,7 @@ jobs:
             sudo cp "$REPO/frontend/public-site/index.html" "$WEB/index.html"
             sudo cp -r "$REPO/frontend/public-site/docs/"* "$WEB/docs/" 2>/dev/null || true
             sudo cp -r "$REPO/frontend/public-site/content/"* "$WEB/content/" 2>/dev/null || true
+            sudo cp -r "$REPO/frontend/public-site/screenshots/"* "$WEB/screenshots/" 2>/dev/null || true
             sudo cp "$REPO/frontend/public/assets/nightjar-logo.png" "$WEB/nightjar-logo.png" 2>/dev/null || true
             sudo cp "$REPO/assets/icons/nightjar-64.png" "$WEB/nightjar-64.png" 2>/dev/null || true
             sudo chown -R www-data:www-data "$WEB"
