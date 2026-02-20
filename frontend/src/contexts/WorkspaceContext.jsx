@@ -21,6 +21,7 @@ import { useIdentity } from './IdentityContext';
 import identityManager from '../utils/identityManager';
 import { META_WS_PORT } from '../config/constants';
 import { logBehavior } from '../utils/logger';
+import { encryptAllWorkspaceSecrets, decryptAllWorkspaceSecrets, removeWorkspaceSecrets } from '../utils/workspaceSecrets';
 
 /**
  * Get identity-scoped storage key for web mode
@@ -181,11 +182,13 @@ export function WorkspaceProvider({ children }) {
   const workspaceTransitionIdRef = useRef(0);
   
   // Persist workspaces to localStorage in web mode (identity-scoped)
+  // Sensitive fields (password, encryptionKey) are encrypted via secureStorage
   useEffect(() => {
     if (!isElectron && workspaces.length > 0) {
       try {
         const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
-        localStorage.setItem(storageKey, JSON.stringify(workspaces));
+        const sanitized = encryptAllWorkspaceSecrets(workspaces);
+        localStorage.setItem(storageKey, JSON.stringify(sanitized));
       } catch (err) {
         console.warn('[WorkspaceContext] Failed to persist workspaces (storage quota exceeded?):', err);
       }
@@ -371,7 +374,9 @@ export function WorkspaceProvider({ children }) {
         // Use identity-scoped storage key
         const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
         const stored = localStorage.getItem(storageKey);
-        const storedWorkspaces = stored ? JSON.parse(stored) : [];
+        const rawWorkspaces = stored ? JSON.parse(stored) : [];
+        // Decrypt sensitive fields (password, encryptionKey) from secureStorage
+        const storedWorkspaces = decryptAllWorkspaceSecrets(rawWorkspaces);
         setWorkspaces(storedWorkspaces);
         
         // Restore keychains for all loaded workspaces (async)
@@ -401,7 +406,8 @@ export function WorkspaceProvider({ children }) {
             secureLog('[WorkspaceContext] Persisting updated workspaces with generated keys');
             setWorkspaces(updatedWorkspaces);
             const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
-            localStorage.setItem(storageKey, JSON.stringify(updatedWorkspaces));
+            const sanitized = encryptAllWorkspaceSecrets(updatedWorkspaces);
+            localStorage.setItem(storageKey, JSON.stringify(sanitized));
           }
         };
         
@@ -437,7 +443,8 @@ export function WorkspaceProvider({ children }) {
         try {
           const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
           const stored = localStorage.getItem(storageKey);
-          const storedWorkspaces = stored ? JSON.parse(stored) : [];
+          const rawWorkspaces = stored ? JSON.parse(stored) : [];
+          const storedWorkspaces = decryptAllWorkspaceSecrets(rawWorkspaces);
           setWorkspaces(storedWorkspaces);
           if (storedWorkspaces.length > 0) {
             const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
@@ -562,7 +569,8 @@ export function WorkspaceProvider({ children }) {
         try {
           const storageKey = getIdentityScopedStorageKey('nahma-workspaces');
           const stored = localStorage.getItem(storageKey);
-          const storedWorkspaces = stored ? JSON.parse(stored) : [];
+          const rawWorkspaces = stored ? JSON.parse(stored) : [];
+          const storedWorkspaces = decryptAllWorkspaceSecrets(rawWorkspaces);
           setWorkspaces(storedWorkspaces);
           
           if (storedWorkspaces.length > 0) {
@@ -716,6 +724,9 @@ export function WorkspaceProvider({ children }) {
     
     sendMessage({ type: 'delete-workspace', workspaceId });
     
+    // Clean up encrypted secrets from secureStorage
+    removeWorkspaceSecrets(workspaceId);
+    
     // Switch away before removing (side effect outside setState updater)
     if (currentWorkspaceId === workspaceId) {
       const remaining = workspacesRef.current.filter(w => w.id !== workspaceId);
@@ -747,6 +758,9 @@ export function WorkspaceProvider({ children }) {
     
     // Tell sidecar to remove local workspace data (same as delete but for non-owners)
     sendMessage({ type: 'leave-workspace', workspaceId });
+    
+    // Clean up encrypted secrets from secureStorage
+    removeWorkspaceSecrets(workspaceId);
     
     // Only apply post-leave state changes if no concurrent switch occurred
     if (workspaceTransitionIdRef.current !== transitionId) {

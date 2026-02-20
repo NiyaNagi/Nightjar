@@ -14,6 +14,8 @@
 
 import { isElectron } from '../hooks/useEnvironment';
 import { YJS_WS_PORT, META_WS_PORT, WEB_SERVER_PORT } from '../config/constants';
+import nacl from 'tweetnacl';
+import { getUnlockedIdentity } from './identityManager';
 
 /**
  * Get the deployment base path (e.g., '/app' for sub-path deployments).
@@ -199,12 +201,43 @@ export async function deliverKeyToServer(roomName, keyBase64, serverUrl = null) 
             return true;
         }
 
-        // Deliver the key
+        // Deliver the key with Ed25519 signature for authentication
         const encodedRoom = encodeURIComponent(roomName);
+        const timestamp = Date.now();
+        
+        // Build the request body — always include the key
+        const body = { key: keyBase64, timestamp };
+        
+        // Sign the request if identity is available (backward-compatible: server
+        // accepts unsigned requests from older clients but verifies if present)
+        try {
+            const unlockedIdentity = getUnlockedIdentity();
+            if (unlockedIdentity?.identityData?.keypair) {
+                const { secretKey, publicKey } = unlockedIdentity.identityData.keypair;
+                if (secretKey && publicKey) {
+                    const signedMessage = `key-delivery:${roomName}:${keyBase64}:${timestamp}`;
+                    const messageBytes = new TextEncoder().encode(signedMessage);
+                    const signature = nacl.sign.detached(messageBytes, secretKey);
+                    
+                    // Convert to base64 for JSON transport
+                    let pubBinary = '';
+                    for (let i = 0; i < publicKey.length; i++) pubBinary += String.fromCharCode(publicKey[i]);
+                    let sigBinary = '';
+                    for (let i = 0; i < signature.length; i++) sigBinary += String.fromCharCode(signature[i]);
+                    
+                    body.publicKey = btoa(pubBinary);
+                    body.signature = btoa(sigBinary);
+                }
+            }
+        } catch (signErr) {
+            // Signing failed — proceed without signature (backward compat)
+            console.debug('[KeyDelivery] Could not sign key delivery (identity may not be unlocked):', signErr.message);
+        }
+        
         const res = await fetch(`${apiBase}/api/rooms/${encodedRoom}/key`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: keyBase64 }),
+            body: JSON.stringify(body),
         });
 
         if (!res.ok) {

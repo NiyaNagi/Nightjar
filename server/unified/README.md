@@ -133,7 +133,8 @@ All other WebSocket paths use the **y-websocket** binary protocol for Yjs CRDT d
 | `/health` | GET | Health check — returns JSON with rooms, uptime, mode |
 | `/api/mesh/status` | GET | Mesh network status and peer info |
 | `/api/mesh/relays` | GET | Top relay nodes (for share link embedding) |
-| `/api/workspace/:id/persisted` | GET | Check if workspace has persistence enabled |
+| `/api/encrypted-persistence` | GET | Check if encrypted persistence is enabled |
+| `/api/rooms/:roomName/key` | POST | Deliver encryption key for a room (authenticated) |
 | `/api/invites` | POST | Create a share invite |
 | `/api/invites/:token` | GET | Retrieve invite details |
 | `/*` | GET | Static files / SPA fallback |

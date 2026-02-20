@@ -1102,6 +1102,30 @@ class SignalingServer {
 const app = express();
 const server = createServer(app);
 
+// =============================================================================
+// Security Headers Middleware
+// =============================================================================
+// Defense-in-depth: mitigate XSS, clickjacking, MIME sniffing, and referrer leakage.
+// CSP is intentionally permissive ('unsafe-inline') to avoid breaking the React SPA.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '0'); // Disabled per modern best practice (CSP supersedes)
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; " +
+    "font-src 'self' data:; " +
+    "connect-src 'self' ws: wss: http: https:; " +
+    "worker-src 'self' blob:; " +
+    "frame-ancestors 'self'"
+  );
+  next();
+});
+
 // Storage is only initialized if persistence is enabled
 const storage = DISABLE_PERSISTENCE ? null : new Storage(DB_PATH);
 const signaling = new SignalingServer(storage);
@@ -1457,15 +1481,6 @@ app.get(BASE_PATH + '/api/mesh/relays', (req, res) => {
   });
 });
 
-// API: Check if workspace is persisted
-app.get(BASE_PATH + '/api/workspace/:id/persisted', (req, res) => {
-  if (!storage) {
-    return res.json({ persisted: false, persistenceDisabled: true });
-  }
-  const persisted = storage.isPersisted(req.params.id);
-  res.json({ persisted });
-});
-
 // API: Check if encrypted persistence is enabled
 app.get(BASE_PATH + '/api/encrypted-persistence', (req, res) => {
   res.json({ enabled: ENCRYPTED_PERSISTENCE });
@@ -1480,12 +1495,54 @@ const keyDeliveryLimiter = new Map(); // ip -> { count, resetAt }
 const KEY_DELIVERY_RATE_LIMIT = 30; // max per window
 const KEY_DELIVERY_RATE_WINDOW = 60000; // 1 minute
 
+// Track which Ed25519 public key "owns" each room's encryption key.
+// Prevents unauthorized key overwrite by a different identity.
+// Maps roomName -> base64-encoded Ed25519 public key string
+const roomKeyOwners = new Map();
+
+/**
+ * Verify an Ed25519 signature.
+ * @param {string} messageString - The original message that was signed
+ * @param {string} signatureBase64 - Base64-encoded 64-byte Ed25519 signature
+ * @param {string} publicKeyBase64 - Base64-encoded 32-byte Ed25519 public key
+ * @returns {boolean} True if valid
+ */
+function verifyEd25519Signature(messageString, signatureBase64, publicKeyBase64) {
+  try {
+    const nacl = require('tweetnacl');
+    const message = Buffer.from(messageString, 'utf-8');
+    const signature = Buffer.from(signatureBase64, 'base64');
+    const publicKey = Buffer.from(publicKeyBase64, 'base64');
+    
+    if (signature.length !== 64 || publicKey.length !== 32) return false;
+    
+    return nacl.sign.detached.verify(
+      new Uint8Array(message),
+      new Uint8Array(signature),
+      new Uint8Array(publicKey)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * POST /api/rooms/:roomName/key
  * Delivers an encryption key for a room. Must be called BEFORE WebSocket connect.
  * Only active when ENCRYPTED_PERSISTENCE=true.
  * 
- * Body: { key: "<base64-encoded 32-byte key>" }
+ * Authenticated via Ed25519 signature to prevent unauthorized key overwrite.
+ * 
+ * Body: {
+ *   key: "<base64-encoded 32-byte key>",
+ *   publicKey: "<base64-encoded 32-byte Ed25519 public key>",
+ *   signature: "<base64-encoded 64-byte Ed25519 signature>",
+ *   timestamp: <unix ms>
+ * }
+ * 
+ * The signature covers: `key-delivery:${roomName}:${keyBase64}:${timestamp}`
+ * Timestamp must be within 5 minutes of server time to prevent replay attacks.
+ * 
  * Response: { success: true } or { error: "..." }
  */
 app.post(BASE_PATH + '/api/rooms/:roomName/key', (req, res) => {
@@ -1508,7 +1565,7 @@ app.post(BASE_PATH + '/api/rooms/:roomName/key', (req, res) => {
   }
 
   const { roomName } = req.params;
-  const { key: keyBase64 } = req.body || {};
+  const { key: keyBase64, publicKey: pubKeyBase64, signature: sigBase64, timestamp } = req.body || {};
 
   if (!roomName || typeof roomName !== 'string' || roomName.length > 512) {
     return res.status(400).json({ error: 'Invalid room name' });
@@ -1518,10 +1575,43 @@ app.post(BASE_PATH + '/api/rooms/:roomName/key', (req, res) => {
     return res.status(400).json({ error: 'Missing key' });
   }
 
-  // Parse and validate the key
+  // Parse and validate the encryption key
   const key = keyFromBase64(keyBase64);
   if (!key) {
     return res.status(400).json({ error: 'Invalid key format (must be valid base64-encoded 32-byte key)' });
+  }
+
+  // --- Ed25519 Signature Verification ---
+  // If signature fields are present, verify them.
+  // If absent, allow unauthenticated delivery for backward compatibility
+  // (older clients that haven't updated yet).
+  if (pubKeyBase64 && sigBase64 && timestamp) {
+    // Validate types
+    if (typeof pubKeyBase64 !== 'string' || typeof sigBase64 !== 'string' || typeof timestamp !== 'number') {
+      return res.status(400).json({ error: 'Invalid signature fields' });
+    }
+
+    // Replay protection: timestamp must be within 5 minutes
+    const REPLAY_WINDOW = 5 * 60 * 1000;
+    if (Math.abs(now - timestamp) > REPLAY_WINDOW) {
+      return res.status(400).json({ error: 'Timestamp out of range (replay protection)' });
+    }
+
+    // Verify Ed25519 signature
+    const signedMessage = `key-delivery:${roomName}:${keyBase64}:${timestamp}`;
+    if (!verifyEd25519Signature(signedMessage, sigBase64, pubKeyBase64)) {
+      return res.status(403).json({ error: 'Invalid signature' });
+    }
+
+    // Check room ownership
+    const existingOwner = roomKeyOwners.get(roomName);
+    if (existingOwner && existingOwner !== pubKeyBase64) {
+      // Different identity trying to overwrite — reject
+      return res.status(403).json({ error: 'Room key already registered by a different identity' });
+    }
+
+    // Register ownership
+    roomKeyOwners.set(roomName, pubKeyBase64);
   }
 
   // Store the key
