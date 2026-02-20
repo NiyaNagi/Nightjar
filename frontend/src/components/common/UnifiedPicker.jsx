@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import './UnifiedPicker.css';
 
 // ---------------------------------------------------------------------------
@@ -427,8 +428,8 @@ function UnifiedPicker({
   size = 'medium',
   disabled = false,
   compact = false,
-  showStrip = true,
-  showColorPreview,      // accepted for backward-compat — ignored
+  showStrip,             // deprecated — ignored (kept for backward compat)
+  showColorPreview,      // deprecated — ignored
   mode = 'both',
 }) {
   // ---- state ----
@@ -436,11 +437,12 @@ function UnifiedPicker({
   const [searchText, setSearchText] = useState('');
   const [activeCategory, setActiveCategory] = useState(EMOJI_CATEGORIES[0]);
   const [recentEmojis, setRecentEmojis] = useState(loadRecentEmojis);
-  const [customColor, setCustomColor] = useState(color);
+  const [customColor, setCustomColor] = useState(color || '#6366f1');
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
 
   // ---- refs ----
-  const rootRef = useRef(null);
   const triggerRef = useRef(null);
+  const popoverRef = useRef(null);
   const searchRef = useRef(null);
   const categoryTabsRef = useRef(null);
 
@@ -449,14 +451,51 @@ function UnifiedPicker({
 
   // sync customColor when prop changes externally
   useEffect(() => {
-    setCustomColor(color);
+    setCustomColor(color || '#6366f1');
   }, [color]);
 
-  // ---- click-outside to close ----
+  // ---- position the portal popover near the trigger ----
+  useEffect(() => {
+    if (!isOpen || !triggerRef.current || compact) return;
+
+    const updatePos = () => {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const popW = 520;
+      const gap = 8;
+      let top = rect.bottom + gap;
+      let left = rect.left;
+
+      // Keep within viewport
+      if (left + popW > window.innerWidth - gap) {
+        left = window.innerWidth - popW - gap;
+      }
+      if (left < gap) left = gap;
+
+      // Flip above if no room below (estimate 420px height)
+      if (top + 420 > window.innerHeight - gap) {
+        top = rect.top - 420 - gap;
+        if (top < gap) top = gap;
+      }
+
+      setPopoverPos({ top, left });
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [isOpen, compact]);
+
+  // ---- click-outside to close (checks both trigger and portal popover) ----
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
+      const inTrigger = triggerRef.current?.contains(e.target);
+      const inPopover = popoverRef.current?.contains(e.target);
+      if (!inTrigger && !inPopover) {
         setIsOpen(false);
       }
     };
@@ -523,10 +562,6 @@ function UnifiedPicker({
     [onColorChange]
   );
 
-  const openPopover = useCallback(() => {
-    if (!disabled) setIsOpen(true);
-  }, [disabled]);
-
   const togglePopover = useCallback(() => {
     if (!disabled) setIsOpen((o) => !o);
   }, [disabled]);
@@ -548,21 +583,6 @@ function UnifiedPicker({
     }
     return results;
   }, [debouncedSearch]);
-
-  // ---- strip emojis: recents first, then popular ----
-  const stripEmojis = useMemo(() => {
-    const pool = [...recentEmojis];
-    for (const e of POPULAR_EMOJIS) {
-      if (!pool.includes(e)) pool.push(e);
-      if (pool.length >= 12) break;
-    }
-    return pool.slice(0, 12);
-  }, [recentEmojis]);
-
-  // ---- quick color dots for the strip ----
-  const stripColors = useMemo(() => {
-    return PRESET_COLOR_HEXES.slice(0, 10);
-  }, []);
 
   // ---- scroll active category tab into view ----
   useEffect(() => {
@@ -589,105 +609,23 @@ function UnifiedPicker({
   const showColors = mode === 'both' || mode === 'color';
 
   // ===========================================================================
-  // RENDER
+  // POPOVER CONTENT (used by both portal and inline compact mode)
   // ===========================================================================
-  return (
+  const popoverContent = (
     <div
-      className={`unified-picker ${sizeClass} ${compact ? 'unified-picker--compact' : ''} ${disabled ? 'unified-picker--disabled' : ''}`}
-      ref={rootRef}
-      data-testid="unified-picker"
+      ref={popoverRef}
+      className={`unified-picker__popover ${compact ? 'unified-picker__popover--inline' : ''}`}
+      style={!compact ? { top: popoverPos.top, left: popoverPos.left } : undefined}
+      role="dialog"
+      aria-label="Pick icon and color"
+      data-testid="unified-picker-popover"
     >
-      {/* ---- INLINE MINI-STRIP ---- */}
-      {showStrip && !compact && (
-        <div className="unified-picker__strip" data-testid="unified-picker-strip">
-          {/* selected icon in coloured circle */}
-          <button
-            ref={triggerRef}
-            type="button"
-            className="unified-picker__strip-trigger"
-            style={{ backgroundColor: color }}
-            onClick={togglePopover}
-            disabled={disabled}
-            aria-expanded={isOpen}
-            aria-haspopup="dialog"
-            title="Change icon and color"
-            data-testid="unified-picker-trigger"
-          >
-            <span className="unified-picker__strip-trigger-icon">{icon}</span>
-          </button>
-
-          {/* quick-pick emojis */}
-          {showIcons &&
-            stripEmojis.map((em) => (
-              <button
-                key={em}
-                type="button"
-                className={`unified-picker__strip-emoji ${em === icon ? 'unified-picker__strip-emoji--selected' : ''}`}
-                onClick={() => handleIconSelect(em)}
-                disabled={disabled}
-                title={em}
-              >
-                {em}
-              </button>
-            ))}
-
-          {/* quick-pick color dots */}
-          {showColors &&
-            stripColors.map((hex) => (
-              <button
-                key={hex}
-                type="button"
-                className={`unified-picker__strip-color ${hex === color ? 'unified-picker__strip-color--selected' : ''}`}
-                style={{ backgroundColor: hex }}
-                onClick={() => handleColorSelect(hex)}
-                disabled={disabled}
-                title={PRESET_COLORS.find((c) => c.hex === hex)?.name || hex}
-              />
-            ))}
-
-          {/* expand button */}
-          <button
-            type="button"
-            className="unified-picker__strip-expand"
-            onClick={openPopover}
-            disabled={disabled}
-            title="More options"
-            data-testid="unified-picker-expand"
-          >
-            ⋯
-          </button>
-        </div>
-      )}
-
-      {/* trigger-only (when strip hidden) */}
-      {!showStrip && !compact && (
-        <button
-          ref={triggerRef}
-          type="button"
-          className="unified-picker__trigger"
-          style={{ backgroundColor: color, borderColor: color }}
-          onClick={togglePopover}
-          disabled={disabled}
-          aria-expanded={isOpen}
-          aria-haspopup="dialog"
-          title="Change icon and color"
-          data-testid="unified-picker-trigger"
-        >
-          <span className="unified-picker__trigger-icon">{icon}</span>
-        </button>
-      )}
-
-      {/* ---- FULL POPOVER ---- */}
-      {(isOpen || compact) && (
-        <div
-          className={`unified-picker__popover ${compact ? 'unified-picker__popover--inline' : ''}`}
-          role="dialog"
-          aria-label="Pick icon and color"
-          data-testid="unified-picker-popover"
-        >
-          {/* ====== EMOJI BROWSER ====== */}
-          {showIcons && (
-            <div className="unified-picker__emoji-section">
+      <div className="unified-picker__panes">
+        {/* ====== EMOJI PANE (left, wider) ====== */}
+        {showIcons && (
+          <div className="unified-picker__emoji-pane">
+            {/* header: search + category tabs */}
+            <div className="unified-picker__emoji-header">
               {/* search */}
               <div className="unified-picker__search-wrap">
                 <input
@@ -730,75 +668,77 @@ function UnifiedPicker({
                   ))}
                 </div>
               )}
+            </div>
 
-              {/* recently used (when NOT searching) */}
-              {!debouncedSearch && recentEmojis.length > 0 && (
-                <div className="unified-picker__recent" data-testid="unified-picker-recent">
-                  <div className="unified-picker__section-label">Recently Used</div>
-                  <div className="unified-picker__emoji-grid">
-                    {recentEmojis.map((em, i) => (
+            {/* recently used (when NOT searching) */}
+            {!debouncedSearch && recentEmojis.length > 0 && (
+              <div className="unified-picker__recent" data-testid="unified-picker-recent">
+                <div className="unified-picker__section-label">Recently Used</div>
+                <div className="unified-picker__emoji-grid">
+                  {recentEmojis.map((em, i) => (
+                    <button
+                      key={`recent-${em}-${i}`}
+                      type="button"
+                      className={`unified-picker__emoji-btn ${em === icon ? 'unified-picker__emoji-btn--selected' : ''}`}
+                      onClick={() => handleIconSelect(em)}
+                      title={em}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* emoji scroll area */}
+            <div className="unified-picker__emoji-scroll" data-testid="unified-picker-emoji-scroll">
+              {debouncedSearch ? (
+                /* search results */
+                filteredEmojis && filteredEmojis.length > 0 ? (
+                  <div className="unified-picker__emoji-grid" data-testid="unified-picker-search-results">
+                    {filteredEmojis.map((entry) => (
                       <button
-                        key={`recent-${em}-${i}`}
+                        key={entry.emoji}
                         type="button"
-                        className={`unified-picker__emoji-btn ${em === icon ? 'unified-picker__emoji-btn--selected' : ''}`}
-                        onClick={() => handleIconSelect(em)}
-                        title={em}
+                        className={`unified-picker__emoji-btn ${entry.emoji === icon ? 'unified-picker__emoji-btn--selected' : ''}`}
+                        onClick={() => handleIconSelect(entry.emoji)}
+                        title={entry.keywords.join(', ')}
                       >
-                        {em}
+                        {entry.emoji}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="unified-picker__empty" data-testid="unified-picker-empty">No emoji found</div>
+                )
+              ) : (
+                /* category grid */
+                <div>
+                  <div className="unified-picker__section-label">
+                    {EMOJI_DATA[activeCategory].label}
+                  </div>
+                  <div className="unified-picker__emoji-grid" data-testid="unified-picker-category-grid">
+                    {activeCategoryEmojis.map((entry) => (
+                      <button
+                        key={entry.emoji}
+                        type="button"
+                        className={`unified-picker__emoji-btn ${entry.emoji === icon ? 'unified-picker__emoji-btn--selected' : ''}`}
+                        onClick={() => handleIconSelect(entry.emoji)}
+                        title={entry.keywords.join(', ')}
+                      >
+                        {entry.emoji}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
-
-              {/* emoji grid */}
-              <div className="unified-picker__emoji-scroll" data-testid="unified-picker-emoji-scroll">
-                {debouncedSearch ? (
-                  /* search results */
-                  filteredEmojis && filteredEmojis.length > 0 ? (
-                    <div className="unified-picker__emoji-grid" data-testid="unified-picker-search-results">
-                      {filteredEmojis.map((entry) => (
-                        <button
-                          key={entry.emoji}
-                          type="button"
-                          className={`unified-picker__emoji-btn ${entry.emoji === icon ? 'unified-picker__emoji-btn--selected' : ''}`}
-                          onClick={() => handleIconSelect(entry.emoji)}
-                          title={entry.keywords.join(', ')}
-                        >
-                          {entry.emoji}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="unified-picker__empty" data-testid="unified-picker-empty">No emoji found</div>
-                  )
-                ) : (
-                  /* category grid */
-                  <div>
-                    <div className="unified-picker__section-label">
-                      {EMOJI_DATA[activeCategory].label}
-                    </div>
-                    <div className="unified-picker__emoji-grid" data-testid="unified-picker-category-grid">
-                      {activeCategoryEmojis.map((entry) => (
-                        <button
-                          key={entry.emoji}
-                          type="button"
-                          className={`unified-picker__emoji-btn ${entry.emoji === icon ? 'unified-picker__emoji-btn--selected' : ''}`}
-                          onClick={() => handleIconSelect(entry.emoji)}
-                          title={entry.keywords.join(', ')}
-                        >
-                          {entry.emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* ====== COLOR PALETTE ====== */}
-          {showColors && (
+        {/* ====== COLOR PANE (right, narrower) ====== */}
+        {showColors && (
+          <div className="unified-picker__color-pane">
             <div className="unified-picker__color-section" data-testid="unified-picker-color-section">
               <div className="unified-picker__section-label">Color</div>
               <div className="unified-picker__color-grid" data-testid="unified-picker-color-grid">
@@ -815,31 +755,68 @@ function UnifiedPicker({
                 ))}
               </div>
 
-              {/* custom color row */}
+              {/* custom color */}
               <div className="unified-picker__custom-color" data-testid="unified-picker-custom-color">
-                <span className="unified-picker__custom-label">Custom:</span>
-                <input
-                  type="color"
-                  className="unified-picker__native-color"
-                  value={customColor.length === 7 ? customColor : '#6366f1'}
-                  onChange={handleCustomNativeColor}
-                  aria-label="Pick custom color"
-                  data-testid="unified-picker-native-color"
-                />
-                <input
-                  type="text"
-                  className="unified-picker__hex-input"
-                  value={customColor}
-                  onChange={handleCustomHexInput}
-                  maxLength={7}
-                  placeholder="#6366f1"
-                  aria-label="Hex color code"
-                  data-testid="unified-picker-hex-input"
-                />
+                <span className="unified-picker__custom-label">Custom</span>
+                <div className="unified-picker__custom-row">
+                  <input
+                    type="color"
+                    className="unified-picker__native-color"
+                    value={customColor && customColor.length === 7 ? customColor : '#6366f1'}
+                    onChange={handleCustomNativeColor}
+                    aria-label="Pick custom color"
+                    data-testid="unified-picker-native-color"
+                  />
+                  <input
+                    type="text"
+                    className="unified-picker__hex-input"
+                  value={customColor || '#'}
+                    onChange={handleCustomHexInput}
+                    maxLength={7}
+                    placeholder="#6366f1"
+                    aria-label="Hex color code"
+                    data-testid="unified-picker-hex-input"
+                  />
+                </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ===========================================================================
+  // RENDER
+  // ===========================================================================
+  return (
+    <div
+      className={`unified-picker ${sizeClass} ${compact ? 'unified-picker--compact' : ''} ${disabled ? 'unified-picker--disabled' : ''}`}
+      data-testid="unified-picker"
+    >
+      {/* ---- PREVIEW BUBBLE TRIGGER ---- */}
+      {!compact && (
+        <button
+          ref={triggerRef}
+          type="button"
+          className="unified-picker__bubble"
+          style={{ backgroundColor: color }}
+          onClick={togglePopover}
+          disabled={disabled}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          title="Change icon and color"
+          data-testid="unified-picker-trigger"
+        >
+          <span className="unified-picker__bubble-icon">{icon}</span>
+        </button>
+      )}
+
+      {/* ---- POPOVER ---- */}
+      {(isOpen || compact) && (
+        compact
+          ? popoverContent
+          : createPortal(popoverContent, document.body)
       )}
     </div>
   );

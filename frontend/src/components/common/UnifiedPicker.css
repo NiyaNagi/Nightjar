@@ -1,5 +1,5 @@
 /**
- * UnifiedPicker Styles
+ * UnifiedPicker Styles — v2 (Bubble + Portal Two-Pane)
  *
  * BEM naming: .unified-picker  /  __element  /  --modifier
  * All colours via CSS custom-properties (app theme-aware).
@@ -20,250 +20,96 @@
 }
 
 /* =========================================================================
-   SIZE VARIANTS (affect trigger / strip-trigger)
+   PREVIEW BUBBLE TRIGGER
    ========================================================================= */
-.unified-picker--small .unified-picker__strip-trigger,
-.unified-picker--small .unified-picker__trigger {
-  width: 28px;
-  height: 28px;
+.unified-picker__bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+  position: relative;
 }
-.unified-picker--small .unified-picker__strip-trigger-icon,
-.unified-picker--small .unified-picker__trigger-icon {
-  font-size: 14px;
+.unified-picker__bubble:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  border-color: rgba(255, 255, 255, 0.5);
 }
-.unified-picker--small .unified-picker__strip {
-  height: 30px;
+.unified-picker__bubble:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--bg-primary, #ffffff), 0 0 0 5px var(--accent-color, #6366f1);
 }
-.unified-picker--small .unified-picker__strip-emoji {
-  font-size: 14px;
-  width: 26px;
-  height: 26px;
+.unified-picker__bubble:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
 }
-.unified-picker--small .unified-picker__strip-color {
-  width: 14px;
-  height: 14px;
+.unified-picker__bubble-icon {
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
-.unified-picker--medium .unified-picker__strip-trigger,
-.unified-picker--medium .unified-picker__trigger {
-  width: 36px;
-  height: 36px;
+/* ---- size variants ---- */
+.unified-picker--small .unified-picker__bubble {
+  width: 40px;
+  height: 40px;
 }
-.unified-picker--medium .unified-picker__strip-trigger-icon,
-.unified-picker--medium .unified-picker__trigger-icon {
+.unified-picker--small .unified-picker__bubble-icon {
   font-size: 18px;
 }
-.unified-picker--medium .unified-picker__strip {
-  height: 36px;
-}
 
-.unified-picker--large .unified-picker__strip-trigger,
-.unified-picker--large .unified-picker__trigger {
-  width: 48px;
-  height: 48px;
+.unified-picker--medium .unified-picker__bubble {
+  width: 52px;
+  height: 52px;
 }
-.unified-picker--large .unified-picker__strip-trigger-icon,
-.unified-picker--large .unified-picker__trigger-icon {
+.unified-picker--medium .unified-picker__bubble-icon {
   font-size: 24px;
 }
-.unified-picker--large .unified-picker__strip {
-  height: 44px;
+
+.unified-picker--large .unified-picker__bubble {
+  width: 64px;
+  height: 64px;
 }
-.unified-picker--large .unified-picker__strip-emoji {
-  font-size: 20px;
-  width: 36px;
-  height: 36px;
-}
-.unified-picker--large .unified-picker__strip-color {
-  width: 20px;
-  height: 20px;
+.unified-picker--large .unified-picker__bubble-icon {
+  font-size: 30px;
 }
 
 /* =========================================================================
-   INLINE MINI-STRIP
+   POPOVER BACKDROP (portal — fixed overlay)
    ========================================================================= */
-.unified-picker__strip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 36px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-}
-.unified-picker__strip::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
-
-/* ---- trigger circle ---- */
-.unified-picker__strip-trigger {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--border-color, #e5e7eb);
-  border-radius: 50%;
-  cursor: pointer;
-  background: var(--bg-secondary, #f9fafb);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.unified-picker__strip-trigger:hover:not(:disabled) {
-  transform: scale(1.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-.unified-picker__strip-trigger:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #6366f1);
-}
-.unified-picker__strip-trigger:disabled {
-  opacity: 0.85;
-  cursor: not-allowed;
-}
-.unified-picker__strip-trigger-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-
-/* ---- quick-pick emoji buttons ---- */
-.unified-picker__strip-emoji {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  font-size: 17px;
-  line-height: 1;
-  background: transparent;
-  border: 2px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.12s ease, background 0.12s ease;
-}
-.unified-picker__strip-emoji:hover {
-  background: var(--bg-hover, #f3f4f6);
-  transform: scale(1.1);
-}
-.unified-picker__strip-emoji--selected {
-  border-color: var(--accent-color, #6366f1);
-  background: var(--accent-color-alpha, rgba(99, 102, 241, 0.1));
-}
-.unified-picker__strip-emoji:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
-}
-
-/* ---- quick-pick color dots ---- */
-.unified-picker__strip-color {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-.unified-picker__strip-color:hover {
-  transform: scale(1.25);
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
-}
-.unified-picker__strip-color--selected {
-  border-color: var(--text-primary, #111827);
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 3px var(--text-primary, #111827);
-}
-.unified-picker__strip-color:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #6366f1);
-}
-
-/* ---- expand "⋯" button ---- */
-.unified-picker__strip-expand {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  font-size: 18px;
-  color: var(--text-secondary, #a1a1aa);
-  background: transparent;
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 0;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.unified-picker__strip-expand:hover {
-  background: var(--bg-hover, #f3f4f6);
-  color: var(--text-primary, #111827);
-}
-.unified-picker__strip-expand:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
+.unified-picker__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-popover, 9999);
 }
 
 /* =========================================================================
-   STANDALONE TRIGGER (when showStrip=false)
-   ========================================================================= */
-.unified-picker__trigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--border-color, #e5e7eb);
-  border-radius: 8px;
-  cursor: pointer;
-  background: var(--bg-secondary, #f9fafb);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.unified-picker__trigger:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-.unified-picker__trigger:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--bg-primary, #ffffff), 0 0 0 4px var(--accent-color, #6366f1);
-}
-.unified-picker__trigger:disabled {
-  opacity: 0.85;
-  cursor: not-allowed;
-}
-.unified-picker__trigger-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-
-/* =========================================================================
-   FULL POPOVER
+   POPOVER (portal — fixed position, on top of everything)
    ========================================================================= */
 .unified-picker__popover {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 6px;
-  width: 380px;
-  max-height: 420px;
-  overflow-y: auto;
+  position: fixed;
+  width: 520px;
+  max-height: min(460px, calc(100vh - 32px));
   background: var(--bg-primary, #ffffff);
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.16), 0 2px 10px rgba(0, 0, 0, 0.08);
-  z-index: var(--z-popover, 9999);
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: calc(var(--z-popover, 9999) + 1);
   animation: unified-picker-slide-in 0.15s ease;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .unified-picker__popover--inline {
   position: static;
-  margin-top: 0;
   width: 100%;
+  max-height: none;
   box-shadow: none;
   border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
   animation: none;
 }
 
@@ -279,11 +125,59 @@
 }
 
 /* =========================================================================
-   EMOJI SECTION
+   TWO-PANE LAYOUT
    ========================================================================= */
-.unified-picker__emoji-section {
-  padding: 10px 12px 6px;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+.unified-picker__panes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- Emoji pane (left, wider) ---- */
+.unified-picker__emoji-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* ---- Color pane (right, narrower) ---- */
+.unified-picker__color-pane {
+  width: 172px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color, #e5e7eb) transparent;
+}
+.unified-picker__color-pane::-webkit-scrollbar {
+  width: 4px;
+}
+.unified-picker__color-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+.unified-picker__color-pane::-webkit-scrollbar-thumb {
+  background: var(--border-color, #d1d5db);
+  border-radius: 4px;
+}
+
+/* ---- icon-only / color-only modes ---- */
+.unified-picker__emoji-pane:only-child {
+  border-right: none;
+}
+.unified-picker__color-pane:only-child {
+  width: 100%;
+}
+
+/* =========================================================================
+   EMOJI SECTION (inside emoji pane)
+   ========================================================================= */
+.unified-picker__emoji-header {
+  padding: 10px 12px 0;
+  flex-shrink: 0;
 }
 
 /* ---- search ---- */
@@ -359,9 +253,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 28px;
-  font-size: 16px;
+  width: 30px;
+  height: 26px;
+  font-size: 15px;
   background: transparent;
   border: none;
   border-radius: 6px;
@@ -383,7 +277,7 @@
 
 /* ---- section labels ---- */
 .unified-picker__section-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -396,19 +290,23 @@
 /* ---- recent row ---- */
 .unified-picker__recent {
   margin-bottom: 6px;
+  padding: 0 12px;
 }
 
-/* ---- emoji grid (10-col) ---- */
+/* ---- emoji grid (8-col in pane) ---- */
 .unified-picker__emoji-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: 2px;
 }
 
+/* ---- emoji scroll area (fills remaining pane height) ---- */
 .unified-picker__emoji-scroll {
-  max-height: 180px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 0 12px 10px;
   scrollbar-width: thin;
   scrollbar-color: var(--border-color, #e5e7eb) transparent;
 }
@@ -423,7 +321,7 @@
   border-radius: 4px;
 }
 
-/* ---- emoji button ---- */
+/* ---- emoji button (box-shadow for selection — no layout shift) ---- */
 .unified-picker__emoji-btn {
   display: flex;
   align-items: center;
@@ -433,18 +331,19 @@
   font-size: 18px;
   line-height: 1;
   background: transparent;
-  border: 2px solid transparent;
+  border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.1s ease;
+  transition: transform 0.1s ease, background 0.1s ease, box-shadow 0.1s ease;
   padding: 0;
+  box-sizing: border-box;
 }
 .unified-picker__emoji-btn:hover {
   background: var(--bg-hover, #f3f4f6);
   transform: scale(1.1);
 }
 .unified-picker__emoji-btn--selected {
-  border-color: var(--accent-color, #6366f1);
+  box-shadow: inset 0 0 0 2px var(--accent-color, #6366f1);
   background: var(--accent-color-alpha, rgba(99, 102, 241, 0.1));
 }
 .unified-picker__emoji-btn:focus-visible {
@@ -463,16 +362,16 @@
 }
 
 /* =========================================================================
-   COLOR SECTION
+   COLOR SECTION (inside color pane)
    ========================================================================= */
 .unified-picker__color-section {
-  padding: 10px 12px 12px;
+  padding: 10px 10px 12px;
 }
 
-/* ---- 10-column color grid ---- */
+/* ---- 5-column color grid (fits narrower pane) ---- */
 .unified-picker__color-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
   margin-bottom: 10px;
 }
@@ -485,6 +384,7 @@
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
   padding: 0;
+  box-sizing: border-box;
 }
 .unified-picker__color-pill:hover {
   transform: scale(1.15);
@@ -505,17 +405,26 @@
 /* ---- custom colour row ---- */
 .unified-picker__custom-color {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--border-color, #e5e7eb);
 }
 
 .unified-picker__custom-label {
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-secondary, #a1a1aa);
   white-space: nowrap;
   user-select: none;
+}
+
+.unified-picker__custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .unified-picker__native-color {
@@ -526,6 +435,7 @@
   border-radius: 6px;
   cursor: pointer;
   background: none;
+  flex-shrink: 0;
 }
 .unified-picker__native-color::-webkit-color-swatch-wrapper {
   padding: 2px;
@@ -538,10 +448,10 @@
 .unified-picker__hex-input {
   flex: 1;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 5px 6px;
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   color: var(--text-primary, #111827);
   background: var(--bg-primary, #ffffff);
@@ -559,4 +469,7 @@
    ========================================================================= */
 .unified-picker--compact {
   display: block;
+}
+.unified-picker--compact .unified-picker__popover {
+  max-height: 380px;
 }

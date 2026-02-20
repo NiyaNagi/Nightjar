@@ -2,7 +2,7 @@
  * UnifiedPicker Component — Comprehensive Test Suite
  *
  * Tests cover:
- * - Rendering (default, sizes, disabled, compact, showStrip variants)
+ * - Rendering (default, sizes, disabled, compact, bubble trigger)
  * - Emoji browsing (category tabs, scrolling, selection, recent tracking)
  * - Search (filtering, empty state, clear, debounce)
  * - Color selection (preset palette, custom hex, native picker)
@@ -100,49 +100,9 @@ describe('Rendering', () => {
     expect(screen.getByTestId('unified-picker-trigger')).toBeDisabled();
   });
 
-  test('disabled state disables strip buttons', () => {
-    render(<UnifiedPicker disabled />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    strip.querySelectorAll('button').forEach((btn) => {
-      expect(btn).toBeDisabled();
-    });
-  });
-
-  test('strip is visible by default', () => {
-    render(<UnifiedPicker />);
-    expect(screen.getByTestId('unified-picker-strip')).toBeInTheDocument();
-  });
-
-  test('showStrip={false} hides strip, shows standalone trigger', () => {
-    render(<UnifiedPicker showStrip={false} />);
-    expect(screen.queryByTestId('unified-picker-strip')).not.toBeInTheDocument();
-    expect(screen.getByTestId('unified-picker-trigger')).toBeInTheDocument();
-  });
-
   test('compact mode renders inline popover immediately', () => {
     render(<UnifiedPicker compact />);
     expect(screen.getByTestId('unified-picker-popover')).toBeInTheDocument();
-    expect(screen.queryByTestId('unified-picker-strip')).not.toBeInTheDocument();
-  });
-
-  test('strip shows quick-pick emojis (12 max)', () => {
-    render(<UnifiedPicker />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    const emojiButtons = strip.querySelectorAll('.unified-picker__strip-emoji');
-    expect(emojiButtons.length).toBeLessThanOrEqual(12);
-    expect(emojiButtons.length).toBeGreaterThan(0);
-  });
-
-  test('strip shows quick-pick color dots (10)', () => {
-    render(<UnifiedPicker />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    const colorDots = strip.querySelectorAll('.unified-picker__strip-color');
-    expect(colorDots.length).toBe(10);
-  });
-
-  test('strip shows expand button ⋯', () => {
-    render(<UnifiedPicker />);
-    expect(screen.getByTestId('unified-picker-expand')).toBeInTheDocument();
   });
 });
 
@@ -154,13 +114,6 @@ describe('Popover lifecycle', () => {
     render(<UnifiedPicker />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     openPopover();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  test('expand button opens popover', () => {
-    render(<UnifiedPicker />);
-    fireEvent.click(screen.getByTestId('unified-picker-expand'));
-    advanceTimersAndFlush();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
@@ -457,22 +410,6 @@ describe('Color selection', () => {
     });
     expect(onColorChange).toHaveBeenCalledWith('#112233');
   });
-
-  test('strip color dot calls onColorChange', () => {
-    const onColorChange = jest.fn();
-    render(<UnifiedPicker onColorChange={onColorChange} />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    const dots = strip.querySelectorAll('.unified-picker__strip-color');
-    fireEvent.click(dots[0]);
-    expect(onColorChange).toHaveBeenCalledWith(PRESET_COLOR_HEXES[0]);
-  });
-
-  test('selected strip color dot has --selected class', () => {
-    render(<UnifiedPicker color={PRESET_COLOR_HEXES[0]} />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    const selected = strip.querySelector('.unified-picker__strip-color--selected');
-    expect(selected).toBeInTheDocument();
-  });
 });
 
 // ============================================================
@@ -495,18 +432,6 @@ describe('Mode prop', () => {
     render(<UnifiedPicker compact mode="color" />);
     expect(screen.queryByTestId('unified-picker-emoji-scroll')).not.toBeInTheDocument();
     expect(screen.getByTestId('unified-picker-color-section')).toBeInTheDocument();
-  });
-
-  test('mode="icon" strip hides color dots', () => {
-    render(<UnifiedPicker mode="icon" />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    expect(strip.querySelectorAll('.unified-picker__strip-color').length).toBe(0);
-  });
-
-  test('mode="color" strip hides emoji quick-picks', () => {
-    render(<UnifiedPicker mode="color" />);
-    const strip = screen.getByTestId('unified-picker-strip');
-    expect(strip.querySelectorAll('.unified-picker__strip-emoji').length).toBe(0);
   });
 });
 

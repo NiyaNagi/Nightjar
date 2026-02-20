@@ -72,22 +72,9 @@ describe('UnifiedPicker Component', () => {
       expect(screen.getByTestId('unified-picker-trigger')).toBeDisabled();
     });
 
-    test('renders inline mini-strip with quick-pick emojis and colors', () => {
-      render(<UnifiedPicker />);
-      expect(screen.getByTestId('unified-picker-strip')).toBeInTheDocument();
-    });
-
-    test('hides strip when showStrip is false', () => {
-      render(<UnifiedPicker showStrip={false} />);
-      expect(screen.queryByTestId('unified-picker-strip')).not.toBeInTheDocument();
-      expect(screen.getByTestId('unified-picker-trigger')).toBeInTheDocument();
-    });
-
     test('renders inline popover in compact mode', () => {
       render(<UnifiedPicker compact />);
       expect(screen.getByTestId('unified-picker-popover')).toBeInTheDocument();
-      // No strip in compact mode
-      expect(screen.queryByTestId('unified-picker-strip')).not.toBeInTheDocument();
     });
   });
 
@@ -96,16 +83,6 @@ describe('UnifiedPicker Component', () => {
       render(<UnifiedPicker />);
       
       fireEvent.click(screen.getByTestId('unified-picker-trigger'));
-      
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
-      });
-    });
-
-    test('opens popover on expand button click', async () => {
-      render(<UnifiedPicker />);
-      
-      fireEvent.click(screen.getByTestId('unified-picker-expand'));
       
       await waitFor(() => {
         expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -126,31 +103,6 @@ describe('UnifiedPicker Component', () => {
       await waitFor(() => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });
-    });
-
-    test('calls onIconChange when emoji selected from strip', () => {
-      const onIconChange = jest.fn();
-      render(<UnifiedPicker onIconChange={onIconChange} />);
-      
-      // Click a quick-pick emoji from the strip
-      const stripEmojis = screen.getByTestId('unified-picker-strip')
-        .querySelectorAll('.unified-picker__strip-emoji');
-      expect(stripEmojis.length).toBeGreaterThan(0);
-      fireEvent.click(stripEmojis[0]);
-      
-      expect(onIconChange).toHaveBeenCalled();
-    });
-
-    test('calls onColorChange when color selected from strip', () => {
-      const onColorChange = jest.fn();
-      render(<UnifiedPicker onColorChange={onColorChange} />);
-      
-      const stripColors = screen.getByTestId('unified-picker-strip')
-        .querySelectorAll('.unified-picker__strip-color');
-      expect(stripColors.length).toBeGreaterThan(0);
-      fireEvent.click(stripColors[0]);
-      
-      expect(onColorChange).toHaveBeenCalled();
     });
 
     test('calls onIconChange when emoji selected from popover', async () => {
