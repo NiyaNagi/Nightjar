@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { getAssetUrl } from '../utils/websocket';
 import './NightjarMascot.css';
 
 // Load sayings from markdown file (cached)
@@ -188,7 +189,7 @@ function NightjarMascot({
             {/* Bird image */}
             <img 
                 className="nightjar-mascot__bird"
-                src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                src={getAssetUrl('/assets/nightjar-logo.png')}
                 alt="Nightjar"
                 draggable={false}
             />

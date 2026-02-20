@@ -8,6 +8,7 @@ import { generateIdentity } from '../../utils/identity';
 import { useIdentity } from '../../contexts/IdentityContext';
 import identityManager from '../../utils/identityManager';
 import { logBehavior } from '../../utils/logger';
+import { getAssetUrl } from '../../utils/websocket';
 import './Onboarding.css';
 
 const STEPS = {
@@ -111,7 +112,7 @@ function WelcomeStep({ hasExistingIdentity, onCreateNew, onRestore }) {
         <div className="onboarding-step welcome-step" data-testid="onboarding-welcome">
             <div className="onboarding-logo">
                 <img 
-                    src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                    src={getAssetUrl('/assets/nightjar-logo.png')}
                     alt="Nightjar" 
                     style={{ width: '200px', height: '200px' }} 
                 />

@@ -51,7 +51,7 @@ import { useToast } from './contexts/ToastContext';
 import { logBehavior } from './utils/logger';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
-import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync } from './utils/websocket';
+import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, getAssetUrl } from './utils/websocket';
 import { parseShareLink, clearUrlFragment, isJoinUrl, joinUrlToNightjarLink } from './utils/sharing';
 import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
@@ -1940,7 +1940,7 @@ function App() {
             <div className="app-loading">
                 <div className="app-loading__content">
                     <img 
-                        src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                        src={getAssetUrl('/assets/nightjar-logo.png')}
                         alt="Nightjar" 
                         className="app-loading__logo"
                         style={{ width: '120px', height: '120px' }} 
@@ -2268,7 +2268,7 @@ function App() {
                         <div className="empty-editor-state onboarding-welcome">
                         <div className="welcome-icon">
                             <img 
-                                src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`}
+                                src={getAssetUrl('/assets/nightjar-logo.png')}
                                 alt="Nightjar" 
                             />
                         </div>

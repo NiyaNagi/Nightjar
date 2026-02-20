@@ -22,6 +22,7 @@ import { useFolders } from '../contexts/FolderContext';
 import { ensureContrastWithWhite, createColorGradient, getTextColorForBackground, getDominantColor } from '../utils/colorUtils';
 import NightjarMascot from './NightjarMascot';
 import { logBehavior } from '../utils/logger';
+import { getAssetUrl } from '../utils/websocket';
 import './HierarchicalSidebar.css';
 
 /**
@@ -358,7 +359,7 @@ function WelcomeState({ onCreateWorkspace, onJoinWorkspace }) {
     return (
         <div className="sidebar-welcome">
             <div className="sidebar-welcome__icon">
-                <img src={`${window.location.protocol === 'file:' ? '.' : ''}/assets/nightjar-logo.png`} alt="Nightjar" />
+                <img src={getAssetUrl('/assets/nightjar-logo.png')} alt="Nightjar" />
             </div>
             <h3 className="sidebar-welcome__title">Welcome to Nightjar</h3>
             <p className="sidebar-welcome__text">

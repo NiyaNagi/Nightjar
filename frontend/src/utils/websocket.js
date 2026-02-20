@@ -30,6 +30,23 @@ export function getBasePath() {
   return (typeof window !== 'undefined' && window.__NIGHTJAR_BASE_PATH__) || '';
 }
 
+/**
+ * Resolve a public asset path that works in all environments:
+ *  - Electron (file:// protocol) → './assets/foo.png'
+ *  - Dev server (localhost)       → '/assets/foo.png'
+ *  - Web deployment with BASE_PATH (e.g., /app) → '/app/assets/foo.png'
+ *
+ * @param {string} relativePath  Path relative to the public root, e.g. '/assets/nightjar-logo.png'
+ */
+export function getAssetUrl(relativePath) {
+  if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+    // Electron production: paths are relative to the index.html in dist/
+    return '.' + relativePath;
+  }
+  // Web: prepend deployment base path (empty string for root deployments)
+  return getBasePath() + relativePath;
+}
+
 // Global P2P configuration (set by P2PContext)
 let globalP2PConfig = {
   enabled: false,
