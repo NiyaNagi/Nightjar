@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import identityManager from '../utils/identityManager';
 import PinInput from './PinInput';
+import { logBehavior } from '../utils/logger';
 import './IdentitySelector.css';
 
 // Views
@@ -69,6 +70,7 @@ export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigrati
   }, [onSelect, onNeedsMigration]);
 
   const handleSelectForUnlock = (identity) => {
+    logBehavior('identity', 'identity_select_for_unlock', { handle: identity.handle });
     setSelectedIdentity(identity);
     setPin('');
     setError(null);
@@ -83,9 +85,11 @@ export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigrati
 
     try {
       const result = await identityManager.unlockIdentity(selectedIdentity.id, pinValue);
+      logBehavior('identity', 'identity_unlocked', { handle: selectedIdentity.handle });
       onSelect?.(result.identityData, result.metadata);
     } catch (err) {
       console.error('[IdentitySelector] Unlock failed:', err);
+      logBehavior('identity', 'identity_unlock_failed', { error: err.message });
       setError(err.message);
       setPin('');
       
@@ -101,6 +105,7 @@ export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigrati
 
   const handleDeleteClick = (identity, e) => {
     e.stopPropagation();
+    logBehavior('identity', 'identity_delete_initiated', { handle: identity.handle });
     setSelectedIdentity(identity);
     setDeleteConfirmName('');
     setDeletePin('');
@@ -144,11 +149,13 @@ export default function IdentitySelector({ onSelect, onCreateNew, onNeedsMigrati
 
       // PIN verified - proceed with deletion
       await identityManager.deleteIdentity(selectedIdentity.id);
+      logBehavior('identity', 'identity_deleted_confirmed', { handle: selectedIdentity.handle });
       loadIdentities();
       setView(VIEWS.LIST);
     } catch (err) {
       // Handle auto-deletion from too many attempts
       if (err.message.includes('deleted')) {
+        logBehavior('identity', 'identity_auto_deleted', { handle: selectedIdentity?.handle });
         loadIdentities();
         setView(VIEWS.LIST);
         return;

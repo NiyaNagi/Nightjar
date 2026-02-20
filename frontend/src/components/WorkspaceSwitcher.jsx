@@ -11,6 +11,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { ensureContrastWithWhite } from '../utils/colorUtils';
+import { logBehavior } from '../utils/logger';
 import './WorkspaceSwitcher.css';
 
 // Permission badges
@@ -57,7 +58,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
         <div className="workspace-switcher__empty-actions">
           <button 
             className="workspace-switcher__action-btn workspace-switcher__action-btn--primary"
-            onClick={onCreateWorkspace}
+            onClick={() => { logBehavior('workspace', 'create_workspace_from_empty'); onCreateWorkspace?.(); }}
             data-testid="create-workspace-btn"
           >
             <span className="workspace-switcher__action-icon">+</span>
@@ -65,7 +66,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
           </button>
           <button 
             className="workspace-switcher__action-btn"
-            onClick={onJoinWorkspace}
+            onClick={() => { logBehavior('workspace', 'join_workspace_from_empty'); onJoinWorkspace?.(); }}
             data-testid="join-workspace-btn"
           >
             <span className="workspace-switcher__action-icon">🔗</span>
@@ -81,7 +82,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
       {/* Current workspace button */}
       <button 
         className="workspace-switcher__trigger"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { logBehavior('workspace', 'switcher_toggle', { opening: !isOpen }); setIsOpen(!isOpen); }}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         data-testid="workspace-selector"
@@ -119,6 +120,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
           className="workspace-switcher__settings"
           onClick={(e) => {
             e.stopPropagation();
+            logBehavior('workspace', 'open_settings', { workspaceId: currentWorkspace?.id });
             setIsOpen(false);
             onOpenSettings?.(currentWorkspace);
           }}
@@ -142,6 +144,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                   workspace.id === currentWorkspace?.id ? 'workspace-switcher__item--active' : ''
                 }`}
                 onClick={() => {
+                  logBehavior('workspace', 'switch_workspace', { workspaceId: workspace.id, workspaceName: workspace.name });
                   switchWorkspace(workspace.id);
                   setIsOpen(false);
                 }}
@@ -180,6 +183,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
             <button 
               className="workspace-switcher__action"
               onClick={() => {
+                logBehavior('workspace', 'create_workspace_from_dropdown');
                 setIsOpen(false);
                 onCreateWorkspace?.();
               }}
@@ -191,6 +195,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
             <button 
               className="workspace-switcher__action"
               onClick={() => {
+                logBehavior('workspace', 'join_workspace_from_dropdown');
                 setIsOpen(false);
                 onJoinWorkspace?.();
               }}
@@ -206,7 +211,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 <div className="workspace-switcher__divider" />
                 <button 
                   className="workspace-switcher__action workspace-switcher__action--danger"
-                  onClick={() => setShowDeleteConfirm(currentWorkspace.id)}
+                  onClick={() => { logBehavior('workspace', 'delete_workspace_initiated', { workspaceId: currentWorkspace.id }); setShowDeleteConfirm(currentWorkspace.id); }}
                 >
                   <span className="workspace-switcher__action-icon">🗑️</span>
                   Delete Workspace
@@ -238,6 +243,7 @@ export default function WorkspaceSwitcher({ onOpenSettings, onCreateWorkspace, o
                 disabled={isDeleting}
                 onClick={async () => {
                   if (showDeleteConfirm && !isDeleting) {
+                    logBehavior('workspace', 'delete_workspace_confirmed', { workspaceId: showDeleteConfirm });
                     setIsDeleting(true);
                     try {
                       await deleteWorkspace(showDeleteConfirm);

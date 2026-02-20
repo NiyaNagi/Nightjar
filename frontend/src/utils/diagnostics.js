@@ -2,6 +2,8 @@
  * Diagnostics and Issue Reporting Utilities
  */
 
+import { getLogs } from './logger';
+
 let logBuffer = [];
 const MAX_LOGS = 1000;
 
@@ -73,6 +75,7 @@ export async function generateDiagnosticReport() {
         timestamp: new Date().toISOString(),
         system: getSystemInfo(),
         browserLogs: getBrowserLogs(),
+        actionLogs: getLogs().filter(entry => entry.level === 'behavior'),
         electronData: null,
         sidecarLogs: null,
         p2pStatus: null,
@@ -150,6 +153,23 @@ export function formatDiagnosticReport(report) {
         lines.push('');
     }
     
+    // UI Action Telemetry (behavior-level logs from logger)
+    if (report.actionLogs && report.actionLogs.length > 0) {
+        lines.push('-'.repeat(80));
+        lines.push(`UI ACTION TELEMETRY (Last ${Math.min(report.actionLogs.length, 500)} of ${report.actionLogs.length})`);
+        lines.push('-'.repeat(80));
+        report.actionLogs.slice(-500).forEach(log => {
+            const time = log.timestamp ? log.timestamp.slice(11, 23) : '??:??:??';
+            const cat = (log.category || 'unknown').padEnd(14);
+            const evt = log.event || '';
+            const dataStr = log.data && Object.keys(log.data).length > 0
+                ? ' ' + JSON.stringify(log.data)
+                : '';
+            lines.push(`[${time}] ${cat} ${evt}${dataStr}`);
+        });
+        lines.push('');
+    }
+
     // Browser Logs
     lines.push('-'.repeat(80));
     lines.push('BROWSER CONSOLE LOGS (Last 500)');

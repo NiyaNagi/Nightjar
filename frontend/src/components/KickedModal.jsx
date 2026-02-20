@@ -7,6 +7,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { logBehavior } from '../utils/logger';
 import './KickedModal.css';
 
 export default function KickedModal({ 
@@ -92,6 +93,7 @@ export default function KickedModal({
             type="button"
             className="kicked-modal__button kicked-modal__button--primary"
             onClick={() => {
+              logBehavior('membership', 'kicked_acknowledged', { workspaceName, kickedBy });
               if (onClearData) {
                 onClearData();
               }

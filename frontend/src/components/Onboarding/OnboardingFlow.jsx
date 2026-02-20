@@ -7,6 +7,7 @@ import RestoreIdentity from './RestoreIdentity';
 import { generateIdentity } from '../../utils/identity';
 import { useIdentity } from '../../contexts/IdentityContext';
 import identityManager from '../../utils/identityManager';
+import { logBehavior } from '../../utils/logger';
 import './Onboarding.css';
 
 const STEPS = {
@@ -31,12 +32,14 @@ export default function OnboardingFlow({ onComplete, isMigration = false, legacy
     
     const handleIdentityCreated = (identity) => {
         console.log('[OnboardingFlow] Identity created:', identity.handle, 'has PIN:', !!identity.pin);
+        logBehavior('identity', 'onboarding_identity_created', { handle: identity.handle });
         setCreatedIdentity(identity);
         setStep(STEPS.SHOW_RECOVERY);
     };
     
     const handleRecoveryConfirmed = () => {
         console.log('[OnboardingFlow] Recovery confirmed, calling onComplete with:', createdIdentity?.handle);
+        logBehavior('identity', 'onboarding_recovery_confirmed', { handle: createdIdentity?.handle });
         if (createdIdentity) {
             onComplete(createdIdentity);
         } else {
@@ -45,11 +48,13 @@ export default function OnboardingFlow({ onComplete, isMigration = false, legacy
     };
     
     const handleRestoreComplete = (identity, hadLocalData) => {
+        logBehavior('identity', 'onboarding_restore_complete', { handle: identity?.handle, hadLocalData });
         onComplete(identity, hadLocalData);
     };
     
     const handleMigrationComplete = (identity) => {
         // Migration skips recovery phrase display since user already has it
+        logBehavior('identity', 'onboarding_migration_complete', { handle: identity?.handle });
         onComplete(identity);
     };
     
@@ -126,10 +131,10 @@ function WelcomeStep({ hasExistingIdentity, onCreateNew, onRestore }) {
             </div>
             
             <div className="onboarding-actions">
-                <button className="btn-primary" onClick={onCreateNew} data-testid="create-identity-btn">
+                <button className="btn-primary" onClick={() => { logBehavior('identity', 'onboarding_create_new_clicked'); onCreateNew(); }} data-testid="create-identity-btn">
                     Create New Identity
                 </button>
-                <button className="btn-secondary" onClick={onRestore} data-testid="restore-identity-btn">
+                <button className="btn-secondary" onClick={() => { logBehavior('identity', 'onboarding_restore_clicked'); onRestore(); }} data-testid="restore-identity-btn">
                     I Have a Recovery Phrase
                 </button>
             </div>
@@ -145,10 +150,12 @@ function ShowRecoveryStep({ mnemonic, onConfirm }) {
     const copyToClipboard = async () => {
         try {
             await navigator.clipboard.writeText(mnemonic);
+            logBehavior('identity', 'onboarding_recovery_phrase_copied');
             setCopyStatus('success');
             setTimeout(() => setCopyStatus(null), 2000);
         } catch (e) {
             console.error('Failed to copy:', e);
+            logBehavior('identity', 'onboarding_recovery_phrase_copy_failed');
             setCopyStatus('error');
             setTimeout(() => setCopyStatus(null), 3000);
         }

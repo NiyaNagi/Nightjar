@@ -7,6 +7,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { logBehavior } from '../utils/logger';
 import './RecoveryCodeModal.css';
 
 export default function RecoveryCodeModal({ 
@@ -50,6 +51,7 @@ export default function RecoveryCodeModal({
   const words = mnemonic.split(' ');
   
   const handleCopy = async () => {
+    logBehavior('identity', 'recovery_code_copy');
     try {
       await navigator.clipboard.writeText(mnemonic);
       setCopied(true);
@@ -84,6 +86,7 @@ export default function RecoveryCodeModal({
   };
   
   const handleSaveToFile = () => {
+    logBehavior('identity', 'recovery_code_save_to_file');
     const content = `Nightjar Recovery Phrase
 ========================
 Generated: ${new Date().toISOString()}
@@ -112,6 +115,7 @@ IMPORTANT:
   };
   
   const handleConfirm = () => {
+    logBehavior('identity', 'recovery_code_confirm');
     setConfirmed(true);
     if (onConfirmed) onConfirmed();
     if (onClose) onClose();
@@ -141,7 +145,7 @@ IMPORTANT:
           </div>
           <h2 id="recovery-modal-title" className="recovery-modal__title">Your Recovery Phrase</h2>
           {!isInitialSetup && (
-            <button type="button" className="recovery-modal__close" onClick={onClose} aria-label="Close">
+            <button type="button" className="recovery-modal__close" onClick={() => { logBehavior('identity', 'recovery_code_close'); onClose?.(); }} aria-label="Close">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -167,7 +171,7 @@ IMPORTANT:
         
         <div className={`recovery-modal__words ${revealed ? 'revealed' : ''}`} ref={wordsRef}>
           {!revealed && (
-            <button type="button" className="recovery-modal__reveal-btn" onClick={() => setRevealed(true)}>
+            <button type="button" className="recovery-modal__reveal-btn" onClick={() => { logBehavior('identity', 'recovery_code_reveal'); setRevealed(true); }}>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                 <circle cx="12" cy="12" r="3" />
@@ -252,7 +256,7 @@ IMPORTANT:
           <button 
             type="button"
             className="recovery-modal__btn recovery-modal__btn--primary recovery-modal__done-btn"
-            onClick={onClose}
+            onClick={() => { logBehavior('identity', 'recovery_code_done'); onClose?.(); }}
           >
             Done
           </button>

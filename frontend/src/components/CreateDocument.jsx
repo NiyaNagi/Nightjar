@@ -9,6 +9,7 @@ import { useFolders } from '../contexts/FolderContext';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { logBehavior } from '../utils/logger';
 import './CreateDocument.css';
 
 const DOCUMENT_ICONS = ['📄', '📝', '📋', '📊', '📈', '📉', '📑', '📃', '🗒️', '🗓️', '📒', '📓', '📔', '📕', '📗', '📘', '📙', '📰', '🎨', '💻'];
@@ -163,6 +164,7 @@ export default function CreateDocumentDialog({
       }
       
       // Success - close dialog and call success callback
+      logBehavior('document', 'document_created', { type: documentType });
       onClose();
       onSuccess?.(docName, documentType);
     } catch (err) {
@@ -209,7 +211,7 @@ export default function CreateDocumentDialog({
                     key={type.type}
                     type="button"
                     className={`document-type-option ${documentType === type.type ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                    onClick={() => !isDisabled && setDocumentType(type.type)}
+                    onClick={() => { if (!isDisabled) { logBehavior('document', 'type_selected', { type: type.type }); setDocumentType(type.type); } }}
                     disabled={isDisabled}
                     title={isDisabled ? `Only one ${type.label.toLowerCase()} per workspace is allowed` : undefined}
                     data-testid={`doc-type-${type.type}`}

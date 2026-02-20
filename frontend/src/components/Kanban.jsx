@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import KanbanCardEditor from './KanbanCardEditor';
 import SimpleMarkdown from './SimpleMarkdown';
 import { useConfirmDialog } from './common/ConfirmDialog';
+import { logBehavior } from '../utils/logger';
 import './Kanban.css';
 
 const generateId = () => crypto.randomUUID?.() || Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -168,6 +169,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
 
     // Retry sync handler
     const handleRetrySync = useCallback(() => {
+        logBehavior('document', 'kanban_retry_sync');
         setSyncError(null);
         setIsLoading(true);
         hasSyncedRef.current = false;
@@ -195,6 +197,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
 
     // Work offline handler
     const handleWorkOffline = useCallback(() => {
+        logBehavior('document', 'kanban_work_offline');
         setSyncError(null);
         hasSyncedRef.current = true;
         // Initialize with defaults if no data
@@ -260,6 +263,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         const newColumns = [...base, newColumn];
         setColumns(newColumns);
         saveToYjs(newColumns);
+        logBehavior('document', 'kanban_add_column', { columnId: newColumn.id, name: newColumn.name });
         setNewColumnName('');
         setShowNewColumn(false);
     }, [columns, newColumnName, saveToYjs]);
@@ -278,6 +282,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         const newColumns = base.filter(c => c.id !== columnId);
         setColumns(newColumns);
         saveToYjs(newColumns);
+        logBehavior('document', 'kanban_delete_column', { columnId });
     }, [columns, saveToYjs, confirm]);
 
     const updateColumnName = useCallback((columnId, name) => {
@@ -291,6 +296,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         );
         setColumns(newColumns);
         saveToYjs(newColumns, columnId);
+        logBehavior('document', 'kanban_rename_column', { columnId, name: name.trim() });
         setEditingColumn(null);
     }, [columns, saveToYjs]);
 
@@ -302,6 +308,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         );
         setColumns(newColumns);
         saveToYjs(newColumns, columnId);
+        logBehavior('document', 'kanban_change_column_color', { columnId, color });
     }, [columns, saveToYjs]);
 
     // Card operations
@@ -329,6 +336,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         
         setColumns(newColumns);
         saveToYjs(newColumns, columnId);
+        logBehavior('document', 'kanban_add_card', { columnId, cardId: newCard.id, position });
         setEditingCard(newCard.id);
     }, [columns, saveToYjs]);
 
@@ -350,6 +358,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         });
         setColumns(newColumns);
         saveToYjs(newColumns, actualColumnId);
+        logBehavior('document', 'kanban_update_card', { columnId: actualColumnId, cardId, fields: Object.keys(updates) });
     }, [columns, saveToYjs]);
 
     const deleteCard = useCallback(async (columnId, cardId) => {
@@ -375,6 +384,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         });
         setColumns(newColumns);
         saveToYjs(newColumns, actualColumnId);
+        logBehavior('document', 'kanban_delete_card', { columnId: actualColumnId, cardId });
         if (editingCard === cardId) setEditingCard(null);
     }, [columns, saveToYjs, confirm, editingCard]);
 
@@ -428,6 +438,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                 else doSave();
                 const latest = ykanbanRef.current.get('columns');
                 if (latest) setColumns(JSON.parse(JSON.stringify(latest)));
+                logBehavior('document', 'kanban_reorder_card', { columnId: toColumnId, cardId: card.id, toIndex });
             }
         } else {
             // Cross-column move — do everything inside a Yjs transaction
@@ -458,6 +469,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                 // Update React state from Yjs after transaction
                 const latest = ykanbanRef.current.get('columns');
                 if (latest) setColumns(JSON.parse(JSON.stringify(latest)));
+                logBehavior('document', 'kanban_move_card', { cardId: card.id, fromColumnId, toColumnId, toIndex });
             }
         }
         setDraggedCard(null);
@@ -499,6 +511,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
         
         setColumns(newColumns);
         saveToYjs(newColumns);
+        logBehavior('document', 'kanban_reorder_column', { columnId: draggedColumn.id, fromIndex, toIndex });
         setDraggedColumn(null);
     };
 
@@ -520,7 +533,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                         <button 
                             type="button"
                             className="btn-add-column"
-                            onClick={() => setShowNewColumn(true)}
+                            onClick={() => { logBehavior('document', 'kanban_show_add_column_form'); setShowNewColumn(true); }}
                             disabled={isLoading || syncError}
                             data-testid="kanban-add-column-btn"
                         >
@@ -604,7 +617,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                             ) : (
                                 <h3 
                                     id={`column-header-${column.id}`}
-                                    onClick={() => !readOnly && setEditingColumn(column.id)}
+                                    onClick={() => { if (!readOnly) { logBehavior('document', 'kanban_start_edit_column', { columnId: column.id }); setEditingColumn(column.id); } }}
                                 >
                                     {column.name}
                                     <span className="card-count">{column.cards.length}</span>
@@ -662,9 +675,11 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !readOnly) {
                                             e.preventDefault();
+                                            logBehavior('document', 'kanban_open_card_editor', { cardId: card.id, columnId: column.id, via: 'keyboard' });
                                             setEditingCard(card.id);
                                         } else if (e.key === 'Delete' && !readOnly) {
                                             e.preventDefault();
+                                            logBehavior('document', 'kanban_delete_card_keyboard', { cardId: card.id, columnId: column.id });
                                             deleteCard(column.id, card.id);
                                         }
                                     }}
@@ -700,6 +715,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                                                         className="btn-edit-card"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
+                                                            logBehavior('document', 'kanban_open_card_editor', { cardId: card.id, columnId: column.id });
                                                             setEditingCard(card.id);
                                                         }}
                                                         title="Edit card"
@@ -763,6 +779,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                             <div className="new-column-actions">
                                 <button type="button" onClick={addColumn} aria-label="Add column">Add</button>
                                 <button type="button" onClick={() => {
+                                    logBehavior('document', 'kanban_cancel_add_column');
                                     setShowNewColumn(false);
                                     setNewColumnName('');
                                 }} aria-label="Cancel adding column">Cancel</button>

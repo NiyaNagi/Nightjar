@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { usePermissions } from '../contexts/PermissionContext';
 import ChatButton from './common/ChatButton';
+import { logBehavior } from '../utils/logger';
 import './CollaboratorList.css';
 
 // Permission level config
@@ -102,7 +103,7 @@ export default function CollaboratorList({
             <button 
               type="button"
               className="collaborator-list__avatar collaborator-list__avatar--more"
-              onClick={() => setExpanded(true)}
+              onClick={() => { logBehavior('membership', 'collaborator_list_expanded', { count: hiddenCount }); setExpanded(true); }}
             >
               +{hiddenCount}
             </button>
@@ -164,7 +165,7 @@ export default function CollaboratorList({
         <button 
           type="button"
           className="collaborator-list__show-more"
-          onClick={() => setExpanded(true)}
+          onClick={() => { logBehavior('membership', 'collaborator_list_show_more', { hiddenCount }); setExpanded(true); }}
         >
           Show {hiddenCount} more
         </button>
@@ -174,7 +175,7 @@ export default function CollaboratorList({
         <button 
           type="button"
           className="collaborator-list__show-less"
-          onClick={() => setExpanded(false)}
+          onClick={() => { logBehavior('membership', 'collaborator_list_show_less'); setExpanded(false); }}
         >
           Show less
         </button>

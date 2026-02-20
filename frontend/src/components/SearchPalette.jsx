@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { fuzzyMatch, highlightMatches, rankItems } from '../utils/fuzzyMatch';
 import * as SearchIndex from '../services/SearchIndexCache';
+import { logBehavior } from '../utils/logger';
 import './SearchPalette.css';
 
 const CHAT_CAP = 2500;
@@ -86,6 +87,7 @@ export default function SearchPalette({
     // ── Focus input on open ─────────────────────────────────────────
     useEffect(() => {
         if (show) {
+            logBehavior('search', 'palette_opened');
             setQuery('');
             setActiveIdx(0);
             setChatSearchAll(false);
@@ -229,6 +231,7 @@ export default function SearchPalette({
 
     // ── Select a result ─────────────────────────────────────────────
     const selectResult = useCallback((r) => {
+        logBehavior('navigation', 'search_result_selected', { category: r.category });
         onClose();
         switch (r.category) {
             case 'people':
@@ -265,7 +268,7 @@ export default function SearchPalette({
 
     // ── Keyboard navigation ─────────────────────────────────────────
     const handleKeyDown = useCallback((e) => {
-        if (e.key === 'Escape') { onClose(); return; }
+        if (e.key === 'Escape') { logBehavior('search', 'palette_closed', { method: 'escape' }); onClose(); return; }
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
@@ -288,7 +291,7 @@ export default function SearchPalette({
 
     // ── Overlay click-outside ───────────────────────────────────────
     const handleOverlayClick = useCallback((e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) { logBehavior('search', 'palette_closed', { method: 'overlay_click' }); onClose(); }
     }, [onClose]);
 
     // Pre-compute category header positions (avoids mutable variable during render)
@@ -381,7 +384,7 @@ export default function SearchPalette({
                             </span>
                             <button
                                 className="search-palette__chat-cap-btn"
-                                onClick={() => setChatSearchAll(true)}
+                                onClick={() => { logBehavior('search', 'search_all_messages'); setChatSearchAll(true); }}
                                 data-testid="search-all-messages-btn"
                             >
                                 Search all {totalChatCount} messages

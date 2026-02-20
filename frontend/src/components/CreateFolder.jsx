@@ -9,6 +9,7 @@ import { useFolders } from '../contexts/FolderContext';
 import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { logBehavior } from '../utils/logger';
 import './CreateFolder.css';
 
 const FOLDER_ICONS = ['📁', '📂', '🗂️', '📚', '🎨', '💻', '📝', '🔬', '🎵', '📸', '💼', '🏠'];
@@ -68,6 +69,7 @@ export default function CreateFolderDialog({
     
     try {
       const folderId = await createFolder(name.trim(), selectedParent, { icon, color });
+      logBehavior('folder', 'folder_created');
       onSuccess?.(folderId);
       onClose?.();
       
@@ -84,6 +86,7 @@ export default function CreateFolderDialog({
   };
   
   const handleClose = () => {
+    logBehavior('folder', 'dialog_closed');
     setName('');
     setError('');
     setIcon('📁');

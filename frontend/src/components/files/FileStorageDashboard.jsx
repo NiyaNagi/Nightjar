@@ -19,6 +19,7 @@ import { useWorkspaces } from '../../contexts/WorkspaceContext';
 import { getStoredKeyChain } from '../../utils/keyDerivation';
 import { getExtension, getFileTypeCategory } from '../../utils/fileTypeCategories';
 import { generateFileId, generateFolderId, fileExistsInFolder } from '../../utils/fileStorageValidation';
+import { logBehavior } from '../../utils/logger';
 import BrowseView from './BrowseView';
 import RecentView from './RecentView';
 import FavoritesView from './FavoritesView';
@@ -248,6 +249,7 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
 
   // Upload files with collision handling
   const handleUploadFiles = useCallback(async (files, folderId, options = {}) => {
+    logBehavior('document', 'file_upload_started', { count: files.length, folderId });
     for (const file of files) {
       let name = file.name;
       if (options.keepBoth && fileExistsInFolder(name, folderId, activeFiles)) {
@@ -265,6 +267,7 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
   // Download file
   const handleDownloadFile = useCallback(async (fileRecord) => {
     try {
+      logBehavior('document', 'file_download_started', { fileId: fileRecord?.id, name: fileRecord?.name });
       setActiveView(VIEWS.DOWNLOADS);
       await downloadFile(fileRecord);
     } catch (err) {
@@ -276,9 +279,11 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
   const handleUpdateFile = useCallback((fileId, updates) => {
     updateFile(fileId, updates);
     if (updates.name) {
+      logBehavior('document', 'file_renamed', { fileId });
       addAuditEntry('rename', 'file', fileId, updates.name, 'Renamed file');
     }
     if (updates.tags) {
+      logBehavior('document', 'file_tags_updated', { fileId });
       addAuditEntry('tag', 'file', fileId, null, 'Tags updated');
     }
   }, [updateFile, addAuditEntry]);
@@ -286,17 +291,20 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
   // Delete file (soft)
   const handleDeleteFile = useCallback((fileId) => {
     const file = activeFiles.find(f => f.id === fileId);
+    logBehavior('document', 'file_deleted', { fileId, name: file?.name });
     deleteFile(fileId);
     addAuditEntry('delete', 'file', fileId, file?.name || fileId, 'Deleted file');
   }, [deleteFile, addAuditEntry, activeFiles]);
 
   // Toggle favorite
   const handleToggleFavorite = useCallback((fileId) => {
+    logBehavior('document', 'file_favorite_toggled', { fileId });
     toggleFavorite(fileId, userPublicKey);
   }, [toggleFavorite, userPublicKey]);
 
   // Create folder
   const handleCreateFolder = useCallback(({ name, parentId, color, icon }) => {
+    logBehavior('document', 'folder_created', { name, parentId });
     createFolderRecord({ name, parentId, color, icon });
     addAuditEntry('create_folder', 'folder', null, name, 'Created folder');
   }, [createFolderRecord, addAuditEntry]);
@@ -312,6 +320,7 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
   // Delete folder
   const handleDeleteFolder = useCallback((folderId) => {
     const folder = activeFolders.find(f => f.id === folderId);
+    logBehavior('document', 'folder_deleted', { folderId, name: folder?.name });
     deleteFolder(folderId);
     addAuditEntry('delete', 'folder', folderId, folder?.name || folderId, 'Deleted folder');
   }, [deleteFolder, addAuditEntry, activeFolders]);
@@ -324,6 +333,7 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
       destFolderId = null;
     }
     const file = activeFiles.find(f => f.id === fileId);
+    logBehavior('document', 'file_moved', { fileId, destFolderId });
     updateFile(fileId, { folderId: destFolderId || null });
     addAuditEntry('move', 'file', fileId, file?.name || fileId, `Moved to ${destFolderId || 'Root'}`);
   }, [updateFile, addAuditEntry, activeFiles, activeFolders]);
@@ -336,35 +346,41 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
       destParentId = null;
     }
     const folder = activeFolders.find(f => f.id === folderId);
+    logBehavior('document', 'folder_moved', { folderId, destParentId });
     updateFolder(folderId, { parentId: destParentId || null });
     addAuditEntry('move', 'folder', folderId, folder?.name || folderId, `Moved to ${destParentId || 'Root'}`);
   }, [updateFolder, addAuditEntry, activeFolders]);
 
   // Restore file/folder
   const handleRestoreFile = useCallback((fileId) => {
+    logBehavior('document', 'file_restored', { fileId });
     restoreFile(fileId);
     addAuditEntry('restore', 'file', fileId, null, 'Restored file');
   }, [restoreFile, addAuditEntry]);
 
   const handleRestoreFolder = useCallback((folderId) => {
+    logBehavior('document', 'folder_restored', { folderId });
     restoreFolder(folderId);
     addAuditEntry('restore', 'folder', folderId, null, 'Restored folder');
   }, [restoreFolder, addAuditEntry]);
 
   // Permanent delete
   const handlePermanentlyDeleteFile = useCallback((fileId) => {
+    logBehavior('document', 'file_permanently_deleted', { fileId });
     permanentlyDeleteFile(fileId);
     addAuditEntry('permanent_delete', 'file', fileId, null, 'Permanently deleted file');
   }, [permanentlyDeleteFile, addAuditEntry]);
 
   const handlePermanentlyDeleteFolder = useCallback((folderId) => {
     // For folders, remove from yStorageFolders (no chunks to clean)
+    logBehavior('document', 'folder_permanently_deleted', { folderId });
     permanentlyDeleteFolder(folderId);
     addAuditEntry('permanent_delete', 'folder', folderId, null, 'Permanently deleted folder');
   }, [permanentlyDeleteFolder, addAuditEntry]);
 
   // Empty trash
   const handleEmptyTrash = useCallback(() => {
+    logBehavior('document', 'trash_emptied', { fileCount: trashedFiles?.length, folderCount: trashedFolders?.length });
     (trashedFiles || []).forEach(f => permanentlyDeleteFile(f.id));
     (trashedFolders || []).forEach(f => permanentlyDeleteFolder(f.id));
     addAuditEntry('permanent_delete', null, null, null, 'Emptied trash');
@@ -372,6 +388,7 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
 
   // Delete all files (danger zone)
   const handleDeleteAllFiles = useCallback(() => {
+    logBehavior('document', 'all_files_deleted', { fileCount: (activeFiles?.length || 0) + (trashedFiles?.length || 0) });
     (activeFiles || []).forEach(f => permanentlyDeleteFile(f.id));
     (activeFolders || []).forEach(f => permanentlyDeleteFolder(f.id));
     (trashedFiles || []).forEach(f => permanentlyDeleteFile(f.id));
@@ -381,12 +398,14 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
 
   // Update settings
   const handleUpdateSettings = useCallback((newSettings) => {
+    logBehavior('document', 'file_storage_settings_updated', { keys: Object.keys(newSettings) });
     updateSettings(newSettings);
     addAuditEntry('settings', null, null, null, 'Updated settings');
   }, [updateSettings, addAuditEntry]);
 
   // Clear download history
   const handleClearHistory = useCallback(() => {
+    logBehavior('document', 'download_history_cleared');
     setDownloadHistory([]);
     saveDownloadHistory(workspaceId, []);
   }, [workspaceId]);
@@ -402,6 +421,7 @@ function FileStorageContent({ onClose, workspaceProvider, onStartChatWith }) {
   }, [clearDownload, workspaceId]);
 
   const handleViewChange = useCallback((viewId) => {
+    logBehavior('document', 'file_storage_view_changed', { view: viewId });
     setActiveView(viewId);
   }, []);
 

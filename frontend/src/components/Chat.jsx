@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './Chat.css';
 import { useNotificationSounds, MESSAGE_TYPES } from '../hooks/useNotificationSounds';
+import { logBehavior } from '../utils/logger';
 
 // Load persisted chat state from localStorage with bounds checking
 const loadChatState = () => {
@@ -327,6 +328,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Start a DM with a user - uses publicKey for stable channel ID
     const startDirectMessage = useCallback((user) => {
+        logBehavior('chat', 'start_direct_message', { targetUser: user.name, hasPublicKey: !!user.publicKey });
         // Prefer publicKey for stable tab ID that persists across sessions
         // Fall back to clientId only if publicKey is unavailable (legacy clients)
         if (!user.publicKey) {
@@ -366,6 +368,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
 
     // Toggle user selection for group chat
     const toggleUserForGroup = useCallback((user) => {
+        logBehavior('chat', 'toggle_user_for_group', { userName: user.name });
         setSelectedUsersForGroup(prev => {
             const key = user.publicKey || user.clientId;
             const isSelected = prev.some(u => (u.publicKey || u.clientId) === key);
@@ -379,6 +382,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Create a group chat
     const createGroupChat = useCallback((name) => {
+        logBehavior('chat', 'create_group_chat', { groupName: name, memberCount: selectedUsersForGroup.length + 1 });
         const groupId = `group-${Date.now().toString(36)}`;
         const members = [
             { publicKey: userPublicKey, name: username },
@@ -442,6 +446,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Archive a channel (hide but keep history)
     const archiveChannel = useCallback((channelId) => {
+        logBehavior('chat', 'archive_channel', { channelId });
         setChannelState(prev => {
             const updated = {
                 ...prev,
@@ -457,6 +462,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Leave a channel (archive + mark as left)
     const leaveChannel = useCallback((channelId) => {
+        logBehavior('chat', 'leave_channel', { channelId });
         // Send system message that user left
         if (ymessagesRef.current) {
             ymessagesRef.current.push([{
@@ -484,6 +490,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Unarchive a channel
     const unarchiveChannel = useCallback((channelId) => {
+        logBehavior('chat', 'unarchive_channel', { channelId });
         setChannelState(prev => {
             const updated = { ...prev };
             if (updated[channelId]) {
@@ -496,6 +503,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Delete a channel (only for creator/owner)
     const deleteChannel = useCallback((channelId) => {
+        logBehavior('chat', 'delete_channel', { channelId });
         // Remove from tabs
         setChatTabs(prev => prev.filter(t => t.id !== channelId));
         // Remove from channel state
@@ -542,6 +550,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     const closeTab = (tabId, e) => {
         e.stopPropagation();
         e.preventDefault();
+        logBehavior('chat', 'close_tab', { tabId });
         console.log('[Chat] closeTab called:', tabId);
         if (tabId === 'general') return; // Can't close general
         setChatTabs(prev => {
@@ -934,6 +943,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
 
     const sendMessage = useCallback(() => {
         if (!inputValue.trim()) return;
+        logBehavior('chat', 'send_message', { channel: activeTab, hasYdoc, mentionCount: pendingMentions.length });
 
         // Determine the channel for this message
         let channel = 'general';
@@ -1029,11 +1039,13 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     
     // Scroll to bottom button handler
     const scrollToBottom = useCallback(() => {
+        logBehavior('chat', 'scroll_to_bottom');
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, []);
     
     // Mark all messages as read
     const markAllAsRead = useCallback(() => {
+        logBehavior('chat', 'mark_all_as_read', { channelCount: Object.keys(unreadCounts).length });
         const updated = {};
         Object.keys(unreadCounts).forEach(channelId => {
             updated[channelId] = { lastRead: Date.now(), count: 0 };
@@ -1192,6 +1204,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
     // Insert a mention into the input
     // Display @Name in the input, store full mention data for conversion on send
     const insertMention = useCallback((user) => {
+        logBehavior('chat', 'insert_mention', { mentionedUser: user.name, isOnline: user.isOnline });
         const beforeMention = inputValue.substring(0, mentionStartIndex);
         // afterMention should start AFTER the @query, not from cursor position
         // +1 for the @ symbol itself
@@ -1304,7 +1317,10 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 onMouseDown={handleDragStart}
                 onClick={(e) => {
                     // Only expand if it wasn't a drag
-                    if (!hasDragged) setMinimized(false);
+                    if (!hasDragged) {
+                        logBehavior('chat', 'expand_chat');
+                        setMinimized(false);
+                    }
                 }}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -1352,7 +1368,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         <button
                             type="button"
                             className="btn-mark-read"
-                            onClick={markAllAsRead}
+                            onClick={() => { logBehavior('chat', 'mark_all_as_read_btn'); markAllAsRead(); }}
                             title="Mark all as read"
                             aria-label="Mark all messages as read"
                         >
@@ -1362,7 +1378,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     <button 
                         type="button"
                         className="btn-minimize"
-                        onClick={() => setMinimized(true)}
+                        onClick={() => { logBehavior('chat', 'minimize_chat'); setMinimized(true); }}
                         title="Minimize chat"
                         aria-label="Minimize chat window"
                     >
@@ -1380,10 +1396,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                         <div 
                             key={tab.id}
                             className={`chat-tab ${activeTab === tab.id ? 'active' : ''}`}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => { logBehavior('chat', 'switch_tab', { tabId: tab.id, tabType: tab.type }); setActiveTab(tab.id); }}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                     e.preventDefault();
+                                    logBehavior('chat', 'switch_tab', { tabId: tab.id, tabType: tab.type });
                                     setActiveTab(tab.id);
                                 }
                             }}
@@ -1438,7 +1455,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     <button
                         type="button"
                         className={`chat-tab archived-toggle ${showArchivedSection ? 'active' : ''}`}
-                        onClick={() => setShowArchivedSection(!showArchivedSection)}
+                        onClick={() => { logBehavior('chat', 'toggle_archived_section', { visible: !showArchivedSection }); setShowArchivedSection(!showArchivedSection); }}
                         title="Show archived chats"
                     >
                         📁 {showArchivedSection ? '▲' : '▼'}
@@ -1448,7 +1465,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 <button 
                     type="button"
                     className="chat-tab add-tab"
-                    onClick={() => setShowUserSearch(true)}
+                    onClick={() => { logBehavior('chat', 'open_new_chat_search'); setShowUserSearch(true); }}
                     title="Start new chat"
                     aria-label="Start a new chat with a user"
                 >
@@ -1464,6 +1481,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                             key={tab.id}
                             className="archived-channel-item"
                             onClick={() => {
+                                logBehavior('chat', 'restore_archived_channel', { channelId: tab.id, channelName: tab.name });
                                 unarchiveChannel(tab.id);
                                 setActiveTab(tab.id);
                                 setShowArchivedSection(false);
@@ -1494,6 +1512,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                             type="button"
                             className="close-search"
                             onClick={() => {
+                                logBehavior('chat', 'close_new_chat_search');
                                 setShowUserSearch(false);
                                 setUserSearchQuery('');
                                 setSelectedUsersForGroup([]);
@@ -1548,9 +1567,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                         onClick={() => {
                                             if (selectedUsersForGroup.length > 0 || isSelected) {
                                                 // Multi-select mode
+                                                logBehavior('chat', 'user_search_toggle_selection', { userName: user.name });
                                                 toggleUserForGroup(user);
                                             } else {
                                                 // Single user - start DM
+                                                logBehavior('chat', 'user_search_start_dm', { userName: user.name });
                                                 startDirectMessage(user);
                                             }
                                         }}
@@ -1598,10 +1619,12 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                             onClick={() => {
                                 if (selectedUsersForGroup.length === 1) {
                                     // Just one user selected - start DM
+                                    logBehavior('chat', 'create_group_btn_start_dm', { userName: selectedUsersForGroup[0].name });
                                     startDirectMessage(selectedUsersForGroup[0]);
                                     setSelectedUsersForGroup([]);
                                 } else {
                                     // Multiple users - show name modal
+                                    logBehavior('chat', 'create_group_btn_show_name_modal', { memberCount: selectedUsersForGroup.length });
                                     const autoName = generateGroupName(selectedUsersForGroup);
                                     setGroupNameInput(autoName);
                                     setShowGroupNameModal(true);
@@ -1634,6 +1657,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                                 type="button"
                                 className="btn-cancel"
                                 onClick={() => {
+                                    logBehavior('chat', 'cancel_group_name_modal');
                                     setShowGroupNameModal(false);
                                     setGroupNameInput('');
                                 }}
@@ -1643,7 +1667,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                             <button
                                 type="button"
                                 className="btn-create"
-                                onClick={() => createGroupChat(groupNameInput || generateGroupName(selectedUsersForGroup))}
+                                onClick={() => { logBehavior('chat', 'confirm_create_group', { groupName: groupNameInput }); createGroupChat(groupNameInput || generateGroupName(selectedUsersForGroup)); }}
                             >
                                 Create
                             </button>

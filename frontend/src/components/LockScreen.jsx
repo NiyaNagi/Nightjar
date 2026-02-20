@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import identityManager from '../utils/identityManager';
 import PinInput from './PinInput';
+import { logBehavior } from '../utils/logger';
 import './LockScreen.css';
 
 export default function LockScreen({ onUnlock, onSwitchIdentity }) {
@@ -66,9 +67,11 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
         try {
             const result = await identityManager.unlockIdentity(identity.id, pinValue);
             setPin(''); // Clear PIN from state immediately on success
+            logBehavior('identity', 'lock_screen_unlocked', { handle: identity.handle });
             onUnlock?.(result.identityData, result.metadata);
         } catch (err) {
             console.error('[LockScreen] Unlock failed:', err);
+            logBehavior('identity', 'lock_screen_unlock_failed', { error: err.message });
             setError(err.message);
             setPin('');
             if (identity) {
@@ -135,7 +138,7 @@ export default function LockScreen({ onUnlock, onSwitchIdentity }) {
                 
                 <button 
                     className="lock-screen__switch-btn"
-                    onClick={onSwitchIdentity}
+                    onClick={() => { logBehavior('identity', 'lock_screen_switch_identity'); onSwitchIdentity?.(); }}
                     type="button"
                 >
                     Switch Identity

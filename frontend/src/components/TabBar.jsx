@@ -3,6 +3,7 @@ import './TabBar.css';
 import UserProfile from './UserProfile';
 import { createColorGradient, getDominantColor, getTextColorForBackground } from '../utils/colorUtils';
 import { CONTENT_DOC_TYPES } from '../config/constants';
+import { logBehavior } from '../utils/logger';
 
 // Load DND state from notification settings
 const loadDoNotDisturb = () => {
@@ -108,7 +109,7 @@ const TabBar = ({
                         <div
                             key={tab.id}
                             className={`tab ${isSelected ? 'active' : ''} ${tab.hasUnsavedChanges ? 'unsaved' : ''} ${hasColor ? 'tab--colored' : ''}`}
-                            onClick={() => onSelectTab(tab.id)}
+                            onClick={() => { logBehavior('navigation', 'tab_select', { tabId: tab.id, tabName: tab.name }); onSelectTab(tab.id); }}
                             onKeyDown={(e) => handleTabKeyDown(e, tabIndex)}
                             style={backgroundStyle}
                             role="tab"
@@ -147,6 +148,7 @@ const TabBar = ({
                             className="tab-close" 
                             onClick={(e) => {
                                 e.stopPropagation();
+                                logBehavior('navigation', 'tab_close', { tabId: tab.id, tabName: tab.name });
                                 onCloseTab(tab.id);
                             }}
                             title="Close tab"
@@ -164,7 +166,7 @@ const TabBar = ({
                 <button
                     type="button"
                     className="tab-bar-btn"
-                    onClick={onOpenSearch}
+                    onClick={() => { logBehavior('navigation', 'open_search'); onOpenSearch?.(); }}
                     title="Search everything (Ctrl+K)"
                     aria-label="Open search palette"
                     data-testid="search-btn"
@@ -179,7 +181,7 @@ const TabBar = ({
                 <button
                     type="button"
                     className="tab-bar-btn"
-                    onClick={onReportBug}
+                    onClick={() => { logBehavior('navigation', 'report_bug'); onReportBug?.(); }}
                     title="Report a bug"
                     aria-label="Report a bug"
                     data-testid="bug-report-btn"
@@ -192,7 +194,7 @@ const TabBar = ({
                 <button 
                     type="button"
                     className={`tab-bar-btn ${showComments ? 'active' : ''}`}
-                    onClick={onShowComments}
+                    onClick={() => { logBehavior('navigation', 'toggle_comments', { showing: !showComments }); onShowComments?.(); }}
                     title={showComments ? 'Hide comments' : 'Show comments'}
                     aria-label={showComments ? 'Hide comments panel' : 'Show comments panel'}
                     aria-pressed={showComments}
@@ -203,7 +205,7 @@ const TabBar = ({
                 <button 
                     type="button"
                     className="tab-bar-btn" 
-                    onClick={onShowChangelog}
+                    onClick={() => { logBehavior('navigation', 'show_changelog'); onShowChangelog?.(); }}
                     title="View changelog"
                     aria-label="View document history changelog"
                 >
@@ -215,7 +217,7 @@ const TabBar = ({
                 <button 
                     type="button"
                     className="tab-bar-btn"
-                    onClick={onToggleFullscreen}
+                    onClick={() => { logBehavior('navigation', 'toggle_fullscreen', { entering: !isFullscreen }); onToggleFullscreen?.(); }}
                     title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                     aria-label={isFullscreen ? 'Exit fullscreen mode' : 'Enter fullscreen mode'}
                 >
@@ -253,6 +255,7 @@ const DoNotDisturbToggle = () => {
     
     const toggleDND = useCallback(() => {
         const newValue = !doNotDisturb;
+        logBehavior('navigation', 'toggle_do_not_disturb', { enabling: newValue });
         setDoNotDisturb(newValue);
         saveDoNotDisturb(newValue);
     }, [doNotDisturb]);

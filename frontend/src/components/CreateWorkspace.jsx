@@ -18,6 +18,7 @@ import {
 } from '../utils/sharing';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { getBasePath } from '../utils/websocket';
+import { logBehavior } from '../utils/logger';
 import './CreateWorkspace.css';
 
 const EMOJI_OPTIONS = [
@@ -233,6 +234,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
         icon,
         color
       });
+      logBehavior('workspace', 'workspace_created');
       onSuccess?.(workspace);
       onClose?.();
     } catch (err) {
@@ -245,6 +247,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
   // Handle join workspace
   const handleJoin = async (e) => {
     e.preventDefault();
+    logBehavior('workspace', 'workspace_join_attempted');
     setJoinError('');
     setConnectionProgress(null);
     
@@ -427,6 +430,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               type="button"
               className={`create-workspace__tab ${activeTab === 'create' ? 'create-workspace__tab--active' : ''}`}
               onClick={() => {
+                logBehavior('workspace', 'tab_switched', { tab: 'create' });
                 setActiveTab('create');
                 // Clear join state
                 setShareLink('');
@@ -447,6 +451,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               type="button"
               className={`create-workspace__tab ${activeTab === 'join' ? 'create-workspace__tab--active' : ''}`}
               onClick={() => {
+                logBehavior('workspace', 'tab_switched', { tab: 'join' });
                 setActiveTab('join');
                 // Clear create state
                 setName('');

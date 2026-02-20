@@ -6,7 +6,7 @@
  * - Auto-populated title based on active document/workspace context
  * - Title and markdown description fields
  * - Pre-filled template with repro steps (Given/When/Then)
- * - Last 20 UI actions from logger (capped at 2,000 chars)
+ * - Last 50 UI actions from logger (capped at 3,000 chars)
  * - Inline diagnostic data embedded in issue body
  * - Screenshot capture with download button on success screen
  * - Creates GitHub issue automatically via API (no manual steps)
@@ -22,8 +22,8 @@ import { getBasePath } from '../utils/websocket';
 import './BugReportModal.css';
 
 const GITHUB_ISSUES_PAGE = 'https://github.com/NiyaNagi/Nightjar/issues/new?labels=bug';
-const MAX_ACTION_CHARS = 2000;
-const MAX_RECENT_ACTIONS = 20;
+const MAX_ACTION_CHARS = 3000;
+const MAX_RECENT_ACTIONS = 50;
 
 /** Pretty-print document type for display in auto-generated titles. */
 const DOC_TYPE_LABELS = {

@@ -14,6 +14,7 @@ import { useWorkspaces } from '../../contexts/WorkspaceContext';
 import { useWorkspaceSyncContext } from '../../contexts/WorkspaceSyncContext';
 import { useNotificationSounds, NOTIFICATION_SOUNDS } from '../../hooks/useNotificationSounds';
 import NightjarMascot from '../NightjarMascot';
+import { logBehavior } from '../../utils/logger';
 
 // Default settings values
 const DEFAULT_SETTINGS = {
@@ -154,6 +155,7 @@ export default function AppSettings({ isOpen, onClose }) {
   // Notification settings auto-persist via the hook, but the save button should
   // still light up so the user gets consistent visual feedback.
   const handleNotificationChange = useCallback((updates) => {
+    logBehavior('app', 'notification_setting_changed', { keys: Object.keys(updates) });
     updateNotificationSettings(updates);
     setHasChanges(true);
   }, [updateNotificationSettings]);
@@ -221,6 +223,7 @@ export default function AppSettings({ isOpen, onClose }) {
 
   // Update a setting and apply immediately for visual settings
   const updateSetting = useCallback((key, value) => {
+    logBehavior('app', 'setting_changed', { key });
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
       
@@ -238,6 +241,7 @@ export default function AppSettings({ isOpen, onClose }) {
 
   // Save all settings
   const handleSave = useCallback(() => {
+    logBehavior('app', 'settings_saved');
     setSaving(true);
     saveSettings(settings);
     
@@ -275,6 +279,7 @@ export default function AppSettings({ isOpen, onClose }) {
       variant: 'warning'
     });
     if (confirmed) {
+      logBehavior('app', 'settings_reset');
       setSettings({ ...DEFAULT_SETTINGS });
       applyTheme(DEFAULT_SETTINGS.theme);
       applyEditorSettings(DEFAULT_SETTINGS);
@@ -379,12 +384,14 @@ export default function AppSettings({ isOpen, onClose }) {
     });
     
     if (!doubleConfirmed) return;
+    logBehavior('app', 'factory_reset');
     await executeFactoryReset();
   }, [confirm, workspaces, currentWorkspaceId, syncMembers, executeFactoryReset]);
   
   // Handle the type-to-confirm factory reset bypass
   const handleOwnershipBypassReset = useCallback(async () => {
     if (factoryResetConfirmText !== 'DELETE WORKSPACES') return;
+    logBehavior('app', 'factory_reset_ownership_bypass');
     setShowOwnershipWarning(false);
     setFactoryResetConfirmText('');
     await executeFactoryReset();
@@ -417,6 +424,7 @@ export default function AppSettings({ isOpen, onClose }) {
   
   // Handle Tor mode change
   const handleTorModeChange = async (newMode) => {
+    logBehavior('app', 'tor_mode_changed', { mode: newMode });
     setTorMode(newMode);
     localStorage.setItem('Nightjar_tor_mode', newMode);
     
@@ -435,6 +443,7 @@ export default function AppSettings({ isOpen, onClose }) {
   
   // Handle Tor start
   const handleStartTor = async () => {
+    logBehavior('app', 'tor_started');
     if (window.electronAPI?.tor) {
       try {
         await window.electronAPI.tor.start(torMode);
@@ -448,6 +457,7 @@ export default function AppSettings({ isOpen, onClose }) {
   
   // Handle Tor stop
   const handleStopTor = async () => {
+    logBehavior('app', 'tor_stopped');
     if (window.electronAPI?.tor) {
       try {
         await window.electronAPI.tor.stop();
@@ -460,6 +470,7 @@ export default function AppSettings({ isOpen, onClose }) {
   
   // Toggle relay
   const handleToggleRelay = async () => {
+    logBehavior('app', 'relay_toggled', { enabled: !relayEnabled });
     if (window.electronAPI?.invoke) {
       try {
         const newEnabled = !relayEnabled;
@@ -483,6 +494,7 @@ export default function AppSettings({ isOpen, onClose }) {
   // Toggle relay bridge (connecting THROUGH a public relay for cross-platform sync)
   const handleToggleRelayBridge = useCallback(async (enable) => {
     const newEnabled = typeof enable === 'boolean' ? enable : !relayBridgeEnabled;
+    logBehavior('app', 'relay_bridge_toggled', { enabled: newEnabled });
     setRelayBridgeEnabled(newEnabled);
     localStorage.setItem('Nightjar_relay_bridge_enabled', newEnabled.toString());
 
@@ -501,6 +513,7 @@ export default function AppSettings({ isOpen, onClose }) {
 
   // Save custom relay URL
   const handleSaveCustomRelay = useCallback(() => {
+    logBehavior('app', 'custom_relay_saved');
     localStorage.setItem('Nightjar_custom_relay_url', customRelayUrl.trim());
     setRelayBridgeSaved(true);
     setTimeout(() => setRelayBridgeSaved(false), 2000);
@@ -539,7 +552,7 @@ export default function AppSettings({ isOpen, onClose }) {
                 key={tab.id}
                 type="button"
                 className={`app-settings__nav-item ${activeTab === tab.id ? 'app-settings__nav-item--active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { logBehavior('app', 'settings_tab_changed', { tab: tab.id }); setActiveTab(tab.id); }}
               >
                 {tab.label}
               </button>
@@ -890,6 +903,7 @@ export default function AppSettings({ isOpen, onClose }) {
                     value={settings.lockTimeout ?? 15}
                     onChange={(e) => {
                       const value = parseInt(e.target.value, 10);
+                      logBehavior('identity', 'lock_timeout_changed', { minutes: value });
                       updateSetting('lockTimeout', value);
                       // Also update the identity manager
                       import('../../utils/identityManager').then(m => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useConfirmDialog } from './common/ConfirmDialog';
 import ChatButton from './common/ChatButton';
+import { logBehavior } from '../utils/logger';
 import './Comments.css';
 
 /**
@@ -36,6 +37,7 @@ const Comments = ({
 
     // Handle delete with confirmation
     const handleDeleteComment = useCallback(async (commentId) => {
+        logBehavior('document', 'comment_delete_initiated', { commentId });
         const confirmed = await confirm({
             title: 'Delete Comment',
             message: 'Are you sure you want to delete this comment?',
@@ -156,6 +158,7 @@ const Comments = ({
         if (!newComment.trim() || !ycommentsRef.current) return;
 
         const selection = getSelectionRange();
+        logBehavior('document', 'comment_add', { hasSelection: !!selection, documentType });
         
         const comment = {
             id: `comment-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
@@ -178,6 +181,7 @@ const Comments = ({
     const addReply = (commentId) => {
         if (!replyText.trim() || !ycommentsRef.current) return;
 
+        logBehavior('document', 'comment_reply', { commentId });
         const reply = {
             id: `reply-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
             text: replyText.trim(),
@@ -210,6 +214,7 @@ const Comments = ({
     const toggleResolve = (commentId) => {
         if (!ycommentsRef.current) return;
 
+        logBehavior('document', 'comment_toggle_resolve', { commentId });
         // Read and mutate inside transact to prevent stale index from remote updates
         ydoc.transact(() => {
             const currentComments = ycommentsRef.current.toArray();
@@ -244,6 +249,7 @@ const Comments = ({
     const goToComment = (comment) => {
         if (!comment.selection) return;
 
+        logBehavior('document', 'comment_navigate', { commentId: comment.id, documentType });
         // For text documents with TipTap editor
         if (editor && documentType === 'text' && comment.selection.from !== undefined) {
             try {
@@ -328,7 +334,7 @@ const Comments = ({
                 <div className="comments-header-actions">
                     <span className="comment-count" data-testid="comment-count">{unresolvedComments.length} open</span>
                     {onClose && (
-                        <button className="btn-close-comments" onClick={onClose} aria-label="Close comments panel" data-testid="close-comments-btn">×</button>
+                        <button className="btn-close-comments" onClick={() => { logBehavior('document', 'comment_panel_close'); onClose(); }} aria-label="Close comments panel" data-testid="close-comments-btn">×</button>
                     )}
                 </div>
             </div>
@@ -343,7 +349,7 @@ const Comments = ({
                         </span>
                         <button 
                             className="clear-selection"
-                            onClick={() => setCurrentSelection(null)}
+                            onClick={() => { logBehavior('document', 'comment_clear_selection'); setCurrentSelection(null); }}
                             title="Clear selection"
                             aria-label="Clear selection"
                         >
@@ -508,6 +514,7 @@ const Comments = ({
                                     className="btn-reply-action"
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        logBehavior('document', 'comment_reply_open', { commentId: comment.id });
                                         setReplyingTo(comment.id);
                                     }}
                                     aria-label="Reply to comment"

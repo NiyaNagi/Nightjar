@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import secureStorage from '../utils/secureStorage';
 import { secureError, secureLog } from '../utils/secureLogger';
 import identityManager from '../utils/identityManager';
+import { logBehavior } from '../utils/logger';
 
 const IdentityContext = createContext(null);
 
@@ -188,6 +189,7 @@ export function IdentityProvider({ children }) {
             setIdentity(identityData);
             setNeedsOnboarding(false);
             setIsUnlocked(true);
+            logBehavior('identity', 'identity_created', { handle: identityData?.handle });
             
             // Dispatch event to notify other contexts that identity was created
             // WorkspaceContext listens for this to reinitialize P2P
@@ -197,6 +199,7 @@ export function IdentityProvider({ children }) {
             return true;
         } catch (e) {
             secureError('[Identity] Failed to create:', e);
+            logBehavior('identity', 'identity_create_failed', { error: e.message });
             setError(e.message);
             return false;
         } finally {
@@ -217,9 +220,11 @@ export function IdentityProvider({ children }) {
             }
             
             setIdentity(updated);
+            logBehavior('identity', 'identity_updated', { fields: Object.keys(updates) });
             return true;
         } catch (e) {
             secureError('[Identity] Failed to update:', e);
+            logBehavior('identity', 'identity_update_failed', { error: e.message });
             setError(e.message);
             return false;
         }
@@ -235,9 +240,11 @@ export function IdentityProvider({ children }) {
             
             setIdentity(null);
             setNeedsOnboarding(true);
+            logBehavior('identity', 'identity_deleted');
             return true;
         } catch (e) {
             secureError('[Identity] Failed to delete:', e);
+            logBehavior('identity', 'identity_delete_failed', { error: e.message });
             setError(e.message);
             return false;
         }
@@ -297,6 +304,7 @@ export function IdentityProvider({ children }) {
                 combined.set(new Uint8Array(ciphertext), salt.length + iv.length);
                 
                 // Return versioned export format
+                logBehavior('identity', 'identity_exported');
                 return JSON.stringify({
                     version: 2,
                     data: (() => { let b = ''; for (let i = 0; i < combined.length; i++) b += String.fromCharCode(combined[i]); return btoa(b); })()
@@ -304,6 +312,7 @@ export function IdentityProvider({ children }) {
             }
         } catch (e) {
             secureError('[Identity] Failed to export:', e);
+            logBehavior('identity', 'identity_export_failed', { error: e.message });
             throw e;
         }
     }, [identity]);
@@ -386,6 +395,7 @@ export function IdentityProvider({ children }) {
             setIdentity(restored);
             setNeedsOnboarding(false);
             setIsUnlocked(true);
+            logBehavior('identity', 'identity_imported', { handle: restored?.handle });
             
             // Dispatch event to notify other contexts (P2P, WorkspaceContext) that identity changed
             window.dispatchEvent(new CustomEvent('identity-created', { detail: restored }));
@@ -394,6 +404,7 @@ export function IdentityProvider({ children }) {
             return true;
         } catch (e) {
             secureError('[Identity] Failed to import:', e);
+            logBehavior('identity', 'identity_import_failed', { error: e.message });
             throw e;
         }
     }, []);
@@ -403,6 +414,7 @@ export function IdentityProvider({ children }) {
     const syncFromIdentityManager = useCallback(async (identityData) => {
         if (identityData) {
             secureLog('[Identity] Syncing identity from identityManager:', identityData.handle);
+            logBehavior('identity', 'identity_switched', { handle: identityData?.handle });
             setIdentity(identityData);
             setNeedsOnboarding(false);
             setHasExistingIdentity(true);

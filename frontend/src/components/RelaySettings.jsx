@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { isElectron } from '../hooks/useEnvironment';
+import { logBehavior } from '../utils/logger';
 import './RelaySettings.css';
 
 // Default relay settings
@@ -76,6 +77,7 @@ export default function RelaySettings({ isOpen, onClose }) {
   const handleToggleRelay = useCallback(async () => {
     if (!isElectron()) return;
     
+    logBehavior('connection', 'relay_toggle', { enabling: !settings.enabled });
     setIsSaving(true);
     setStatusMessage(null);
     
@@ -112,6 +114,7 @@ export default function RelaySettings({ isOpen, onClose }) {
   
   // Update settings
   const handleSettingChange = useCallback((key, value) => {
+    logBehavior('connection', 'relay_setting_change', { key, value });
     setSettings(prev => ({ ...prev, [key]: value }));
   }, []);
   
@@ -119,6 +122,7 @@ export default function RelaySettings({ isOpen, onClose }) {
   const handleSaveSettings = useCallback(async () => {
     if (!isElectron()) return;
     
+    logBehavior('connection', 'relay_save_settings', { port: settings.port, maxConnections: settings.maxConnections });
     setIsSaving(true);
     setStatusMessage(null);
     
@@ -150,6 +154,7 @@ export default function RelaySettings({ isOpen, onClose }) {
   const handleTestUpnp = useCallback(async () => {
     if (!isElectron()) return;
     
+    logBehavior('connection', 'relay_test_upnp', { port: settings.port });
     setIsSaving(true);
     setStatusMessage(null);
     
