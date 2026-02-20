@@ -52,7 +52,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          VITE_GITHUB_PAT: ${{ secrets.VITE_GITHUB_PAT }}
+          VITE_GITHUB_PAT: ${{ secrets.ISSUE_GITHUB_PAT }}
 
       - name: Package for Windows
         run: npx electron-builder --win
@@ -102,7 +102,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          VITE_GITHUB_PAT: ${{ secrets.VITE_GITHUB_PAT }}
+          VITE_GITHUB_PAT: ${{ secrets.ISSUE_GITHUB_PAT }}
 
       - name: Package for macOS
         run: npx electron-builder --mac
@@ -152,7 +152,7 @@ jobs:
       - name: Build frontend
         run: npm run build
         env:
-          VITE_GITHUB_PAT: ${{ secrets.VITE_GITHUB_PAT }}
+          VITE_GITHUB_PAT: ${{ secrets.ISSUE_GITHUB_PAT }}
 
       - name: Package for Linux
         run: npx electron-builder --linux
