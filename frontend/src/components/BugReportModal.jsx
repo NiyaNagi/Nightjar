@@ -22,6 +22,100 @@ import { getBasePath } from '../utils/websocket';
 import './BugReportModal.css';
 
 const GITHUB_ISSUES_PAGE = 'https://github.com/NiyaNagi/Nightjar/issues/new?labels=bug';
+
+/**
+ * Lightweight markdown-to-HTML renderer for preview.
+ * Supports: ## headings, **bold**, *italic*, `code`, \n paragraphs, - lists.
+ * No external dependencies — just enough for GitHub-flavored bug reports.
+ */
+function simpleMarkdown(text) {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .map(line => {
+      // Headings
+      if (line.startsWith('### ')) return `<h4>${esc(line.slice(4))}</h4>`;
+      if (line.startsWith('## '))  return `<h3>${esc(line.slice(3))}</h3>`;
+      if (line.startsWith('# '))   return `<h2>${esc(line.slice(2))}</h2>`;
+      // List items
+      if (/^[-*] /.test(line)) return `<li>${inline(line.slice(2))}</li>`;
+      // Blank line
+      if (line.trim() === '') return '<br/>';
+      // Normal paragraph
+      return `<p>${inline(line)}</p>`;
+    })
+    .join('');
+
+  function esc(s) { return inline(s); }
+  function inline(s) {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>');
+  }
+}
+
+/**
+ * Tabbed markdown editor with Write and Preview modes.
+ * Write mode: plain textarea. Preview mode: rendered HTML.
+ */
+function MarkdownEditor({ value, onChange, disabled }) {
+  const [mode, setMode] = useState('write');
+  const textareaRef = useRef(null);
+
+  // Auto-focus textarea when switching to write mode
+  useEffect(() => {
+    if (mode === 'write' && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [mode]);
+
+  return (
+    <div className="bug-report-field">
+      <div className="bug-report-md-header">
+        <label htmlFor="bug-description">Description</label>
+        <div className="bug-report-md-tabs">
+          <button
+            type="button"
+            className={`bug-report-md-tab ${mode === 'write' ? 'active' : ''}`}
+            onClick={() => setMode('write')}
+            disabled={disabled}
+          >
+            Write
+          </button>
+          <button
+            type="button"
+            className={`bug-report-md-tab ${mode === 'preview' ? 'active' : ''}`}
+            onClick={() => setMode('preview')}
+            disabled={disabled}
+          >
+            Preview
+          </button>
+        </div>
+      </div>
+      {mode === 'write' ? (
+        <textarea
+          ref={textareaRef}
+          id="bug-description"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Describe the bug in detail..."
+          className="bug-report-textarea"
+          rows={8}
+          disabled={disabled}
+        />
+      ) : (
+        <div
+          className="bug-report-md-preview"
+          dangerouslySetInnerHTML={{ __html: simpleMarkdown(value) }}
+        />
+      )}
+    </div>
+  );
+}
 const MAX_ACTION_CHARS = 3000;
 const MAX_RECENT_ACTIONS = 50;
 
@@ -439,18 +533,11 @@ export default function BugReportModal({ isOpen, onClose, context }) {
               />
             </div>
 
-            <div className="bug-report-field">
-              <label htmlFor="bug-description">Description</label>
-              <textarea
-                id="bug-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the bug in detail..."
-                className="bug-report-textarea"
-                rows={6}
-                disabled={isSubmitting}
-              />
-            </div>
+            <MarkdownEditor
+              value={description}
+              onChange={setDescription}
+              disabled={isSubmitting}
+            />
 
             <div className="bug-report-field">
               <label>Recent Actions (auto-captured)</label>

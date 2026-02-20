@@ -142,6 +142,128 @@
   opacity: 0.6;
 }
 
+/* Markdown Editor */
+.bug-report-md-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.bug-report-md-header label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary, #a1a1aa);
+  margin: 0;
+}
+
+.bug-report-md-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary, #14141f);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.bug-report-md-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #a1a1aa);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.bug-report-md-tab:hover:not(:disabled) {
+  color: var(--text-primary, #e4e4e7);
+}
+
+.bug-report-md-tab.active {
+  background: var(--bg-secondary, #1e1e2e);
+  color: var(--text-primary, #e4e4e7);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.bug-report-md-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bug-report-md-preview {
+  background: var(--bg-primary, #14141f);
+  border: 1px solid var(--border-color, #2d2d44);
+  border-radius: 6px;
+  padding: 12px 14px;
+  min-height: 160px;
+  max-height: 300px;
+  overflow-y: auto;
+  color: var(--text-primary, #e4e4e7);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.bug-report-md-preview h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text-primary, #e4e4e7);
+  border-bottom: 1px solid var(--border-color, #2d2d44);
+  padding-bottom: 4px;
+}
+
+.bug-report-md-preview h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 12px 0 4px;
+  color: var(--text-primary, #e4e4e7);
+}
+
+.bug-report-md-preview h4 {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 10px 0 4px;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.bug-report-md-preview p {
+  margin: 0 0 4px;
+  color: var(--text-primary, #e4e4e7);
+}
+
+.bug-report-md-preview li {
+  margin-left: 16px;
+  list-style: disc;
+  color: var(--text-primary, #e4e4e7);
+}
+
+.bug-report-md-preview strong {
+  color: var(--text-primary, #e4e4e7);
+  font-weight: 600;
+}
+
+.bug-report-md-preview em {
+  color: var(--text-secondary, #a1a1aa);
+  font-style: italic;
+}
+
+.bug-report-md-preview code {
+  background: rgba(99, 102, 241, 0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.82rem;
+}
+
+.bug-report-md-preview br {
+  display: block;
+  content: '';
+  margin: 4px 0;
+}
+
 /* Actions Pre Block */
 .bug-report-actions {
   background: var(--bg-primary, #14141f);

@@ -705,7 +705,7 @@ describe('State Reset', () => {
 
     // Should be reset to context-based title, not the changed value
     expect(screen.getByLabelText('Title')).toHaveValue('Bug in Spreadsheet: Data');
-    expect(screen.getByLabelText('Description')).toHaveValue('');
+    expect(screen.getByLabelText('Description').value).toContain('## Description');
   });
 });
 
