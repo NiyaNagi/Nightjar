@@ -75,7 +75,7 @@ jobs:
 
             echo "=== Writing server environment ==="
             ENV_FILE="$REPO/server/deploy/.env"
-            echo "GITHUB_PAT=${{ secrets.GITHUB_PAT }}" > "$ENV_FILE"
+            echo "GITHUB_PAT=${{ secrets.ISSUE_GITHUB_PAT }}" > "$ENV_FILE"
             chmod 600 "$ENV_FILE"
 
             echo "=== Starting containers ==="
