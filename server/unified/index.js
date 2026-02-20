@@ -2035,7 +2035,10 @@ app.get((BASE_PATH || '') + '/join/*', (req, res) => {
 });
 
 // Static files (React app)
-app.use(BASE_PATH || '/', express.static(STATIC_PATH));
+// index: false prevents express.static from serving the raw index.html for
+// directory requests — the SPA fallback below serves the injected version
+// that includes __NIGHTJAR_BASE_PATH__ so the frontend can resolve asset URLs.
+app.use(BASE_PATH || '/', express.static(STATIC_PATH, { index: false }));
 
 // Read index.html and inject BASE_PATH as a runtime global variable
 // so the frontend knows its deployment path (e.g., '/app') for URL construction
