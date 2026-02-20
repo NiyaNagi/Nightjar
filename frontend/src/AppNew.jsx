@@ -51,7 +51,7 @@ import { useToast } from './contexts/ToastContext';
 import { logBehavior } from './utils/logger';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
-import { getYjsWebSocketUrl, deliverKeyToServer } from './utils/websocket';
+import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync } from './utils/websocket';
 import { parseShareLink, clearUrlFragment, isJoinUrl, joinUrlToNightjarLink } from './utils/sharing';
 import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
@@ -1156,7 +1156,8 @@ function App() {
 
         // Create Yjs doc and provider - pass serverUrl for remote workspaces
         const ydoc = new Y.Doc();
-        const wsUrl = getWsUrl(workspaceServerUrl);
+        const docAuthToken = computeRoomAuthTokenSync(sessionKey, docId);
+        const wsUrl = getWsUrl(workspaceServerUrl, docAuthToken);
         console.log(`[App] Creating document ${docId} with wsUrl: ${wsUrl}`);
 
         // In web mode, deliver encryption key for this document room to the server
@@ -1264,7 +1265,8 @@ function App() {
         {
             const ydoc = new Y.Doc();
             // Pass serverUrl for cross-platform sync (Electron joining remote workspace)
-            const wsUrl = getWsUrl(workspaceServerUrl);
+            const docAuthToken = computeRoomAuthTokenSync(sessionKey, docId);
+            const wsUrl = getWsUrl(workspaceServerUrl, docAuthToken);
             console.log(`[App] Opening document ${docId} with wsUrl: ${wsUrl}`);
 
             // In web mode, deliver encryption key for this document room to the server

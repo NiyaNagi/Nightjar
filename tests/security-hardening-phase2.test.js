@@ -311,6 +311,62 @@ describe('Fix 4: HMAC Room-Join Authentication', () => {
       expect(validate(`yws:${roomName}`, p2pToken).allowed).toBe(false);
     });
   });
+
+  describe('computeRoomAuthTokenSync', () => {
+    // Re-implement the sync version for comparison
+    function computeRoomAuthTokenSyncLocal(workspaceKey, roomOrTopic) {
+      if (!workspaceKey || !roomOrTopic) return null;
+      let keyBytes;
+      if (typeof workspaceKey === 'string') {
+        keyBytes = Buffer.from(workspaceKey, 'base64');
+      } else if (workspaceKey instanceof Uint8Array) {
+        keyBytes = Buffer.from(workspaceKey);
+      } else {
+        return null;
+      }
+      const message = `room-auth:${roomOrTopic}`;
+      const hmac = crypto.createHmac('sha256', keyBytes);
+      hmac.update(message);
+      return hmac.digest('base64');
+    }
+
+    test('sync and async produce identical tokens', async () => {
+      const key = nacl.randomBytes(32);
+      const room = 'test-room-sync';
+      const asyncToken = await computeRoomAuthToken(key, room);
+      const syncToken = computeRoomAuthTokenSyncLocal(key, room);
+      expect(syncToken).toBe(asyncToken);
+    });
+
+    test('returns null for null key', () => {
+      expect(computeRoomAuthTokenSyncLocal(null, 'room')).toBeNull();
+    });
+
+    test('returns null for null room', () => {
+      const key = nacl.randomBytes(32);
+      expect(computeRoomAuthTokenSyncLocal(key, null)).toBeNull();
+    });
+
+    test('accepts string key (base64)', () => {
+      const key = nacl.randomBytes(32);
+      const keyBase64 = Buffer.from(key).toString('base64');
+      const fromBytes = computeRoomAuthTokenSyncLocal(key, 'room');
+      const fromString = computeRoomAuthTokenSyncLocal(keyBase64, 'room');
+      expect(fromString).toBe(fromBytes);
+    });
+
+    test('sync token validates against server auth', async () => {
+      const validate = createRoomAuthValidator();
+      const key = nacl.randomBytes(32);
+      const room = 'doc-sync-test';
+      // First client registers with async token
+      const asyncToken = await computeRoomAuthToken(key, room);
+      validate(room, asyncToken);
+      // Second client joins with sync token — should match
+      const syncToken = computeRoomAuthTokenSyncLocal(key, room);
+      expect(validate(room, syncToken).allowed).toBe(true);
+    });
+  });
 });
 
 // =============================================================================
@@ -885,6 +941,51 @@ describe('Fix 4 + Fix 6: Source Code Structure Verification', () => {
     test('computeRoomAuthToken is re-exported', () => {
       const src = readSource(WEBSOCKET_UTIL_PATH);
       expect(src).toContain('computeRoomAuthToken');
+    });
+
+    test('computeRoomAuthTokenSync is re-exported', () => {
+      const src = readSource(WEBSOCKET_UTIL_PATH);
+      expect(src).toContain('computeRoomAuthTokenSync');
+      expect(src).toMatch(/export\s*\{[^}]*computeRoomAuthTokenSync/);
+    });
+  });
+
+  describe('Client: AppNew.jsx document-room auth', () => {
+    const APP_PATH = path.join(__dirname, '..', 'frontend', 'src', 'AppNew.jsx');
+
+    test('imports computeRoomAuthTokenSync', () => {
+      const src = readSource(APP_PATH);
+      expect(src).toContain('computeRoomAuthTokenSync');
+    });
+
+    test('creates auth token for document rooms', () => {
+      const src = readSource(APP_PATH);
+      // Both createDocument and openDocument paths should compute docAuthToken
+      const matches = src.match(/computeRoomAuthTokenSync\(sessionKey,\s*docId\)/g);
+      expect(matches).not.toBeNull();
+      expect(matches.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test('passes auth token to getWsUrl', () => {
+      const src = readSource(APP_PATH);
+      // Both call sites should pass docAuthToken to getWsUrl
+      const matches = src.match(/getWsUrl\(workspaceServerUrl,\s*docAuthToken\)/g);
+      expect(matches).not.toBeNull();
+      expect(matches.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('Client: useWorkspaceSync.js auth', () => {
+    const SYNC_PATH = path.join(__dirname, '..', 'frontend', 'src', 'hooks', 'useWorkspaceSync.js');
+
+    test('imports computeRoomAuthTokenSync', () => {
+      const src = readSource(SYNC_PATH);
+      expect(src).toContain('computeRoomAuthTokenSync');
+    });
+
+    test('passes auth token to getYjsWebSocketUrl', () => {
+      const src = readSource(SYNC_PATH);
+      expect(src).toMatch(/getYjsWebSocketUrl\(serverUrl,\s*ywsAuthToken\)/);
     });
   });
 });

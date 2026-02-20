@@ -84,6 +84,46 @@ export async function computeRoomAuthToken(workspaceKey, roomOrTopic) {
   }
 }
 
+/**
+ * Synchronous HMAC-SHA256 computation for use in synchronous init paths
+ * (e.g., React useEffect bodies that cannot be made async).
+ * Uses Node.js crypto (available in Electron). Returns null in browser.
+ * 
+ * @param {Uint8Array|string} workspaceKey - 32-byte workspace encryption key
+ * @param {string} roomOrTopic - The room name or topic hash
+ * @returns {string|null} Base64-encoded HMAC-SHA256 token, or null if sync computation unavailable
+ */
+export function computeRoomAuthTokenSync(workspaceKey, roomOrTopic) {
+  if (!workspaceKey || !roomOrTopic) return null;
+
+  let keyBytes;
+  if (typeof workspaceKey === 'string') {
+    try { keyBytes = Uint8Array.from(atob(workspaceKey), c => c.charCodeAt(0)); }
+    catch { return null; }
+  } else if (workspaceKey instanceof Uint8Array) {
+    keyBytes = workspaceKey;
+  } else {
+    return null;
+  }
+
+  const message = `room-auth:${roomOrTopic}`;
+
+  // Node.js crypto (Electron / test environments) — synchronous
+  try {
+    // eslint-disable-next-line no-undef
+    const nodeCrypto = require('crypto');
+    const hmac = nodeCrypto.createHmac('sha256', Buffer.from(keyBytes));
+    hmac.update(message);
+    return hmac.digest('base64');
+  } catch {
+    // Not in Node.js environment
+  }
+
+  // Browser: no synchronous HMAC available — return null
+  // Callers should fall back to computeRoomAuthToken() (async) if needed
+  return null;
+}
+
 // ─── Relay Message Encryption (Fix 6) ─────────────────────────────────────────
 
 /**

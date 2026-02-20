@@ -16,10 +16,10 @@ import { isElectron } from '../hooks/useEnvironment';
 import { YJS_WS_PORT, META_WS_PORT, WEB_SERVER_PORT } from '../config/constants';
 import nacl from 'tweetnacl';
 import { getUnlockedIdentity } from './identityManager';
-import { computeRoomAuthToken } from './roomAuth';
+import { computeRoomAuthToken, computeRoomAuthTokenSync } from './roomAuth';
 
 // Re-export for convenience
-export { computeRoomAuthToken };
+export { computeRoomAuthToken, computeRoomAuthTokenSync };
 
 /**
  * Get the deployment base path (e.g., '/app' for sub-path deployments).
