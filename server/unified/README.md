@@ -141,7 +141,7 @@ All other WebSocket paths use the **y-websocket** binary protocol for Yjs CRDT d
 
 ## Deployment
 
-For step-by-step deployment instructions (VPS + Docker + Caddy), see: [../../docs/RELAY_DEPLOYMENT_GUIDE.md](../../docs/RELAY_DEPLOYMENT_GUIDE.md)
+For step-by-step deployment instructions (VPS + Docker + Caddy), see: [../../docs/guides/RELAY_DEPLOYMENT_GUIDE.md](../../docs/guides/RELAY_DEPLOYMENT_GUIDE.md)
 
 ## For QNAP Deployment
 

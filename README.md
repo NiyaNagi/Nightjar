@@ -276,8 +276,8 @@ Nightjar uses a **zero-config hybrid P2P architecture** that combines multiple n
 For cross-network scenarios or private deployments, you can specify a custom relay server in Workspace Settings. The built-in validator tests connectivity and latency before use.
 
 📖 **Learn more:**
-- [Relay Architecture](docs/RELAY_ARCHITECTURE.md) - How P2P discovery works
-- [Deploy Custom Relay](docs/RELAY_DEPLOYMENT.md) - Host your own relay server (Fly.io, Railway, Render, or self-hosted)
+- [Relay Architecture](docs/architecture/RELAY_ARCHITECTURE.md) - How P2P discovery works
+- [Deploy Custom Relay](docs/guides/RELAY_DEPLOYMENT.md) - Host your own relay server (Fly.io, Railway, Render, or self-hosted)
 
 ---
 
@@ -703,7 +703,7 @@ PUBLIC_URL=wss://your-domain.com docker compose up -d
 
 The default public relay is `wss://relay.night-jar.co`. Clients will automatically connect when available, and gracefully fall back to direct Hyperswarm P2P if the relay is unreachable.
 
-**Full step-by-step deployment guide:** [docs/RELAY_DEPLOYMENT_GUIDE.md](docs/RELAY_DEPLOYMENT_GUIDE.md)
+**Full step-by-step deployment guide:** [docs/guides/RELAY_DEPLOYMENT_GUIDE.md](docs/guides/RELAY_DEPLOYMENT_GUIDE.md)
 
 See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for all deployment modes and options.
 
