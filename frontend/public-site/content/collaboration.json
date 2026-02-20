@@ -5,7 +5,7 @@
   "content": [
     { "type": "heading", "text": "Real-Time Collaboration" },
     { "type": "paragraph", "text": "Nightjar uses Yjs CRDT technology for conflict-free real-time editing. Multiple people can edit the same document simultaneously — changes merge automatically without conflicts." },
-    { "type": "screenshot", "id": "collaboration-cursors", "caption": "Multiple collaborators editing simultaneously with colored live cursors." },
+    { "type": "screenshot", "id": "text-editor", "caption": "Multiple collaborators editing simultaneously with colored live cursors." },
     { "type": "heading", "text": "Live Cursors" },
     { "type": "paragraph", "text": "In text documents, you can see other collaborators' cursors in real-time. Each person gets a unique color with their display name shown next to their cursor." },
     { "type": "heading", "text": "Follow Cursor" },

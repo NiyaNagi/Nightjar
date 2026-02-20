@@ -5,7 +5,7 @@
   "content": [
     { "type": "heading", "text": "Welcome to Nightjar" },
     { "type": "paragraph", "text": "Nightjar is a secure, decentralized collaboration platform. Everything you create is end-to-end encrypted and synced peer-to-peer — no central server ever sees your data." },
-    { "type": "screenshot", "id": "workspace-overview", "caption": "The Nightjar workspace — documents, files, and tools in one encrypted space." },
+    { "type": "screenshot", "id": "workspace-switcher", "caption": "The Nightjar workspace — documents, files, and tools in one encrypted space." },
     { "type": "heading", "text": "First-Time Setup" },
     { "type": "steps", "items": [
       "Launch Nightjar. You'll see the onboarding screen.",

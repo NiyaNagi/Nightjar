@@ -15,8 +15,58 @@
   <a href="#security">Security</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#global-relay-mesh-network">Relay Mesh</a> •
+  <a href="#docker-deployment">Docker</a> •
   <a href="#development">Development</a>
 </p>
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/text-editor.webp" alt="Rich Text Editor" width="720"><br>
+  <em>Rich text editing with formatting toolbar, tables, and real-time collaboration</em>
+</p>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/spreadsheet.webp" alt="Spreadsheet" width="720"><br>
+  <em>Full-featured spreadsheets with formulas and cell formatting</em>
+</p>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/kanban-board.webp" alt="Kanban Board" width="720"><br>
+  <em>Visual task management with drag-and-drop cards and custom columns</em>
+</p>
+
+<details>
+<summary><strong>More screenshots</strong></summary>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/chat-panel.webp" alt="Encrypted Chat" width="720"><br>
+  <em>End-to-end encrypted team messaging</em>
+</p>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/inventory-dashboard.webp" alt="Inventory Management" width="720"><br>
+  <em>Inventory tracking with search, filters, and CSV import/export</em>
+</p>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/sharing-panel.webp" alt="Sharing Panel" width="720"><br>
+  <em>Share workspaces via encrypted invite links or QR codes</em>
+</p>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/file-storage.webp" alt="File Storage" width="720"><br>
+  <em>Encrypted file storage with drag-and-drop upload</em>
+</p>
+
+<p align="center">
+  <img src="frontend/public-site/screenshots/dark-theme-editor.webp" alt="Dark Theme" width="720"><br>
+  <em>Beautiful dark theme — easy on the eyes</em>
+</p>
+
+</details>
 
 ---
 
@@ -371,6 +421,8 @@ Nightjar uses an **Electron + Sidecar** architecture that separates the UI from 
 
 ### System Overview
 
+> 📐 **Interactive diagrams**: See the [Architecture Deep Dive](https://night-jar.co/docs/architecture.html) for Mermaid diagrams of every layer.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         NIGHTJAR CLIENT                              │
@@ -404,9 +456,21 @@ Nightjar uses an **Electron + Sidecar** architecture that separates the UI from 
 ├─────────────────────────────────────────────────────────────────────┤
 │                        Sidecar (Node.js)                             │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
-│  │ y-websocket     │  │  LevelDB        │  │  libp2p + Tor       │  │
-│  │ server (:8080)  │  │  Persistence    │  │  GossipSub          │  │
+│  │ y-websocket     │  │  LevelDB        │  │  Hyperswarm DHT     │  │
+│  │ server (:8080)  │  │  Persistence    │  │  + Tor SOCKS Proxy  │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    UNIFIED SERVER (Docker)                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
+│  │ Express + WS    │  │  y-websocket    │  │  better-sqlite3     │  │
+│  │ REST + Relay    │  │  Yjs sync       │  │  Encrypted at rest  │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │
+│                                                                      │
+│   Modes: host (mesh + storage) │ relay (mesh only) │ private        │
+│   Env:   NIGHTJAR_MODE · ENCRYPTED_PERSISTENCE · PUBLIC_URL         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -475,6 +539,49 @@ User types "Hello" in document
 │  Encrypted storage  │    │  To all peers       │
 └─────────────────────┘    └─────────────────────┘
 ```
+
+### At-Rest Encryption (Server)
+
+When `ENCRYPTED_PERSISTENCE=true`, the unified server encrypts all stored Yjs documents at rest using NaCl secretbox:
+
+```
+Client creates workspace
+         │
+         ▼
+┌─────────────────────────────┐
+│  Client derives 256-bit     │
+│  workspace key (Argon2id)   │
+└─────────────────────────────┘
+         │
+         ▼  POST /api/rooms/:room/key
+┌─────────────────────────────┐
+│  Server receives key over   │
+│  TLS, stores in-memory only │
+│  (never written to disk)    │
+└─────────────────────────────┘
+         │
+         ▼  Yjs document update
+┌─────────────────────────────┐
+│  Server encrypts update     │
+│  XSalsa20-Poly1305          │
+│  Random 24-byte nonce       │
+│  Stored: nonce ‖ ciphertext │
+└─────────────────────────────┘
+         │
+         ▼  SQLite (better-sqlite3)
+┌─────────────────────────────┐
+│  Encrypted blobs in DB      │
+│  Key evicted on room empty  │
+│  Re-delivered on next join  │
+└─────────────────────────────┘
+```
+
+**Key properties:**
+- Keys live only in server memory — never persisted to disk
+- Each room uses a unique encryption key
+- Keys are evicted when all clients disconnect
+- Clients re-deliver keys on reconnection via authenticated POST
+- Without the key, stored data is indistinguishable from random bytes
 
 ---
 
@@ -650,7 +757,8 @@ See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for a
 
 | Technology | Purpose |
 |------------|---------|
-| **LevelDB** | Local encrypted document storage |
+| **LevelDB** | Client-side encrypted document storage (sidecar) |
+| **better-sqlite3** | Server-side encrypted persistence (unified server) |
 | **IndexedDB** | Browser-based storage fallback |
 
 ### Testing
@@ -866,6 +974,56 @@ Built-in protections against common attacks:
 *🎯 Insider Threats*: Granular permissions and instant member removal prevent privilege abuse. Secure workspace deletion ensures terminated employees lose access.
 
 *🎯 Supply Chain Attack*: Hard identity security prevents automatic access even if Nightjar itself is compromised - recovery phrases still required.
+
+---
+
+## Docker Deployment
+
+Nightjar provides a unified Docker image for all server modes. See the [Self-Hosting Guide](https://night-jar.co/docs/self-hosting.html) for full instructions.
+
+### Quick Start
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/niyanagi/nightjar:latest
+
+# Host mode (default) — mesh + encrypted persistence
+docker run -d --name nightjar \
+  -p 4444:4444 \
+  -e NIGHTJAR_MODE=host \
+  -e ENCRYPTED_PERSISTENCE=true \
+  -e PUBLIC_URL=wss://your-domain.com \
+  -v nightjar-data:/app/data \
+  ghcr.io/niyanagi/nightjar:latest
+
+# Relay mode — lightweight, no storage
+docker run -d --name nightjar-relay \
+  -p 4444:4444 \
+  -e NIGHTJAR_MODE=relay \
+  -e PUBLIC_URL=wss://relay.your-domain.com \
+  ghcr.io/niyanagi/nightjar:latest
+
+# Private mode — isolated, no mesh discovery
+docker run -d --name nightjar-private \
+  -p 4444:4444 \
+  -e NIGHTJAR_MODE=private \
+  -v nightjar-data:/app/data \
+  ghcr.io/niyanagi/nightjar:latest
+```
+
+### Docker Compose
+
+```bash
+# Host mode (default profile)
+PUBLIC_URL=wss://your-domain.com docker compose up -d
+
+# Relay mode
+PUBLIC_URL=wss://relay.your-domain.com docker compose --profile relay up -d
+```
+
+**Environment variables:** `NIGHTJAR_MODE`, `PUBLIC_URL`, `ENCRYPTED_PERSISTENCE`, `PORT` (default 4444)
+
+See [server/unified/docker-compose.yml](server/unified/docker-compose.yml) for all options.
 
 ---
 

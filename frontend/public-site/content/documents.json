@@ -10,6 +10,8 @@
       "📊 Spreadsheets — Powered by Fortune Sheet with formulas, cell formatting, and multi-sheet support.",
       "📋 Kanban Boards — Visual task management with columns, cards, labels, and due dates."
     ]},
+    { "type": "screenshot", "id": "text-editor", "caption": "A rich text document with formatting toolbar, tables, and real-time collaboration." },
+    { "type": "screenshot", "id": "spreadsheet", "caption": "A spreadsheet with formulas, cell formatting, and multi-sheet support." },
     { "type": "heading", "text": "Creating a Document" },
     { "type": "steps", "items": [
       "Click the ➕ (New) button in the sidebar action bar.",

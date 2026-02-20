@@ -4,6 +4,7 @@
   "icon": "⌨️",
   "content": [
     { "type": "heading", "text": "Application Shortcuts" },
+    { "type": "screenshot", "id": "help-page", "caption": "The help page with keyboard shortcuts, documentation, and quick reference guides." },
     { "type": "shortcuts", "items": [
       { "keys": ["Ctrl", "K"], "action": "Open search palette" },
       { "keys": ["Ctrl", ","], "action": "Open Settings" },

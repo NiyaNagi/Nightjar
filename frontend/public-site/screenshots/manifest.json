@@ -1,16 +1,16 @@
 {
-  "generated": "2026-02-20T07:27:05.771Z",
+  "generated": "2026-02-20T09:14:07.821Z",
   "resolution": "1920x1080",
   "format": "webp",
   "quality": 85,
   "screenshots": [
     {
-      "id": "workspace-overview",
-      "title": "Workspace Overview",
-      "description": "Your encrypted home base — folders, documents, and quick actions at a glance",
-      "category": "workspaces",
-      "filename": "workspace-overview.webp",
-      "sizeKB": 40,
+      "id": "onboarding",
+      "title": "Identity Creation",
+      "description": "Create your encrypted identity — no email, no phone, no tracking",
+      "category": "identity",
+      "filename": "onboarding.webp",
+      "sizeKB": 21,
       "width": 1920,
       "height": 1080
     },
@@ -20,7 +20,7 @@
       "description": "Collaborative real-time editing with formatting, headings, lists, and code blocks",
       "category": "documents",
       "filename": "text-editor.webp",
-      "sizeKB": 71,
+      "sizeKB": 63,
       "width": 1920,
       "height": 1080
     },
@@ -37,10 +37,10 @@
     {
       "id": "kanban-board",
       "title": "Kanban Board",
-      "description": "Visual task management with drag-and-drop cards, tags, and assignees",
+      "description": "Visual task management with drag-and-drop cards and custom columns",
       "category": "documents",
       "filename": "kanban-board.webp",
-      "sizeKB": 44,
+      "sizeKB": 52,
       "width": 1920,
       "height": 1080
     },
@@ -50,16 +50,16 @@
       "description": "End-to-end encrypted team messaging — right inside your workspace",
       "category": "collaboration",
       "filename": "chat-panel.webp",
-      "sizeKB": 53,
+      "sizeKB": 64,
       "width": 1920,
       "height": 1080
     },
     {
-      "id": "inventory-list",
+      "id": "inventory-dashboard",
       "title": "Inventory Management",
-      "description": "Track products, stock levels, and locations with real-time search and filters",
+      "description": "Track products, stock levels, and requests with analytics dashboards",
       "category": "inventory",
-      "filename": "inventory-list.webp",
+      "filename": "inventory-dashboard.webp",
       "sizeKB": 67,
       "width": 1920,
       "height": 1080
@@ -70,7 +70,7 @@
       "description": "Share your workspace via encrypted invite links or scannable QR codes",
       "category": "sharing",
       "filename": "sharing-panel.webp",
-      "sizeKB": 66,
+      "sizeKB": 59,
       "width": 1920,
       "height": 1080
     },
@@ -83,12 +83,52 @@
       "sizeKB": 57,
       "width": 1920,
       "height": 1080
+    },
+    {
+      "id": "file-storage",
+      "title": "File Storage",
+      "description": "Encrypted file storage with drag-and-drop upload and folder organization",
+      "category": "documents",
+      "filename": "file-storage.webp",
+      "sizeKB": 43,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "search-palette",
+      "title": "Search Palette",
+      "description": "Find anything instantly — documents, people, inventory, and chat messages",
+      "category": "navigation",
+      "filename": "search-palette.webp",
+      "sizeKB": 24,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "workspace-switcher",
+      "title": "Workspace Switcher",
+      "description": "Manage multiple workspaces and switch between them in one click",
+      "category": "workspaces",
+      "filename": "workspace-switcher.webp",
+      "sizeKB": 63,
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "dark-theme-editor",
+      "title": "Dark Theme Editor",
+      "description": "Beautiful dark theme with full rich-text formatting — easy on the eyes",
+      "category": "documents",
+      "filename": "dark-theme-editor.webp",
+      "sizeKB": 70,
+      "width": 1920,
+      "height": 1080
     }
   ],
   "stats": {
-    "total": 8,
-    "captured": 8,
+    "total": 12,
+    "captured": 12,
     "failed": 0,
-    "totalSizeKB": 459
+    "totalSizeKB": 644
   }
 }

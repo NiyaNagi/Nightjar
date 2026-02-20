@@ -15,7 +15,7 @@
       "Connection timeout settings.",
       "Sync verification — Confirm data integrity with connected peers."
     ]},
-    { "type": "screenshot", "id": "settings", "caption": "The Settings panel with network, notification, and appearance configuration." },
+    { "type": "screenshot", "id": "sharing-panel", "caption": "The Settings panel with network, notification, and appearance configuration." },
     { "type": "heading", "text": "Tor Support (Desktop)" },
     { "type": "paragraph", "text": "The desktop app supports routing connections through the Tor network for enhanced privacy. Enable it in Settings → Desktop. Nightjar bundles a Tor client — no external setup required." },
     { "type": "tip", "text": "The status bar at the bottom shows your current peer count and connection status. Hover for details." }

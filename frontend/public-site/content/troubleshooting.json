@@ -4,6 +4,7 @@
   "icon": "🔧",
   "content": [
     { "type": "heading", "text": "Common Issues" },
+    { "type": "screenshot", "id": "help-page", "caption": "Press F1 to open Help for documentation, shortcuts, and troubleshooting guides." },
     { "type": "heading", "text": "Documents not syncing" },
     { "type": "steps", "items": [
       "Check your internet connection.",

@@ -5,6 +5,7 @@
   "content": [
     { "type": "heading", "text": "What Are Workspaces?" },
     { "type": "paragraph", "text": "Workspaces are encrypted containers that hold your documents, spreadsheets, kanban boards, files, and inventory. Each workspace has its own encryption key and member list." },
+    { "type": "screenshot", "id": "workspace-switcher", "caption": "The workspace switcher showing multiple encrypted workspaces with folders and documents." },
     { "type": "heading", "text": "Creating a Workspace" },
     { "type": "steps", "items": [
       "Click the ➕ (New) button in the sidebar action bar.",

@@ -1,11 +1,11 @@
 {
   "id": "identity",
-  "title": "🪪 Identity & Security",
-  "icon": "🪪",
+  "title": "🔐 Identity & Security",
+  "icon": "🔐",
   "content": [
     { "type": "heading", "text": "Your Identity" },
     { "type": "paragraph", "text": "Your identity is a cryptographic keypair stored locally on your device. It's encrypted with your 6-digit PIN using Argon2 key derivation. Your identity is never sent to any server." },
-    { "type": "screenshot", "id": "identity-profile", "caption": "Your cryptographic identity — display name, avatar, and recovery phrase access." },
+    { "type": "screenshot", "id": "onboarding", "caption": "Your cryptographic identity — display name, avatar, and recovery phrase access." },
     { "type": "heading", "text": "Managing Your Profile" },
     { "type": "steps", "items": [
       "Click your avatar or display name in the top-left area of the sidebar.",
