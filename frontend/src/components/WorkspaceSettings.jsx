@@ -13,7 +13,7 @@ import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useIdentity } from '../contexts/IdentityContext';
 import { useToast } from '../contexts/ToastContext';
-import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash, BOOTSTRAP_RELAY_NODES } from '../utils/sharing';
+import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash, BOOTSTRAP_RELAY_NODES, nightjarLinkToJoinUrl, DEFAULT_SHARE_HOST } from '../utils/sharing';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { signData, uint8ToBase62 } from '../utils/identity';
 import { isElectron } from '../hooks/useEnvironment';
@@ -382,14 +382,15 @@ export default function WorkspaceSettings({
           serverUrl,
         });
         
-        return compress ? await compressShareLink(signedInvite.link) : signedInvite.link;
+        const finalLink = nightjarLinkToJoinUrl(signedInvite.link, DEFAULT_SHARE_HOST);
+        return compress ? await compressShareLink(finalLink) : finalLink;
       } catch (err) {
         console.warn('Failed to generate signed invite, falling back to legacy:', err);
       }
     }
     
     // Fallback to legacy link format with P2P info
-    const link = generateShareLink({
+    const nightjarLink = generateShareLink({
       entityType: 'workspace',
       entityId: workspace.id,
       permission: shareLevel,
@@ -402,6 +403,9 @@ export default function WorkspaceSettings({
       directAddress, // Include direct P2P address (public IP:port)
       serverUrl,
     });
+    
+    // Convert to clickable HTTPS link
+    const link = nightjarLinkToJoinUrl(nightjarLink, DEFAULT_SHARE_HOST);
     
     if (compress) {
       try {
