@@ -125,6 +125,38 @@
 }
 
 /* =========================================================================
+   CLOSE BUTTON (top-right of popover)
+   ========================================================================= */
+.unified-picker__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-secondary, #a1a1aa);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  z-index: 2;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.unified-picker__close:hover {
+  color: var(--text-primary, #111827);
+  background: var(--hover-bg, #f3f4f6);
+}
+.unified-picker__close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
+}
+
+/* =========================================================================
    TWO-PANE LAYOUT
    ========================================================================= */
 .unified-picker__panes {
@@ -203,7 +235,7 @@
 }
 .unified-picker__search:focus {
   border-color: var(--accent-color, #6366f1);
-  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(99, 102, 241, 0.15));
+  box-shadow: 0 0 0 2px var(--accent-alpha, rgba(99, 102, 241, 0.15));
 }
 
 .unified-picker__search-clear {
@@ -264,10 +296,10 @@
   transition: background 0.12s ease;
 }
 .unified-picker__cat-tab:hover {
-  background: var(--bg-hover, #f3f4f6);
+  background: var(--hover-bg, #f3f4f6);
 }
 .unified-picker__cat-tab--active {
-  background: var(--accent-color-alpha, rgba(99, 102, 241, 0.12));
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.12));
   box-shadow: inset 0 0 0 1px var(--accent-color, #6366f1);
 }
 .unified-picker__cat-tab:focus-visible {
@@ -339,12 +371,12 @@
   box-sizing: border-box;
 }
 .unified-picker__emoji-btn:hover {
-  background: var(--bg-hover, #f3f4f6);
+  background: var(--hover-bg, #f3f4f6);
   transform: scale(1.1);
 }
 .unified-picker__emoji-btn--selected {
   box-shadow: inset 0 0 0 2px var(--accent-color, #6366f1);
-  background: var(--accent-color-alpha, rgba(99, 102, 241, 0.1));
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.1));
 }
 .unified-picker__emoji-btn:focus-visible {
   outline: none;
@@ -461,7 +493,7 @@
 }
 .unified-picker__hex-input:focus {
   border-color: var(--accent-color, #6366f1);
-  box-shadow: 0 0 0 2px var(--accent-color-alpha, rgba(99, 102, 241, 0.15));
+  box-shadow: 0 0 0 2px var(--accent-alpha, rgba(99, 102, 241, 0.15));
 }
 
 /* =========================================================================

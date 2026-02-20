@@ -32,16 +32,26 @@
       <p style="color:var(--text-dim)">Loading…</p>
     </main>
   </div>
+  <div class="docs-sidebar-backdrop" id="sidebar-backdrop"></div>
+  <button class="mobile-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
 
   <div class="docs-footer">
     Nightjar · <a href="https://github.com/NiyaNagi/Nightjar" target="_blank" rel="noopener">Open Source</a> · Built by <a href="https://github.com/NiyaNagi" target="_blank" rel="noopener">NiyaNagi</a>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'dark', themeVariables: {
+      primaryColor: '#6c63ff', primaryTextColor: '#e4e4e7', primaryBorderColor: '#363b4f',
+      lineColor: '#6c63ff', secondaryColor: '#1a1d27', tertiaryColor: '#13151e',
+      background: '#1a1d27', mainBkg: '#1a1d27', nodeBorder: '#363b4f',
+      clusterBkg: '#13151e', clusterBorder: '#2a2e3d', titleColor: '#f9fafb',
+      edgeLabelBackground: '#1a1d27', nodeTextColor: '#e4e4e7'
+    }});
+
     const CONTENT_BASE = '/content';
     const SCREENSHOT_BASE = '/screenshots';
 
-    // Derive section ID from filename: "editor.html" → "editor"
     function getSectionId() {
       const path = window.location.pathname;
       const file = path.split('/').pop() || '';
@@ -90,6 +100,12 @@
             <pre><code id="${codeId}">${escapeHTML(block.text)}</code></pre>
             ${block.caption ? `<div class="code-block-caption">${escapeHTML(block.caption)}</div>` : ''}
           </div>`;
+        case 'mermaid':
+          const mermaidId = 'mermaid-' + Math.random().toString(36).slice(2, 8);
+          return `<div class="mermaid-block">
+            ${block.caption ? `<div class="mermaid-block-header">${escapeHTML(block.caption)}</div>` : ''}
+            <div class="mermaid" id="${mermaidId}">${escapeHTML(block.text)}</div>
+          </div>`;
         default:
           return '';
       }
@@ -99,7 +115,6 @@
       const sectionId = getSectionId();
       if (!sectionId) { window.location.href = '/docs/'; return; }
 
-      // Load index for sidebar + prev/next navigation
       let sections = [];
       try {
         const idxRes = await fetch(`${CONTENT_BASE}/index.json`);
@@ -109,14 +124,49 @@
         }
       } catch {}
 
-      // Build sidebar
+      // Build sidebar with search
       const sidebar = document.getElementById('sidebar');
-      sidebar.innerHTML = '<h3>Documentation</h3><ul>' +
+      sidebar.innerHTML = '<div class="sidebar-search"><svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Search docs…" id="sidebar-search" aria-label="Search documentation"></div><h3>Documentation</h3><ul id="sidebar-list">' +
         sections.map(s => {
           const active = s.id === sectionId ? ' class="active"' : '';
-          const label = s.title.replace(/^[^\s]+\s/, '');
-          return `<li><a href="${s.id}.html"${active}><span class="icon">${s.icon}</span>${label}</a></li>`;
+          const label = s.title;
+          return `<li data-title="${escapeHTML(label.toLowerCase())}" data-summary="${escapeHTML((s.summary || '').toLowerCase())}"><a href="${s.id}.html"${active}><span class="icon">${s.icon}</span><span class="sidebar-label">${escapeHTML(label)}</span></a></li>`;
         }).join('') + '</ul>';
+
+      // Search filter
+      const searchInput = document.getElementById('sidebar-search');
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.toLowerCase().trim();
+        document.querySelectorAll('#sidebar-list li').forEach(li => {
+          const match = !q || li.dataset.title.includes(q) || li.dataset.summary.includes(q);
+          li.style.display = match ? '' : 'none';
+        });
+      });
+
+      // Mobile sidebar toggle with backdrop and scroll lock
+      const sidebarToggle = document.getElementById('sidebar-toggle');
+      const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+      function closeSidebar() {
+        sidebar.classList.remove('open');
+        sidebarBackdrop?.classList.remove('open');
+        if (sidebarToggle) sidebarToggle.textContent = '☰';
+        document.body.style.overflow = '';
+      }
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+          const isOpen = sidebar.classList.toggle('open');
+          sidebarBackdrop?.classList.toggle('open', isOpen);
+          sidebarToggle.textContent = isOpen ? '✕' : '☰';
+          document.body.style.overflow = isOpen ? 'hidden' : '';
+        });
+      }
+      if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', closeSidebar);
+      }
+      // Close sidebar when a link is clicked (mobile)
+      sidebar.addEventListener('click', (e) => {
+        if (e.target.closest('a')) closeSidebar();
+      });
 
       // Load section content
       let data;
@@ -129,17 +179,13 @@
         return;
       }
 
-      // Update page title
-      const plainTitle = data.title.replace(/^[^\s]+\s/, '');
-      document.title = `${plainTitle} — Nightjar Docs`;
-      document.getElementById('breadcrumb-title').textContent = plainTitle;
+      document.title = `${data.title} — Nightjar Docs`;
+      document.getElementById('breadcrumb-title').textContent = data.title;
 
-      // Render content
       const content = document.getElementById('content');
       let html = `<h1>${escapeHTML(data.title)}</h1>`;
       html += (data.content || []).map(renderBlock).join('\n');
 
-      // Prev / Next navigation
       const idx = sections.findIndex(s => s.id === sectionId);
       if (idx !== -1) {
         const prev = idx > 0 ? sections[idx - 1] : null;
@@ -155,6 +201,9 @@
       }
 
       content.innerHTML = html;
+
+      // Render mermaid diagrams
+      try { await mermaid.run({ querySelector: '.mermaid' }); } catch {}
     }
     init();
   </script>

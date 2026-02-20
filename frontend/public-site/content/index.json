@@ -13,7 +13,7 @@
     {
       "id": "identity",
       "title": "Identity & Security",
-      "icon": "🪪",
+      "icon": "🔐",
       "order": 2,
       "file": "identity.json",
       "summary": "Managing your cryptographic identity, PIN, recovery phrase, and multiple identities."
@@ -139,10 +139,18 @@
       "summary": "Visual architecture diagrams — system overview, encryption, P2P networking, and deployment."
     },
     {
+      "id": "security-model",
+      "title": "Security Model & Threats",
+      "icon": "🛡️",
+      "order": 18,
+      "file": "security-model.json",
+      "summary": "What Nightjar protects against, what it doesn't, encryption details, data flow diagrams, and honest threat analysis."
+    },
+    {
       "id": "changelog",
       "title": "Changelog",
       "icon": "📋",
-      "order": 18,
+      "order": 19,
       "file": "changelog.json",
       "summary": "Release history loaded from GitHub — version numbers, dates, and change summaries."
     }

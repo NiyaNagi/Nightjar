@@ -440,37 +440,53 @@
     }
     .faq-item.open .faq-answer { max-height: 500px; }
 
+    /* ── Global responsive image rule ── */
+    img { max-width: 100%; height: auto; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       .hero { padding: 48px 0 40px; }
       .hero h1 { font-size: 2rem; }
       .hero-sub { font-size: 1rem; }
-      .downloads { flex-direction: column; align-items: center; }
+      .hero-logo { width: clamp(120px, 36vw, 200px); height: clamp(120px, 36vw, 200px); border-radius: 28px; }
+      .downloads { flex-direction: column; align-items: stretch; padding: 0 24px; }
+      .downloads .btn { justify-content: center; }
+      .hero-links { flex-direction: column; align-items: stretch; padding: 0 24px; }
+      .hero-links .btn { justify-content: center; }
       .nav-links { display: none; }
       .hamburger { display: flex; }
       .features-grid { grid-template-columns: 1fr; }
       .steps { flex-direction: column; align-items: center; }
+      .step { max-width: 100%; }
       .comparison-table { font-size: 0.8rem; }
       .comparison-table th, .comparison-table td { padding: 8px 10px; }
       .comparison-table th:first-child, .comparison-table td:first-child { min-width: 120px; }
       .security-grid { grid-template-columns: 1fr; }
       .usecases-grid { grid-template-columns: 1fr; }
       .faq-question { font-size: 0.9rem; padding: 14px 18px; }
-      .hero-links { flex-direction: column; align-items: center; }
       .slideshow { aspect-ratio: 4/3; }
+      .slideshow-controls button { width: 44px; height: 44px; }
       section { padding: 48px 0; }
       .how-section, .security-section { padding: 48px 0; }
       .section-header h2 { font-size: 1.6rem; }
       .section-header { margin-bottom: 32px; }
       .mascot-bubble { max-width: 240px; padding: 10px 16px; }
       .mascot-saying { font-size: 0.9rem; }
+      .footer-links { gap: 16px; }
+      footer { padding: 32px 0; }
     }
     @media (max-width: 480px) {
       .hero h1 { font-size: 1.65rem; }
+      .hero-logo { width: 120px; height: 120px; border-radius: 24px; }
       .container { padding: 0 16px; }
       .btn { padding: 12px 22px; font-size: 0.9rem; }
       .comparison-table th, .comparison-table td { padding: 6px 8px; font-size: 0.75rem; }
+      .comparison-table th:first-child, .comparison-table td:first-child { min-width: unset; white-space: nowrap; }
       .mascot-bubble { max-width: 200px; min-width: 140px; }
+      .footer-links { flex-direction: column; align-items: center; gap: 10px; }
+      .tech-pill { padding: 6px 12px; font-size: 0.82rem; }
+      .feature-card { padding: 20px; }
+      .security-card { padding: 18px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .mascot-bubble { animation: none !important; transition: none !important; }

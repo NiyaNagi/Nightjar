@@ -552,3 +552,109 @@ input:focus {
         scroll-behavior: auto !important;
     }
 }
+
+/* =========================================================================
+   MOBILE RESPONSIVE — 768px (tablet) and 480px (phone)
+   ========================================================================= */
+
+/* Touch-device enhancements (any coarse pointer) */
+@media (pointer: coarse) {
+    .toast__close {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .fullscreen-exit-btn {
+        padding: 12px 20px;
+        font-size: 1rem;
+        opacity: 0.6;
+    }
+
+    /* Ensure all interactive elements meet 44px touch target */
+    .header-actions button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* Tablet breakpoint */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+
+    .toast {
+        right: 12px;
+        left: 12px;
+        max-width: none;
+        bottom: calc(40px + var(--safe-area-inset-bottom));
+    }
+
+    .onboarding-welcome h2 {
+        font-size: 1.5rem !important;
+    }
+
+    .onboarding-welcome p {
+        font-size: 1rem;
+    }
+
+    .empty-editor-state {
+        padding: 24px 16px;
+        gap: 16px;
+    }
+
+    .empty-editor-state h2 {
+        font-size: 1.25rem;
+    }
+
+    .empty-editor-state .welcome-icon {
+        width: 72px;
+        height: 72px;
+    }
+
+    .header-bar-minimal {
+        padding: 6px 12px;
+        min-height: 44px;
+    }
+}
+
+/* Phone breakpoint */
+@media (max-width: 480px) {
+    .onboarding-welcome {
+        max-width: 100%;
+        padding: 0 16px;
+    }
+
+    .onboarding-welcome h2 {
+        font-size: 1.3rem !important;
+    }
+
+    .empty-editor-state .btn-create {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+    }
+
+    .empty-editor-state .btn-create.primary {
+        font-size: 1rem;
+        padding: 12px 20px;
+    }
+
+    .empty-editor-state .create-buttons {
+        flex-direction: column;
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .loading-state h2 {
+        font-size: 1.2rem;
+    }
+
+    /* Scrollbar thinner on mobile */
+    ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+}

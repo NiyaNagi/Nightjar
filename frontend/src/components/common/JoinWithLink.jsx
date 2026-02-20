@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { isJoinUrl, joinUrlToNightjarLink } from '../../utils/sharing';
 import './JoinWithLink.css';
 
 // Regex patterns for different link types (case-insensitive for protocol)
@@ -22,7 +23,12 @@ const validateLink = (link) => {
     return { valid: false, type: null, id: null, error: null };
   }
 
-  const trimmed = link.trim();
+  let trimmed = link.trim();
+
+  // Convert HTTPS join URLs to nightjar:// format for validation
+  if (isJoinUrl(trimmed)) {
+    trimmed = joinUrlToNightjarLink(trimmed);
+  }
 
   // Check workspace link
   const workspaceMatch = trimmed.match(LINK_PATTERNS.workspace);
@@ -47,7 +53,7 @@ const validateLink = (link) => {
   }
 
   // Unknown format
-  return { valid: false, type: null, id: null, error: 'Paste a nightjar:// link or share code' };
+  return { valid: false, type: null, id: null, error: 'Paste a share link or share code' };
 };
 
 export default function JoinWithLink({ isOpen, onClose, onJoin }) {

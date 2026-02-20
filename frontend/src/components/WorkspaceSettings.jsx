@@ -13,7 +13,7 @@ import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useIdentity } from '../contexts/IdentityContext';
 import { useToast } from '../contexts/ToastContext';
-import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash, BOOTSTRAP_RELAY_NODES, nightjarLinkToJoinUrl, DEFAULT_SHARE_HOST } from '../utils/sharing';
+import { generateShareLink, generateShareMessage, compressShareLink, generateSignedInviteLink, generateTopicHash, BOOTSTRAP_RELAY_NODES, nightjarLinkToJoinUrl, joinUrlToNightjarLink, extractShareCode, DEFAULT_SHARE_HOST } from '../utils/sharing';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { signData, uint8ToBase62 } from '../utils/identity';
 import { isElectron } from '../hooks/useEnvironment';
@@ -436,10 +436,9 @@ export default function WorkspaceSettings({
         });
         break;
       case 'code': {
-        // Extract just the workspace code/ID from the link
-        const url = new URL(link);
-        const hash = url.hash.slice(1); // Remove leading #
-        textToCopy = hash || workspace.id;
+        // Convert HTTPS join URL back to nightjar:// and extract compact share code
+        const nightjarLink = joinUrlToNightjarLink(link);
+        textToCopy = extractShareCode(nightjarLink) || workspace.id;
         break;
       }
       case 'link':
@@ -842,7 +841,7 @@ export default function WorkspaceSettings({
                       >
                         <span className="workspace-settings__share-menu-icon">🔗</span>
                         <span>Copy Link</span>
-                        <span className="workspace-settings__share-menu-desc">Full nahma:// URL</span>
+                        <span className="workspace-settings__share-menu-desc">Full shareable URL</span>
                       </button>
                       <button 
                         className="workspace-settings__share-menu-item"

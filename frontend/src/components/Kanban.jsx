@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import KanbanCardEditor from './KanbanCardEditor';
 import SimpleMarkdown from './SimpleMarkdown';
 import { useConfirmDialog } from './common/ConfirmDialog';
+import { UnifiedPicker } from './common';
 import { logBehavior } from '../utils/logger';
 import './Kanban.css';
 
@@ -625,12 +626,11 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                             )}
                             {!readOnly && (
                                 <div className="column-actions">
-                                    <input
-                                        type="color"
-                                        value={column.color}
-                                        onChange={(e) => updateColumnColor(column.id, e.target.value)}
-                                        title="Change color"
-                                        aria-label={`Change ${column.name} column color`}
+                                    <UnifiedPicker
+                                        mode="color"
+                                        color={column.color || '#6366f1'}
+                                        onColorChange={(c) => updateColumnColor(column.id, c)}
+                                        size="small"
                                     />
                                     <button 
                                         type="button"

@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://night-jar.co/sitemap.xml

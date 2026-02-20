@@ -10,19 +10,8 @@ import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { logBehavior } from '../utils/logger';
+import { UnifiedPicker } from './common';
 import './CreateFolder.css';
-
-const FOLDER_ICONS = ['📁', '📂', '🗂️', '📚', '🎨', '💻', '📝', '🔬', '🎵', '📸', '💼', '🏠'];
-const FOLDER_COLORS = [
-  { name: 'Default', value: null },
-  { name: 'Red', value: '#ef4444' },
-  { name: 'Orange', value: '#f97316' },
-  { name: 'Yellow', value: '#eab308' },
-  { name: 'Green', value: '#22c55e' },
-  { name: 'Blue', value: '#3b82f6' },
-  { name: 'Purple', value: '#8b5cf6' },
-  { name: 'Pink', value: '#ec4899' },
-];
 
 export default function CreateFolderDialog({ 
   isOpen, 
@@ -119,21 +108,16 @@ export default function CreateFolderDialog({
             <span className="create-folder__workspace-name">{currentWorkspace?.name || 'Workspace'}</span>
           </div>
           
-          {/* Icon selector */}
+          {/* Icon & Color selector */}
           <div className="create-folder__section">
-            <label className="create-folder__label">Icon</label>
-            <div className="create-folder__icons">
-              {FOLDER_ICONS.map(emoji => (
-                <button
-                  key={emoji}
-                  type="button"
-                  className={`create-folder__icon ${icon === emoji ? 'create-folder__icon--selected' : ''}`}
-                  onClick={() => setIcon(emoji)}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
+            <label className="create-folder__label">Appearance</label>
+            <UnifiedPicker
+              icon={icon}
+              color={color}
+              onIconChange={setIcon}
+              onColorChange={setColor}
+              compact
+            />
           </div>
           
           {/* Name input */}
@@ -147,26 +131,6 @@ export default function CreateFolderDialog({
               placeholder="My Folder"
               autoFocus
             />
-          </div>
-          
-          {/* Color selector */}
-          <div className="create-folder__section">
-            <label className="create-folder__label">Color (optional)</label>
-            <div className="create-folder__colors">
-              {FOLDER_COLORS.map(c => (
-                <button
-                  key={c.name}
-                  type="button"
-                  className={`create-folder__color ${color === c.value ? 'create-folder__color--selected' : ''}`}
-                  style={{ 
-                    backgroundColor: c.value || '#e5e7eb',
-                    borderColor: color === c.value ? '#3b82f6' : 'transparent'
-                  }}
-                  onClick={() => setColor(c.value)}
-                  title={c.name}
-                />
-              ))}
-            </div>
           </div>
           
           {/* Parent folder selector */}

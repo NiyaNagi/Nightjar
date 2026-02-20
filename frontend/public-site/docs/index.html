@@ -34,6 +34,7 @@
       <div class="hub-grid" id="hub-grid"></div>
     </main>
   </div>
+  <div class="docs-sidebar-backdrop" id="sidebar-backdrop"></div>
   <button class="mobile-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
 
   <div class="docs-footer">
@@ -42,6 +43,12 @@
 
   <script>
     const CONTENT_BASE = '/content';
+
+    function escapeHTML(str) {
+      const el = document.createElement('span');
+      el.textContent = str;
+      return el.innerHTML;
+    }
 
     async function init() {
       try {
@@ -52,8 +59,8 @@
 
         // Build sidebar with search
         const sidebar = document.getElementById('sidebar');
-        const navHTML = '<div class="sidebar-search"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Search docs…" id="sidebar-search" aria-label="Search documentation"></div><h3>Documentation</h3><ul id="sidebar-list">' +
-          sections.map(s => `<li data-title="${s.title.replace(/^[^\s]+\s/, '').toLowerCase()}" data-summary="${(s.summary || '').toLowerCase()}"><a href="${s.id}.html"><span class="icon">${s.icon}</span>${s.title.replace(/^[^\s]+\s/, '')}</a></li>`).join('') +
+        const navHTML = '<div class="sidebar-search"><svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Search docs…" id="sidebar-search" aria-label="Search documentation"></div><h3>Documentation</h3><ul id="sidebar-list">' +
+          sections.map(s => `<li data-title="${escapeHTML(s.title.toLowerCase())}" data-summary="${escapeHTML((s.summary || '').toLowerCase())}"><a href="${s.id}.html"><span class="icon">${s.icon}</span><span class="sidebar-label">${escapeHTML(s.title)}</span></a></li>`).join('') +
           '</ul>';
         sidebar.innerHTML = navHTML;
 
@@ -73,22 +80,37 @@
           });
         });
 
-        // Mobile sidebar toggle
+        // Mobile sidebar toggle with backdrop and scroll lock
         const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        function closeSidebar() {
+          sidebar.classList.remove('open');
+          sidebarBackdrop?.classList.remove('open');
+          if (sidebarToggle) sidebarToggle.textContent = '☰';
+          document.body.style.overflow = '';
+        }
         if (sidebarToggle) {
           sidebarToggle.addEventListener('click', () => {
             const isOpen = sidebar.classList.toggle('open');
+            sidebarBackdrop?.classList.toggle('open', isOpen);
             sidebarToggle.textContent = isOpen ? '✕' : '☰';
+            document.body.style.overflow = isOpen ? 'hidden' : '';
           });
         }
+        if (sidebarBackdrop) {
+          sidebarBackdrop.addEventListener('click', closeSidebar);
+        }
+        sidebar.addEventListener('click', (e) => {
+          if (e.target.closest('a')) closeSidebar();
+        });
 
         // Build hub grid
         const grid = document.getElementById('hub-grid');
         grid.innerHTML = sections.map(s =>
           `<a href="${s.id}.html" class="hub-card">
             <div class="icon">${s.icon}</div>
-            <h3>${s.title.replace(/^[^\s]+\s/, '')}</h3>
-            <p>${s.summary}</p>
+            <h3>${escapeHTML(s.title)}</h3>
+            <p>${escapeHTML(s.summary)}</p>
           </a>`
         ).join('');
       } catch (e) {

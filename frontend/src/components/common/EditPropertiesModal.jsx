@@ -20,7 +20,7 @@ export default function EditPropertiesModal({
 }) {
     const [name, setName] = useState(item?.name || '');
     const [icon, setIcon] = useState(item?.icon || (item?.type === 'folder' ? '📁' : '📄'));
-    const [color, setColor] = useState(item?.color || null);
+    const [color, setColor] = useState(item?.color || undefined);
     const [isSaving, setIsSaving] = useState(false);
     const modalRef = useRef(null);
     
@@ -32,7 +32,7 @@ export default function EditPropertiesModal({
         if (item) {
             setName(item.name || '');
             setIcon(item.icon || (item.type === 'folder' ? '📁' : '📄'));
-            setColor(item.color || null);
+            setColor(item.color || undefined);
         }
     }, [item?.id, item?.name, item?.icon, item?.color, item?.type]);
     

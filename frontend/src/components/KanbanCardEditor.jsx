@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import MiniToolbar from './MiniToolbar';
+import { UnifiedPicker } from './common';
 
 const KanbanCardEditor = ({ card, onUpdate, onDelete, onClose, onAddComment }) => {
     const [title, setTitle] = useState(card.title);
@@ -125,14 +126,14 @@ const KanbanCardEditor = ({ card, onUpdate, onDelete, onClose, onAddComment }) =
             )}
 
             <div className="card-edit-actions">
-                <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => {
-                        setColor(e.target.value);
-                        onUpdate({ title, description, color: e.target.value });
+                <UnifiedPicker
+                    mode="color"
+                    color={color}
+                    onColorChange={(c) => {
+                        setColor(c);
+                        onUpdate({ title, description, color: c });
                     }}
-                    aria-label="Card color"
+                    size="small"
                 />
                 <button 
                     type="button"

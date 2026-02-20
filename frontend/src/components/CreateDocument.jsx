@@ -10,9 +10,8 @@ import { useWorkspaces } from '../contexts/WorkspaceContext';
 import { usePermissions } from '../contexts/PermissionContext';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { logBehavior } from '../utils/logger';
+import { UnifiedPicker } from './common';
 import './CreateDocument.css';
-
-const DOCUMENT_ICONS = ['📄', '📝', '📋', '📊', '📈', '📉', '📑', '📃', '🗒️', '🗓️', '📒', '📓', '📔', '📕', '📗', '📘', '📙', '📰', '🎨', '💻'];
 
 const DOC_TYPES = {
     TEXT: 'text',
@@ -53,19 +52,6 @@ const DOCUMENT_TYPES = [
         label: 'File Storage', 
         description: 'Encrypted P2P file sharing and storage'
     }
-];
-
-const DOCUMENT_COLORS = [
-  { name: 'Default', value: null },
-  { name: 'Red', value: '#ef4444' },
-  { name: 'Orange', value: '#f97316' },
-  { name: 'Yellow', value: '#eab308' },
-  { name: 'Green', value: '#22c55e' },
-  { name: 'Blue', value: '#3b82f6' },
-  { name: 'Purple', value: '#8b5cf6' },
-  { name: 'Pink', value: '#ec4899' },
-  { name: 'Indigo', value: '#6366f1' },
-  { name: 'Teal', value: '#14b8a6' },
 ];
 
 export default function CreateDocumentDialog({ 
@@ -120,10 +106,11 @@ export default function CreateDocumentDialog({
     }
   }, [isOpen, defaultType, parentFolderId]);
   
-  // Update icon when document type changes
+  // Update icon when document type changes — only set the default type icon if the user hasn't customized it yet
   React.useEffect(() => {
     const typeInfo = DOCUMENT_TYPES.find(t => t.type === documentType);
-    if (typeInfo && !DOCUMENT_ICONS.some(i => i === icon)) {
+    const defaultIcons = DOCUMENT_TYPES.map(t => t.icon);
+    if (typeInfo && defaultIcons.includes(icon)) {
       setIcon(typeInfo.icon);
     }
   }, [documentType, icon]);
@@ -246,44 +233,16 @@ export default function CreateDocumentDialog({
             />
           </div>
           
-          {/* Icon Selection */}
+          {/* Icon & Color Selection */}
           <div className="create-document-field">
-            <label className="create-document-field__label">Icon</label>
-            <div className="icon-grid">
-              {DOCUMENT_ICONS.map((iconOption) => (
-                <button
-                  key={iconOption}
-                  type="button"
-                  className={`icon-option ${icon === iconOption ? 'selected' : ''}`}
-                  onClick={() => setIcon(iconOption)}
-                >
-                  {iconOption}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          {/* Color Selection */}
-          <div className="create-document-field">
-            <label className="create-document-field__label">Color</label>
-            <div className="color-grid">
-              {DOCUMENT_COLORS.map((colorOption) => (
-                <button
-                  key={colorOption.name}
-                  type="button"
-                  className={`color-option ${color === colorOption.value ? 'selected' : ''}`}
-                  onClick={() => setColor(colorOption.value)}
-                  style={{ 
-                    backgroundColor: colorOption.value || '#f3f4f6',
-                    border: colorOption.value ? 'none' : '2px solid #e5e7eb'
-                  }}
-                  title={colorOption.name}
-                  aria-label={`Set color to ${colorOption.name}`}
-                >
-                  {!colorOption.value && '○'}
-                </button>
-              ))}
-            </div>
+            <label className="create-document-field__label">Appearance</label>
+            <UnifiedPicker
+              icon={icon}
+              color={color}
+              onIconChange={setIcon}
+              onColorChange={setColor}
+              compact
+            />
           </div>
           
           {/* Folder Selection */}

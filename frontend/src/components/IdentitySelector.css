@@ -278,7 +278,7 @@
 .identity-selector__attempts {
   margin-top: 16px;
   font-size: 12px;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .identity-selector__unlocking {
@@ -418,4 +418,45 @@
 
 .identity-selector__error button:hover {
   background: #4f46e5;
+}
+
+/* ── Force light-theme PinInput inside IdentitySelector (white card) ── */
+/* Overrides dark-mode @media (prefers-color-scheme: dark) from PinInput.css */
+.identity-selector .pin-input-label {
+  color: #374151;
+}
+
+.identity-selector .pin-input-digit {
+  background: #ffffff;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
+
+.identity-selector .pin-input-digit:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.identity-selector .pin-input-digit.filled {
+  border-color: #6366f1;
+  background: #f5f5ff;
+}
+
+.identity-selector .pin-input-digit:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+}
+
+.identity-selector .pin-input-error-message {
+  color: #ef4444;
+}
+
+/* Fix note text contrast (4.6:1 against white) */
+.identity-selector__note {
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
 }

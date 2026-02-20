@@ -473,8 +473,8 @@ describe('Exported constants', () => {
     expect(ALL_ICONS).toEqual(expected);
   });
 
-  test('ALL_ICONS has 200+ emojis', () => {
-    expect(ALL_ICONS.length).toBeGreaterThan(200);
+  test('ALL_ICONS has 500+ emojis', () => {
+    expect(ALL_ICONS.length).toBeGreaterThan(500);
   });
 
   test('PRESET_COLORS has 30 entries with hex and name', () => {
