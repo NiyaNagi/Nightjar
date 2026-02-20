@@ -32,6 +32,7 @@ import IdentitySelector from './components/IdentitySelector';
 import LockScreen from './components/LockScreen';
 import NightjarMascot from './components/NightjarMascot';
 import HelpPage from './components/common/HelpPage';
+import DeepLinkGate from './components/common/DeepLinkGate';
 import SearchPalette from './components/SearchPalette';
 import BugReportModal from './components/BugReportModal';
 import { handleIndexResults, clearCache as clearSearchIndexCache } from './services/SearchIndexCache';
@@ -374,6 +375,8 @@ function App() {
     const [showSearchPalette, setShowSearchPalette] = useState(false); // Cross-app search palette
     const [showBugReport, setShowBugReport] = useState(false); // Bug report modal
     const [expandedFolders, setExpandedFolders] = useState(new Set()); // Lifted from sidebar for search folder-reveal
+    const [showDeepLinkGate, setShowDeepLinkGate] = useState(false); // Deep link attempt overlay
+    const [pendingDeepLink, setPendingDeepLink] = useState(null); // nightjar:// link for deep link gate
 
     // --- Auto-Lock Hook ---
     const { isLocked, setIsLocked, lock: lockApp, unlock: unlockApp } = useAutoLock();
@@ -383,6 +386,33 @@ function App() {
 
     // --- Toast (from context, available to all components) ---
     const { showToast } = useToast();
+
+    // --- Helper: Process pending share link after onboarding or lock screen ---
+    const processPendingShareLink = useCallback(() => {
+        const pendingLink = sessionStorage.getItem('pendingShareLink');
+        if (!pendingLink) return;
+
+        // Check if the pending link has expired
+        const pendingExpiry = sessionStorage.getItem('pendingShareLinkExpiry');
+        if (pendingExpiry) {
+            const expiryTs = parseInt(pendingExpiry, 10);
+            if (Date.now() > expiryTs) {
+                console.log('[App] Pending share link has expired, discarding');
+                sessionStorage.removeItem('pendingShareLink');
+                sessionStorage.removeItem('pendingShareLinkExpiry');
+                showToast('The share link expired while you were setting up. Please request a new one.', 'warning');
+                return;
+            }
+        }
+
+        console.log('[App] Found pending share link after identity setup, opening join dialog');
+        // Use setTimeout to let the current render cycle complete
+        setTimeout(() => {
+            setCreateWorkspaceMode('join');
+            setShowCreateWorkspaceDialog(true);
+            showToast('Share link detected - please review the invitation details', 'info');
+        }, 500);
+    }, [showToast]);
 
     // --- Onboarding Handler ---
     const handleOnboardingComplete = useCallback(async (identity, hadLocalData = false) => {
@@ -451,7 +481,10 @@ function App() {
             console.error('[App] Error during identity creation:', error);
             showToast('Error creating identity: ' + error.message, 'error');
         }
-    }, [createIdentity, showToast, needsMigration]);
+
+        // Check for pending share link that arrived before onboarding was complete
+        processPendingShareLink();
+    }, [createIdentity, showToast, needsMigration, processPendingShareLink]);
 
     // --- Lock Screen Handlers ---
     const handleLockScreenUnlock = useCallback((identityData, metadata) => {
@@ -469,7 +502,10 @@ function App() {
         }
         
         showToast(`Welcome back, ${metadata?.handle || 'User'}! 🔓`, 'success');
-    }, [unlockApp, showToast]);
+
+        // Check for pending share link that arrived while locked
+        processPendingShareLink();
+    }, [unlockApp, showToast, processPendingShareLink]);
     
     const handleSwitchIdentity = useCallback(() => {
         logBehavior('identity', 'switch_identity_initiated');
@@ -1068,6 +1104,11 @@ function App() {
     // Supports both:
     //   1. URL fragment: https://host/#p:pass&perm:e&...  (legacy web deploy)
     //   2. Join path:    https://host/join/w/payload#fragment  (clickable HTTPS share links)
+    //
+    // On the web, if a /join/ URL is detected, we first show a DeepLinkGate overlay
+    // that attempts to open the nightjar:// deep link (for desktop app users). If the
+    // deep link fails, the user can "Continue in Browser" to proceed with the web join flow.
+    // In Electron, the deep link gate is skipped (protocol handled natively).
     useEffect(() => {
         // Check for clickable HTTPS join URL first (e.g., /join/w/abc123#fragment)
         const joinIdx = window.location.pathname.indexOf('/join/');
@@ -1082,6 +1123,11 @@ function App() {
 
             // Store the converted nightjar:// link for the join dialog
             sessionStorage.setItem('pendingShareLink', nightjarLink);
+            // Also store expiry from fragment for persistence through onboarding/lock
+            const expMatch = fragment.match(/exp:(\d+)/);
+            if (expMatch) {
+                sessionStorage.setItem('pendingShareLinkExpiry', expMatch[1]);
+            }
 
             // Clear the URL for security — replace with clean path
             try {
@@ -1091,10 +1137,16 @@ function App() {
                 clearUrlFragment(true);
             }
 
-            // Open the join workspace dialog
-            setCreateWorkspaceMode('join');
-            setShowCreateWorkspaceDialog(true);
-            showToast('Share link detected - please review the invitation details', 'info');
+            // On web (non-Electron), show DeepLinkGate to attempt opening the desktop app
+            if (!isElectron()) {
+                setPendingDeepLink(nightjarLink);
+                setShowDeepLinkGate(true);
+            } else {
+                // In Electron, skip deep link gate and open join dialog directly
+                setCreateWorkspaceMode('join');
+                setShowCreateWorkspaceDialog(true);
+                showToast('Share link detected - please review the invitation details', 'info');
+            }
             return;
         }
 
@@ -1103,6 +1155,7 @@ function App() {
         const fragment = window.location.hash.slice(1);
         if (!fragment) {
             sessionStorage.removeItem('pendingShareLink');
+            sessionStorage.removeItem('pendingShareLinkExpiry');
             return;
         }
         
@@ -1114,6 +1167,11 @@ function App() {
             // The dialog will parse and display rich metadata for user consent
             const fullLink = window.location.origin + window.location.pathname + '#' + fragment;
             sessionStorage.setItem('pendingShareLink', fullLink);
+            // Store expiry for persistence through onboarding/lock
+            const expMatch = fragment.match(/exp:(\d+)/);
+            if (expMatch) {
+                sessionStorage.setItem('pendingShareLinkExpiry', expMatch[1]);
+            }
             
             // Clear the URL fragment immediately for security
             clearUrlFragment(true);
@@ -2472,11 +2530,34 @@ function App() {
                         setShowCreateWorkspaceDialog(false);
                         setCreateWorkspaceMode('create'); // Reset to default
                         sessionStorage.removeItem('pendingShareLink'); // Clear any pending share link
+                        sessionStorage.removeItem('pendingShareLinkExpiry');
                     }}
                     onSuccess={() => {
                         setShowCreateWorkspaceDialog(false);
                         setCreateWorkspaceMode('create'); // Reset to default
                         sessionStorage.removeItem('pendingShareLink'); // Clear pending share link
+                        sessionStorage.removeItem('pendingShareLinkExpiry');
+                    }}
+                />
+            )}
+
+            {/* Deep Link Gate — attempts nightjar:// protocol, falls back to web join */}
+            {showDeepLinkGate && pendingDeepLink && (
+                <DeepLinkGate
+                    nightjarLink={pendingDeepLink}
+                    onContinueInBrowser={() => {
+                        setShowDeepLinkGate(false);
+                        setPendingDeepLink(null);
+                        // Open the join workspace dialog with the pending share link
+                        setCreateWorkspaceMode('join');
+                        setShowCreateWorkspaceDialog(true);
+                        showToast('Share link detected - please review the invitation details', 'info');
+                    }}
+                    onCancel={() => {
+                        setShowDeepLinkGate(false);
+                        setPendingDeepLink(null);
+                        sessionStorage.removeItem('pendingShareLink');
+                        sessionStorage.removeItem('pendingShareLinkExpiry');
                     }}
                 />
             )}

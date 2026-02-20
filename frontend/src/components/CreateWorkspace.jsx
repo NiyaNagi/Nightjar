@@ -117,6 +117,12 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
         if (parsed.embeddedPassword) {
           setJoinPassword(parsed.embeddedPassword);
         }
+        // Validate signature for compressed links that have been decompressed to nightjar://
+        // The decompressed link may contain exp:/sig:/by: fields
+        if (parsed._decompressedLink) {
+          const validation = validateSignedInvite(parsed._decompressedLink);
+          setLinkValidation(validation);
+        }
       } catch (err) {
         console.error('Failed to decompress link:', err);
         setJoinError('Invalid compressed share link');
@@ -248,6 +254,18 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       return;
     }
     
+    // SECURITY: Enforce expiry at join time — never allow joining with an expired link
+    if (linkValidation?.expiry && Date.now() > linkValidation.expiry) {
+      setJoinError('This invite link has expired. Please request a new one.');
+      return;
+    }
+    
+    // Block join if signature verification failed
+    if (linkValidation && linkValidation.valid === false && !linkValidation.legacy) {
+      setJoinError(linkValidation.error || 'Link verification failed');
+      return;
+    }
+    
     // SECURITY: Log only non-sensitive parsed link properties (no keys/passwords)
     console.log(`[CreateWorkspace] Join attempt - isP2P: ${parsedLink.isP2P}, entityId: ${parsedLink.entityId}, hasKey: ${!!parsedLink.encryptionKey}`);
     
@@ -299,6 +317,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
             const perm = workspace.myPermission || 'editor';
             const label = perm.charAt(0).toUpperCase() + perm.slice(1);
             showToast(`You already have ${label} access`, 'info');
+          } else if (workspace.permissionChanged === null && workspace.alreadyMember) {
+            showToast('You are already a member of this workspace', 'info');
           }
           onSuccess?.(workspace);
           onClose?.();
@@ -341,6 +361,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           const perm = workspace.myPermission || 'editor';
           const label = perm.charAt(0).toUpperCase() + perm.slice(1);
           showToast(`You already have ${label} access`, 'info');
+        } else if (workspace?.permissionChanged === null && workspace?.alreadyMember) {
+          showToast('You are already a member of this workspace', 'info');
         }
         onSuccess?.(workspace);
         onClose?.();
@@ -386,6 +408,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           const perm = workspace.myPermission || 'editor';
           const label = perm.charAt(0).toUpperCase() + perm.slice(1);
           showToast(`You already have ${label} access`, 'info');
+        } else if (workspace?.permissionChanged === null && workspace?.alreadyMember) {
+          showToast('You are already a member of this workspace', 'info');
         }
         onSuccess?.(workspace);
         onClose?.();
@@ -661,7 +685,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               <button 
                 type="submit" 
                 className="create-workspace__submit"
-                disabled={isJoining || !parsedLink}
+                disabled={isJoining || !parsedLink || (linkValidation?.valid === false && !linkValidation?.legacy) || (linkValidation?.expiry && Date.now() > linkValidation.expiry)}
                 data-testid="join-btn"
               >
                 {isJoining ? 'Joining...' : 'Join Workspace'}

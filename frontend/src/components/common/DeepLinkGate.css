@@ -1,0 +1,124 @@
+/* DeepLinkGate — overlay for deep link attempt + fallback */
+
+.deep-link-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  padding: 1.5rem;
+}
+
+.deep-link-gate__card {
+  background: var(--bg-primary, #161b22);
+  border: 1px solid var(--border-primary, #30363d);
+  border-radius: 12px;
+  padding: 2.5rem;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.deep-link-gate__logo {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.deep-link-gate__title {
+  font-size: 1.3rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary, #e6edf3);
+}
+
+.deep-link-gate__text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #8b949e);
+  margin-bottom: 1.25rem;
+}
+
+.deep-link-gate__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border-primary, #30363d);
+  border-top-color: var(--accent-blue, #58a6ff);
+  border-radius: 50%;
+  animation: deep-link-spin 0.8s linear infinite;
+  margin: 1rem auto;
+}
+
+@keyframes deep-link-spin {
+  to { transform: rotate(360deg); }
+}
+
+.deep-link-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.deep-link-gate__btn {
+  display: inline-block;
+  padding: 0.65rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  margin: 0.2rem 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.deep-link-gate__btn--primary {
+  background: var(--accent-green, #238636);
+  color: #fff;
+}
+.deep-link-gate__btn--primary:hover {
+  background: var(--accent-green-hover, #2ea043);
+}
+
+.deep-link-gate__btn--secondary {
+  background: transparent;
+  color: var(--accent-blue, #58a6ff);
+  border: 1px solid var(--border-primary, #30363d);
+}
+.deep-link-gate__btn--secondary:hover {
+  border-color: var(--accent-blue, #58a6ff);
+}
+
+.deep-link-gate__btn--tertiary {
+  background: transparent;
+  color: var(--text-secondary, #8b949e);
+  font-size: 0.85rem;
+}
+.deep-link-gate__btn--tertiary:hover {
+  color: var(--text-primary, #e6edf3);
+}
+
+.deep-link-gate__btn--cancel {
+  background: transparent;
+  color: var(--text-tertiary, #6e7681);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+.deep-link-gate__btn--cancel:hover {
+  color: var(--text-secondary, #8b949e);
+}
+
+.deep-link-gate__footer {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.deep-link-gate__download-link {
+  color: var(--accent-blue, #58a6ff);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.deep-link-gate__download-link:hover {
+  text-decoration: underline;
+}

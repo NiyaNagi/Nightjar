@@ -19,5 +19,8 @@
     "allowMixedContent": false,
     "captureInput": true,
     "webContentsDebuggingEnabled": false
+  },
+  "_TODO_deepLinks": {
+    "_comment": "TODO: Configure Capacitor App Links / Deep Links for mobile share links. When implemented, add: (1) Android intent-filter for nightjar:// scheme and https://relay.night-jar.co/join/* URLs, (2) iOS universal links with apple-app-site-association file, (3) Capacitor App.addListener('appUrlOpen') handler in the mobile entry point"
   }
 }

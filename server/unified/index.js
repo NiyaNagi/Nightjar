@@ -231,6 +231,14 @@ class Storage {
       incrementInviteUse: this.db.prepare('UPDATE invites SET use_count = use_count + 1 WHERE token = ?'),
       deleteInvite: this.db.prepare('DELETE FROM invites WHERE token = ?'),
       getInvitesByEntity: this.db.prepare('SELECT * FROM invites WHERE entity_id = ?'),
+      // Cleanup: delete expired invites (expires_at < now)
+      deleteExpiredInvites: this.db.prepare('DELETE FROM invites WHERE expires_at IS NOT NULL AND expires_at < ?'),
+      // Nuclear cleanup: delete ALL invites older than 24 hours from creation regardless of expiry
+      nuclearDeleteOldInvites: this.db.prepare('DELETE FROM invites WHERE created_at < ?'),
+      // TODO: Encrypt invite rows at rest — currently entity metadata (type, ID, permission)
+      // is stored in cleartext in SQLite. While secrets (passwords, keys) are never stored
+      // server-side, the metadata could be encrypted with a server-level key to reduce
+      // exposure if the database file is compromised.
       
       // Yjs document persistence (for y-websocket)
       getYjsDoc: this.db.prepare('SELECT state FROM yjs_docs WHERE room_name = ?'),
@@ -289,6 +297,25 @@ class Storage {
    */
   useInvite(token) {
     this._stmts.incrementInviteUse.run(token);
+  }
+
+  /**
+   * Delete all invites that have passed their expires_at timestamp.
+   * @param {number} now - Current timestamp (Date.now())
+   * @returns {{ changes: number }} Number of deleted rows
+   */
+  deleteExpiredInvites(now) {
+    return this._stmts.deleteExpiredInvites.run(now);
+  }
+
+  /**
+   * Nuclear cleanup: delete ALL invites older than cutoff regardless of expiry.
+   * This ensures no invite persists beyond 24 hours from creation.
+   * @param {number} cutoff - Timestamp cutoff (invites created before this are deleted)
+   * @returns {{ changes: number }} Number of deleted rows
+   */
+  nuclearDeleteOldInvites(cutoff) {
+    return this._stmts.nuclearDeleteOldInvites.run(cutoff);
   }
 
   /**
@@ -1393,6 +1420,45 @@ const docCleanupInterval = setInterval(() => {
   }
 }, DOC_CLEANUP_INTERVAL_MS);
 
+// =============================================================================
+// Invite Cleanup — Two-Tier Strategy
+// =============================================================================
+// 1. Hourly: Delete invites that have passed their expires_at timestamp
+// 2. Nuclear (every 6 hours): Delete ALL invites older than 24h from creation,
+//    regardless of their expires_at value. This is a hard ceiling to ensure
+//    no invite persists indefinitely even if it was created without an expiry.
+// =============================================================================
+
+const INVITE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // Every hour
+const NUCLEAR_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // Every 6 hours
+const MAX_INVITE_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours absolute maximum
+
+let lastNuclearCleanup = Date.now();
+
+const inviteCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  
+  try {
+    // Tier 1: Delete expired invites (expires_at < now)
+    const expiredResult = storage.deleteExpiredInvites(now);
+    if (expiredResult.changes > 0) {
+      console.log(`[Invite Cleanup] Deleted ${expiredResult.changes} expired invites`);
+    }
+    
+    // Tier 2: Nuclear cleanup every 6 hours — delete ALL invites older than 24h
+    if (now - lastNuclearCleanup >= NUCLEAR_CLEANUP_INTERVAL_MS) {
+      const cutoff = now - MAX_INVITE_AGE_MS;
+      const nuclearResult = storage.nuclearDeleteOldInvites(cutoff);
+      if (nuclearResult.changes > 0) {
+        console.log(`[Invite Cleanup] NUCLEAR: Deleted ${nuclearResult.changes} invites older than 24h`);
+      }
+      lastNuclearCleanup = now;
+    }
+  } catch (err) {
+    console.error('[Invite Cleanup] Error during invite cleanup:', err);
+  }
+}, INVITE_CLEANUP_INTERVAL_MS);
+
 wssYjs.on('connection', (ws, req) => {
   // Extract room name from URL
   const roomName = req.url.slice(1).split('?')[0] || 'default';
@@ -1959,94 +2025,37 @@ app.post(BASE_PATH + '/api/invites/:token/use', (req, res) => {
 });
 
 // =============================================================================
-// Clickable Share Link Redirect Shim
+// Clickable Share Link — Serve SPA for /join/* routes
 // =============================================================================
-// Handles HTTPS share links in the format:
+// Share links in the format:
 //   https://{host}/join/{typeCode}/{base62_payload}#{fragment}
 //
-// The page attempts to open nightjar://{typeCode}/{payload}#{fragment} via
-// deep link (for users with the desktop app installed), and falls back to a
-// friendly download page after a short timeout.
+// are now handled entirely by the React SPA. The SPA's DeepLinkGate component
+// will attempt to open nightjar:// deep links for desktop app users, then
+// fall back to the web app's join flow for web-only users.
 //
 // SECURITY: The URL #fragment (containing secrets like passwords/keys) is
 // NEVER sent to the server (RFC 3986). It is only available client-side.
+//
+// The /join/* route simply serves the SPA (same as the catch-all), ensuring
+// the React app loads and handles the join path + fragment on the client.
 // =============================================================================
 
-const JOIN_REDIRECT_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nightjar – Opening Share Link</title>
-  <meta name="description" content="Nightjar – Privacy-first collaborative editing">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem}
-    .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:2.5rem;max-width:420px;width:100%;text-align:center}
-    .logo{font-size:3rem;margin-bottom:1rem}
-    h1{font-size:1.4rem;margin-bottom:.75rem;color:#e6edf3}
-    p{font-size:.95rem;line-height:1.5;color:#8b949e;margin-bottom:1rem}
-    ol{text-align:left;margin:1rem 0 1.5rem 1.5rem;color:#8b949e;font-size:.9rem;line-height:1.7}
-    .btn{display:inline-block;padding:.65rem 1.5rem;border-radius:8px;font-size:.95rem;font-weight:500;text-decoration:none;cursor:pointer;border:none;margin:.35rem}
-    .btn-primary{background:#238636;color:#fff}
-    .btn-primary:hover{background:#2ea043}
-    .btn-secondary{background:transparent;color:#58a6ff;border:1px solid #30363d}
-    .btn-secondary:hover{border-color:#58a6ff}
-    .spinner{width:28px;height:28px;border:3px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite;margin:1rem auto}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .hidden{display:none}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div id="opening">
-      <div class="logo">🪶</div>
-      <h1>Opening Nightjar…</h1>
-      <p>Attempting to open this share link in the Nightjar desktop app.</p>
-      <div class="spinner"></div>
-    </div>
-    <div id="fallback" class="hidden">
-      <div class="logo">🪶</div>
-      <h1>Nightjar</h1>
-      <p>This is a Nightjar share link. To access the shared content:</p>
-      <ol>
-        <li>Install the Nightjar desktop app</li>
-        <li>Open the app</li>
-        <li>Click this link again (or paste it into the app)</li>
-      </ol>
-      <a href="https://github.com/NiyaNagi/Nightjar/releases" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Download Nightjar</a>
-      <button onclick="tryOpen()" class="btn btn-secondary">Try Opening App Again</button>
-    </div>
-  </div>
-  <script>
-    (function() {
-      var path = window.location.pathname;
-      var joinStr = '/join/';
-      var idx = path.indexOf(joinStr);
-      if (idx === -1) return;
-      // Everything after /join/ maps to the nightjar:// path
-      var remainder = path.slice(idx + joinStr.length);
-      var fragment = window.location.hash || '';
-      var deepLink = 'nightjar://' + remainder + fragment;
-
-      function tryOpen() {
-        window.location.href = deepLink;
-      }
-      window.tryOpen = tryOpen;
-      tryOpen();
-
-      setTimeout(function() {
-        document.getElementById('opening').classList.add('hidden');
-        document.getElementById('fallback').classList.remove('hidden');
-      }, 2000);
-    })();
-  </script>
-</body>
-</html>`;
-
 // Route must be registered BEFORE the SPA fallback catch-all
+// This ensures /join/* paths serve the SPA rather than returning 404
+// The React app will detect /join/ in the pathname and handle it
 app.get((BASE_PATH || '') + '/join/*', (req, res) => {
-  res.type('html').send(JOIN_REDIRECT_HTML);
+  // Serve the SPA — the React app will handle the share link client-side
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  if (injectedIndexHtml) {
+    res.type('html').send(injectedIndexHtml);
+  } else if (existsSync(indexHtmlPath)) {
+    res.sendFile(indexHtmlPath);
+  } else {
+    res.status(404).type('text').send('SPA not found');
+  }
 });
 
 // Static files (React app)
@@ -2185,6 +2194,9 @@ const gracefulShutdown = async () => {
 
   // Stop stale doc cleanup interval
   clearInterval(docCleanupInterval);
+  
+  // Stop invite cleanup interval
+  clearInterval(inviteCleanupInterval);
   
   // Stop mesh participation
   if (meshParticipant) {

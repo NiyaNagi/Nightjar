@@ -165,12 +165,15 @@ Whether you're a journalist protecting sources, an activist organizing securely,
 
 ### 🔗 Sharing
 - **Cryptographically signed** invite links with Ed25519 signatures
-- **Time-limited invitations** (maximum 24 hours, configurable expiry)
+- **Time-limited invitations** (maximum 24 hours, mandatory expiry on signed links)
 - **Fragment-based encryption** - keys embedded in URL fragment, never sent to servers
+- **DeepLinkGate** — automatic `nightjar://` protocol detection with graceful fallback to web join flow *(New in v1.7.15)*
+- **Server-side invite cleanup** — two-tier automatic removal: hourly expired + nuclear 24h deletion *(New in v1.7.15)*
 - **QR codes** for easy mobile sharing
 - **Join-with-link modal** — paste `nightjar://` links or short codes with real-time validation and password field
 - **Entity-level sharing** — share workspaces, folders, or individual documents with per-entity permission tiers
 - **Granular permissions**: Owner, Editor, Viewer
+- **Already-a-member detection** — friendly toast when re-joining an existing workspace *(New in v1.7.15)*
 - **Instant revocation** - kick members and invalidate their access immediately
 - **Workspace deletion** with secure data wiping
 
@@ -891,14 +894,16 @@ nightjar://w/abc123#key=base64encryptionkey&perm=e&exp=1706745600&sig=ed25519sig
 
 **Security Properties:**
 - **URL Fragment Security**: Key never sent to servers (fragment only exists client-side)
+- **Mandatory Expiry**: Signed links require an expiry field — links without expiry are rejected *(Enforced in v1.7.15)*
 - **Time Expiry**: Maximum 24-hour window, configurable down to minutes
 - **Cryptographic Integrity**: Ed25519 signatures prevent tampering or replay
 - **Zero-Knowledge Servers**: Relay servers never see encryption keys
+- **Server-Side Cleanup**: Two-tier automatic invite removal — hourly expired purge + nuclear 24h deletion *(New in v1.7.15)*
 - **Instant Revocation**: Active members can be kicked, invalidating their access
 - **Secure Deletion**: Complete workspace deletion with cryptographic key destruction
 
 **Link Generation Process:**
-1. Generate time-limited invitation with workspace key
+1. Generate time-limited invitation with workspace key (mandatory expiry)
 2. Sign invitation parameters with workspace owner's Ed25519 key
 3. Embed key in URL fragment (invisible to servers)
 4. Optionally encode as QR code for mobile sharing
@@ -906,8 +911,15 @@ nightjar://w/abc123#key=base64encryptionkey&perm=e&exp=1706745600&sig=ed25519sig
 **Validation Process:**
 1. Extract parameters from URL fragment
 2. Verify Ed25519 signature against workspace owner's public key
-3. Check expiration timestamp
+3. Check expiration timestamp (reject if expired or missing on signed links)
 4. Grant access if signature valid and not expired
+
+**Web Share Link Flow** *(New in v1.7.15):*
+1. User clicks HTTPS share link (`https://relay.night-jar.co/join/...`)
+2. Server serves full SPA (not a redirect shim)
+3. DeepLinkGate attempts to open `nightjar://` protocol for desktop app
+4. If app doesn't respond within 1.5s, shows fallback with "Continue in Browser"
+5. Share link persists through onboarding and PIN lock via `sessionStorage`
 
 ### Workspace Management & Member Control
 
@@ -1092,6 +1104,27 @@ npm run test:e2e:smoke      # Quick smoke tests
 - **Bug Fix**: InventoryNavRail — added scrollbar hiding, z-index layering, and flex-shrink:0 to prevent icon compression on narrow viewports
 - **Style**: iOS zoom prevention — `touch-action: manipulation`, `-webkit-tap-highlight-color: transparent`, 16px input font on mobile, hover guard for touch devices
 - **Style**: Breakpoint standardization — BulkTagDialog, CatalogManager, SubmitRequest changed from 600px to 768px
+- **Style**: Momentum scrolling — `-webkit-overflow-scrolling: touch` on SlidePanel and AllRequests
+- **Style**: Toast bottom offset increased 40→80px to clear mobile nav rail
+- **Style**: FileStorageNavRail header/divider hidden on mobile, z-index added
+- **Testing**: 56 unit tests (useIsMobile hook + comprehensive mobile suite), 8 E2E Playwright tests at mobile viewport — 24 files changed, 947 insertions, 58 deletions
+
+### v1.7.15 - Share Link Overhaul, DeepLinkGate & Invite Cleanup
+- **Critical Fix**: Share links now work when clicked from web on new devices — replaced deep-link shim with SPA-serving `/join/*` route
+- **New Feature**: DeepLinkGate component — detects `nightjar://` protocol support, offers fallback with "Continue in Browser", "Copy Link", "Try Again", and download options
+- **Security**: Mandatory expiry enforcement — signed links without expiry are now rejected
+- **Security**: Two-tier server invite cleanup — hourly expired removal + nuclear 24h deletion
+- **Security**: Pending share link persists through onboarding and PIN lock flows via `sessionStorage`
+- **Bug Fix**: "Already a member" toast now fires correctly (was never set in `joinWorkspace` return)
+- **Bug Fix**: Join button disabled for expired or invalid links with clear error message
+- **Testing**: 55 new tests across 3 suites (share-link-security, server-invite-cleanup, deep-link-gate)
+
+### v1.7.14 - Mobile Optimizations, PWA & Card Views
+- **New Feature**: Mobile card view for AllRequests admin table (≤768px), `useIsMobile` hook
+- **PWA**: Full Progressive Web App manifest with generated icons (192, 512, apple-touch)
+- **Fix**: Z-index stacking on SlidePanel, ProducerDashboard, ProducerMyRequests (100→900)
+- **Fix**: Nav rail mobile bugs — InventoryNavRail scrollbar, FileStorageNavRail selector mismatch
+- **Fix**: iOS auto-zoom on inputs (16px minimum font), touch-action manipulation, tap-highlight removal
 - **Style**: Momentum scrolling — `-webkit-overflow-scrolling: touch` on SlidePanel and AllRequests
 - **Style**: Toast bottom offset increased 40→80px to clear mobile nav rail
 - **Style**: FileStorageNavRail header/divider hidden on mobile, z-index added

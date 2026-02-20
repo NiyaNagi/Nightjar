@@ -884,7 +884,8 @@ export function WorkspaceProvider({ children }) {
       
       switchWorkspace(entityId);
       // Return the updated workspace with permissionChanged flag for toast feedback
-      return { ...existing, ...updates, permissionChanged };
+      // alreadyMember: true lets callers show "already a member" toast when permissionChanged is null
+      return { ...existing, ...updates, permissionChanged, alreadyMember: true };
     }
     
     // Determine workspace key from password or embedded key

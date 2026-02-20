@@ -1090,7 +1090,7 @@ export function validateSignedInvite(link) {
     // Extract expiry, signature, and owner from fragment
     const [, fragment] = link.split('#');
     if (!fragment) {
-      // Legacy link without signature - still valid but not time-limited
+      // Legacy link without any fragment — still valid but not time-limited
       return { valid: true, legacy: true, ...parsed };
     }
     
@@ -1107,18 +1107,23 @@ export function validateSignedInvite(link) {
     const signatureBase62 = params.sig;
     const ownerPublicKey = params.by;
     
-    // If no expiry/signature, it's a legacy link
-    if (!expiry || !signatureBase62) {
+    // If link has a signature but no expiry, reject it — all signed links MUST have expiry
+    if (signatureBase62 && !expiry) {
+      return { valid: false, error: 'Signed link is missing mandatory expiry', ...parsed };
+    }
+    
+    // If no expiry AND no signature, it's a truly legacy link (pre-signing era)
+    if (!expiry && !signatureBase62) {
       return { valid: true, legacy: true, ...parsed };
     }
     
-    // Check expiry
-    if (Date.now() > expiry) {
+    // Check expiry — mandatory for all signed links
+    if (expiry && Date.now() > expiry) {
       return { valid: false, error: 'Invite link has expired', expiry };
     }
     
     // Verify signature
-    if (ownerPublicKey) {
+    if (ownerPublicKey && signatureBase62) {
       const messageToSign = `${parsed.entityId}|${expiry}|${parsed.permission}`;
       const signature = base62ToUint8(signatureBase62, 64);
       const publicKey = base62ToUint8(ownerPublicKey, 32);
@@ -1132,7 +1137,7 @@ export function validateSignedInvite(link) {
     return {
       valid: true,
       expiry,
-      expiresIn: expiry - Date.now(),
+      expiresIn: expiry ? expiry - Date.now() : null,
       permission: parsed.permission,
       ownerPublicKey,
       ...parsed,
@@ -1470,6 +1475,13 @@ export const ICE_SERVERS = [
 /**
  * Default share host derived from the production relay server.
  * Used when no explicit shareHost is provided.
+ * 
+ * TODO: Support per-workspace relay URL configuration. Currently all workspaces
+ * share the same relay host. When a workspace is created on a self-hosted server,
+ * share links should use that server's URL instead of the default. This requires:
+ * 1. Storing the relay URL in workspace metadata
+ * 2. Passing it through to generateClickableShareLink/generateSignedInviteLink
+ * 3. UI in workspace settings to configure the relay URL
  */
 export const DEFAULT_SHARE_HOST = 'https://relay.night-jar.co';
 
