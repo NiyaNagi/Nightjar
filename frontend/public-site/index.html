@@ -1186,20 +1186,25 @@
     let autoplay = true;
     let timer = null;
 
+    let cacheBuster = '';
+
     async function initSlideshow() {
       try {
-        const res = await fetch('/screenshots/manifest.json');
+        const res = await fetch(`/screenshots/manifest.json?t=${Date.now()}`);
         if (!res.ok) return;
         const manifest = await res.json();
         slides = (manifest.screenshots || []).filter(s => s.filename);
         if (!slides.length) return;
+
+        // Use manifest generation timestamp as cache-buster for images
+        cacheBuster = manifest.generated ? `?v=${encodeURIComponent(manifest.generated)}` : `?v=${Date.now()}`;
 
         // Preload all images before showing slideshow
         const preloadPromises = slides.map(s => new Promise((resolve) => {
           const img = new Image();
           img.onload = () => resolve(true);
           img.onerror = () => resolve(false);
-          img.src = `/screenshots/${s.filename}`;
+          img.src = `/screenshots/${s.filename}${cacheBuster}`;
         }));
         const results = await Promise.all(preloadPromises);
         // Filter out any slides whose images failed to load
@@ -1227,7 +1232,7 @@
       currentSlide = idx;
       const slide = slides[idx];
       const img = document.getElementById('slideshow-img');
-      img.src = `/screenshots/${slide.filename}`;
+      img.src = `/screenshots/${slide.filename}${cacheBuster}`;
       img.alt = slide.title;
       // Handle individual image load errors gracefully
       img.onerror = () => {
