@@ -188,6 +188,17 @@
     .btn-linux:hover { background: #f06732; color: #fff; transform: translateY(-2px); box-shadow: 0 0 28px rgba(233,84,32,0.45); }
     .btn-docker { background: #1d63ed; color: #fff; border: 1px solid #1d63ed; box-shadow: 0 0 20px rgba(29,99,237,0.3); }
     .btn-docker:hover { background: #3578f0; color: #fff; transform: translateY(-2px); box-shadow: 0 0 28px rgba(29,99,237,0.45); }
+
+    /* Subtle pulse for auto-detected platform */
+    @keyframes pulse-glow {
+      0%, 100% { filter: brightness(1); box-shadow: var(--detected-glow); }
+      50% { filter: brightness(1.12); box-shadow: var(--detected-glow-bright); }
+    }
+    .btn-detected { animation: pulse-glow 2.5s ease-in-out infinite; }
+    .btn-detected:hover { animation: none; }
+    .btn-windows.btn-detected { --detected-glow: 0 0 16px rgba(0,120,212,0.35); --detected-glow-bright: 0 0 28px rgba(0,120,212,0.55); }
+    .btn-macos.btn-detected { --detected-glow: 0 0 16px rgba(255,255,255,0.08); --detected-glow-bright: 0 0 28px rgba(255,255,255,0.16); }
+    .btn-linux.btn-detected { --detected-glow: 0 0 16px rgba(233,84,32,0.35); --detected-glow-bright: 0 0 28px rgba(233,84,32,0.55); }
     .version-row { text-align: center; color: var(--text-dim); font-size: 0.85rem; margin-bottom: 8px; }
     .version-row a { color: var(--accent-light); margin-left: 8px; }
     .hero-links { display: flex; justify-content: center; gap: 12px; margin: 16px 0 0; flex-wrap: wrap; }
@@ -477,6 +488,7 @@
     @media (prefers-reduced-motion: reduce) {
       .mascot-bubble { animation: none !important; transition: none !important; }
       .hero-mascot .hero-logo { transition: none !important; }
+      .btn-detected { animation: none !important; }
     }
   </style>
 </head>
@@ -1035,8 +1047,8 @@
         if (!p) return;
         btn.classList.remove('btn-primary', 'btn-secondary');
         if (brandClass[p]) btn.classList.add(brandClass[p]);
-        // Slightly enlarge the detected platform's button
-        if (p === platform) btn.style.transform = 'scale(1.05)';
+        // Subtle pulsing glow on the detected platform's button
+        if (p === platform) btn.classList.add('btn-detected');
       });
     })();
 
