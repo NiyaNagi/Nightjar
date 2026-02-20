@@ -237,3 +237,96 @@ git push origin main --tags
    - App icon correct in taskbar and title bar
    - All features working (editor, spreadsheet, P2P)
 
+7. **Update GitHub Release notes** (REQUIRED — see format below):
+   After the tag push triggers `softprops/action-gh-release` (which only creates
+   a stub release with asset links), update the release body with full notes:
+   ```bash
+   gh release edit v{version} --notes-file docs/release-notes/RELEASE_NOTES_v{version}.md
+   ```
+
+## GitHub Release Notes Format
+
+**ALWAYS** generate full release notes in the following format when pushing a new release tag. The CI/CD `build.yml` uses `softprops/action-gh-release` with `generate_release_notes: true`, which only produces a bare "Full Changelog" link. You MUST update the release body with comprehensive notes using `gh release edit`.
+
+Reference: see v1.7.11, v1.7.12, v1.7.13 releases for examples.
+
+### Required Structure
+
+```markdown
+# Release Notes — v{VERSION}
+
+**Release Date:** {Month} {Day}, {Year}
+
+{One-paragraph summary of the release — what it delivers at a high level.}
+
+---
+
+## {emoji} {Major Feature/Area 1}
+
+{Description paragraph}
+
+| Column1 | Column2 |
+|---------|---------|
+| ... | ... |
+
+## {emoji} {Major Feature/Area 2}
+...
+
+## 🐛 Bug Fixes
+
+### {Category}
+- **{Fix title}** — {Description}
+
+## 📖 Documentation
+- ...
+
+## 🔧 Technical Details
+
+### New Files
+| File | Purpose |
+|------|---------|
+| ... | ... |
+
+### Removed Files (if any)
+| File | Reason |
+|------|--------|
+| ... | ... |
+
+## 📊 Statistics
+| Metric | Value |
+|--------|-------|
+| Files changed | {N} |
+| Insertions | {N} |
+| Deletions | {N} |
+| Commits | {N} |
+| Test suites | {N} |
+| Tests passing | {N} |
+
+## 📋 Cumulative Feature Summary (v1.5 → v{VERSION})
+| Version | Highlights |
+|---------|------------|
+| ... | ... |
+| **v{VERSION}** | **{This release highlights}** |
+
+## 🚀 Upgrade Notes
+{Backward compatibility, breaking changes, migration steps}
+
+## 📦 Build Targets
+| Platform | Formats |
+|----------|---------|
+| Windows | `.exe` (NSIS installer) |
+| macOS | `.dmg`, `.zip` (x64 + arm64) |
+| Linux | `.AppImage`, `.deb` |
+```
+
+### Key Rules
+1. **Use emoji section headers** (🔒 🔗 ✨ 📱 🐛 📖 🔧 📊 📋 🚀 📦)
+2. **Use tables extensively** — feature matrices, file lists, statistics, cumulative summary
+3. **Include a Cumulative Feature Summary** table covering v1.5 → current
+4. **List all new/removed files** with line counts and purpose
+5. **Include test statistics** — suites, total tests, pass count
+6. **Include git statistics** — files changed, insertions, deletions, commit count
+7. **Include Upgrade Notes** — backward compatibility, breaking changes
+8. **Include Build Targets** table at the end
+9. **Save to `docs/release-notes/RELEASE_NOTES_v{VERSION}.md`** and also push to GitHub release via `gh release edit`
+
