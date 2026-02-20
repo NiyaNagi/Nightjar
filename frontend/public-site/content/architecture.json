@@ -89,7 +89,7 @@
     },
     {
       "type": "paragraph",
-      "text": "When ENCRYPTED_PERSISTENCE=true, the server encrypts all Yjs document state at rest in SQLite. Clients deliver encryption keys via HTTP POST before establishing WebSocket connections. Keys are held in memory only and never persisted to disk."
+      "text": "Encrypted persistence is enabled by default (ENCRYPTED_PERSISTENCE=true). The server encrypts all Yjs document state at rest in SQLite. Clients deliver encryption keys via HTTP POST before establishing WebSocket connections. Keys are held in memory only and never persisted to disk."
     },
     {
       "type": "mermaid",

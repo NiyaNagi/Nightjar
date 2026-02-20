@@ -66,6 +66,8 @@ services:
       - PORT=3000
       - NODE_ENV=production
       - NIGHTJAR_MODE=private
+      # Encrypted persistence is ON by default — documents encrypted at rest
+      - ENCRYPTED_PERSISTENCE=true
       # Express uses this to prefix all routes and strip from incoming requests
       - BASE_PATH=/app
       # Bug report proxy — auto-submits GitHub issues from the app

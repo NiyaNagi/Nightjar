@@ -84,12 +84,14 @@ if (DISABLE_PERSISTENCE) {
 
 // Encrypted persistence: encrypts Yjs document state at rest in SQLite
 // When enabled, clients must deliver encryption keys via HTTP POST before connecting
-// Feature flag — default OFF. All existing behavior unchanged when off.
-const ENCRYPTED_PERSISTENCE = process.env.ENCRYPTED_PERSISTENCE === '1' ||
-                              process.env.ENCRYPTED_PERSISTENCE === 'true';
+// Default ON — set ENCRYPTED_PERSISTENCE=false or ENCRYPTED_PERSISTENCE=0 to disable.
+const ENCRYPTED_PERSISTENCE = process.env.ENCRYPTED_PERSISTENCE !== '0' &&
+                              process.env.ENCRYPTED_PERSISTENCE !== 'false';
 
 if (ENCRYPTED_PERSISTENCE) {
   console.log('[Config] Encrypted persistence ENABLED - Yjs state will be encrypted at rest');
+} else {
+  console.log('[Config] Encrypted persistence DISABLED - Yjs state will be stored in cleartext');
 }
 
 // In-memory key store for encrypted persistence

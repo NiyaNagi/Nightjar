@@ -27,6 +27,8 @@ services:
       - PORT=3000
       - NODE_ENV=production
       - NIGHTJAR_MODE=host
+      # Encrypted persistence is ON by default — documents encrypted at rest
+      - ENCRYPTED_PERSISTENCE=true
       # Set PUBLIC_URL to enable mesh relay announcements
       # Example: wss://your-domain.com
       - PUBLIC_URL=${PUBLIC_URL:-}
@@ -88,6 +90,8 @@ services:
       - PORT=3000
       - NODE_ENV=production
       - NIGHTJAR_MODE=private
+      # Encrypted persistence is ON by default — documents encrypted at rest
+      - ENCRYPTED_PERSISTENCE=true
       # Optional: GitHub PAT for auto-submitting bug reports as GitHub issues
       - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:

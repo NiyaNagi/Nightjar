@@ -79,7 +79,7 @@
       "NIGHTJAR_MODE — Server mode: host, relay, or private (default: host)",
       "PUBLIC_URL — Your server's public WebSocket URL, e.g. wss://your-domain.com. Required for host and relay modes to be discoverable on the mesh.",
       "BASE_PATH — Sub-path prefix for reverse-proxy deployments, e.g. /app (default: empty, serves from root)",
-      "ENCRYPTED_PERSISTENCE — Set to true to encrypt Yjs document state at rest in the SQLite database (default: false). Clients must deliver workspace keys before connecting.",
+      "ENCRYPTED_PERSISTENCE — Encrypts Yjs document state at rest in the SQLite database using NaCl secretbox (default: true). Set to false to disable. Clients deliver workspace keys via authenticated Ed25519-signed HTTP POST before connecting.",
       "MAX_ROOM_PEERS — Maximum concurrent WebSocket connections per workspace room (default: 100)",
       "NO_PERSISTENCE — Set to 1 or true to explicitly disable document persistence. Relay mode sets this automatically.",
       "NODE_ENV — Set to production for production deployments",

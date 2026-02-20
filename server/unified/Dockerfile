@@ -59,6 +59,10 @@ ENV PORT=3000
 ENV STATIC_PATH=/app/frontend/dist
 ENV DB_PATH=/app/server/unified/data/nightjar.db
 
+# Encrypted persistence: encrypts Yjs document state at rest in SQLite (default: true)
+# Set to false to disable encryption (not recommended)
+ENV ENCRYPTED_PERSISTENCE=true
+
 # Base path for sub-path deployments (e.g., /app)
 # Express uses this to prefix all routes and strip it from incoming requests
 ENV BASE_PATH=

@@ -1,0 +1,347 @@
+{
+  "title": "🛡️ Security Model & Threat Analysis",
+  "content": [
+    {
+      "type": "paragraph",
+      "text": "This page provides an honest, comprehensive overview of what Nightjar protects, what it doesn't, and the exact cryptographic details behind every security claim. We believe transparency builds trust — so we document both strengths and limitations clearly."
+    },
+
+    {
+      "type": "heading",
+      "text": "Security Architecture at a Glance"
+    },
+    {
+      "type": "paragraph",
+      "text": "Nightjar uses a layered defense model: cryptographic identity, end-to-end encryption, authenticated room joins, and encrypted relay. Different deployment modes (Electron desktop, web browser, self-hosted server) offer different trust boundaries."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Defense-in-Depth Layers",
+      "text": "graph TB\n    subgraph L1[\"Layer 1 — Identity\"]\n        BIP[\"BIP39 Mnemonic\\n12 words · 128-bit entropy\"]\n        ED[\"Ed25519 Keypair\\nSigning & authentication\"]\n        PIN[\"6-digit PIN\\nPBKDF2 · 100K iterations\"]\n    end\n\n    subgraph L2[\"Layer 2 — Data Encryption\"]\n        ARGON[\"Argon2id Key Derivation\\n64MB · 4 iterations\"]\n        NACL[\"NaCl secretbox\\nXSalsa20-Poly1305\"]\n        PAD[\"4KB Block Padding\\nTraffic analysis resistance\"]\n    end\n\n    subgraph L3[\"Layer 3 — Network Auth\"]\n        HMAC[\"HMAC-SHA256 Room Auth\\nFirst-write-wins\"]\n        SIG[\"Ed25519 Signed Key Delivery\\nTimestamp + replay protection\"]\n        TLS[\"TLS Transport\\nWSS connections\"]\n    end\n\n    subgraph L4[\"Layer 4 — Relay Encryption\"]\n        RELAY[\"NaCl secretbox Relay\\nOpaque encrypted envelopes\"]\n        P2P[\"Direct P2P\\nWebRTC · Hyperswarm · mDNS\"]\n    end\n\n    L1 --> L2 --> L3 --> L4"
+    },
+
+    {
+      "type": "heading",
+      "text": "What Data Exists and Where"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every piece of data in Nightjar lives somewhere — in the browser, on the server, or in transit. Here's exactly what's stored and whether it's encrypted."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Data Storage Map — What's Encrypted vs. Plaintext",
+      "text": "graph LR\n    subgraph Client[\"Your Device\"]\n        direction TB\n        LS_ENC[\"🔒 Encrypted in localStorage\\n· Identity private key + mnemonic\\n· Workspace secrets\"]\n        LS_PLAIN[\"📋 Plaintext in localStorage\\n· Identity metadata — handle, icon, color\\n· Workspace list + names\\n· App settings + preferences\\n· Cached peer addresses\"]\n        IDB_ENC[\"🔒 Encrypted in IndexedDB\\n· File storage chunks\\n· Yjs docs — Electron mode\"]\n        IDB_PLAIN[\"📋 Plaintext in IndexedDB\\n· Search index cache\\n· Saved addresses — inventory\"]\n        SS[\"⚠️ sessionStorage\\n· Session encryption key — JSON bytes\\n· Unlocked identity key\"]\n    end\n\n    subgraph Server[\"Server — Web Mode\"]\n        direction TB\n        SRV_DEFAULT[\"📋 Default Mode\\n· Yjs document state — CLEARTEXT SQLite\\n· Room names + peer counts\\n· Invite metadata\"]\n        SRV_ENC[\"🔒 Encrypted Mode\\n· Yjs state — NaCl secretbox blobs\\n· Keys held in memory only\\n· Keys forgotten on disconnect\"]\n    end\n\n    Client -->|\"WebSocket\"| Server"
+    },
+
+    {
+      "type": "heading",
+      "text": "Encryption Algorithms & Key Sizes"
+    },
+    {
+      "type": "paragraph",
+      "text": "Nightjar uses well-known, peer-reviewed cryptographic primitives from the NaCl/TweetNaCl family, supplemented by standard Web Crypto APIs. No custom cryptography is used."
+    },
+    {
+      "type": "list",
+      "items": [
+        "Document encryption — XSalsa20-Poly1305 (NaCl secretbox), 256-bit key, 192-bit random nonce per operation, with 4KB block padding",
+        "Identity signing — Ed25519, 32-byte public key / 64-byte secret key, via TweetNaCl",
+        "Workspace key derivation — Argon2id, 64MB memory cost, 4 iterations, parallelism 4, 256-bit output, domain-separated salts",
+        "PIN key derivation — PBKDF2-HMAC-SHA256, 100,000 iterations, 128-bit random salt, 256-bit output via Web Crypto API",
+        "Room authentication — HMAC-SHA256, 256-bit workspace key, prefix 'room-auth:{roomName}'",
+        "Relay encryption — XSalsa20-Poly1305 (NaCl secretbox), 256-bit workspace key, 192-bit random nonce",
+        "Key exchange (inventory) — Curve25519-XSalsa20-Poly1305 (NaCl box), ed2curve key conversion",
+        "QR identity transfer — NaCl secretbox with SHA-256(PIN) as key, 5-minute expiry"
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Key Hierarchy & Derivation"
+    },
+    {
+      "type": "paragraph",
+      "text": "Keys are derived hierarchically with domain separation — each workspace, folder, and document gets a unique derived key, so compromising one does not compromise others."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Full Key Derivation Chain",
+      "text": "graph TD\n    PW[\"Workspace Password\"] --> A1[\"Argon2id\\nsalt = 'Nightjar-v1-workspace-{id}'\"]\n    A1 --> WK[\"Workspace Key — 256-bit\"]\n\n    WK --> A2[\"Argon2id\\nsalt = 'Nightjar-v1-folder-{id}'\"]\n    A2 --> FK[\"Folder Key — 256-bit\"]\n\n    FK --> A3[\"Argon2id\\nsalt = 'Nightjar-v1-document-{id}'\"]\n    A3 --> DK[\"Document Key — 256-bit\"]\n\n    DK --> ENC[\"NaCl secretbox\\nXSalsa20-Poly1305\"]\n    ENC --> BLOB[\"Encrypted Document\\n24-byte nonce | ciphertext | Poly1305 tag\"]\n\n    WK --> HMAC_AUTH[\"HMAC-SHA256\\nRoom join tokens\"]\n    WK --> RELAY_ENC[\"NaCl secretbox\\nRelay message encryption\"]"
+    },
+
+    {
+      "type": "heading",
+      "text": "Deployment Modes — Trust Boundaries"
+    },
+    {
+      "type": "paragraph",
+      "text": "The security guarantees change significantly depending on how you use Nightjar. Here's an honest comparison."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Trust Boundaries by Deployment Mode",
+      "text": "graph TB\n    subgraph Electron[\"Electron Desktop — Strongest\"]\n        E_DOC[\"Documents encrypted locally\\nLevelDB via sidecar\"]\n        E_KEY[\"Keys never leave your machine\"]\n        E_NET[\"Optional: P2P sync\\nDirect connections preferred\"]\n        E_SVR[\"Server optional\\nRelay-only if used\"]\n    end\n\n    subgraph SelfHost[\"Self-Hosted Server — Strong\"]\n        SH_DOC[\"ENCRYPTED_PERSISTENCE=true\\nDocuments encrypted at rest\"]\n        SH_KEY[\"Keys in server memory only\\nForgotten on disconnect\"]\n        SH_NET[\"You control the server\\nNo third-party access\"]\n        SH_CAVEAT[\"⚠️ Server holds keys in RAM\\nwhile clients are connected\"]\n    end\n\n    subgraph WebDefault[\"Web Mode Default — Weakest\"]\n        WD_DOC[\"Documents stored CLEARTEXT\\nin server SQLite\"]\n        WD_KEY[\"Server has full access\\nto document content\"]\n        WD_NET[\"Awareness data visible\\nto server operator\"]\n        WD_CAVEAT[\"⚠️ Trust the server operator\\nas much as you trust yourself\"]\n    end"
+    },
+
+    {
+      "type": "heading",
+      "text": "Data Flow — What the Server Sees"
+    },
+    {
+      "type": "paragraph",
+      "text": "This is the most important diagram for understanding Nightjar's security. In every deployment mode, some metadata is visible to the server."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Server Visibility — What's Encrypted vs. Exposed",
+      "text": "graph LR\n    subgraph Encrypted[\"🔒 Server Cannot Read\"]\n        direction TB\n        E1[\"Relay message content\\nwhen workspace key available\"]\n        E2[\"Document content\\nElectron desktop mode\"]\n        E3[\"File chunks\\nencrypted before upload\"]\n        E4[\"Identity private keys\\nnever leave device\"]\n        E5[\"Workspace passwords\\nnever transmitted\"]\n    end\n\n    subgraph Visible[\"👁️ Server Can See\"]\n        direction TB\n        V1[\"Room names + topic hashes\\nused for routing\"]\n        V2[\"IP addresses\\nstandard TCP\"]\n        V3[\"Awareness data — cursor positions\\nuser handles, colors, typing state\"]\n        V4[\"Peer count per room\\nconnection timing\"]\n        V5[\"WebRTC signaling data\\nSDP offers, ICE candidates\"]\n        V6[\"Document IDs + workspace IDs\\nin room names and API calls\"]\n        V7[\"Invite metadata\\nentity type, permission level\"]\n    end\n\n    subgraph Conditional[\"⚠️ Depends on Config\"]\n        direction TB\n        C1[\"Yjs document content\\nCLEARTEXT if ENCRYPTED_PERSISTENCE=false\\nEncrypted if =true\"]\n        C2[\"Relay messages\\nEncrypted if workspace key available\\nPlaintext for legacy clients\"]\n    end"
+    },
+
+    {
+      "type": "heading",
+      "text": "Threat Analysis — Use Cases"
+    },
+    {
+      "type": "paragraph",
+      "text": "Below is a detailed breakdown of specific threats, whether Nightjar protects against them, and under what conditions."
+    },
+
+    {
+      "type": "heading",
+      "text": "Threats You ARE Protected Against"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Passive network eavesdropping — All WebSocket connections use WSS (TLS). P2P relay messages are encrypted with NaCl secretbox. Direct peer connections use encrypted transports.",
+        "Server-side data breach (Electron mode) — Documents never leave your device. The server is either not used or acts as a relay only. No document content is stored server-side.",
+        "Server-side data breach (encrypted persistence) — Even if the server's SQLite database is stolen, document blobs are NaCl secretbox ciphertext. Attacker needs the workspace key to decrypt.",
+        "Unauthorized room joins — HMAC-SHA256 tokens bind room access to workspace key knowledge. First-write-wins registration with constant-time comparison prevents timing attacks.",
+        "Key delivery spoofing — Ed25519-signed key delivery with replay protection (5-min timestamp window). First public key to deliver 'owns' the room — others cannot overwrite.",
+        "Cross-workspace key reuse — Argon2id with domain-separated salts (workspace ID, folder ID, document ID) ensures every key is unique. Compromising one document key does not reveal others.",
+        "Identity theft without device access — Private keys are encrypted with a PIN-derived key (PBKDF2, 100K iterations) and never transmitted. The BIP39 mnemonic is the only recovery path.",
+        "Brute-force PIN attacks (online) — 10 attempt limit per hour. Exceeding the limit permanently deletes the identity. Timing-safe comparison prevents enumeration.",
+        "Invite link credential leakage to servers — Passwords and encryption keys are placed in URL fragments (#), which are never sent in HTTP requests per RFC 3986.",
+        "Relay operator reading messages — When workspace key is available, relay messages are encrypted with NaCl secretbox before reaching the relay. The server forwards opaque blobs it cannot decrypt.",
+        "Traffic analysis on document size — All encrypted blobs use 4KB block padding, so an observer cannot determine exact document length from ciphertext size."
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Threats You Are NOT Protected Against"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Malicious server operator (web mode) — With ENCRYPTED_PERSISTENCE enabled by default, the server stores Yjs document state as NaCl secretbox ciphertext and the database alone is not sufficient to read content. However, the server holds decryption keys in memory while clients are connected. A sophisticated attacker who compromises the server process (not just the database) can extract keys from RAM. Mitigation: use Electron desktop mode for maximum security.",
+        "Server with ENCRYPTED_PERSISTENCE explicitly disabled — If a server operator sets ENCRYPTED_PERSISTENCE=false, documents are stored as cleartext SQLite blobs and the server can read all content. This is not the default. Mitigation: do not disable encrypted persistence; use the default configuration.",
+        "Awareness/cursor metadata surveillance — User handles, avatar colors, cursor positions, typing indicators, and which documents are open are always transmitted in cleartext via the y-websocket awareness protocol. Any server operator or network observer can see this. There is no option to encrypt awareness data.",
+        "XSS attacks stealing session keys — The session encryption key is stored in sessionStorage as a JSON byte array. The CSP allows unsafe-inline and unsafe-eval for script-src. A successful XSS attack could read all decrypted identity data. Mitigation: the app uses React (which auto-escapes by default) and does not render user HTML.",
+        "PIN brute-force (offline, with localStorage access) — The 6-digit PIN has ~20 bits of entropy. PBKDF2 at 100K iterations adds ~17 bits of computational cost. With the encrypted localStorage blob, a dedicated attacker can try all 1 million PINs in minutes to hours on modern hardware. Mitigation: the attacker must first obtain the localStorage data (requires device access or XSS).",
+        "QR identity transfer interception — QR transfer uses SHA-256(PIN) as the encryption key without key stretching (no PBKDF2 iterations). If an attacker captures the QR code, they can brute-force the 6-digit PIN almost instantly. Mitigation: QR codes expire after 5 minutes and require physical proximity.",
+        "IP address exposure — Your IP address is visible to the signaling server, relay nodes, and (via WebRTC ICE candidates) potentially to other peers. Nightjar supports Tor for some transports, but this is not enabled by default.",
+        "Metadata correlation — An observer who controls the server can correlate: which users are in which rooms, when they connect/disconnect, how many peers are in each room, and which documents they have open (via awareness data). Room names are opaque hashes but are consistent — the same workspace always produces the same room name.",
+        "Invite link exposure — v3 invite links (nightjar:// protocol) contain the workspace password in the URL fragment. While fragments are not sent in HTTP requests, they may be visible in browser history, bookmarks, screen recordings, or messaging apps. There is no mechanism to revoke a v3 link once shared.",
+        "Saved addresses (inventory) — Shipping addresses in the inventory module are stored as plaintext in IndexedDB. They are not encrypted at rest.",
+        "Legacy client fallback — Relay messages fall back to plaintext when the workspace key is unavailable (older clients). A mixed-version workspace may have some messages encrypted and some in cleartext. The server can read the plaintext ones."
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Identity System"
+    },
+    {
+      "type": "paragraph",
+      "text": "Your Nightjar identity is a cryptographic keypair generated entirely on your device. It is never transmitted to any server."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Identity Creation & Storage Flow",
+      "text": "sequenceDiagram\n    participant U as User\n    participant App as Nightjar App\n    participant LS as localStorage\n\n    U->>App: Create identity + choose PIN\n    App->>App: Generate BIP39 mnemonic (12 words, 128-bit)\n    App->>App: PBKDF2-SHA512 → 32-byte seed\n    App->>App: Ed25519 keypair from seed\n    App->>App: Generate 16-byte random salt\n    App->>App: PBKDF2-SHA256(PIN, salt, 100K) → 256-bit key\n    App->>App: NaCl secretbox(identity data, derived key)\n    App->>LS: Store encrypted blob + salt + PIN hash\n    Note over LS: Private key is never stored in plaintext\n\n    U->>App: Unlock with PIN\n    App->>LS: Read encrypted blob + salt\n    App->>App: PBKDF2-SHA256(PIN, salt, 100K) → key\n    App->>App: SHA-256(key) → compare with stored hash\n    App->>App: NaCl secretbox.open(blob, key)\n    App->>U: Identity unlocked"
+    },
+
+    {
+      "type": "heading",
+      "text": "Room Authentication Flow"
+    },
+    {
+      "type": "paragraph",
+      "text": "When a client joins a workspace room, it proves knowledge of the workspace key by presenting an HMAC-SHA256 token. This prevents unauthorized peers from joining rooms even if they know the room name."
+    },
+    {
+      "type": "mermaid",
+      "caption": "HMAC Room Join Authentication",
+      "text": "sequenceDiagram\n    participant C1 as Client A (first)\n    participant S as Server\n    participant C2 as Client B (authorized)\n    participant C3 as Attacker\n\n    C1->>C1: token = HMAC-SHA256(workspaceKey, 'room-auth:' + room)\n    C1->>S: join-topic {room, authToken: token}\n    S->>S: No token stored → register token (first-write-wins)\n    S->>C1: ✅ Joined\n\n    C2->>C2: token = HMAC-SHA256(workspaceKey, 'room-auth:' + room)\n    C2->>S: join-topic {room, authToken: token}\n    S->>S: timingSafeEqual(stored, provided) → match\n    S->>C2: ✅ Joined\n\n    C3->>S: join-topic {room, authToken: wrong_token}\n    S->>S: timingSafeEqual(stored, provided) → mismatch\n    S->>C3: ❌ Rejected: auth_token_mismatch\n\n    C3->>S: join-topic {room} (no token)\n    S->>S: Room has registered token → reject unauthenticated\n    S->>C3: ❌ Rejected: room_requires_auth"
+    },
+
+    {
+      "type": "heading",
+      "text": "Encrypted Relay Flow"
+    },
+    {
+      "type": "paragraph",
+      "text": "When direct P2P connections aren't possible, messages pass through a relay server. With the workspace key available, these messages are encrypted end-to-end — the relay forwards opaque blobs it cannot read."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Relay Message Encryption",
+      "text": "sequenceDiagram\n    participant A as Sender\n    participant S as Relay Server\n    participant B as Recipient\n\n    A->>A: payload = {type: 'sync', data: ...}\n    A->>A: nonce = random 24 bytes\n    A->>A: ciphertext = NaCl.secretbox(JSON(payload), nonce, workspaceKey)\n    A->>A: encryptedPayload = base64(nonce + ciphertext)\n    A->>S: relay-message {to, encryptedPayload}\n    Note over S: Server sees opaque base64 blob\\nCannot decrypt without workspace key\n    S->>B: relay-message {from, encryptedPayload}\n    B->>B: decode base64 → nonce (24 bytes) + ciphertext\n    B->>B: payload = NaCl.secretbox.open(ciphertext, nonce, workspaceKey)\n    B->>B: Process decrypted message"
+    },
+
+    {
+      "type": "heading",
+      "text": "Key Delivery & Server Persistence"
+    },
+    {
+      "type": "paragraph",
+      "text": "In web mode, encrypted persistence is enabled by default. Clients deliver workspace keys to the server so it can encrypt/decrypt persisted Yjs state. This is authenticated and replay-protected — but it does mean the server holds the key in memory while clients are connected."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Authenticated Key Delivery",
+      "text": "sequenceDiagram\n    participant C as Client\n    participant S as Server\n    participant DB as SQLite\n\n    C->>C: message = 'key-delivery:{room}:{timestamp}'\n    C->>C: signature = Ed25519.sign(message, privateKey)\n    C->>S: POST /api/room-key {room, key, timestamp, signature, publicKey}\n    S->>S: Verify timestamp within 5 minutes\n    S->>S: Ed25519.verify(signature, message, publicKey)\n    S->>S: Check: first key for this room? (ownership)\n    S->>S: Store key in memory-only Map\n    S->>C: 200 OK\n\n    Note over S: Key lives in RAM only — never written to disk\n    Note over S: Key deleted when all clients disconnect\n\n    S->>DB: Encrypt Yjs state with NaCl secretbox before save\n    DB->>S: Load encrypted blob\n    S->>S: Decrypt with in-memory key"
+    },
+
+    {
+      "type": "heading",
+      "text": "Complete Data Classification"
+    },
+    {
+      "type": "paragraph",
+      "text": "Here is every category of data in Nightjar, its encryption status, and where it lives."
+    },
+
+    {
+      "type": "heading",
+      "text": "Encrypted Data"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Identity private key + BIP39 mnemonic — NaCl secretbox with PBKDF2-derived key, stored in localStorage",
+        "Workspace secrets (password, encryption key) — NaCl secretbox with session key, stored in localStorage",
+        "Document content (Electron mode) — NaCl secretbox with document-derived key, stored in local LevelDB",
+        "Document content (web mode, default) — NaCl secretbox with workspace key, stored in server SQLite. ENCRYPTED_PERSISTENCE is enabled by default.",
+        "File storage chunks — NaCl secretbox, per-chunk random nonce, stored in IndexedDB",
+        "Relay messages (when workspace key available) — NaCl secretbox with workspace key, in transit only",
+        "P2P sync data (direct connections) — Encrypted transport layer (WebRTC DTLS, Hyperswarm noise protocol)"
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Plaintext Data"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Identity metadata — handle, icon, color, creation date, PIN hash, salt (localStorage)",
+        "Workspace list — names, IDs, server URLs (localStorage)",
+        "App settings — theme, notification preferences, sidebar state (localStorage)",
+        "Cached peer addresses — IP:port pairs of known peers (localStorage)",
+        "Search index cache — built from document content, stored in IndexedDB (web mode)",
+        "Saved shipping addresses — inventory module, IndexedDB",
+        "Awareness/presence data — cursor positions, user handles, colors, typing state, open docs (in transit, never stored)",
+        "Room names and topic hashes — used for routing (in transit, server memory)",
+        "Document IDs and workspace IDs — in room names, API calls, localStorage keys",
+        "Invite metadata — entity type, entity ID, permission level, use count (server SQLite)",
+        "WebRTC signaling — SDP offers, ICE candidates including local IPs (in transit through server)"
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Security Recommendations"
+    },
+    {
+      "type": "paragraph",
+      "text": "Based on the security model above, here are our recommendations for different use cases."
+    },
+
+    {
+      "type": "heading",
+      "text": "For Maximum Security"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Use Electron desktop mode — your data never leaves your device unless you explicitly sync",
+        "Use direct P2P connections (LAN/mDNS or Hyperswarm) instead of relay servers when possible",
+        "Choose strong workspace passwords — the workspace key is derived from this via Argon2id",
+        "Back up your BIP39 recovery phrase offline — it's the only way to recover your identity",
+        "Use a unique PIN — while only 6 digits, it protects against casual device access",
+        "Share invite links via secure channels — the workspace password is in the URL fragment"
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "For Team/Web Deployments"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Self-host your server — don't trust third-party infrastructure with your data",
+        "Keep ENCRYPTED_PERSISTENCE enabled (the default) — documents are encrypted at rest on the server. Do not disable it unless you have a specific reason.",
+        "Understand the trade-off: even with encrypted persistence, the server holds keys in memory while clients are connected",
+        "Use TLS (HTTPS/WSS) — the server supports automatic TLS configuration",
+        "Consider relay-only mode for the server if you don't need server-side persistence — this means the server never sees document content",
+        "Be aware that awareness data (cursors, presence) is always visible to the server operator"
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Comparison: Nightjar vs. Common Alternatives"
+    },
+    {
+      "type": "paragraph",
+      "text": "A high-level comparison of security properties across collaboration tools."
+    },
+    {
+      "type": "mermaid",
+      "caption": "Security Feature Comparison",
+      "text": "graph TB\n    subgraph NJ[\"Nightjar — Electron\"]\n        NJ1[\"✅ E2E encrypted documents\"]\n        NJ2[\"✅ Local-first storage\"]\n        NJ3[\"✅ Cryptographic identity\"]\n        NJ4[\"✅ No account required\"]\n        NJ5[\"⚠️ Awareness data unencrypted\"]\n    end\n\n    subgraph NJW[\"Nightjar — Web\"]\n        NJW1[\"✅ Encrypted at rest by default\"]\n        NJW2[\"⚠️ Server holds keys in RAM\"]\n        NJW3[\"✅ Cryptographic identity\"]\n        NJW4[\"✅ No account required\"]\n        NJW5[\"⚠️ Awareness data unencrypted\"]\n    end\n\n    subgraph GD[\"Typical Cloud Docs\"]\n        GD1[\"❌ Server reads all content\"]\n        GD2[\"❌ Cloud-only storage\"]\n        GD3[\"❌ Email/password identity\"]\n        GD4[\"❌ Account required\"]\n        GD5[\"❌ All metadata visible to provider\"]\n    end"
+    },
+
+    {
+      "type": "heading",
+      "text": "Cryptographic Primitive Reference"
+    },
+    {
+      "type": "paragraph",
+      "text": "Every cryptographic operation in Nightjar, its parameters, and where it runs."
+    },
+    {
+      "type": "list",
+      "items": [
+        "XSalsa20-Poly1305 (NaCl secretbox) — 256-bit key, 192-bit nonce, authenticated encryption. Used for: document encryption, identity encryption, relay messages, file chunks. Runs: client-side only (except server persistence mode).",
+        "Ed25519 — 32-byte public key, 64-byte secret key. Used for: identity signing, key delivery authentication, invite verification. Runs: client-side only.",
+        "Curve25519-XSalsa20-Poly1305 (NaCl box) — Diffie-Hellman key agreement + authenticated encryption. Used for: inventory address encryption between identities. Runs: client-side only.",
+        "Argon2id — 64MB memory, 4 iterations, parallelism 4, 256-bit output. Used for: workspace/folder/document key derivation. Runs: client-side only (via hash-wasm).",
+        "PBKDF2-HMAC-SHA256 — 100,000 iterations, 128-bit salt, 256-bit output. Used for: PIN-based identity encryption. Runs: client-side only (via Web Crypto API).",
+        "HMAC-SHA256 — 256-bit key. Used for: room join authentication tokens. Runs: client-side (token generation) + server-side (token validation with timingSafeEqual).",
+        "SHA-256 — Used for: PIN verification hashes, QR transfer key derivation. Runs: client-side only."
+      ]
+    },
+
+    {
+      "type": "heading",
+      "text": "Known Limitations & Future Work"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Awareness protocol encryption — Cursor positions and presence data are not yet encrypted. This is a limitation of the y-websocket protocol and would require a custom awareness layer.",
+        "Forward secrecy — Nightjar does not implement forward secrecy (like Signal's Double Ratchet). If a workspace key is compromised, past messages encrypted with that key can be decrypted. Key rotation support is planned.",
+        "Multi-device key sync — Currently, identity transfer between devices requires QR scanning. Automated secure key sync (similar to Signal's linked devices) is planned.",
+        "PIN strength — The 6-digit PIN is a usability trade-off. Support for longer PINs or biometric unlock on mobile is planned.",
+        "CSP hardening — The current Content Security Policy allows unsafe-inline and unsafe-eval. Tightening this would improve XSS resistance but requires refactoring inline styles.",
+        "Metadata-resistant networking — Room names are consistent hashes that allow correlation. Implementing private information retrieval or mix networks would reduce this, but is not currently planned."
+      ]
+    }
+  ]
+}
