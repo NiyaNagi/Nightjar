@@ -90,7 +90,8 @@
    ========================================================================= */
 .unified-picker__popover {
   position: fixed;
-  width: 520px;
+  width: 480px;
+  max-width: calc(100vw - 16px);
   max-height: min(460px, calc(100vh - 32px));
   background: var(--bg-primary, #ffffff);
   border: 1px solid var(--border-color, #e5e7eb);
@@ -176,7 +177,7 @@
 
 /* ---- Color pane (right, narrower) ---- */
 .unified-picker__color-pane {
-  width: 172px;
+  width: 160px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -208,7 +209,7 @@
    EMOJI SECTION (inside emoji pane)
    ========================================================================= */
 .unified-picker__emoji-header {
-  padding: 10px 12px 0;
+  padding: 8px 8px 0;
   flex-shrink: 0;
 }
 
@@ -265,7 +266,7 @@
   box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
 }
 
-/* ---- category tabs ---- */
+/* ---- category tabs (pill-style with icon + label) ---- */
 .unified-picker__cat-tabs {
   display: flex;
   gap: 2px;
@@ -273,7 +274,7 @@
   overflow-y: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   padding-bottom: 2px;
 }
 .unified-picker__cat-tabs::-webkit-scrollbar {
@@ -282,29 +283,40 @@
 
 .unified-picker__cat-tab {
   flex-shrink: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 26px;
-  font-size: 15px;
+  gap: 3px;
+  padding: 3px 7px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
-  padding: 0;
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease;
+  white-space: nowrap;
+  color: var(--text-secondary, #a1a1aa);
 }
 .unified-picker__cat-tab:hover {
   background: var(--hover-bg, #f3f4f6);
+  color: var(--text-primary, #111827);
 }
 .unified-picker__cat-tab--active {
-  background: var(--accent-alpha, rgba(99, 102, 241, 0.12));
-  box-shadow: inset 0 0 0 1px var(--accent-color, #6366f1);
+  background: var(--accent-alpha, rgba(99, 102, 241, 0.15));
+  color: var(--accent-color, #6366f1);
 }
 .unified-picker__cat-tab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--accent-color, #6366f1);
+}
+
+.unified-picker__cat-tab-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.unified-picker__cat-tab-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 /* ---- section labels ---- */
@@ -321,15 +333,15 @@
 
 /* ---- recent row ---- */
 .unified-picker__recent {
-  margin-bottom: 6px;
-  padding: 0 12px;
+  margin-bottom: 4px;
+  padding: 0 8px;
 }
 
 /* ---- emoji grid (8-col in pane) ---- */
 .unified-picker__emoji-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 1px;
 }
 
 /* ---- emoji scroll area (fills remaining pane height) ---- */
@@ -338,7 +350,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 12px 10px;
+  padding: 0 8px 8px;
   scrollbar-width: thin;
   scrollbar-color: var(--border-color, #e5e7eb) transparent;
 }
@@ -359,15 +371,14 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  aspect-ratio: 1;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: transform 0.1s ease, background 0.1s ease, box-shadow 0.1s ease;
-  padding: 0;
+  padding: 4px 0;
   box-sizing: border-box;
 }
 .unified-picker__emoji-btn:hover {
@@ -504,4 +515,74 @@
 }
 .unified-picker--compact .unified-picker__popover {
   max-height: 380px;
+}
+
+/* ========== Touch targets ========== */
+@media (pointer: coarse) {
+  .unified-picker__close {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  .unified-picker__cat-tab {
+    padding: 5px 10px;
+  }
+
+  .unified-picker__emoji-btn {
+    font-size: 18px;
+  }
+
+  .unified-picker__color-pill {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* ========== Mobile Responsive ========== */
+@media (max-width: 768px) {
+  .unified-picker__popover {
+    width: calc(100vw - 24px);
+    max-width: 480px;
+    left: 12px !important;
+    right: 12px !important;
+  }
+
+  .unified-picker__color-pane {
+    width: 140px;
+  }
+}
+
+@media (max-width: 480px) {
+  .unified-picker__popover {
+    width: calc(100vw - 16px);
+    left: 8px !important;
+    right: 8px !important;
+    max-height: min(400px, calc(100vh - 40px));
+  }
+
+  /* Stack panes vertically on small phones */
+  .unified-picker__panes {
+    flex-direction: column;
+  }
+
+  .unified-picker__emoji-pane {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    max-height: 240px;
+  }
+
+  .unified-picker__color-pane {
+    width: 100%;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .unified-picker__color-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+
+  .unified-picker__emoji-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
 }

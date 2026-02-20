@@ -113,7 +113,7 @@ function UnifiedPicker({
 
     const updatePos = () => {
       const rect = triggerRef.current.getBoundingClientRect();
-      const popW = 520;
+      const popW = 480;
       const gap = 8;
       let top = rect.bottom + gap;
       let left = rect.left;
@@ -335,7 +335,8 @@ function UnifiedPicker({
                       title={EMOJI_DATA[catKey].label}
                       data-testid={`unified-picker-cat-${catKey}`}
                     >
-                      {EMOJI_DATA[catKey].icon}
+                      <span className="unified-picker__cat-tab-icon">{EMOJI_DATA[catKey].icon}</span>
+                      <span className="unified-picker__cat-tab-label">{catKey.charAt(0).toUpperCase() + catKey.slice(1)}</span>
                     </button>
                   ))}
                 </div>
