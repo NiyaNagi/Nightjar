@@ -131,7 +131,7 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
     const onChangeCountRef = useRef(0);         // Count onChange calls to skip the first one after mount
     const isReceivingRemoteUpdate = useRef(false); // Track when we're applying a remote update (to skip saving)
     const pendingRemoteUpdateTimeout = useRef(null); // Timeout to clear the remote update flag
-    const queuedLocalSaveRef = useRef(null); // Queue local saves during remote update window instead of dropping them
+    const dirtyDuringProtection = useRef(false); // True if local edits happened during the remote update protection window
     const dataRef = useRef(null); // Always holds latest data for stale-closure-safe reads
     
     // Custom presence overlays (Fortune Sheet's API is unreliable)
@@ -323,7 +323,58 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
         const ysheet = ydoc.getMap('sheet-data');
         ysheetRef.current = ysheet;
 
-        // Handler for remote changes
+        // Use Y.Array for ops — CRDT-safe append/delete replaces the old
+        // Y.Map.set('pendingOps', [...]) which was last-writer-wins.
+        const yOps = ydoc.getArray('sheet-ops');
+
+        // Clean up legacy pendingOps key from old Y.Map-based approach
+        if (ysheet.has('pendingOps')) {
+            ydoc.transact(() => { ysheet.delete('pendingOps'); });
+            console.log('[Sheet] Cleaned up legacy pendingOps key from Y.Map');
+        }
+
+        // Track whether ops were successfully applied this cycle
+        let opsAppliedThisCycle = false;
+
+        // Observe Y.Array for real-time op-based sync
+        const handleOpsChange = (event) => {
+            if (isApplyingRemoteOps.current) return;
+            // Collect all newly inserted items from the Y.Array event
+            const newItems = [];
+            if (event.changes && event.changes.added) {
+                event.changes.added.forEach(item => {
+                    let content = item.content;
+                    if (content && content.getContent) {
+                        newItems.push(...content.getContent());
+                    }
+                });
+            }
+            if (newItems.length === 0) return;
+            // Filter to only remote ops
+            const remoteOps = newItems.filter(op => op && op.clientId !== ydoc.clientID);
+            if (remoteOps.length > 0 && workbookRef.current) {
+                isApplyingRemoteOps.current = true;
+                try {
+                    const opsToApply = remoteOps.flatMap(entry => entry.ops || (Array.isArray(entry) ? entry : [entry]));
+                    workbookRef.current.applyOp(opsToApply);
+                    opsAppliedThisCycle = true;
+                    console.log('[Sheet] Applied', opsToApply.length, 'remote ops via Y.Array');
+                } catch (e) {
+                    console.error('[Sheet] Failed to apply remote ops:', e);
+                } finally {
+                    isApplyingRemoteOps.current = false;
+                }
+            }
+            // Clean up processed ops in a transaction to avoid growing unboundedly
+            if (yOps.length > 0) {
+                ydoc.transact(() => {
+                    yOps.delete(0, yOps.length);
+                });
+            }
+        };
+        yOps.observe(handleOpsChange);
+
+        // Handler for remote changes (full-sheet data path)
         const updateFromYjs = () => {
             // Don't update if we're applying local changes
             if (isApplyingRemoteOps.current) {
@@ -332,28 +383,18 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             }
 
             const storedData = ysheet.get('sheets');
-            const storedOps = ysheet.get('pendingOps');
             const storedVersion = ysheet.get('version') || null;
-            
-            // Process pending ops BEFORE version checks.
-            // Ops arrive independently from full-data saves; skipping them
-            // on a version match would leave remote ops unapplied and
-            // the pendingOps array growing unboundedly.
-            if (storedOps && Array.isArray(storedOps) && storedOps.length > 0) {
-                const remoteOps = storedOps.filter(op => op.clientId !== ydoc.clientID);
-                if (remoteOps.length > 0 && workbookRef.current) {
-                    isApplyingRemoteOps.current = true;
-                    try {
-                        const opsToApply = remoteOps.flatMap(entry => entry.ops || (Array.isArray(entry) ? entry : [entry]));
-                        workbookRef.current.applyOp(opsToApply);
-                    } catch (e) {
-                        console.error('[Sheet] Failed to apply remote ops:', e);
-                    } finally {
-                        isApplyingRemoteOps.current = false;
-                    }
+
+            // If ops were already applied this cycle via Y.Array observer,
+            // skip the full-sheet setData to avoid double-applying and flicker.
+            if (opsAppliedThisCycle) {
+                opsAppliedThisCycle = false;
+                // Still update version tracking
+                if (storedVersion) {
+                    lastLoadedVersion.current = storedVersion;
                 }
-                // Clear all processed ops (both local and remote)
-                ysheet.set('pendingOps', []);
+                console.log('[Sheet] Skipping full-sheet setData - ops already applied via Y.Array');
+                return;
             }
             
             console.log('[Sheet] updateFromYjs - version:', storedVersion, 'lastSaved:', lastSavedVersion.current, 'lastLoaded:', lastLoadedVersion.current, 'sheetCount:', storedData?.length);
@@ -372,7 +413,13 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
 
             if (storedData) {
                 try {
-                    const sheets = JSON.parse(JSON.stringify(storedData));
+                    let sheets = JSON.parse(JSON.stringify(storedData));
+                    
+                    // Convert celldata → 2D data array for sheets missing it.
+                    // Remote data arrives as celldata-only from Yjs, but Fortune
+                    // Sheet needs the 2D data array after initial initialization.
+                    sheets = convertCelldataToData(sheets);
+                    
                     // Fortune Sheet uses 'data' (2D array) after initialization, not 'celldata'
                     const cellCount = sheets[0]?.celldata?.length || 0;
                     const dataRows = sheets[0]?.data?.length || 0;
@@ -395,9 +442,9 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                     if (isNewRemoteUpdate) {
                         console.log('[Sheet] New remote update detected, enabling protection');
                         isReceivingRemoteUpdate.current = true;
+                        dirtyDuringProtection.current = false;
                         
-                        // Queue any pending local save instead of canceling it
-                        // so we can replay it after the protection window closes
+                        // Cancel pending debounced saves during protection window
                         if (debouncedSaveRef.current) {
                             debouncedSaveRef.current.cancel();
                         }
@@ -408,16 +455,20 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                         }
                         
                         // Clear the flag after a delay that exceeds the debounce delay (300ms)
-                        // Then replay any queued local save that was interrupted
+                        // Then save the LIVE workbook state if any local edits happened during the window
                         pendingRemoteUpdateTimeout.current = setTimeout(() => {
                             isReceivingRemoteUpdate.current = false;
                             console.log('[Sheet] Remote update window closed, saves enabled');
-                            // Replay queued local save if one was interrupted
-                            if (queuedLocalSaveRef.current) {
-                                console.log('[Sheet] Replaying queued local save');
-                                const queuedData = queuedLocalSaveRef.current;
-                                queuedLocalSaveRef.current = null;
-                                debouncedSaveRef.current?.(queuedData);
+                            // If any local edits happened during the protection window,
+                            // capture the latest live state from the workbook (not a stale snapshot)
+                            if (dirtyDuringProtection.current) {
+                                console.log('[Sheet] Saving dirty state after protection window');
+                                dirtyDuringProtection.current = false;
+                                // Use debouncedSaveRef (ref-stable) to avoid stale closure over saveToYjs
+                                const liveData = workbookRef.current?.getAllSheets?.() || dataRef.current;
+                                if (liveData && debouncedSaveRef.current) {
+                                    debouncedSaveRef.current(liveData);
+                                }
                             }
                         }, 350);
                     }
@@ -436,21 +487,19 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                 const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
                 ydoc.transact(() => {
                     ysheet.set('sheets', defaultSheets);
-                    ysheet.set('pendingOps', []);
                 });
                 setData(defaultSheets);
                 setIsInitialized(true);
             }
-
-            // (Ops are now processed at the top of updateFromYjs, before version checks)
         };
 
         ysheet.observeDeep(updateFromYjs);
         updateFromYjs();
 
         return () => {
-            console.log('[Sheet] Cleanup - unobserving ysheet');
+            console.log('[Sheet] Cleanup - unobserving ysheet and yOps');
             ysheet.unobserveDeep(updateFromYjs);
+            yOps.unobserve(handleOpsChange);
             // Clear any pending timeout
             if (pendingRemoteUpdateTimeout.current) {
                 clearTimeout(pendingRemoteUpdateTimeout.current);
@@ -470,7 +519,6 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                     const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
                     ydoc.transact(() => {
                         ysheetRef.current.set('sheets', defaultSheets);
-                        ysheetRef.current.set('pendingOps', []);
                     });
                     setData(defaultSheets);
                     setIsInitialized(true);
@@ -495,7 +543,6 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                     const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
                     ydoc.transact(() => {
                         ysheetRef.current.set('sheets', defaultSheets);
-                        ysheetRef.current.set('pendingOps', []);
                     });
                     setData(defaultSheets);
                     setIsInitialized(true);
@@ -534,6 +581,31 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                 // Remove data to avoid doubling Yjs storage
                 delete newSheet.data;
                 console.log('[Sheet] Converted data to celldata:', celldata.length, 'cells');
+            }
+            return newSheet;
+        });
+    }, []);
+
+    // Helper to convert celldata (sparse format) back to 2D data array
+    // This is the inverse of convertDataToCelldata — needed when receiving
+    // remote data that only contains celldata (no 2D data array) from Yjs.
+    const convertCelldataToData = useCallback((sheets) => {
+        return sheets.map(sheet => {
+            const newSheet = { ...sheet };
+            // Only convert if sheet has celldata but no data (2D array)
+            if (sheet.celldata && Array.isArray(sheet.celldata) && !sheet.data) {
+                const rows = sheet.row || 100;
+                const cols = sheet.column || 26;
+                // Build a 2D array initialized with nulls
+                const data = Array.from({ length: rows }, () => Array(cols).fill(null));
+                // Place each cell entry into the 2D array
+                for (const cell of sheet.celldata) {
+                    if (cell && cell.r != null && cell.c != null && cell.r < rows && cell.c < cols) {
+                        data[cell.r][cell.c] = cell.v !== undefined ? cell.v : null;
+                    }
+                }
+                newSheet.data = data;
+                console.log('[Sheet] Converted celldata to data: placed', sheet.celldata.length, 'cells into', rows, 'x', cols, 'grid');
             }
             return newSheet;
         });
@@ -705,11 +777,12 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             // Report stats via debounced calculator (avoids O(cells) on every keystroke)
             debouncedReportStats(newData);
             
-            // During the remote update protection window, queue local edits
-            // instead of dropping them. They'll be replayed when the window closes.
+            // During the remote update protection window, mark dirty so the
+            // latest live workbook state is saved when the window closes.
+            // This replaces the old stale-snapshot queue approach.
             if (isReceivingRemoteUpdate.current) {
-                console.log('[Sheet] Queueing local save - receiving remote update (will replay after window closes)');
-                queuedLocalSaveRef.current = newData;
+                console.log('[Sheet] Marking dirty during protection window (will save live state when window closes)');
+                dirtyDuringProtection.current = true;
                 setData(newData);
                 return;
             }
@@ -720,17 +793,18 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
     }, [debouncedSaveToYjs, debouncedReportStats]);
 
     // Handle operations for real-time sync (immediate, not debounced)
+    // Uses Y.Array ('sheet-ops') for CRDT-safe append — concurrent pushes
+    // from different clients are all preserved (unlike Y.Map.set which was
+    // last-writer-wins and silently lost ops).
     const handleOp = useCallback((ops) => {
         // Don't sync our own application of remote ops
         if (isApplyingRemoteOps.current) return;
-        if (!ysheetRef.current || !ydoc) return;
+        if (!ydoc) return;
 
         try {
-            // Immediately send ops to peers, tagging with our clientID
-            // so the observer can skip ops that originated from us.
+            const yOps = ydoc.getArray('sheet-ops');
             ydoc.transact(() => {
-                const existingOps = ysheetRef.current.get('pendingOps') || [];
-                ysheetRef.current.set('pendingOps', [...existingOps, { ops, clientId: ydoc.clientID }]);
+                yOps.push([{ ops, clientId: ydoc.clientID }]);
             });
         } catch (e) {
             console.error('[Sheet] Failed to send ops to Yjs:', e);

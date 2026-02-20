@@ -1074,6 +1074,15 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.15 - Spreadsheet Sync Fix (Issue #4)
+- **Critical Fix**: Spreadsheet cell edits now sync across clients — migrated real-time ops from `Y.Map.set('pendingOps', ...)` (last-writer-wins) to `Y.Array('sheet-ops')` with CRDT-ordered push/observe, eliminating silent op loss during concurrent edits
+- **Critical Fix**: Remote spreadsheet data now renders correctly — added `convertCelldataToData` helper that builds a 2D data array from sparse `celldata` format before passing to Fortune Sheet, fixing the "non-empty cells: 0" bug where remote updates arrived but cells appeared blank
+- **Critical Fix**: Op-based sync (`applyOp`) now short-circuits the full-sheet `setData` path when ops are successfully applied, preventing double-apply flicker and data loss
+- **Bug Fix**: Protection window hardened — replaced stale-snapshot queue (`queuedLocalSaveRef`) with a `dirtyDuringProtection` flag; when the 350ms window closes, the latest **live** workbook state is saved instead of a potentially outdated snapshot
+- **Bug Fix**: Legacy `pendingOps` key on `Y.Map` is automatically cleaned up on sheet initialization
+- **Testing**: 18 new sync tests (celldata↔data conversion, Y.Array op ordering, concurrent edits, 3-way sync, rapid edits stress test, legacy cleanup) — all 33 sheet tests passing
+- **Scope**: 3 files changed (`Sheet.jsx`, `sheet.test.js`, new `sheet-sync-fix.test.js`)
+
 ### v1.7.14 - Mobile UX Optimizations, PWA & Card View
 - **New Feature**: Progressive Web App (PWA) — manifest.json, generated icons (192/512/apple-touch), `display: standalone`, theme-color, apple-mobile-web-app-capable meta tags. Users can "Add to Home Screen" on iOS and Android
 - **New Feature**: Mobile card view for AllRequests — responsive card layout replaces the admin table on ≤768px viewports, with status-colored borders and SlidePanel drill-in

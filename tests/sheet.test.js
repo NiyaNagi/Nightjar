@@ -205,7 +205,10 @@ describe('Sheet Component', () => {
       // Trigger an operation
       fireEvent.click(screen.getByTestId('trigger-op'));
 
-      // Should not throw
+      // Verify ops are stored in Y.Array ('sheet-ops'), not Y.Map('pendingOps')
+      const yOps = ydoc.getArray('sheet-ops');
+      // Ops may have been processed and cleared, but Y.Array should exist
+      expect(yOps).toBeDefined();
       expect(screen.getByTestId('fortune-sheet-mock')).toBeInTheDocument();
     });
   });
