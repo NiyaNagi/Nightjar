@@ -313,7 +313,7 @@
   cursor: not-allowed;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .submit-request__footer {
     flex-direction: column;
     align-items: stretch;

@@ -57,6 +57,7 @@
 /* Table */
 .all-requests__table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .all-requests__table {
   width: 100%;
@@ -128,10 +129,90 @@
 }
 
 @media (max-width: 768px) {
+  .all-requests {
+    padding: 12px;
+  }
   .all-requests__filters {
     flex-direction: column;
   }
   .all-requests__search input {
     width: 100%;
   }
+  .all-requests__filters select,
+  .all-requests__filters input[type="date"] {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+  .all-requests__search input {
+    font-size: 16px;
+  }
+}
+
+/* ── Mobile Card View ── */
+.all-requests__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.all-requests__card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.all-requests__card:hover,
+.all-requests__card--active {
+  border-color: var(--accent-color);
+}
+
+.all-requests__card--urgent {
+  border-left: 3px solid var(--warning-color, #f59e0b);
+}
+
+.all-requests__card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.all-requests__card-id {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.all-requests__card-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 8px;
+  text-transform: capitalize;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.all-requests__card-status--approved { color: var(--success-color); }
+.all-requests__card-status--shipped  { color: var(--accent-color); }
+.all-requests__card-status--cancelled { color: var(--error-color); }
+.all-requests__card-status--blocked  { color: var(--warning-color); }
+
+.all-requests__card-item {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.all-requests__card-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.all-requests__card-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }

@@ -1024,6 +1024,11 @@
         cursor: default;
     }
 
+    /* TODO: [Mobile Step 3] Chat bubble overlaps inventory bottom nav tabs.
+       Increase bottom offset to ~80px to clear the nav rail.
+       Also consider: auto-minimize chat on mobile load,
+       add visualViewport keyboard listener to reposition chat input above virtual keyboard,
+       and add z-index coordination with inventory nav rail. */
     .chat-minimized {
         bottom: calc(50px + var(--safe-area-inset-bottom, 0px));
         right: 12px;

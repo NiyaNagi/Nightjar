@@ -182,14 +182,24 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .bulk-tag-dialog {
     min-width: unset;
     width: calc(100vw - 24px);
     max-width: 480px;
+    padding: 16px;
+  }
+  .bulk-tag-input {
+    font-size: 16px; /* prevent iOS zoom */
   }
   .bulk-tag-body {
     padding: 12px;
+  }
+  .bulk-tag-actions {
+    flex-direction: column;
+  }
+  .bulk-tag-actions button {
+    width: 100%;
   }
   .bulk-tag-footer {
     flex-direction: column;

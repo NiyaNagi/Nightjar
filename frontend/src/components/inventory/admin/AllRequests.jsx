@@ -10,8 +10,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useInventory } from '../../../contexts/InventoryContext';
 import { useToast } from '../../../contexts/ToastContext';
+import useIsMobile from '../../../hooks/useIsMobile';
 import RequestRow from '../common/RequestRow';
 import RequestDetail from '../common/RequestDetail';
+import SlidePanel from '../common/SlidePanel';
 import { generateId, US_STATES } from '../../../utils/inventoryValidation';
 import { pushNotification } from '../../../utils/inventoryNotifications';
 import { exportRequests } from '../../../utils/inventoryExport';
@@ -28,6 +30,7 @@ export default function AllRequests() {
   const { yInventoryRequests, yInventoryAuditLog, inventorySystemId, collaborators, yInventoryNotifications,
     requests, catalogItems } = ctx;
   const { showToast } = useToast();
+  const isMobile = useIsMobile();
 
   // Filters
   const [statusFilter, setStatusFilter] = useState('all');
@@ -361,54 +364,103 @@ export default function AllRequests() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="all-requests__table-wrap">
-        <table className="all-requests__table">
-          <thead>
-            <tr>
-              <th style={{ width: 28 }}>⚡</th>
-              <th onClick={() => handleSort('id')}>ID{sortIndicator('id')}</th>
-              <th onClick={() => handleSort('catalogItemName')}>Item{sortIndicator('catalogItemName')}</th>
-              <th onClick={() => handleSort('quantity')}>Qty{sortIndicator('quantity')}</th>
-              <th onClick={() => handleSort('state')}>Loc{sortIndicator('state')}</th>
-              <th onClick={() => handleSort('status')}>Status{sortIndicator('status')}</th>
-              <th>Assigned</th>
-              <th onClick={() => handleSort('requestedAt')}>Date{sortIndicator('requestedAt')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageData.map(req => (
-              <React.Fragment key={req.id}>
-                <RequestRow
-                  request={req}
-                  collaborators={collaborators}
-                  isExpanded={expandedId === req.id}
-                  onClick={handleRowClick}
-                />
-                {expandedId === req.id && (
-                  <tr className="all-requests__detail-row">
-                    <td colSpan={8}>
-                      <RequestDetail
-                        request={req}
-                        isAdmin
-                        collaborators={collaborators}
-                        onClose={() => setExpandedId(null)}
-                        onApprove={handleApprove}
-                        onReject={handleReject}
-                        onCancel={handleCancel}
-                        onMarkInProgress={handleMarkInProgress}
-                        onMarkShipped={handleMarkShipped}
-                        onRevertToApproved={handleRevertToApproved}
-                        onRevertToInProgress={handleRevertToInProgress}
-                      />
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Mobile: card view / Desktop: table view */}
+      {isMobile ? (
+        <div className="all-requests__cards">
+          {pageData.map(req => (
+            <div
+              key={req.id}
+              className={`all-requests__card${req.urgent ? ' all-requests__card--urgent' : ''}${expandedId === req.id ? ' all-requests__card--active' : ''}`}
+              onClick={() => handleRowClick(req)}
+            >
+              <div className="all-requests__card-top">
+                <span className="all-requests__card-id">{req.urgent ? '⚡ ' : ''}{req.id?.slice(0, 10)}</span>
+                <span className={`all-requests__card-status all-requests__card-status--${req.status}`}>
+                  {(req.status || '').replace(/_/g, ' ')}
+                </span>
+              </div>
+              <div className="all-requests__card-item">{req.catalogItemName || '—'}</div>
+              <div className="all-requests__card-meta">
+                <span>Qty: {req.quantity || 1}</span>
+                {req.state && <span> · {req.state}</span>}
+                {req.assignedTo && <span> · {resolveUserName(collaborators, req.assignedTo)}</span>}
+              </div>
+              <div className="all-requests__card-date">
+                {req.requestedAt ? new Date(req.requestedAt).toLocaleDateString() : '—'}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="all-requests__table-wrap">
+          <table className="all-requests__table">
+            <thead>
+              <tr>
+                <th style={{ width: 28 }}>⚡</th>
+                <th onClick={() => handleSort('id')}>ID{sortIndicator('id')}</th>
+                <th onClick={() => handleSort('catalogItemName')}>Item{sortIndicator('catalogItemName')}</th>
+                <th onClick={() => handleSort('quantity')}>Qty{sortIndicator('quantity')}</th>
+                <th onClick={() => handleSort('state')}>Loc{sortIndicator('state')}</th>
+                <th onClick={() => handleSort('status')}>Status{sortIndicator('status')}</th>
+                <th>Assigned</th>
+                <th onClick={() => handleSort('requestedAt')}>Date{sortIndicator('requestedAt')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageData.map(req => (
+                <React.Fragment key={req.id}>
+                  <RequestRow
+                    request={req}
+                    collaborators={collaborators}
+                    isExpanded={expandedId === req.id}
+                    onClick={handleRowClick}
+                  />
+                  {expandedId === req.id && (
+                    <tr className="all-requests__detail-row">
+                      <td colSpan={8}>
+                        <RequestDetail
+                          request={req}
+                          isAdmin
+                          collaborators={collaborators}
+                          onClose={() => setExpandedId(null)}
+                          onApprove={handleApprove}
+                          onReject={handleReject}
+                          onCancel={handleCancel}
+                          onMarkInProgress={handleMarkInProgress}
+                          onMarkShipped={handleMarkShipped}
+                          onRevertToApproved={handleRevertToApproved}
+                          onRevertToInProgress={handleRevertToInProgress}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Mobile: SlidePanel for detail on card tap */}
+      {isMobile && (
+        <SlidePanel isOpen={!!expandedId} title={`Request ${expandedId?.slice(0, 10) || ''}`} onClose={() => setExpandedId(null)}>
+          {expandedId && (
+            <RequestDetail
+              request={pageData.find(r => r.id === expandedId) || filtered.find(r => r.id === expandedId)}
+              isAdmin
+              collaborators={collaborators}
+              onClose={() => setExpandedId(null)}
+              onApprove={handleApprove}
+              onReject={handleReject}
+              onCancel={handleCancel}
+              onMarkInProgress={handleMarkInProgress}
+              onMarkShipped={handleMarkShipped}
+              onRevertToApproved={handleRevertToApproved}
+              onRevertToInProgress={handleRevertToInProgress}
+            />
+          )}
+        </SlidePanel>
+      )}
 
       {filtered.length === 0 && (
         <div className="all-requests__empty">No requests match your filters.</div>

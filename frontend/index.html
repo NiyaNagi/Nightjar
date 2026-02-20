@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- TODO: [Mobile Step 1] Add viewport-fit=cover for safe-area-inset support on notch iPhones:
+         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" /> -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Security: Prevent referrer leakage of URL fragments containing secrets -->
     <meta name="referrer" content="no-referrer" />
@@ -32,6 +34,13 @@
       For web deployment, configure this header on your server.
     -->
     <link rel="icon" type="image/png" href="/assets/nightjar-logo.png" />
+    <!-- PWA manifest & Apple meta tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Nightjar" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Nightjar - Secure P2P Collaboration</title>
   </head>
   <body>

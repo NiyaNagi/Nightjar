@@ -232,7 +232,7 @@
 }
 
 /* Responsive */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .catalog-form__row {
     flex-direction: column;
   }

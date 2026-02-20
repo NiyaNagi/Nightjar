@@ -1,3 +1,8 @@
+/* TODO: [Mobile Step 1] This Vite boilerplate conflicts with global.css.
+   The `place-items: center` and `min-height: 100vh` can cause layout centering bugs.
+   Consider removing conflicting properties (display: flex, place-items: center, min-height: 100vh)
+   or stripping this file entirely since global.css handles all resets.
+*/
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

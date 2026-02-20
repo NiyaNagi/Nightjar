@@ -169,6 +169,13 @@
     overflow-x: auto;
     overflow-y: hidden;
     order: 1; /* Push below content */
+    z-index: var(--z-fixed, 300);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .inventory-nav-rail::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
   }
 
   .inventory-nav-rail__header,
@@ -188,6 +195,8 @@
     padding: 6px 10px;
     gap: 2px;
     font-size: 11px;
+    flex-shrink: 0;
+    min-width: 56px;
   }
 
   .inventory-nav-item__icon {

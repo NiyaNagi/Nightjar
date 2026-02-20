@@ -136,6 +136,29 @@
     padding: 0;
 }
 
+/* Prevent double-tap-to-zoom and other touch delays */
+html {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS zoom on input focus — requires 16px minimum font-size */
+@media (max-width: 768px) {
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Guard :hover styles on touch devices to prevent sticky hover states */
+@media (hover: none) {
+    .toast__close:hover,
+    .fullscreen-exit-btn:hover,
+    .header-actions button:hover {
+        background: inherit;
+        color: inherit;
+    }
+}
+
 /* Visually hidden - for screen readers only */
 .visually-hidden {
     position: absolute;
@@ -148,6 +171,13 @@
     white-space: nowrap;
     border: 0;
 }
+
+/* TODO: [Mobile Step 1] Add overscroll-behavior: none to html to prevent pull-to-refresh / rubber-banding.
+   Also add height: 100dvh fallback alongside 100% for proper mobile viewport handling.
+   Example:
+   html { overscroll-behavior: none; }
+   .app-container { height: 100dvh; height: 100vh; } (dvh with vh fallback)
+*/
 
 html, body, #root {
     height: 100%;
@@ -590,7 +620,7 @@ input:focus {
         right: 12px;
         left: 12px;
         max-width: none;
-        bottom: calc(40px + var(--safe-area-inset-bottom));
+        bottom: calc(80px + var(--safe-area-inset-bottom));
     }
 
     .onboarding-welcome h2 {

@@ -128,9 +128,11 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .file-storage-nav-rail {
     width: 100%;
+    min-width: unset;
+    height: auto;
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
@@ -140,12 +142,29 @@
     gap: 4px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    z-index: var(--z-fixed, 300);
   }
   .file-storage-nav-rail::-webkit-scrollbar { display: none; }
-  .file-storage-nav-rail__item {
+
+  .file-storage-nav-header {
+    display: none;
+  }
+
+  .file-storage-nav-divider {
+    display: none;
+  }
+
+  .file-storage-nav-item {
     flex-shrink: 0;
     padding: 6px 12px;
     font-size: 0.8rem;
     white-space: nowrap;
+    border-radius: 6px;
+  }
+
+  .file-storage-nav-items {
+    flex-direction: row;
+    padding: 0;
+    gap: 4px;
   }
 }
