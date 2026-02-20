@@ -15,7 +15,10 @@
 #
 # Usage:
 #   docker login ghcr.io    (one-time, with PAT)
-#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d
+#
+# The .env file is created automatically by CI/CD and contains GITHUB_PAT.
+# To create it manually:  echo "GITHUB_PAT=ghp_xxx" > .env && chmod 600 .env
 #
 # =============================================================================
 
@@ -36,6 +39,8 @@ services:
       - NODE_ENV=production
       - NIGHTJAR_MODE=relay
       - PUBLIC_URL=wss://night-jar.co
+      # Bug report proxy — auto-submits GitHub issues from the app
+      - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
@@ -63,6 +68,8 @@ services:
       - NIGHTJAR_MODE=private
       # Express uses this to prefix all routes and strip from incoming requests
       - BASE_PATH=/toot
+      # Bug report proxy — auto-submits GitHub issues from the app
+      - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/toot/health"]
       interval: 30s

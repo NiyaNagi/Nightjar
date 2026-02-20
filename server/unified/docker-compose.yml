@@ -30,6 +30,8 @@ services:
       # Set PUBLIC_URL to enable mesh relay announcements
       # Example: wss://your-domain.com
       - PUBLIC_URL=${PUBLIC_URL:-}
+      # Optional: GitHub PAT for auto-submitting bug reports as GitHub issues
+      - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
@@ -55,6 +57,8 @@ services:
       - NIGHTJAR_MODE=relay
       # PUBLIC_URL is required for relay mode to be discoverable
       - PUBLIC_URL=${PUBLIC_URL:-}
+      # Optional: GitHub PAT for auto-submitting bug reports as GitHub issues
+      - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
@@ -84,6 +88,8 @@ services:
       - PORT=3000
       - NODE_ENV=production
       - NIGHTJAR_MODE=private
+      # Optional: GitHub PAT for auto-submitting bug reports as GitHub issues
+      - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
       interval: 30s
@@ -123,5 +129,7 @@ volumes:
 # 3. Consider using host network mode for better P2P connectivity
 # 4. Mount persistent volume for host/private modes
 # 5. Set up proper logging and monitoring
+# 6. (Optional) Set GITHUB_PAT for auto-submitting in-app bug reports
+#    Create a fine-grained PAT with Issues read/write on NiyaNagi/Nightjar
 #
 # For SSL termination with nginx, see: server/nginx/nginx.conf

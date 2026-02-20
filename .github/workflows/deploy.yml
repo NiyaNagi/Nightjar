@@ -73,8 +73,13 @@ jobs:
             echo "=== Pulling Docker image ==="
             docker pull "$IMAGE"
 
+            echo "=== Writing server environment ==="
+            ENV_FILE="$REPO/server/deploy/.env"
+            echo "GITHUB_PAT=${{ secrets.GITHUB_PAT }}" > "$ENV_FILE"
+            chmod 600 "$ENV_FILE"
+
             echo "=== Starting containers ==="
-            docker compose -f server/deploy/docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f server/deploy/docker-compose.prod.yml --env-file "$ENV_FILE" up -d --remove-orphans
 
             echo "=== Deploying landing page ==="
             sudo mkdir -p "$WEB/download" "$WEB/docs" "$WEB/content" "$WEB/screenshots"
