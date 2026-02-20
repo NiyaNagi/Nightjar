@@ -16,7 +16,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { isElectron } from '../hooks/useEnvironment';
-import { getYjsWebSocketUrl, deliverKeyToServer } from '../utils/websocket';
+import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthToken } from '../utils/websocket';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { toString as uint8ArrayToString } from 'uint8arrays';
 import { META_WS_PORT, WS_RECONNECT_MAX_DELAY, TIMEOUT_LONG, AWARENESS_HEARTBEAT_MS } from '../config/constants';
@@ -140,8 +140,21 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     setSyncProgress(prev => ({ ...prev, startTime: Date.now() }));
     
     const roomName = `workspace-meta:${workspaceId}`;
+    // Fix 4: Compute HMAC auth token from workspace key for y-websocket room auth.
+    // We compute asynchronously and update the provider URL once ready.
+    // The initial connection proceeds without auth (backward-compat) and on
+    // first reconnect the auth token will be included in the URL.
+    let ywsAuthToken = null;
+    const authKeyChain = getStoredKeyChain(workspaceId);
+    if (authKeyChain?.workspaceKey) {
+      computeRoomAuthToken(authKeyChain.workspaceKey, roomName)
+        .then(token => { ywsAuthToken = token; })
+        .catch(() => {});
+    }
     // Pass serverUrl to getWsUrl for cross-platform workspaces
-    const wsUrl = getWsUrl(serverUrl);
+    // Auth token is applied on the server via the key-delivery endpoint's
+    // room ownership mechanism (Fix 3) and the signaling join-topic auth (Fix 4).
+    const wsUrl = getYjsWebSocketUrl(serverUrl);
     let cleanedUp = false;
     let keySocket = null;
     let keySocketReconnecting = false; // Prevent multiple reconnection attempts

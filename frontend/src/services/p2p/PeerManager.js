@@ -257,12 +257,14 @@ export class PeerManager extends EventEmitter {
     this.currentWorkspaceId = workspaceId;
     this.currentTopic = connectionParams.topic || await generateTopic(workspaceId);
 
-    // Start bootstrap process
+    // Start bootstrap process (passes authToken and workspaceKey for Fix 4 & 6)
     await this.bootstrapManager.bootstrap({
       workspaceId,
       topic: this.currentTopic,
       serverUrl: connectionParams.serverUrl,
       bootstrapPeers: connectionParams.bootstrapPeers,
+      authToken: connectionParams.authToken,
+      workspaceKey: connectionParams.workspaceKey,
     });
 
     this.emit('workspace-joined', { 

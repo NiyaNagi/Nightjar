@@ -8,6 +8,7 @@
 import { BaseTransport } from './BaseTransport.js';
 import { encodeMessage, decodeMessage } from '../protocol/serialization.js';
 import { MessageTypes, createPeerRequestMessage } from '../protocol/messages.js';
+import { encryptRelayPayload, decryptRelayPayload } from '../../../utils/roomAuth.js';
 
 export class WebSocketTransport extends BaseTransport {
   constructor() {
@@ -23,6 +24,8 @@ export class WebSocketTransport extends BaseTransport {
     this.pingInterval = null;
     this.identity = null;
     this.currentTopic = null;
+    this.currentAuthToken = null; // Fix 4: HMAC auth token for room joins
+    this.workspaceKey = null;     // Fix 6: workspace key for relay encryption
   }
 
   /**
@@ -149,6 +152,15 @@ export class WebSocketTransport extends BaseTransport {
           break;
           
         default:
+          // Fix 6: Check for encrypted relay messages
+          if (message.encryptedPayload && this.workspaceKey) {
+            const decrypted = decryptRelayPayload(message.encryptedPayload, this.workspaceKey);
+            if (decrypted) {
+              const peerId = message._fromPeerId || 'server';
+              this._onMessage(peerId, decrypted);
+              return;
+            }
+          }
           // Regular message - determine source peer
           const peerId = message._fromPeerId || message.origin || 'server';
           this._onMessage(peerId, message);
@@ -296,7 +308,25 @@ export class WebSocketTransport extends BaseTransport {
       throw new Error('Not connected to server');
     }
     
-    // Wrap in relay-message envelope so the server knows to forward it
+    // Fix 6: Encrypt payload with workspace key if available
+    if (this.workspaceKey) {
+      const payloadToEncrypt = {
+        ...message,
+        _fromPeerId: this.localPeerId,
+      };
+      const encryptedPayload = encryptRelayPayload(payloadToEncrypt, this.workspaceKey);
+      if (encryptedPayload) {
+        const relayEnvelope = {
+          type: 'relay-message',
+          targetPeerId: peerId,
+          encryptedPayload,
+        };
+        this.serverSocket.send(encodeMessage(relayEnvelope));
+        return;
+      }
+    }
+    
+    // Fallback: unencrypted relay (backward compat)
     const relayEnvelope = {
       type: 'relay-message',
       targetPeerId: peerId,
@@ -317,7 +347,24 @@ export class WebSocketTransport extends BaseTransport {
       return;
     }
     
-    // Wrap in relay-broadcast envelope so the server broadcasts to all topic peers
+    // Fix 6: Encrypt payload with workspace key if available
+    if (this.workspaceKey) {
+      const payloadToEncrypt = {
+        ...message,
+        _fromPeerId: this.localPeerId,
+      };
+      const encryptedPayload = encryptRelayPayload(payloadToEncrypt, this.workspaceKey);
+      if (encryptedPayload) {
+        const broadcastEnvelope = {
+          type: 'relay-broadcast',
+          encryptedPayload,
+        };
+        this.serverSocket.send(encodeMessage(broadcastEnvelope));
+        return;
+      }
+    }
+    
+    // Fallback: unencrypted broadcast (backward compat)
     const broadcastEnvelope = {
       type: 'relay-broadcast',
       payload: {
@@ -332,14 +379,27 @@ export class WebSocketTransport extends BaseTransport {
   /**
    * Join a topic/room on the server
    */
-  async joinTopic(topic) {
+  async joinTopic(topic, options = {}) {
     this.currentTopic = topic;
+    // Fix 4: Store auth token for reconnection
+    if (options.authToken) {
+      this.currentAuthToken = options.authToken;
+    }
+    // Fix 6: Store workspace key for relay encryption
+    if (options.workspaceKey) {
+      this.workspaceKey = options.workspaceKey;
+    }
     if (this.isServerConnected()) {
-      await this.sendToServer({
+      const msg = {
         type: 'join-topic',
         topic,
         peerId: this.localPeerId,
-      });
+      };
+      // Include HMAC auth token if available
+      if (this.currentAuthToken) {
+        msg.authToken = this.currentAuthToken;
+      }
+      await this.sendToServer(msg);
     }
   }
 
@@ -399,6 +459,8 @@ export class WebSocketTransport extends BaseTransport {
     
     this.serverUrl = null;
     this.currentTopic = null;
+    this.currentAuthToken = null;
+    this.workspaceKey = null;
     
     await super.destroy();
   }

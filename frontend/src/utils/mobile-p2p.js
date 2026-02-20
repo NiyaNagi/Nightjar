@@ -19,6 +19,7 @@ class MobileP2PService {
     this.reconnectTimer = null;
     this.isConnected = false;
     this.destroyed = false;
+    this.topicAuthTokens = new Map(); // Fix 4: topic -> authToken
     
     // Default relay server (users can self-host)
     this.relayUrl = 'wss://localhost:8082'; // Will be configurable
@@ -64,12 +65,15 @@ class MobileP2PService {
             ...this.identity
           });
           
-          // Rejoin topics
+          // Rejoin topics with auth tokens (Fix 4)
           for (const topic of this.topics) {
-            this.send({
+            const msg = {
               type: 'join-topic',
               topic
-            });
+            };
+            const authToken = this.topicAuthTokens.get(topic);
+            if (authToken) msg.authToken = authToken;
+            this.send(msg);
           }
           
           resolve(true);
@@ -179,13 +183,19 @@ class MobileP2PService {
   /**
    * Join a topic
    */
-  async joinTopic(topicHex) {
+  async joinTopic(topicHex, options = {}) {
     this.topics.add(topicHex);
+    // Fix 4: Store auth token for reconnection
+    if (options.authToken) {
+      this.topicAuthTokens.set(topicHex, options.authToken);
+    }
     
-    this.send({
+    const msg = {
       type: 'join-topic',
       topic: topicHex
-    });
+    };
+    if (options.authToken) msg.authToken = options.authToken;
+    this.send(msg);
     
     this.emit('topic-joined', { topic: topicHex });
     return true;

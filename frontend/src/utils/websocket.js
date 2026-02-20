@@ -16,6 +16,10 @@ import { isElectron } from '../hooks/useEnvironment';
 import { YJS_WS_PORT, META_WS_PORT, WEB_SERVER_PORT } from '../config/constants';
 import nacl from 'tweetnacl';
 import { getUnlockedIdentity } from './identityManager';
+import { computeRoomAuthToken } from './roomAuth';
+
+// Re-export for convenience
+export { computeRoomAuthToken };
 
 /**
  * Get the deployment base path (e.g., '/app' for sub-path deployments).
@@ -57,11 +61,19 @@ export function getWebSocketPolyfill(options = {}) {
 /**
  * Get the WebSocket URL for Yjs document sync
  * @param {string|null} serverUrl - Optional remote server URL (for cross-platform workspaces)
+ * @param {string|null} authToken - Optional HMAC auth token for room authentication (Fix 4)
  * @returns {string}
  */
-export function getYjsWebSocketUrl(serverUrl = null) {
+export function getYjsWebSocketUrl(serverUrl = null, authToken = null) {
     const isElectronMode = isElectron();
     let url;
+    
+    // Helper to append auth token as query parameter
+    const appendAuth = (baseUrl) => {
+        if (!authToken) return baseUrl;
+        const separator = baseUrl.includes('?') ? '&' : '?';
+        return `${baseUrl}${separator}auth=${encodeURIComponent(authToken)}`;
+    };
     
     // If a remote serverUrl is provided, use it (cross-platform sharing)
     if (serverUrl) {
@@ -78,7 +90,7 @@ export function getYjsWebSocketUrl(serverUrl = null) {
                 .replace(/^http:/i, 'ws:');
             url = wsUrl;
             console.log(`[WebSocket] getYjsWebSocketUrl(serverUrl: ${serverUrl}) => ${url} (remote workspace)`);
-            return url;
+            return appendAuth(url);
         } else {
             console.warn(`[WebSocket] Invalid serverUrl protocol: ${serverUrl}. Using local server.`);
             // Fall through to use local server instead
@@ -95,7 +107,7 @@ export function getYjsWebSocketUrl(serverUrl = null) {
                     .replace(/^https:/, 'wss:')
                     .replace(/^http:/, 'ws:');
                 console.log(`[WebSocket] getYjsWebSocketUrl() => ${wsUrl} (mobile relay)`);
-                return wsUrl;
+                return appendAuth(wsUrl);
             }
         } catch (e) {
             // Ignore localStorage errors
@@ -120,7 +132,7 @@ export function getYjsWebSocketUrl(serverUrl = null) {
         }
     }
     console.log(`[WebSocket] getYjsWebSocketUrl() => ${url} (isElectron: ${isElectronMode})`);
-    return url;
+    return appendAuth(url);
 }
 
 /**

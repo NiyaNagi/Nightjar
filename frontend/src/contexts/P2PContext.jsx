@@ -86,6 +86,8 @@ export function P2PProvider({ children, config = {} }) {
       identity: options.identity,
       peerManager: peerManagerRef.current,
       bootstrapPeers: options.bootstrapPeers,
+      authToken: options.authToken,         // Fix 4: HMAC room auth
+      workspaceKey: options.workspaceKey,    // Fix 6: relay encryption key
     });
   }, [isEnabled]);
 
@@ -176,7 +178,7 @@ export function P2PProvider({ children, config = {} }) {
     }
 
     return new P2PWebSocketAdapter({
-      ...options,
+      ...options,  // includes authToken, workspaceKey if provided
       peerManager: peerManagerRef.current,
     });
   }, [isEnabled]);

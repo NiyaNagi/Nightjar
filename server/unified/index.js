@@ -548,10 +548,17 @@ class SignalingServer {
    * Join a room (workspace)
    */
   handleJoin(ws, info, msg) {
-    const { roomId, profile } = msg;
+    const { roomId, profile, authToken } = msg;
     
     if (!roomId || typeof roomId !== 'string' || roomId.length > 256) {
       this.send(ws, { type: 'error', error: 'invalid_room' });
+      return;
+    }
+
+    // Fix 4: HMAC room-join authentication
+    const authResult = validateRoomAuthToken(roomId, authToken);
+    if (!authResult.allowed) {
+      this.send(ws, { type: 'error', error: authResult.reason });
       return;
     }
 
@@ -661,11 +668,19 @@ class SignalingServer {
    * Handle join-topic (P2P topic-based room joining)
    */
   handleJoinTopic(ws, info, msg) {
-    const { topic, peerId: clientPeerId } = msg;
+    const { topic, peerId: clientPeerId, authToken } = msg;
     if (!topic || typeof topic !== 'string' || topic.length > 256) return;
 
     // Use topic as room ID for P2P purposes
     const roomId = `p2p:${topic}`;
+
+    // Fix 4: HMAC room-join authentication
+    // Validates that the client holds the workspace encryption key
+    const authResult = validateRoomAuthToken(roomId, authToken);
+    if (!authResult.allowed) {
+      this.send(ws, { type: 'error', error: authResult.reason });
+      return;
+    }
     
     if (!this.rooms.has(roomId)) {
       // Prevent unbounded room creation (DoS)
@@ -843,16 +858,16 @@ class SignalingServer {
    * The server is opaque to the payload — it just routes it.
    */
   handleRelayMessage(ws, info, msg) {
-    const { targetPeerId, payload } = msg;
-    if (!targetPeerId || !payload) {
+    const { targetPeerId, payload, encryptedPayload } = msg;
+    if (!targetPeerId || (!payload && !encryptedPayload)) {
       this.send(ws, { type: 'error', error: 'relay_missing_target_or_payload' });
       return;
     }
 
     // Guard against oversized relay payloads
     const MAX_RELAY_MESSAGE_SIZE = 64 * 1024; // 64 KB
-    const serialized = JSON.stringify(payload);
-    if (serialized.length > MAX_RELAY_MESSAGE_SIZE) {
+    const dataToCheck = encryptedPayload || JSON.stringify(payload);
+    if ((typeof dataToCheck === 'string' ? dataToCheck.length : 0) > MAX_RELAY_MESSAGE_SIZE) {
       this.send(ws, { type: 'error', error: 'relay_payload_too_large', maxBytes: MAX_RELAY_MESSAGE_SIZE });
       return;
     }
@@ -872,13 +887,24 @@ class SignalingServer {
       for (const peer of room) {
         const pInfo = this.peerInfo.get(peer);
         if (pInfo && pInfo.peerId === targetPeerId) {
-          // Forward the payload with sender info
-          // Use Object.create(null) as base to prevent prototype pollution from untrusted payload
-          const forwarded = Object.create(null);
-          Object.assign(forwarded, payload);
-          forwarded._fromPeerId = info.peerId;
-          forwarded._relayed = true;
-          this.send(peer, forwarded);
+          // Fix 6: If client sent encryptedPayload, forward the opaque
+          // encrypted envelope without reading its contents.
+          if (encryptedPayload) {
+            this.send(peer, {
+              type: 'relay-message',
+              encryptedPayload,
+              _fromPeerId: info.peerId,
+              _relayed: true,
+            });
+          } else {
+            // Legacy plaintext relay — forward with sender info
+            // Use Object.create(null) as base to prevent prototype pollution from untrusted payload
+            const forwarded = Object.create(null);
+            Object.assign(forwarded, payload);
+            forwarded._fromPeerId = info.peerId;
+            forwarded._relayed = true;
+            this.send(peer, forwarded);
+          }
           return;
         }
       }
@@ -893,16 +919,16 @@ class SignalingServer {
    * in the sender's topics. Used for chunk-seed announcements etc.
    */
   handleRelayBroadcast(ws, info, msg) {
-    const { payload } = msg;
-    if (!payload) {
+    const { payload, encryptedPayload } = msg;
+    if (!payload && !encryptedPayload) {
       this.send(ws, { type: 'error', error: 'broadcast_missing_payload' });
       return;
     }
 
     // Guard against amplification DoS — reject oversized payloads
     const MAX_RELAY_BROADCAST_SIZE = 64 * 1024; // 64 KB
-    const serialized = JSON.stringify(payload);
-    if (serialized.length > MAX_RELAY_BROADCAST_SIZE) {
+    const dataToCheck = encryptedPayload || JSON.stringify(payload);
+    if ((typeof dataToCheck === 'string' ? dataToCheck.length : 0) > MAX_RELAY_BROADCAST_SIZE) {
       this.send(ws, { type: 'error', error: 'broadcast_payload_too_large', maxBytes: MAX_RELAY_BROADCAST_SIZE });
       return;
     }
@@ -912,6 +938,22 @@ class SignalingServer {
       return;
     }
 
+    // Fix 6: If client sent encryptedPayload, forward the opaque envelope
+    if (encryptedPayload) {
+      const encrypted = {
+        type: 'relay-broadcast',
+        encryptedPayload,
+        _fromPeerId: info.peerId,
+        _relayed: true,
+      };
+      for (const topic of info.topics) {
+        const roomId = `p2p:${topic}`;
+        this.broadcast(roomId, encrypted, ws);
+      }
+      return;
+    }
+
+    // Legacy plaintext broadcast
     // Use Object.create(null) as base to prevent prototype pollution from untrusted payload
     const broadcastPayload = Object.create(null);
     Object.assign(broadcastPayload, payload);
@@ -1337,6 +1379,17 @@ const docCleanupInterval = setInterval(() => {
 wssYjs.on('connection', (ws, req) => {
   // Extract room name from URL
   const roomName = req.url.slice(1).split('?')[0] || 'default';
+  
+  // Fix 4: HMAC room-join authentication for y-websocket
+  const urlParams = new URLSearchParams(req.url.includes('?') ? req.url.split('?')[1] : '');
+  const ywsAuthToken = urlParams.get('auth') || undefined;
+  const ywsAuthResult = validateRoomAuthToken(`yws:${roomName}`, ywsAuthToken);
+  if (!ywsAuthResult.allowed) {
+    console.warn(`[Y-WS] Auth rejected for room: ${roomName.slice(0, 30)}... reason: ${ywsAuthResult.reason}`);
+    ws.close(4403, ywsAuthResult.reason);
+    return;
+  }
+
   console.log(`[Y-WS] Client connected to room: ${roomName.slice(0, 30)}...`);
   
   // Track connection for heartbeat
@@ -1499,6 +1552,59 @@ const KEY_DELIVERY_RATE_WINDOW = 60000; // 1 minute
 // Prevents unauthorized key overwrite by a different identity.
 // Maps roomName -> base64-encoded Ed25519 public key string
 const roomKeyOwners = new Map();
+
+// =============================================================================
+// Fix 4: HMAC Room-Join Authentication
+// =============================================================================
+// Tracks the HMAC auth token for each signaling topic / y-websocket room.
+// First client to present a valid token "registers" it; subsequent clients
+// must present the same token to prove they hold the workspace encryption key.
+// Maps: topic-or-room string -> base64-encoded HMAC-SHA256 token
+const roomAuthTokens = new Map();
+
+/**
+ * Validate an HMAC room-auth token.
+ * - If no token is stored yet for this room, register the provided one (first-write-wins).
+ * - If a token is already stored, the provided one must match.
+ * - If the client does not provide a token, allow for backward compatibility.
+ * @param {string} roomId - The room/topic identifier
+ * @param {string|undefined} authToken - The HMAC auth token from the client
+ * @returns {{ allowed: boolean, reason?: string }}
+ */
+function validateRoomAuthToken(roomId, authToken) {
+  if (!authToken) {
+    // Backward compatibility: older clients don't send auth tokens.
+    // Once a room has a registered token, unauthenticated joins are blocked.
+    if (roomAuthTokens.has(roomId)) {
+      return { allowed: false, reason: 'room_requires_auth' };
+    }
+    return { allowed: true };
+  }
+
+  if (typeof authToken !== 'string' || authToken.length > 256) {
+    return { allowed: false, reason: 'invalid_auth_token' };
+  }
+
+  const existingToken = roomAuthTokens.get(roomId);
+  if (!existingToken) {
+    // First client to auth — register token
+    roomAuthTokens.set(roomId, authToken);
+    return { allowed: true };
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  if (existingToken.length !== authToken.length) {
+    return { allowed: false, reason: 'auth_token_mismatch' };
+  }
+  const a = Buffer.from(existingToken);
+  const b = Buffer.from(authToken);
+  const { timingSafeEqual } = require('crypto');
+  if (!timingSafeEqual(a, b)) {
+    return { allowed: false, reason: 'auth_token_mismatch' };
+  }
+
+  return { allowed: true };
+}
 
 /**
  * Verify an Ed25519 signature.

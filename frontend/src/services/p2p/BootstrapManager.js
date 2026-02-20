@@ -86,6 +86,10 @@ export class BootstrapManager extends EventEmitter {
       // Generate topic from workspace ID if not provided
       this.currentTopic = topic || (workspaceId ? await generateTopic(workspaceId) : null);
 
+      // Store auth params for seeding (Fix 4 & 6)
+      this._authToken = connectionParams.authToken || null;
+      this._workspaceKey = connectionParams.workspaceKey || null;
+
       // Step 1: Try all initial connection methods
       const connected = await this._seedConnections(serverUrl, bootstrapPeers, this.currentTopic);
       
@@ -128,7 +132,12 @@ export class BootstrapManager extends EventEmitter {
           .then(() => {
             console.log('[Bootstrap] Connected to WebSocket server');
             if (topic) {
-              return transports.websocket.joinTopic(topic);
+              // Fix 4 & 6: Pass authToken and workspaceKey for room authentication
+              // and relay message encryption
+              return transports.websocket.joinTopic(topic, {
+                authToken: this._authToken,
+                workspaceKey: this._workspaceKey,
+              });
             }
           })
           .then(() => true)

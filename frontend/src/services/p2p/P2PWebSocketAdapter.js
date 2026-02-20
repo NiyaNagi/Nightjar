@@ -47,6 +47,8 @@ export class P2PWebSocketAdapter {
     this.bootstrapPeers = options.bootstrapPeers || [];
     this.identity = options.identity || {};
     this.topic = options.topic || options.workspaceId;
+    this.authToken = options.authToken || null;       // Fix 4: HMAC room auth
+    this.workspaceKey = options.workspaceKey || null;  // Fix 6: relay encryption key
     
     // Use provided PeerManager or get singleton
     this.peerManager = options.peerManager || null;
@@ -115,6 +117,8 @@ export class P2PWebSocketAdapter {
         serverUrl: this.serverUrl,
         bootstrapPeers: this.bootstrapPeers,
         topic: this.topic,
+        authToken: this.authToken,
+        workspaceKey: this.workspaceKey,
       });
 
       // Connection established
