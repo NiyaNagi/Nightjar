@@ -91,24 +91,30 @@ describe('nginx: join route', () => {
 // 4. Docker — relay ENCRYPTED_PERSISTENCE=false
 // ---------------------------------------------------------------------------
 describe('docker-compose.prod: relay persistence config', () => {
-  test('relay service sets ENCRYPTED_PERSISTENCE=false', () => {
-    // Find the relay service block
+  test('relay service uses NIGHTJAR_MODE=host for encrypted persistence', () => {
     const relayIdx = dockerCompose.indexOf('nightjar-relay:');
     expect(relayIdx).toBeGreaterThan(-1);
 
-    // Find the next service (nightjar-private) to bound the search
     const privateIdx = dockerCompose.indexOf('nightjar-private:', relayIdx);
     const relayBlock = dockerCompose.slice(relayIdx, privateIdx > 0 ? privateIdx : undefined);
 
-    expect(relayBlock).toContain('ENCRYPTED_PERSISTENCE=false');
+    expect(relayBlock).toContain('NIGHTJAR_MODE=host');
   });
 
-  test('relay service uses NIGHTJAR_MODE=relay', () => {
+  test('relay service has ENCRYPTED_PERSISTENCE=true', () => {
     const relayIdx = dockerCompose.indexOf('nightjar-relay:');
     const privateIdx = dockerCompose.indexOf('nightjar-private:', relayIdx);
     const relayBlock = dockerCompose.slice(relayIdx, privateIdx > 0 ? privateIdx : undefined);
 
-    expect(relayBlock).toContain('NIGHTJAR_MODE=relay');
+    expect(relayBlock).toContain('ENCRYPTED_PERSISTENCE=true');
+  });
+
+  test('relay service has a persistent data volume', () => {
+    const relayIdx = dockerCompose.indexOf('nightjar-relay:');
+    const privateIdx = dockerCompose.indexOf('nightjar-private:', relayIdx);
+    const relayBlock = dockerCompose.slice(relayIdx, privateIdx > 0 ? privateIdx : undefined);
+
+    expect(relayBlock).toMatch(/nightjar-relay-data:\/app\/server\/unified\/data/);
   });
 
   test('private service keeps ENCRYPTED_PERSISTENCE=true', () => {

@@ -1086,6 +1086,12 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.21 - Share Link Blank Screen & Relay Routing Fix (Issue #6)
+- **Critical Fix**: Clicking a `/join/` share link no longer shows a blank screen — nginx now proxies `/assets/` and `/api/` to the relay server so the SPA's JS bundles and API calls reach the correct backend
+- **Enhancement**: Public relay upgraded from signaling-only to full encrypted persistence — workspace data is encrypted at rest so share-link users can sync even when the desktop peer is offline
+- **Server Fix**: `/api/encrypted-persistence` endpoint now returns `false` when persistence is disabled, preventing unnecessary key delivery in pure-relay deployments
+- **Testing**: 22 new tests for nginx routing, Docker config, server logic, and v1.7.20 regression checks
+
 ### v1.7.20 - Web App Share Link Fix (Issue #5)
 - **Critical Fix**: Joining a workspace via share link on a phone browser now correctly syncs all documents — previously showed an empty workspace due to `express.json()` middleware being registered after the key delivery route on the server
 - **Resilience**: Client-side key delivery now retries up to 3 times with exponential backoff (1s → 2s → 4s)

@@ -3,8 +3,8 @@
 # =============================================================================
 #
 # Services:
-#   1. nightjar-relay   — Public relay server (wss://night-jar.co/signal)
-#   2. nightjar-private — Private instance with storage (night-jar.co/app)
+#   1. nightjar-relay   — Public server with encrypted persistence (wss://night-jar.co)
+#   2. nightjar-private — Private instance with encrypted persistence (night-jar.co/app)
 #
 # The Docker image is built on GitHub Actions and pushed to GHCR.
 # This compose file PULLS the pre-built image — no local build needed.
@@ -24,9 +24,10 @@
 
 services:
   # --------------------------------------------------------------------------
-  # Relay Server — lightweight signaling + mesh participation
-  # No persistence, no storage — just routes encrypted connections
-  # Accessible at night-jar.co/signal, /health, /api/mesh/*, /yjs/*
+  # Public Server — mesh participation + encrypted persistence
+  # Persists workspace data encrypted at rest so share-link users can sync
+  # even when the original desktop peer is offline.
+  # Accessible at night-jar.co/signal, /health, /api/*, /yjs/*, /join/*
   # --------------------------------------------------------------------------
   nightjar-relay:
     image: ghcr.io/niyanagi/nightjar:latest
@@ -34,13 +35,16 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3000"
+    volumes:
+      - nightjar-relay-data:/app/server/unified/data
     environment:
       - PORT=3000
       - NODE_ENV=production
-      - NIGHTJAR_MODE=relay
+      - NIGHTJAR_MODE=host
       - PUBLIC_URL=wss://night-jar.co
-      # Relay has no persistence — don't ask clients to deliver encryption keys
-      - ENCRYPTED_PERSISTENCE=false
+      # Encrypted persistence ON — workspace data encrypted at rest (default)
+      # Clients deliver encryption keys via POST /api/rooms/:room/key
+      - ENCRYPTED_PERSISTENCE=true
       # Bug report proxy — auto-submits GitHub issues from the app
       - GITHUB_PAT=${GITHUB_PAT:-}
     healthcheck:
@@ -83,6 +87,8 @@ services:
       - nightjar-net
 
 volumes:
+  nightjar-relay-data:
+    driver: local
   nightjar-private-data:
     driver: local
 
