@@ -22,7 +22,7 @@
     border-radius: 16px;
     width: 100%;
     max-width: 520px;
-    max-height: 85vh;
+    max-height: 85dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -584,7 +584,7 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     width: 100%;
-    max-height: 85vh;
+    max-height: 85dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;

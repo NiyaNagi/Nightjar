@@ -88,7 +88,7 @@
   .create-folder-modal {
     width: 100% !important;
     max-width: 100% !important;
-    max-height: 90vh !important;
+    max-height: 90dvh !important;
     max-height: 90dvh !important;
     margin: 0 !important;
     border-radius: 16px 16px 0 0 !important;
@@ -102,7 +102,7 @@
   .replace-dialog,
   .folder-create-dialog,
   .workspace-switcher__confirm-card {
-    max-height: 60vh !important;
+    max-height: 60dvh !important;
     max-height: 60dvh !important;
   }
 
@@ -114,7 +114,7 @@
   .edit-properties-modal,
   .file-picker-modal,
   .file-detail-panel {
-    max-height: 95vh !important;
+    max-height: 95dvh !important;
     max-height: 95dvh !important;
   }
 

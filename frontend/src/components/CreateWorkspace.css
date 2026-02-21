@@ -21,7 +21,7 @@
   border-radius: 12px;
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;

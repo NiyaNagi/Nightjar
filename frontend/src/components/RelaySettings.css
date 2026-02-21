@@ -19,7 +19,7 @@
   border-radius: 12px;
   width: 480px;
   max-width: 90vw;
-  max-height: 85vh;
+  max-height: 85dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -414,7 +414,7 @@
   .relay-settings-modal {
     width: 100%;
     max-width: calc(100vw - 16px);
-    max-height: 90vh;
+    max-height: 90dvh;
     border-radius: 10px;
   }
   .relay-settings-content {

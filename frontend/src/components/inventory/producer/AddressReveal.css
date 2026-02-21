@@ -359,7 +359,7 @@
   .ar-modal {
     width: calc(100vw - 16px);
     max-width: 480px;
-    max-height: 90vh;
+    max-height: 90dvh;
   }
   .ar-body {
     padding: 14px 12px;

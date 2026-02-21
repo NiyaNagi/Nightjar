@@ -19,7 +19,7 @@
   flex-direction: column;
   width: 100%;
   max-width: 800px;
-  max-height: 85vh;
+  max-height: 85dvh;
   background: var(--bg-primary, #1f2937);
   border: 1px solid var(--border-color, #374151);
   border-radius: 16px;

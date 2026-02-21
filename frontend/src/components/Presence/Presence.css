@@ -179,7 +179,7 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     width: 320px;
-    max-height: 70vh;
+    max-height: 70dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -335,7 +335,7 @@
   .peers-list-panel {
     width: calc(100vw - 24px);
     max-width: 320px;
-    max-height: 60vh;
+    max-height: 60dvh;
   }
   .peer-item {
     padding: 8px 10px;

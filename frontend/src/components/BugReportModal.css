@@ -24,7 +24,7 @@
   border-radius: 12px;
   width: 560px;
   max-width: 90vw;
-  max-height: 85vh;
+  max-height: 85dvh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
@@ -430,7 +430,7 @@
   .bug-report-modal {
     width: 100%;
     max-width: calc(100vw - 16px);
-    max-height: 90vh;
+    max-height: 90dvh;
   }
   .bug-report-modal__body {
     padding: 14px 12px;

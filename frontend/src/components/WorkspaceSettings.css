@@ -22,7 +22,7 @@
   flex-direction: column;
   width: 100%;
   max-width: 520px;
-  max-height: 90vh;
+  max-height: 90dvh;
   background: var(--bg-primary, #ffffff);
   border-radius: 12px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);

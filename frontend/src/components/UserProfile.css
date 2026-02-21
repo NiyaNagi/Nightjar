@@ -288,7 +288,7 @@
 /* Larger panel variant */
 .profile-panel--large {
     width: 380px;
-    max-height: 85vh;
+    max-height: 85dvh;
     overflow-y: auto;
 }
 
