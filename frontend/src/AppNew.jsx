@@ -482,7 +482,12 @@ function App() {
             showToast('Error creating identity: ' + error.message, 'error');
         }
 
-        // Check for pending share link that arrived before onboarding was complete
+        // Check for pending share link that arrived before onboarding was complete.
+        // Clear the DeepLinkGate first — if a share link was detected before onboarding,
+        // the gate state may still be true but was never rendered (behind the onboarding
+        // early return). Clearing it prevents the gate from overlaying the join dialog.
+        setShowDeepLinkGate(false);
+        setPendingDeepLink(null);
         processPendingShareLink();
     }, [createIdentity, showToast, needsMigration, processPendingShareLink]);
 
@@ -504,6 +509,9 @@ function App() {
         showToast(`Welcome back, ${metadata?.handle || 'User'}! 🔓`, 'success');
 
         // Check for pending share link that arrived while locked
+        // Clear DeepLinkGate to prevent it overlaying the join dialog
+        setShowDeepLinkGate(false);
+        setPendingDeepLink(null);
         processPendingShareLink();
     }, [unlockApp, showToast, processPendingShareLink]);
     
@@ -1157,10 +1165,22 @@ function App() {
                 clearUrlFragment(true);
             }
 
-            // On web (non-Electron), show DeepLinkGate to attempt opening the desktop app
+            // On web (non-Electron), decide whether to show DeepLinkGate
             if (!isElectron()) {
-                setPendingDeepLink(nightjarLink);
-                setShowDeepLinkGate(true);
+                // Detect mobile browsers — nightjar:// protocol never works on mobile,
+                // so skip the DeepLinkGate entirely and go straight to join dialog.
+                const isMobile = /Android|iPhone|iPad|iPod|Mobile|webOS/i.test(navigator.userAgent);
+                if (isMobile) {
+                    // Mobile: skip deep link gate, open join dialog directly
+                    console.log('[ShareLink] Mobile detected — skipping DeepLinkGate');
+                    setCreateWorkspaceMode('join');
+                    setShowCreateWorkspaceDialog(true);
+                    showToast('Share link detected - please review the invitation details', 'info');
+                } else {
+                    // Desktop web: attempt to open desktop app first
+                    setPendingDeepLink(nightjarLink);
+                    setShowDeepLinkGate(true);
+                }
             } else {
                 // In Electron, skip deep link gate and open join dialog directly
                 setCreateWorkspaceMode('join');

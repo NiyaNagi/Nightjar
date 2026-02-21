@@ -93,6 +93,11 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
   
   // Parse share link as user types
   const handleLinkChange = async (value) => {
+    // Normalize HTML-encoded ampersands that occur when users copy links
+    // from HTML-rendered sources (email clients, GitHub, web pages, etc.).
+    // Without this, fragment parameters after the first &amp; would be lost.
+    value = value.replace(/&amp;/g, '&');
+    
     setShareLink(value);
     setLinkValidation(null);
     setJoinError('');
@@ -322,7 +327,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
             const label = perm.charAt(0).toUpperCase() + perm.slice(1);
             showToast(`You already have ${label} access`, 'info');
           } else if (workspace.permissionChanged === null && workspace.alreadyMember) {
-            showToast('You are already a member of this workspace', 'info');
+            const wsName = workspace.name && workspace.name !== 'Shared Workspace' ? workspace.name : 'this workspace';
+            showToast(`Switched to ${wsName} — you're already a member`, 'success');
           }
           onSuccess?.(workspace);
           onClose?.();
@@ -366,7 +372,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           const label = perm.charAt(0).toUpperCase() + perm.slice(1);
           showToast(`You already have ${label} access`, 'info');
         } else if (workspace?.permissionChanged === null && workspace?.alreadyMember) {
-          showToast('You are already a member of this workspace', 'info');
+          const wsName = workspace.name && workspace.name !== 'Shared Workspace' ? workspace.name : 'this workspace';
+          showToast(`Switched to ${wsName} — you're already a member`, 'success');
         }
         onSuccess?.(workspace);
         onClose?.();
@@ -413,7 +420,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           const label = perm.charAt(0).toUpperCase() + perm.slice(1);
           showToast(`You already have ${label} access`, 'info');
         } else if (workspace?.permissionChanged === null && workspace?.alreadyMember) {
-          showToast('You are already a member of this workspace', 'info');
+          const wsName = workspace.name && workspace.name !== 'Shared Workspace' ? workspace.name : 'this workspace';
+          showToast(`Switched to ${wsName} — you're already a member`, 'success');
         }
         onSuccess?.(workspace);
         onClose?.();

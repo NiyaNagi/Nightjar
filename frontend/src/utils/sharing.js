@@ -384,6 +384,10 @@ export function parseShareLink(link) {
   let fragment = '';
   let entityType = 'document'; // Default for legacy links
   
+  // Normalize HTML-encoded ampersands — links copied from HTML sources
+  // (email clients, GitHub, web pages) may have &amp; instead of &
+  encoded = encoded.replace(/&amp;/g, '&');
+  
   // Normalize protocol to lowercase for comparison
   const encodedLower = encoded.toLowerCase();
   
