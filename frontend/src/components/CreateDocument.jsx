@@ -93,9 +93,14 @@ export default function CreateDocumentDialog({
   // Check if user can create documents
   const canCreateDocument = currentWorkspace && canCreate('document', currentWorkspaceId);
   
-  // Reset form when modal opens/closes
+  // Reset form only on the rising edge of isOpen (closed → open).
+  // Do NOT include defaultType/parentFolderId in deps — they can change while
+  // the dialog is open (e.g., parent re-render) and would wipe user input.
+  const prevIsOpenRef = useRef(false);
   React.useEffect(() => {
-    if (isOpen) {
+    const wasOpen = prevIsOpenRef.current;
+    prevIsOpenRef.current = isOpen;
+    if (isOpen && !wasOpen) {
       setName('');
       setDocumentType(defaultType);
       setIcon(DOCUMENT_TYPES.find(t => t.type === defaultType)?.icon || '📄');
@@ -104,7 +109,8 @@ export default function CreateDocumentDialog({
       setError('');
       setIsCreating(false);
     }
-  }, [isOpen, defaultType, parentFolderId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
   
   // Update icon when document type changes — only set the default type icon if the user hasn't customized it yet
   React.useEffect(() => {

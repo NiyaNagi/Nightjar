@@ -50,15 +50,20 @@ const Comments = ({
         }
     }, [confirm]);
 
-    // Handle pending selection from bubble menu
+    // Handle pending selection from bubble menu.
+    // Use a ref to avoid re-firing when onPendingSelectionHandled changes identity.
+    const onPendingSelectionHandledRef = useRef(onPendingSelectionHandled);
+    useEffect(() => { onPendingSelectionHandledRef.current = onPendingSelectionHandled; });
+    const lastHandledSelectionRef = useRef(null);
     useEffect(() => {
-        if (pendingSelection) {
+        if (pendingSelection && pendingSelection !== lastHandledSelectionRef.current) {
+            lastHandledSelectionRef.current = pendingSelection;
             setCurrentSelection(pendingSelection);
             // Focus the input
             setTimeout(() => inputRef.current?.focus(), 100);
-            onPendingSelectionHandled?.();
+            onPendingSelectionHandledRef.current?.();
         }
-    }, [pendingSelection, onPendingSelectionHandled]);
+    }, [pendingSelection]);
 
     // Check if a comment's referenced text still exists in the document
     const checkCommentTextExists = (comment, docText) => {

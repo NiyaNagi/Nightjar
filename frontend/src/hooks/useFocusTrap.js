@@ -5,7 +5,7 @@
  * Ensures accessibility by preventing focus from leaving the modal.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 
 /**
  * Get all focusable elements within a container
@@ -45,13 +45,30 @@ export function useFocusTrap(containerRef, isActive = true, options = {}) {
         onEscape = null,
     } = options;
     
+    // Store callbacks in refs so the keydown handler and effect don't depend
+    // on potentially-inline function identity (which changes every render).
+    const onEscapeRef = useRef(onEscape);
+    useEffect(() => { onEscapeRef.current = onEscape; });
+    
+    // Track whether we've already auto-focused for this activation.
+    // This prevents re-stealing focus when the effect re-runs due to
+    // dependency changes (e.g., handleKeyDown identity).
+    const hasAutoFocusedRef = useRef(false);
+    
+    // Reset the flag when the trap is deactivated so re-activation focuses again.
+    useEffect(() => {
+        if (!isActive) {
+            hasAutoFocusedRef.current = false;
+        }
+    }, [isActive]);
+    
     const handleKeyDown = useCallback((event) => {
         if (!containerRef.current || !isActive) return;
         
         // Handle Escape key
-        if (event.key === 'Escape' && onEscape) {
+        if (event.key === 'Escape' && onEscapeRef.current) {
             event.preventDefault();
-            onEscape();
+            onEscapeRef.current();
             return;
         }
         
@@ -74,7 +91,7 @@ export function useFocusTrap(containerRef, isActive = true, options = {}) {
             event.preventDefault();
             firstElement.focus();
         }
-    }, [containerRef, isActive, onEscape]);
+    }, [containerRef, isActive]);
     
     useEffect(() => {
         if (!isActive || !containerRef.current) return;
@@ -82,8 +99,9 @@ export function useFocusTrap(containerRef, isActive = true, options = {}) {
         // Store previously focused element
         const previouslyFocused = document.activeElement;
         
-        // Auto-focus first focusable element
-        if (autoFocus) {
+        // Auto-focus first focusable element — only once per activation
+        if (autoFocus && !hasAutoFocusedRef.current) {
+            hasAutoFocusedRef.current = true;
             const focusableElements = getFocusableElements(containerRef.current);
             if (focusableElements.length > 0) {
                 // Small delay to ensure the modal is fully rendered

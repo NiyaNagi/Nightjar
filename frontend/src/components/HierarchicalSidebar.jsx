@@ -8,7 +8,7 @@
  * - All items collapsed by default
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import CreateFolder from './CreateFolder';
 import CreateDocument from './CreateDocument';
@@ -496,6 +496,7 @@ const HierarchicalSidebar = ({
     
     // Context menu state
     const [contextMenu, setContextMenu] = useState(null);
+    const contextMenuElRef = useRef(null);
     
     // Edit properties modal state
     const [editPropertiesItem, setEditPropertiesItem] = useState(null);
@@ -1058,7 +1059,7 @@ const HierarchicalSidebar = ({
                         onKeyDown={(e) => { if (e.key === 'Escape') closeContextMenu(); }}
                         role="menu"
                         tabIndex={-1}
-                        ref={(el) => el?.focus()}
+                        ref={(el) => { if (el && el !== contextMenuElRef.current) { contextMenuElRef.current = el; el.focus(); } }}
                     >
                         {canEditInWorkspace && (
                             <button

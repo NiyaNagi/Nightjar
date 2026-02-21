@@ -34,12 +34,15 @@ export default function PinInput({
         }
     }, [autoFocus]);
     
-    // Focus appropriate input when value changes externally (like clear)
+    // Focus first input only when value transitions from non-empty → empty
+    // (e.g., after a failed PIN attempt clears the field), not on every render.
+    const prevValueRef = useRef(value);
     useEffect(() => {
-        if (value === '' && inputRefs.current[0]) {
+        if (value === '' && prevValueRef.current !== '' && inputRefs.current[0]) {
             inputRefs.current[0].focus();
             setFocusIndex(0);
         }
+        prevValueRef.current = value;
     }, [value]);
     
     const handleChange = (index, e) => {
