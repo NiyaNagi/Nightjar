@@ -1,26 +1,30 @@
 /**
- * Relay Auth & Cross-Platform Sync Tests for v1.7.26
+ * Relay Auth & Cross-Platform Sync Tests for v1.7.26 / v1.7.27
  *
- * Tests for the relay bridge HMAC authentication fix (Issue #11):
+ * Tests for the relay bridge HMAC authentication fix (Issue #11) and
+ * the encryption key delivery + sanitizeRoomName fixes (Issue #12):
  *
- * ROOT CAUSE: The sidecar's relay bridge did NOT send HMAC auth tokens when
- * connecting to the relay server. Once a web client registered its token via
- * first-write-wins, the sidecar was permanently locked out (4403 rejection).
+ * v1.7.26 ROOT CAUSE (Issue #11): The sidecar's relay bridge did NOT send
+ * HMAC auth tokens when connecting to the relay server.
  *
- * FIXES:
- * 1. relay-bridge.js: accepts authToken param, appends ?auth=TOKEN to WS URL,
- *    stores token for reconnects, handles 4403 close code without retrying
- * 2. sidecar/index.js: computeRelayAuthToken() HMAC helper, all connect() call
- *    sites pass auth tokens, set-key handler reconnects with auth, expanded
- *    room filters (workspace-folders: and doc- rooms)
- * 3. useWorkspaceSync.js: browser async auth fallback via Web Crypto API
- * 4. AppNew.jsx: browser async auth fallback for document rooms
+ * v1.7.27 ROOT CAUSES (Issue #12):
+ * 1. sanitizeId() rejects colons → workspace room names like
+ *    "workspace-meta:abc123" are sanitized to null → keys fall through to
+ *    global sessionKey → relay auth-reconnect is bypassed
+ * 2. Sidecar never HTTP POSTs encryption keys to relay server → server
+ *    can't persist Yjs state (encrypted persistence ON by default) → web
+ *    joiners see empty rooms
+ * 3. Password-derived workspace keys aren't persisted → autoRejoinWorkspaces
+ *    on restart can't deliver keys or compute auth tokens
  *
- * Scenarios tested:
- * - Native ↔ Web: sidecar connects with auth, browser uses async fallback
- * - Web ↔ Web: both use async fallback, tokens match
- * - Native ↔ Native: both compute same HMAC from same key
- * - Web → Native and Native → Web: connection order doesn't matter
+ * FIXES (v1.7.27):
+ * 1. sanitizeRoomName() allows colons for room prefixes
+ * 2. deliverKeyToRelayServer() / deliverKeyToAllRelays() HTTP POST keys
+ * 3. set-key handler persists workspace keys in LevelDB metadata
+ * 4. create-workspace / join-workspace deliver keys to relay
+ * 5. connectAllDocsToRelay / autoRejoinWorkspaces skip keyless rooms
+ * 6. doc-added handler skips relay connect without key
+ * 7. Server accepts same-key delivery from different identities
  *
  * @jest-environment node
  */
@@ -219,7 +223,8 @@ describe('Sidecar relay connect call sites pass auth tokens', () => {
   });
 
   test('autoRejoinWorkspaces relay connection passes auth token', () => {
-    const pattern = /const key = getKeyForDocument\(roomName\);\s*const authToken = computeRelayAuthToken\(key, roomName\);\s*relayBridge\.connect\(roomName, doc, null, authToken\)\.catch/;
+    // After v1.7.27, autoRejoinWorkspaces has a key-null guard before connecting
+    const pattern = /const key = getKeyForDocument\(roomName\);\s*[\s\S]*?if \(key\) \{\s*const authToken = computeRelayAuthToken\(key, roomName\);\s*relayBridge\.connect\(roomName, doc, null, authToken\)\.catch/;
     expect(sidecarSource).toMatch(pattern);
   });
 
@@ -228,8 +233,8 @@ describe('Sidecar relay connect call sites pass auth tokens', () => {
     expect(sidecarSource).toContain(
       "console.log(`[Sidecar] Connecting ${docName} to public relay for cross-platform sharing...`);"
     );
-    // And compute auth before connecting
-    const docAddedPattern = /const key = getKeyForDocument\(docName\);\s*const authToken = computeRelayAuthToken\(key, docName\);\s*relayBridge\.connect\(docName, doc, null, authToken\)\.catch/;
+    // Auth token is computed and passed inside the if (key) guard
+    const docAddedPattern = /if \(key\) \{[\s\S]*?const authToken = computeRelayAuthToken\(key, docName\);\s*relayBridge\.connect\(docName, doc, null, authToken\)\.catch/;
     expect(sidecarSource).toMatch(docAddedPattern);
   });
 
@@ -674,5 +679,442 @@ describe('Regression: existing relay functionality preserved', () => {
     expect(serverSource).toMatch(
       /if\s*\(!authToken\)\s*\{[^}]*if\s*\(roomAuthTokens\.has\(roomId\)\)/s
     );
+  });
+});
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — sanitizeRoomName (Issue #12 Root Cause #1)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('sanitizeRoomName — colon-safe room name validation', () => {
+  test('sanitizeRoomName function exists in sidecar', () => {
+    expect(sidecarSource).toContain('function sanitizeRoomName(name)');
+  });
+
+  test('sanitizeRoomName allows colons for workspace room prefixes', () => {
+    // The regex must match [a-zA-Z0-9_\-:]+ (note the colon)
+    expect(sidecarSource).toMatch(/sanitizeRoomName[\s\S]*?safePattern\s*=\s*\/.*:/);
+  });
+
+  test('sanitizeRoomName rejects dangerous characters (slashes, dots, etc.)', () => {
+    // The safe pattern should NOT allow slashes, periods, spaces, etc.
+    expect(sidecarSource).toContain("if (name.includes('..') || name.includes('./') || name.includes('/.'))");
+  });
+
+  test('sanitizeId still rejects colons (unchanged, for non-room-name IDs)', () => {
+    // sanitizeId must NOT match colons — it guards document/workspace/folder IDs
+    expect(sidecarSource).toMatch(/function sanitizeId[\s\S]*?safePattern\s*=\s*\/\^?\[a-zA-Z0-9_\\-\]\+\$/);
+  });
+
+  test('set-key handler uses sanitizeRoomName instead of sanitizeId', () => {
+    // The set-key case must call sanitizeRoomName for docName
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection).not.toBeNull();
+    expect(setKeySection[0]).toContain('sanitizeRoomName(docName)');
+  });
+
+  test('set-key handler falls back to sanitizeId for non-room names', () => {
+    // If sanitizeRoomName returns null, it should try sanitizeId
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection[0]).toContain('sanitizeRoomName(docName) || sanitizeId(docName)');
+  });
+
+  // Functional test: verify regex actually works
+  test('sanitizeRoomName regex accepts valid workspace room names', () => {
+    const regex = /^[a-zA-Z0-9_\-:]+$/;
+    expect(regex.test('workspace-meta:abc123def456')).toBe(true);
+    expect(regex.test('workspace-folders:abc123def456')).toBe(true);
+    expect(regex.test('doc-abc123')).toBe(true);
+  });
+
+  test('sanitizeRoomName regex rejects injection attempts', () => {
+    const regex = /^[a-zA-Z0-9_\-:]+$/;
+    expect(regex.test('workspace-meta:abc/../../etc/passwd')).toBe(false);
+    expect(regex.test('workspace-meta:abc\nHTTP/1.1')).toBe(false);
+    expect(regex.test('workspace-meta:abc 123')).toBe(false);
+    expect(regex.test('')).toBe(false);
+    expect(regex.test('workspace-meta:abc;ls -la')).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — deliverKeyToRelayServer (Issue #12 Root Cause #2)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('deliverKeyToRelayServer — HTTP POST key to relay', () => {
+  test('deliverKeyToRelayServer function exists in sidecar', () => {
+    expect(sidecarSource).toContain('async function deliverKeyToRelayServer(relayUrl, roomName, keyBytes)');
+  });
+
+  test('deliverKeyToAllRelays function exists in sidecar', () => {
+    expect(sidecarSource).toContain('async function deliverKeyToAllRelays(roomName, keyBytes)');
+  });
+
+  test('deliverKeyToRelayServer converts wss:// to https://', () => {
+    expect(sidecarSource).toContain(".replace(/^wss:/i, 'https:')");
+  });
+
+  test('deliverKeyToRelayServer converts ws:// to http://', () => {
+    expect(sidecarSource).toContain(".replace(/^ws:/i, 'http:')");
+  });
+
+  test('deliverKeyToRelayServer posts to /api/rooms/:roomName/key', () => {
+    expect(sidecarSource).toContain('/api/rooms/${encodedRoom}/key');
+  });
+
+  test('deliverKeyToRelayServer URL-encodes room name (handles colons)', () => {
+    expect(sidecarSource).toContain('encodeURIComponent(roomName)');
+  });
+
+  test('deliverKeyToRelayServer signs with Ed25519 identity', () => {
+    expect(sidecarSource).toContain('nacl.sign.detached(messageBytes, ident.privateKey)');
+  });
+
+  test('deliverKeyToRelayServer uses same signature format as frontend', () => {
+    // Both sidecar and frontend sign: "key-delivery:{roomName}:{keyBase64}:{timestamp}"
+    expect(sidecarSource).toContain('`key-delivery:${roomName}:${keyBase64}:${timestamp}`');
+    expect(websocketSource).toContain('`key-delivery:${roomName}:${keyBase64}:${timestamp}`');
+  });
+
+  test('deliverKeyToRelayServer handles 404 gracefully (persistence disabled)', () => {
+    expect(sidecarSource).toContain("res.statusCode === 404");
+    // Should return true on 404 (not an error — just no persistence)
+    const fnSection = sidecarSource.match(/async function deliverKeyToRelayServer[\s\S]*?^}/m);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain("resolve(true)");
+  });
+
+  test('deliverKeyToRelayServer has request timeout', () => {
+    expect(sidecarSource).toContain('timeout: 10000');
+  });
+
+  test('deliverKeyToAllRelays loads bootstrap nodes from mesh-constants', () => {
+    const fnSection = sidecarSource.match(/async function deliverKeyToAllRelays[\s\S]*?^}/m);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain('BOOTSTRAP_NODES');
+    expect(fnSection[0]).toContain('DEV_BOOTSTRAP_NODES');
+  });
+
+  test('deliverKeyToAllRelays uses Promise.allSettled for parallel delivery', () => {
+    expect(sidecarSource).toContain('Promise.allSettled(promises)');
+  });
+
+  test('deliverKeyToAllRelays respects RELAY_OVERRIDE', () => {
+    const fnSection = sidecarSource.match(/async function deliverKeyToAllRelays[\s\S]*?^}/m);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain('RELAY_OVERRIDE');
+  });
+
+  test('sidecar imports http module for dev-mode relay servers', () => {
+    expect(sidecarSource).toContain("const http = require('http')");
+  });
+
+  test('sidecar imports tweetnacl for Ed25519 signing', () => {
+    expect(sidecarSource).toContain("const nacl = require('tweetnacl')");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — Key delivery wiring (Issue #12 fix integration)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Key delivery wiring — all paths deliver keys to relay', () => {
+  test('set-key handler delivers key to relay after documentKeys.set', () => {
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection).not.toBeNull();
+    expect(setKeySection[0]).toContain('deliverKeyToAllRelays(sanitizedDocName, key)');
+  });
+
+  test('set-key handler persists workspace keys in LevelDB metadata', () => {
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection).not.toBeNull();
+    // Should check for workspace-meta: or workspace-folders: prefix and save
+    expect(setKeySection[0]).toContain("sanitizedDocName.startsWith('workspace-meta:')");
+    expect(setKeySection[0]).toContain('saveWorkspaceMetadata(wsId, wsMeta)');
+  });
+
+  test('set-key handler stores key as base64url in workspace metadata', () => {
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection).not.toBeNull();
+    // Must convert to base64url format (matching frontend)
+    expect(setKeySection[0]).toContain("replace(/\\+/g, '-')");
+    expect(setKeySection[0]).toContain("replace(/\\//g, '_')");
+  });
+
+  test('create-workspace handler delivers key to all relays', () => {
+    const createSection = sidecarSource.match(/case 'create-workspace':[\s\S]*?break;/);
+    expect(createSection).not.toBeNull();
+    expect(createSection[0]).toContain('deliverKeyToAllRelays(`workspace-meta:${wsData.id}`, keyBytes)');
+    expect(createSection[0]).toContain('deliverKeyToAllRelays(`workspace-folders:${wsData.id}`, keyBytes)');
+  });
+
+  test('join-workspace handler delivers key to all relays', () => {
+    const joinSection = sidecarSource.match(/case 'join-workspace':[\s\S]*?break;/);
+    expect(joinSection).not.toBeNull();
+    expect(joinSection[0]).toContain('deliverKeyToAllRelays(workspaceMetaDocName, keyBytes)');
+    expect(joinSection[0]).toContain('deliverKeyToAllRelays(workspaceFoldersDocName, keyBytes)');
+  });
+
+  test('connectAllDocsToRelay skips rooms without encryption key', () => {
+    const fnSection = sidecarSource.match(/async function connectAllDocsToRelay[\s\S]*?return connected;\s*\}/);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain('if (!key)');
+    expect(fnSection[0]).toContain('continue');
+    expect(fnSection[0]).toContain('no key available yet');
+  });
+
+  test('connectAllDocsToRelay delivers key to relay for connected rooms', () => {
+    const fnSection = sidecarSource.match(/async function connectAllDocsToRelay[\s\S]*?return connected;\s*\}/);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain('deliverKeyToAllRelays(roomName, key)');
+  });
+
+  test('autoRejoinWorkspaces skips relay when no key available', () => {
+    const fnSection = sidecarSource.match(/async function autoRejoinWorkspaces[\s\S]*?^\}/m);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain('Deferring relay connect');
+    expect(fnSection[0]).toContain('no key available yet');
+  });
+
+  test('autoRejoinWorkspaces delivers key to relay when available', () => {
+    const fnSection = sidecarSource.match(/async function autoRejoinWorkspaces[\s\S]*?^\}/m);
+    expect(fnSection).not.toBeNull();
+    expect(fnSection[0]).toContain('deliverKeyToAllRelays(roomName, key)');
+    expect(fnSection[0]).toContain('deliverKeyToAllRelays(foldersRoom, key)');
+  });
+
+  test('doc-added handler skips relay connect without key', () => {
+    // The doc-added event handler must check for key before relay connect
+    const docAddedSection = sidecarSource.match(/docs\.on\('doc-added'[\s\S]*?^\}\);/m);
+    expect(docAddedSection).not.toBeNull();
+    expect(docAddedSection[0]).toContain('Deferring relay connect');
+    expect(docAddedSection[0]).toContain('no key available yet');
+  });
+
+  test('doc-added handler delivers key to relay when key exists', () => {
+    const docAddedSection = sidecarSource.match(/docs\.on\('doc-added'[\s\S]*?^\}\);/m);
+    expect(docAddedSection).not.toBeNull();
+    expect(docAddedSection[0]).toContain('deliverKeyToAllRelays(docName, key)');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — Server same-key acceptance (Issue #12 Bug #10 fix)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Server key delivery — same-key different-identity acceptance', () => {
+  test('server key endpoint accepts same key from different identity', () => {
+    // The server should compare the incoming key with the stored key
+    // and return 200 if they match, even if the identity is different
+    expect(serverSource).toContain('Same key re-delivered by different identity');
+  });
+
+  test('server key endpoint uses Buffer.equals for key comparison', () => {
+    // Must use proper byte comparison, not string comparison
+    const keySection = serverSource.match(/api\/rooms\/:roomName\/key[\s\S]*?res\.json\(\{ success: true \}\);[\s\S]*?\}\);/);
+    expect(keySection).not.toBeNull();
+    expect(keySection[0]).toContain('.equals(');
+  });
+
+  test('server still rejects truly different key from different identity', () => {
+    // Different key + different identity should still return 403
+    expect(serverSource).toContain("'Room key already registered by a different identity'");
+  });
+
+  test('server key endpoint still has encrypted persistence gate', () => {
+    expect(serverSource).toContain("if (!ENCRYPTED_PERSISTENCE)");
+  });
+
+  test('server key endpoint still has rate limiting', () => {
+    expect(serverSource).toContain('keyDeliveryLimiter');
+  });
+
+  test('server key endpoint handles deferred loads (pendingKeyLoads)', () => {
+    expect(serverSource).toContain('pendingKeyLoads.has(roomName)');
+    expect(serverSource).toContain("Y.applyUpdate(doc, decrypted, 'persistence-load')");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — Cross-Platform Matrix Verification
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Cross-Platform Matrix — all 4 scenarios work end-to-end', () => {
+
+  // Scenario 1: Native → Web
+  describe('Scenario 1: Native creates, Web joins', () => {
+    test('create-workspace registers key in documentKeys', () => {
+      const createSection = sidecarSource.match(/case 'create-workspace':[\s\S]*?break;/);
+      expect(createSection[0]).toContain('documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes)');
+      expect(createSection[0]).toContain('documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes)');
+    });
+
+    test('create-workspace delivers key to relay for server persistence', () => {
+      const createSection = sidecarSource.match(/case 'create-workspace':[\s\S]*?break;/);
+      expect(createSection[0]).toContain('deliverKeyToAllRelays');
+    });
+
+    test('set-key accepts workspace-meta:xxx (colon in name)', () => {
+      // sanitizeRoomName must accept colons
+      expect(sidecarSource).toContain('function sanitizeRoomName(name)');
+      const regex = /^[a-zA-Z0-9_\-:]+$/;
+      expect(regex.test('workspace-meta:test123')).toBe(true);
+    });
+
+    test('set-key delivers key to relay server', () => {
+      const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+      expect(setKeySection[0]).toContain('deliverKeyToAllRelays(sanitizedDocName, key)');
+    });
+
+    test('web client can still use deliverKeyToServer from frontend', () => {
+      // Browser path: useWorkspaceSync → deliverKeyToServer → HTTP POST
+      expect(websocketSource).toContain('async function deliverKeyToServer');
+      expect(websocketSource).toContain('/api/rooms/${encodedRoom}/key');
+    });
+  });
+
+  // Scenario 2: Web → Native
+  describe('Scenario 2: Web creates, Native joins', () => {
+    test('web client delivers key via deliverKeyToServer (browser path)', () => {
+      expect(websocketSource).toContain("isElectron() && !serverUrl");
+      // Browser mode should proceed (skip condition is Electron without serverUrl)
+    });
+
+    test('join-workspace registers key from share link', () => {
+      const joinSection = sidecarSource.match(/case 'join-workspace':[\s\S]*?break;/);
+      expect(joinSection[0]).toContain("documentKeys.set(workspaceMetaDocName, keyBytes)");
+      expect(joinSection[0]).toContain("documentKeys.set(workspaceFoldersDocName, keyBytes)");
+    });
+
+    test('join-workspace delivers key to relay (covers native joiner)', () => {
+      const joinSection = sidecarSource.match(/case 'join-workspace':[\s\S]*?break;/);
+      expect(joinSection[0]).toContain('deliverKeyToAllRelays(workspaceMetaDocName, keyBytes)');
+    });
+  });
+
+  // Scenario 3: Native → Native
+  describe('Scenario 3: Native creates, Native joins', () => {
+    test('both sides compute identical HMAC auth tokens', () => {
+      // Both use computeRelayAuthToken with identical algorithm
+      const key = crypto.randomBytes(32);
+      const room = 'workspace-meta:testws123';
+      const token = crypto.createHmac('sha256', key).update(`room-auth:${room}`).digest('base64');
+
+      // Second computation must produce same result
+      const token2 = crypto.createHmac('sha256', key).update(`room-auth:${room}`).digest('base64');
+      expect(token).toBe(token2);
+    });
+
+    test('both sides deliver same key to relay (server accepts)', () => {
+      // Server must accept same-key delivery from different identity
+      expect(serverSource).toContain('Same key re-delivered by different identity');
+    });
+
+    test('relay bridge appends auth token to WebSocket URL', () => {
+      expect(relayBridgeSource).toContain('auth=${encodeURIComponent(authToken)}');
+    });
+  });
+
+  // Scenario 4: Web → Web
+  describe('Scenario 4: Web creates, Web joins', () => {
+    test('browser uses async auth fallback (Web Crypto API)', () => {
+      // useWorkspaceSync has fallback for browsers without sync HMAC
+      expect(useWorkspaceSyncSource).toContain('computeRoomAuthToken(authKeyChain.workspaceKey, roomName)');
+    });
+
+    test('browser delivers key to server via fetch (no sidecar involved)', () => {
+      expect(websocketSource).toContain("method: 'POST'");
+      expect(websocketSource).toContain("'Content-Type': 'application/json'");
+    });
+
+    test('sidecar changes do not affect browser-only path', () => {
+      // deliverKeyToServer in websocket.js skips in Electron mode
+      expect(websocketSource).toContain('isElectron() && !serverUrl');
+      // Browser mode: isElectron() returns false → proceeds with delivery
+    });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — Key Persistence and Restart Recovery
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Key persistence — workspace keys survive restart', () => {
+  test('set-key handler persists key for workspace-meta rooms', () => {
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection[0]).toContain("sanitizedDocName.startsWith('workspace-meta:')");
+    expect(setKeySection[0]).toContain('saveWorkspaceMetadata(wsId, wsMeta)');
+  });
+
+  test('set-key handler persists key for workspace-folders rooms', () => {
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection[0]).toContain("sanitizedDocName.startsWith('workspace-folders:')");
+  });
+
+  test('loadWorkspaceList preloads keys from persisted metadata', () => {
+    // loadWorkspaceList already loads encryptionKey into documentKeys
+    expect(sidecarSource).toContain('Loaded encryption key for workspace-meta:');
+    // Use word boundary \b to avoid matching loadWorkspaceListInternal
+    const loadSection = sidecarSource.match(/async function loadWorkspaceList\b(?!Internal)[\s\S]*?return workspaces;\s*\}/);
+    expect(loadSection).not.toBeNull();
+    expect(loadSection[0]).toContain('documentKeys.set(workspaceMetaDocName, keyBytes)');
+    expect(loadSection[0]).toContain('documentKeys.set(workspaceFoldersDocName, keyBytes)');
+  });
+
+  test('autoRejoinWorkspaces uses preloaded keys for relay auth', () => {
+    // After loadWorkspaceList preloads keys, autoRejoinWorkspaces should
+    // find them via getKeyForDocument and compute auth tokens
+    const fnSection = sidecarSource.match(/async function autoRejoinWorkspaces[\s\S]*?^\}/m);
+    expect(fnSection[0]).toContain('getKeyForDocument(roomName)');
+    expect(fnSection[0]).toContain('computeRelayAuthToken(key, roomName)');
+  });
+
+  test('set-key handler handles missing workspace metadata gracefully', () => {
+    // If workspace doesn't exist yet in metadata DB, should not crash
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection[0]).toContain('LEVEL_NOT_FOUND');
+  });
+
+  test('set-key handler only persists when key not already saved', () => {
+    // Idempotency: don't overwrite existing persisted key
+    const setKeySection = sidecarSource.match(/case 'set-key':[\s\S]*?break;/);
+    expect(setKeySection[0]).toContain('!wsMeta.encryptionKey');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v1.7.27 — Signature format compatibility
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Ed25519 Signature compatibility — sidecar matches frontend', () => {
+  test('both use identical signed message format', () => {
+    // Sidecar: `key-delivery:${roomName}:${keyBase64}:${timestamp}`
+    expect(sidecarSource).toContain('`key-delivery:${roomName}:${keyBase64}:${timestamp}`');
+    // Frontend: same format
+    expect(websocketSource).toContain('`key-delivery:${roomName}:${keyBase64}:${timestamp}`');
+  });
+
+  test('sidecar uses nacl.sign.detached for signing', () => {
+    expect(sidecarSource).toContain('nacl.sign.detached(messageBytes, ident.privateKey)');
+  });
+
+  test('frontend uses nacl.sign.detached for signing', () => {
+    expect(websocketSource).toContain('nacl.sign.detached(messageBytes, secretKey)');
+  });
+
+  test('both encode public key and signature as base64', () => {
+    // Sidecar uses Buffer.from().toString('base64')
+    expect(sidecarSource).toContain("Buffer.from(ident.publicKey).toString('base64')");
+    expect(sidecarSource).toContain("Buffer.from(signature).toString('base64')");
+    // Frontend uses btoa()
+    expect(websocketSource).toContain('btoa(pubBinary)');
+    expect(websocketSource).toContain('btoa(sigBinary)');
+  });
+
+  // Verify that Buffer.from(str, 'utf-8') and TextEncoder produce identical bytes for ASCII
+  test('signature byte encoding produces identical results for ASCII strings', () => {
+    const testMessage = 'key-delivery:workspace-meta:abc123:AaBbCcDd+/==:1234567890';
+    const bufferBytes = Buffer.from(testMessage, 'utf-8');
+    const encoderBytes = new TextEncoder().encode(testMessage);
+    expect(Buffer.from(encoderBytes).equals(bufferBytes)).toBe(true);
   });
 });

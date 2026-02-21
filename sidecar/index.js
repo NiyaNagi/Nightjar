@@ -63,6 +63,8 @@ function getUPnPMapper() {
 }
 const { relayBridge } = require('./relay-bridge');
 const https = require('https');
+const http = require('http');
+const nacl = require('tweetnacl');
 
 console.log(`[Sidecar] All imports completed (${Date.now() - startTime}ms)`);
 
@@ -225,6 +227,31 @@ function sanitizeId(id) {
     if (id.length === 0) return null;
     
     return id;
+}
+
+/**
+ * Validate and sanitize a room name (workspace-meta:xxx, workspace-folders:xxx, doc-xxx).
+ * Unlike sanitizeId(), this allows colons which are needed for room name prefixes.
+ * @param {string} name - Room name to validate
+ * @returns {string|null} Sanitized room name or null if invalid
+ */
+function sanitizeRoomName(name) {
+    if (typeof name !== 'string') return null;
+    name = name.trim();
+    if (name.length === 0 || name.length > MAX_ID_LENGTH) return null;
+    
+    // Allow alphanumeric, underscore, hyphen, and colon (for room prefixes)
+    const safePattern = /^[a-zA-Z0-9_\-:]+$/;
+    if (!safePattern.test(name)) return null;
+    
+    // Reject path traversal
+    if (name.includes('..') || name.includes('./') || name.includes('/.')) return null;
+    
+    // Strip leading dots
+    name = name.replace(/^\.+/, '');
+    if (name.length === 0) return null;
+    
+    return name;
 }
 
 /**
@@ -566,6 +593,125 @@ function computeRelayAuthToken(keyBytes, roomName) {
     }
 }
 
+/**
+ * Deliver an encryption key to a relay server via HTTP POST.
+ * This is required for servers with encrypted persistence enabled (default).
+ * Without the key, the server cannot persist Yjs state, and web joiners see empty rooms.
+ *
+ * Mirrors the web client's deliverKeyToServer() in frontend/src/utils/websocket.js.
+ *
+ * @param {string} relayUrl - WebSocket URL of the relay (e.g., 'wss://night-jar.co')
+ * @param {string} roomName - Room name (e.g., 'workspace-meta:abc123')
+ * @param {Uint8Array|Buffer} keyBytes - 32-byte encryption key
+ * @returns {Promise<boolean>} True if key was delivered successfully
+ */
+async function deliverKeyToRelayServer(relayUrl, roomName, keyBytes) {
+    if (!relayUrl || !roomName || !keyBytes) return false;
+    
+    try {
+        // Convert relay WebSocket URL to HTTP(S) URL
+        const apiBase = relayUrl
+            .replace(/^wss:/i, 'https:')
+            .replace(/^ws:/i, 'http:')
+            .replace(/\/$/, ''); // strip trailing slash
+        
+        const keyBase64 = Buffer.from(keyBytes).toString('base64');
+        const encodedRoom = encodeURIComponent(roomName);
+        const timestamp = Date.now();
+        
+        // Build request body
+        const body = { key: keyBase64, timestamp };
+        
+        // Sign with Ed25519 identity if available
+        try {
+            const ident = identity.loadIdentity();
+            if (ident?.privateKey && ident?.publicKey) {
+                const signedMessage = `key-delivery:${roomName}:${keyBase64}:${timestamp}`;
+                const messageBytes = Buffer.from(signedMessage, 'utf-8');
+                const signature = nacl.sign.detached(messageBytes, ident.privateKey);
+                
+                body.publicKey = Buffer.from(ident.publicKey).toString('base64');
+                body.signature = Buffer.from(signature).toString('base64');
+            }
+        } catch (signErr) {
+            console.debug('[Sidecar] Could not sign key delivery:', signErr.message);
+        }
+        
+        const postData = JSON.stringify(body);
+        const url = new URL(`${apiBase}/api/rooms/${encodedRoom}/key`);
+        const transport = url.protocol === 'https:' ? https : http;
+        
+        return new Promise((resolve) => {
+            const req = transport.request({
+                hostname: url.hostname,
+                port: url.port || (url.protocol === 'https:' ? 443 : 80),
+                path: url.pathname + url.search,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(postData),
+                },
+                timeout: 10000,
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                    if (res.statusCode === 200) {
+                        console.log(`[Sidecar] Key delivered to relay for room: ${roomName.slice(0, 30)}...`);
+                        resolve(true);
+                    } else if (res.statusCode === 404) {
+                        // Persistence not enabled on this server — that's fine
+                        console.debug(`[Sidecar] Relay does not have encrypted persistence enabled`);
+                        resolve(true);
+                    } else {
+                        console.warn(`[Sidecar] Key delivery failed (${res.statusCode}): ${data}`);
+                        resolve(false);
+                    }
+                });
+            });
+            
+            req.on('error', (err) => {
+                console.warn(`[Sidecar] Key delivery request failed for ${roomName}:`, err.message);
+                resolve(false);
+            });
+            
+            req.on('timeout', () => {
+                req.destroy();
+                console.warn(`[Sidecar] Key delivery timed out for ${roomName}`);
+                resolve(false);
+            });
+            
+            req.write(postData);
+            req.end();
+        });
+    } catch (err) {
+        console.warn(`[Sidecar] deliverKeyToRelayServer error for ${roomName}:`, err.message);
+        return false;
+    }
+}
+
+/**
+ * Deliver an encryption key to ALL configured relay servers.
+ * Fires in parallel (Promise.allSettled) so one failure doesn't block others.
+ *
+ * @param {string} roomName - Room name
+ * @param {Uint8Array|Buffer} keyBytes - 32-byte encryption key
+ * @returns {Promise<void>}
+ */
+async function deliverKeyToAllRelays(roomName, keyBytes) {
+    if (!roomName || !keyBytes) return;
+    
+    const { BOOTSTRAP_NODES: bootstrapNodes, DEV_BOOTSTRAP_NODES: devNodes } = require('./mesh-constants');
+    const relays = process.env.RELAY_OVERRIDE
+        ? [process.env.RELAY_OVERRIDE]
+        : (process.env.NODE_ENV === 'development' ? devNodes : bootstrapNodes);
+    
+    if (relays.length === 0) return;
+    
+    const promises = relays.map(relay => deliverKeyToRelayServer(relay, roomName, keyBytes));
+    await Promise.allSettled(promises);
+}
+
 // Helper to persist and optionally broadcast document updates
 async function persistUpdate(docName, update, origin) {
     const key = getKeyForDocument(docName);
@@ -758,9 +904,23 @@ async function connectAllDocsToRelay() {
         if (roomName.startsWith('workspace-meta:') || roomName.startsWith('workspace-folders:') || roomName.startsWith('doc-')) {
             try {
                 const key = getKeyForDocument(roomName);
+                
+                // Skip rooms with no encryption key — the set-key handler will
+                // connect once the frontend delivers the key. Connecting without
+                // a key means no auth token and no encrypted persistence.
+                if (!key) {
+                    console.log(`[Sidecar] Skipping relay connect for ${roomName} — no key available yet`);
+                    continue;
+                }
+                
                 const authToken = computeRelayAuthToken(key, roomName);
                 await relayBridge.connect(roomName, doc, null, authToken);
                 connected++;
+                
+                // Deliver encryption key to relay for persistence
+                deliverKeyToAllRelays(roomName, key).catch(err => {
+                    console.warn(`[Sidecar] Background key delivery failed for ${roomName}:`, err.message);
+                });
             } catch (connectErr) {
                 console.warn(`[Sidecar] Relay connect for ${roomName} failed:`, connectErr.message);
             }
@@ -1738,13 +1898,41 @@ async function handleMetadataMessage(ws, parsed) {
                     return;
                 }
                 
-                // Sanitize docName if provided
-                const sanitizedDocName = docName ? sanitizeId(docName) : null;
+                // Use sanitizeRoomName (allows colons) for room names like workspace-meta:abc123
+                // Falls back to sanitizeId for plain doc IDs (no colons)
+                const sanitizedDocName = docName
+                    ? (sanitizeRoomName(docName) || sanitizeId(docName))
+                    : null;
                 
                 if (sanitizedDocName) {
                     // Per-document key
                     console.log(`[Sidecar] Received encryption key for document: ${sanitizedDocName}`);
                     documentKeys.set(sanitizedDocName, key);
+                    
+                    // Persist workspace keys in LevelDB so autoRejoinWorkspaces has them on restart
+                    if (sanitizedDocName.startsWith('workspace-meta:') || sanitizedDocName.startsWith('workspace-folders:')) {
+                        const wsId = sanitizedDocName.split(':')[1];
+                        if (wsId) {
+                            try {
+                                const wsMeta = await loadWorkspaceMetadata(wsId);
+                                if (wsMeta && !wsMeta.encryptionKey) {
+                                    // Store as base64url (matches frontend format)
+                                    wsMeta.encryptionKey = Buffer.from(key)
+                                        .toString('base64')
+                                        .replace(/\+/g, '-')
+                                        .replace(/\//g, '_')
+                                        .replace(/=+$/, '');
+                                    await saveWorkspaceMetadata(wsId, wsMeta);
+                                    console.log(`[Sidecar] Persisted encryption key for workspace: ${wsId}`);
+                                }
+                            } catch (persistErr) {
+                                // Workspace may not exist yet — that's fine
+                                if (persistErr.code !== 'LEVEL_NOT_FOUND') {
+                                    console.warn(`[Sidecar] Failed to persist workspace key:`, persistErr.message);
+                                }
+                            }
+                        }
+                    }
                     
                     // If this document is already loaded, reload its data with the correct key
                     if (docs.has(sanitizedDocName)) {
@@ -1764,6 +1952,14 @@ async function handleMetadataMessage(ws, parsed) {
                             await persistUpdate(sanitizedDocName, update, origin);
                         }
                         pendingUpdates.set(sanitizedDocName, []);
+                    }
+                    
+                    // Deliver encryption key to relay servers for encrypted persistence
+                    // This ensures the server can persist Yjs state so web joiners see data
+                    if (relayBridgeEnabled) {
+                        deliverKeyToAllRelays(sanitizedDocName, key).catch(err => {
+                            console.warn(`[Sidecar] Background key delivery failed for ${sanitizedDocName}:`, err.message);
+                        });
                     }
                     
                     // If this doc is connected to the relay WITHOUT auth (key arrived
@@ -2014,6 +2210,18 @@ async function handleMetadataMessage(ws, parsed) {
                             documentKeys.set(`workspace-meta:${wsData.id}`, keyBytes);
                             documentKeys.set(`workspace-folders:${wsData.id}`, keyBytes);
                             console.log(`[Sidecar] Registered encryption key for created workspace-meta: ${wsData.id}`);
+                            
+                            // Deliver key to relay servers for encrypted persistence
+                            // This is critical: without the key, the relay can't persist state
+                            // and web joiners will see empty rooms
+                            if (relayBridgeEnabled) {
+                                deliverKeyToAllRelays(`workspace-meta:${wsData.id}`, keyBytes).catch(err => {
+                                    console.warn(`[Sidecar] Background key delivery failed (create meta):`, err.message);
+                                });
+                                deliverKeyToAllRelays(`workspace-folders:${wsData.id}`, keyBytes).catch(err => {
+                                    console.warn(`[Sidecar] Background key delivery failed (create folders):`, err.message);
+                                });
+                            }
                         } catch (e) {
                             console.error(`[Sidecar] Failed to register key for workspace ${wsData.id}:`, e.message);
                         }
@@ -2131,6 +2339,17 @@ async function handleMetadataMessage(ws, parsed) {
                             // Also register for workspace-folders room
                             const workspaceFoldersDocName = `workspace-folders:${joinWsData.id}`;
                             documentKeys.set(workspaceFoldersDocName, keyBytes);
+                            
+                            // Deliver key to relay servers for encrypted persistence
+                            // Critical for both native→web and native→native sharing
+                            if (relayBridgeEnabled) {
+                                deliverKeyToAllRelays(workspaceMetaDocName, keyBytes).catch(err => {
+                                    console.warn(`[Sidecar] Background key delivery failed (join meta):`, err.message);
+                                });
+                                deliverKeyToAllRelays(workspaceFoldersDocName, keyBytes).catch(err => {
+                                    console.warn(`[Sidecar] Background key delivery failed (join folders):`, err.message);
+                                });
+                            }
                         } catch (e) {
                             console.error(`[Sidecar] Failed to register key for joined workspace ${joinWsData.id}:`, e.message);
                         }
@@ -5040,10 +5259,30 @@ async function autoRejoinWorkspaces() {
                         const doc = getOrCreateYDoc(roomName);
                         if (doc) {
                             const key = getKeyForDocument(roomName);
-                            const authToken = computeRelayAuthToken(key, roomName);
-                            relayBridge.connect(roomName, doc, null, authToken).catch(err => {
-                                console.warn(`[Sidecar] Relay connection for ${ws.id.slice(0, 8)}... failed:`, err.message);
-                            });
+                            
+                            // Only connect to relay if we have the encryption key.
+                            // Without the key we can't compute auth tokens or deliver
+                            // keys for persistence. The set-key handler will connect
+                            // once the frontend sends the key.
+                            if (key) {
+                                const authToken = computeRelayAuthToken(key, roomName);
+                                relayBridge.connect(roomName, doc, null, authToken).catch(err => {
+                                    console.warn(`[Sidecar] Relay connection for ${ws.id.slice(0, 8)}... failed:`, err.message);
+                                });
+                                
+                                // Deliver key to relay server for encrypted persistence
+                                deliverKeyToAllRelays(roomName, key).catch(err => {
+                                    console.warn(`[Sidecar] Key delivery for ${ws.id.slice(0, 8)}... failed:`, err.message);
+                                });
+                                
+                                // Also deliver key for workspace-folders room
+                                const foldersRoom = `workspace-folders:${ws.id}`;
+                                deliverKeyToAllRelays(foldersRoom, key).catch(err => {
+                                    console.warn(`[Sidecar] Key delivery (folders) for ${ws.id.slice(0, 8)}... failed:`, err.message);
+                                });
+                            } else {
+                                console.log(`[Sidecar] Deferring relay connect for ${ws.id.slice(0, 8)}... — no key available yet`);
+                            }
                         }
                     }
                 } catch (e) {
@@ -5481,13 +5720,26 @@ docs.on('doc-added', async (doc, docName) => {
             docName.startsWith('workspace-folders:') ||
             docName.startsWith('doc-')
         )) {
-            console.log(`[Sidecar] Connecting ${docName} to public relay for cross-platform sharing...`);
             const key = getKeyForDocument(docName);
-            const authToken = computeRelayAuthToken(key, docName);
-            relayBridge.connect(docName, doc, null, authToken).catch(err => {
-                console.warn(`[Sidecar] Failed to connect ${docName} to relay:`, err.message);
-                // Non-fatal - P2P mesh will still work
-            });
+            
+            // Only connect to relay if we have the encryption key.
+            // Without the key we can't compute auth tokens or enable persistence.
+            // The set-key handler will connect once the frontend delivers the key.
+            if (key) {
+                console.log(`[Sidecar] Connecting ${docName} to public relay for cross-platform sharing...`);
+                const authToken = computeRelayAuthToken(key, docName);
+                relayBridge.connect(docName, doc, null, authToken).catch(err => {
+                    console.warn(`[Sidecar] Failed to connect ${docName} to relay:`, err.message);
+                    // Non-fatal - P2P mesh will still work
+                });
+                
+                // Deliver key to relay for encrypted persistence
+                deliverKeyToAllRelays(docName, key).catch(err => {
+                    console.warn(`[Sidecar] Background key delivery failed for ${docName}:`, err.message);
+                });
+            } else {
+                console.log(`[Sidecar] Deferring relay connect for ${docName} — no key available yet`);
+            }
         }
         
         // For workspace-meta docs, add P2P broadcast observer if topic is registered

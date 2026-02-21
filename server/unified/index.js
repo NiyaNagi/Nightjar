@@ -1800,7 +1800,15 @@ app.post(BASE_PATH + '/api/rooms/:roomName/key', express.json({ limit: '64kb' })
     // Check room ownership
     const existingOwner = roomKeyOwners.get(roomName);
     if (existingOwner && existingOwner !== pubKeyBase64) {
-      // Different identity trying to overwrite — reject
+      // Different identity trying to deliver a key. If the key matches the
+      // already-registered key, accept it — workspace members share the same
+      // encryption key so this is a legitimate delivery from a different device.
+      const existingKey = documentKeys.get(roomName);
+      if (existingKey && key.length === existingKey.length && Buffer.from(key).equals(Buffer.from(existingKey))) {
+        console.log(`[EncryptedPersistence] Same key re-delivered by different identity for room: ${roomName.slice(0, 30)}...`);
+        return res.json({ success: true });
+      }
+      // Truly different key from different identity — reject
       return res.status(403).json({ error: 'Room key already registered by a different identity' });
     }
 
