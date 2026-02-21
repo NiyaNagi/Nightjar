@@ -136,6 +136,8 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
     
     // Custom presence overlays (Fortune Sheet's API is unreliable)
     const [presenceOverlays, setPresenceOverlays] = useState([]);
+    // Store raw presence data separately from computed overlay positions
+    const presenceDataRef = useRef([]);
     
     // Ref-stable callback for stats so the debounced function never goes stale
     const onStatsChangeRef = useRef(onStatsChange);
@@ -172,6 +174,149 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
     // Keep dataRef in sync with the latest data state
     // Updated at render time (not in useEffect) to avoid one-frame stale reads
     dataRef.current = data;
+
+    /**
+     * Compute pixel positions for presence overlays using actual cell dimensions
+     * from Fortune Sheet's API rather than hardcoded defaults.
+     * This is called when:
+     *  - awareness state changes (collaborator moves)
+     *  - the user scrolls the sheet
+     *  - the sheet resizes
+     */
+    const computePresenceOverlays = useCallback(() => {
+        const presences = presenceDataRef.current;
+        if (!presences || presences.length === 0) {
+            setPresenceOverlays([]);
+            return;
+        }
+
+        // Read actual cell dimensions from the Fortune Sheet workbook API
+        const wb = workbookRef.current;
+        
+        // Collect all unique row and column indices we need dimensions for
+        const rowIndices = [...new Set(presences.map(p => p.selection.r))];
+        const colIndices = [...new Set(presences.map(p => p.selection.c))];
+        
+        // For positioning, we need cumulative heights/widths up to each index.
+        // getRowHeight / getColumnWidth return the size of the requested rows/columns.
+        // We need to sum all rows from 0..r-1 for the top edge and add row r's height for the bottom.
+        
+        // Find the max row/col index we need and request all rows/cols from 0 to max
+        const maxRow = Math.max(...rowIndices);
+        const maxCol = Math.max(...colIndices);
+        
+        // Build arrays [0, 1, 2, ..., maxRow] and [0, 1, ..., maxCol]
+        const allRows = Array.from({ length: maxRow + 1 }, (_, i) => i);
+        const allCols = Array.from({ length: maxCol + 1 }, (_, i) => i);
+        
+        // Default dimensions as fallback
+        const defaultRowH = 25;
+        const defaultColW = 100;
+        
+        // Get actual dimensions from the API (returns Record<number, number>)
+        let rowHeights = {};
+        let colWidths = {};
+        try {
+            if (wb?.getRowHeight && allRows.length > 0) {
+                rowHeights = wb.getRowHeight(allRows) || {};
+            }
+        } catch (e) {
+            console.warn('[Sheet] getRowHeight failed, using defaults:', e);
+        }
+        try {
+            if (wb?.getColumnWidth && allCols.length > 0) {
+                colWidths = wb.getColumnWidth(allCols) || {};
+            }
+        } catch (e) {
+            console.warn('[Sheet] getColumnWidth failed, using defaults:', e);
+        }
+        
+        // Build cumulative position arrays
+        // cumulativeRowY[r] = top edge of row r (sum of heights of rows 0..r-1)
+        const cumulativeRowY = new Array(maxRow + 2);
+        cumulativeRowY[0] = 0;
+        for (let r = 0; r <= maxRow; r++) {
+            const h = rowHeights[r] ?? defaultRowH;
+            cumulativeRowY[r + 1] = cumulativeRowY[r] + h;
+        }
+        
+        // cumulativeColX[c] = left edge of column c (sum of widths of columns 0..c-1)
+        const cumulativeColX = new Array(maxCol + 2);
+        cumulativeColX[0] = 0;
+        for (let c = 0; c <= maxCol; c++) {
+            const w = colWidths[c] ?? defaultColW;
+            cumulativeColX[c + 1] = cumulativeColX[c] + w;
+        }
+        
+        // Read Fortune Sheet's internal scroll position from the DOM
+        let scrollLeft = 0;
+        let scrollTop = 0;
+        if (containerRef.current) {
+            const scrollXEl = containerRef.current.querySelector('.luckysheet-scrollbar-x');
+            const scrollYEl = containerRef.current.querySelector('.luckysheet-scrollbar-y');
+            if (scrollXEl) scrollLeft = scrollXEl.scrollLeft || 0;
+            if (scrollYEl) scrollTop = scrollYEl.scrollTop || 0;
+        }
+        
+        // Measure actual header dimensions from the DOM for precision
+        let topOffset = 93; // fallback: toolbar(40) + formula-bar(28) + col-headers(25)
+        let rowHeaderWidth = 46; // fallback
+        if (containerRef.current) {
+            // The column header row sits above the cells
+            const colHeader = containerRef.current.querySelector('.fortune-col-header');
+            const cellArea = containerRef.current.querySelector('.fortune-cell-area');
+            const toolbar = containerRef.current.querySelector('.fortune-toolbar');
+            const formulaBar = containerRef.current.querySelector('.fortune-formula-bar');
+            
+            // Calculate topOffset from actual DOM elements if available
+            if (cellArea) {
+                // cellArea's offsetTop relative to the sheet-workbook-wrapper gives us the exact top offset
+                const wrapperEl = containerRef.current.querySelector('.sheet-workbook-wrapper') || containerRef.current;
+                const wrapperRect = wrapperEl.getBoundingClientRect();
+                const cellAreaRect = cellArea.getBoundingClientRect();
+                topOffset = cellAreaRect.top - wrapperRect.top;
+            }
+            
+            // Measure row header width from DOM
+            const rowHeader = containerRef.current.querySelector('.fortune-row-header');
+            if (rowHeader) {
+                rowHeaderWidth = rowHeader.offsetWidth || 46;
+            }
+        }
+        
+        const overlays = presences.map(p => {
+            const r = p.selection.r;
+            const c = p.selection.c;
+            
+            const cellTop = cumulativeRowY[r] ?? (r * defaultRowH);
+            const cellLeft = cumulativeColX[c] ?? (c * defaultColW);
+            const cellHeight = rowHeights[r] ?? defaultRowH;
+            const cellWidth = colWidths[c] ?? defaultColW;
+            
+            // Position relative to the wrapper: header offsets + cell position - scroll
+            const cellX = rowHeaderWidth + cellLeft - scrollLeft;
+            const cellY = topOffset + cellTop - scrollTop;
+            
+            return {
+                clientId: p.userId,
+                name: p.username,
+                color: p.color,
+                cellX,
+                cellY,
+                cellWidth,
+                cellHeight,
+                // Dot position: upper-right corner of the cell
+                dotX: cellX + cellWidth - 12,
+                dotY: cellY + 2,
+                row: r,
+                col: c,
+                // Hide if scrolled out of view
+                visible: cellX + cellWidth > rowHeaderWidth && cellY + cellHeight > topOffset,
+            };
+        });
+        
+        setPresenceOverlays(overlays);
+    }, []); // No deps — reads from refs and DOM
 
     // Subscribe to awareness for collaborator presence and selections
     useEffect(() => {
@@ -265,34 +410,10 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             
             setCollaborators(collabs);
             
-            // Build custom presence overlay positions
-            // Fortune Sheet's presence API is unreliable, so we render our own
-            const defaultColWidth = 100;
-            const defaultRowHeight = 25;
-            // Formula bar + toolbar height - these are fixed in Fortune Sheet
-            // Toolbar: ~40px, Formula bar: ~28px, Column headers: ~25px
-            const toolbarHeight = 40;
-            const formulaBarHeight = 28;
-            const columnHeaderHeight = 25;
-            const topOffset = toolbarHeight + formulaBarHeight + columnHeaderHeight;
-            const rowHeaderWidth = 46;
-            
-            const overlays = presences.map(p => ({
-                clientId: p.userId,
-                name: p.username,
-                color: p.color,
-                // Cell position for border
-                cellX: rowHeaderWidth + (p.selection.c * defaultColWidth),
-                cellY: topOffset + (p.selection.r * defaultRowHeight),
-                cellWidth: defaultColWidth,
-                cellHeight: defaultRowHeight,
-                // Dot position: upper-right corner of the cell (inside the cell, offset from corner)
-                dotX: rowHeaderWidth + ((p.selection.c + 1) * defaultColWidth) - 12,
-                dotY: topOffset + (p.selection.r * defaultRowHeight) + 2,
-                row: p.selection.r,
-                col: p.selection.c,
-            }));
-            setPresenceOverlays(overlays);
+            // Store raw presence data — pixel positions are computed separately
+            // in computePresenceOverlays() which reads actual cell dimensions from the API
+            presenceDataRef.current = presences;
+            computePresenceOverlays();
             
             // Update previousClientIds for next comparison
             previousClientIds = currentClientIds;
@@ -310,7 +431,64 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             // Clear our selection when leaving the sheet
             awareness.setLocalStateField('selection', null);
         };
-    }, [provider, userHandle, userColor, userPublicKey]);
+    }, [provider, userHandle, userColor, userPublicKey, computePresenceOverlays]);
+
+    // Recompute presence overlays when the user scrolls or resizes the sheet.
+    // Fortune Sheet uses custom scrollbar divs, so we attach listeners to those.
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        // Debounce scroll/resize handler for performance (16ms ≈ 1 frame)
+        let rafId = null;
+        const handleScrollOrResize = () => {
+            if (rafId) return; // already scheduled
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                computePresenceOverlays();
+            });
+        };
+
+        // Attach to Fortune Sheet's custom scrollbar elements.
+        // They may not exist until the workbook mounts, so use MutationObserver
+        // to detect when they appear.
+        let scrollXEl = container.querySelector('.luckysheet-scrollbar-x');
+        let scrollYEl = container.querySelector('.luckysheet-scrollbar-y');
+
+        const attachScrollListeners = () => {
+            scrollXEl = container.querySelector('.luckysheet-scrollbar-x');
+            scrollYEl = container.querySelector('.luckysheet-scrollbar-y');
+            if (scrollXEl) scrollXEl.addEventListener('scroll', handleScrollOrResize, { passive: true });
+            if (scrollYEl) scrollYEl.addEventListener('scroll', handleScrollOrResize, { passive: true });
+        };
+
+        attachScrollListeners();
+
+        // Also listen for window resize
+        window.addEventListener('resize', handleScrollOrResize, { passive: true });
+
+        // Use MutationObserver in case scrollbar elements mount after this effect runs
+        const observer = new MutationObserver(() => {
+            const newX = container.querySelector('.luckysheet-scrollbar-x');
+            const newY = container.querySelector('.luckysheet-scrollbar-y');
+            if (newX !== scrollXEl || newY !== scrollYEl) {
+                // Detach old
+                if (scrollXEl) scrollXEl.removeEventListener('scroll', handleScrollOrResize);
+                if (scrollYEl) scrollYEl.removeEventListener('scroll', handleScrollOrResize);
+                // Attach new
+                attachScrollListeners();
+            }
+        });
+        observer.observe(container, { childList: true, subtree: true });
+
+        return () => {
+            if (scrollXEl) scrollXEl.removeEventListener('scroll', handleScrollOrResize);
+            if (scrollYEl) scrollYEl.removeEventListener('scroll', handleScrollOrResize);
+            window.removeEventListener('resize', handleScrollOrResize);
+            observer.disconnect();
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [computePresenceOverlays]);
 
     // Initialize Yjs map for sheet data
     useEffect(() => {
@@ -849,20 +1027,60 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
             });
             
             // Calculate toolbar position based on container and selection
-            // Position above the selected cell(s)
+            // Position below the selected cell(s)
             if (containerRef.current) {
                 const container = containerRef.current;
                 const rect = container.getBoundingClientRect();
                 
-                // Estimate cell position (approximate - Fortune Sheet doesn't expose exact positions)
-                const defaultColWidth = 100;
-                const defaultRowHeight = 25;
-                const headerHeight = 30;
-                const rowHeaderWidth = 46;
+                // Use actual cell dimensions from workbook API when available
+                const wb = workbookRef.current;
+                let colOffset = 0;
+                let rowOffset = 0;
+                let cellWidth = 100;
+                let cellHeight = 25;
+                const rowHeaderW = 46;
                 
-                const x = rect.left + rowHeaderWidth + (column[0] * defaultColWidth) + (defaultColWidth / 2);
-                // Position toolbar below the selected cell (add 1 row height offset)
-                const y = rect.top + headerHeight + ((row[0] + 1) * defaultRowHeight);
+                try {
+                    if (wb?.getColumnWidth) {
+                        const colsNeeded = Array.from({ length: column[0] + 1 }, (_, i) => i);
+                        const widths = wb.getColumnWidth(colsNeeded) || {};
+                        for (let i = 0; i < column[0]; i++) colOffset += widths[i] ?? 100;
+                        cellWidth = widths[column[0]] ?? 100;
+                    } else {
+                        colOffset = column[0] * 100;
+                    }
+                    if (wb?.getRowHeight) {
+                        const rowsNeeded = Array.from({ length: row[0] + 2 }, (_, i) => i);
+                        const heights = wb.getRowHeight(rowsNeeded) || {};
+                        for (let i = 0; i <= row[0]; i++) rowOffset += heights[i] ?? 25;
+                        cellHeight = heights[row[0]] ?? 25;
+                    } else {
+                        rowOffset = (row[0] + 1) * 25;
+                    }
+                } catch (e) {
+                    // Fallback to defaults
+                    colOffset = column[0] * 100;
+                    rowOffset = (row[0] + 1) * 25;
+                }
+                
+                // Read scroll offset
+                let scrollLeft = 0;
+                let scrollTop = 0;
+                const scrollXEl = container.querySelector('.luckysheet-scrollbar-x');
+                const scrollYEl = container.querySelector('.luckysheet-scrollbar-y');
+                if (scrollXEl) scrollLeft = scrollXEl.scrollLeft || 0;
+                if (scrollYEl) scrollTop = scrollYEl.scrollTop || 0;
+                
+                // Measure header height from DOM
+                let headerHeight = 30;
+                const cellArea = container.querySelector('.fortune-cell-area');
+                if (cellArea) {
+                    const cellAreaRect = cellArea.getBoundingClientRect();
+                    headerHeight = cellAreaRect.top - rect.top;
+                }
+                
+                const x = rect.left + rowHeaderW + colOffset + (cellWidth / 2) - scrollLeft;
+                const y = rect.top + headerHeight + rowOffset - scrollTop;
                 
                 setToolbarPosition({ x, y });
             }
@@ -995,8 +1213,8 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
                     hooks={hooks}
                     {...settings}
                 />
-                {/* Custom presence overlays - Fortune Sheet's API is unreliable */}
-                {presenceOverlays.map((p) => (
+                {/* Custom presence overlays - uses actual cell dimensions from Fortune Sheet API */}
+                {presenceOverlays.filter(p => p.visible !== false).map((p) => (
                     <React.Fragment key={p.clientId}>
                         {/* Cell border showing selection */}
                         <div
