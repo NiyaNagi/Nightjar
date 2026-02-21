@@ -961,7 +961,8 @@ describe('Fix 4 + Fix 6: Source Code Structure Verification', () => {
     test('creates auth token for document rooms', () => {
       const src = readSource(APP_PATH);
       // Both createDocument and openDocument paths should compute docAuthToken
-      const matches = src.match(/computeRoomAuthTokenSync\(sessionKey,\s*docId\)/g);
+      // v1.7.29: uses authKey (workspace key) instead of sessionKey for cross-client auth
+      const matches = src.match(/computeRoomAuthTokenSync\(authKey,\s*docId\)/g);
       expect(matches).not.toBeNull();
       expect(matches.length).toBeGreaterThanOrEqual(2);
     });

@@ -389,7 +389,8 @@ describe('Browser async auth fallback (AppNew.jsx)', () => {
     expect(firstSite).toBeGreaterThan(-1);
 
     // Should have async fallback after provider creation
-    const afterFirst = appNewSource.indexOf('!docAuthToken && sessionKey', firstSite);
+    // v1.7.29: uses authKey (workspace key) instead of sessionKey for cross-client auth
+    const afterFirst = appNewSource.indexOf('!docAuthToken && authKey', firstSite);
     expect(afterFirst).toBeGreaterThan(firstSite);
   });
 
@@ -399,7 +400,8 @@ describe('Browser async auth fallback (AppNew.jsx)', () => {
     expect(secondSite).toBeGreaterThan(-1);
 
     // Should have async fallback after provider creation
-    const afterSecond = appNewSource.indexOf('!docAuthToken && sessionKey', secondSite);
+    // v1.7.29: uses authKey (workspace key) instead of sessionKey for cross-client auth
+    const afterSecond = appNewSource.indexOf('!docAuthToken && authKey', secondSite);
     expect(afterSecond).toBeGreaterThan(secondSite);
   });
 

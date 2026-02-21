@@ -53,6 +53,7 @@ import { logBehavior } from './utils/logger';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
 import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, computeRoomAuthToken, getAssetUrl } from './utils/websocket';
+import { getStoredKeyChain } from './utils/keyDerivation';
 import { parseShareLink, clearUrlFragment, isJoinUrl, joinUrlToNightjarLink } from './utils/sharing';
 import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
@@ -1282,32 +1283,41 @@ function App() {
 
         // Create Yjs doc and provider - pass serverUrl for remote workspaces
         const ydoc = new Y.Doc();
-        const docAuthToken = computeRoomAuthTokenSync(sessionKey, docId);
+        // FIX: Use workspace key (shared by all members) for room auth tokens,
+        // not the per-browser session key. This ensures all clients in the same
+        // workspace compute identical HMAC tokens so the relay's first-write-wins
+        // auth accepts every member. Falls back to sessionKey if no keychain yet.
+        const authKey = getStoredKeyChain(currentWorkspaceId)?.workspaceKey || sessionKey;
+        const docAuthToken = computeRoomAuthTokenSync(authKey, docId);
         const wsUrl = getWsUrl(workspaceServerUrl, docAuthToken);
         console.log(`[App] Creating document ${docId} with wsUrl: ${wsUrl}`);
 
         // In web mode, deliver encryption key for this document room to the server
         // before creating the WebSocket provider (so server can decrypt persisted state)
-        if (!isElectronMode && sessionKey) {
-            const keyBase64 = uint8ArrayToString(sessionKey, 'base64');
+        if (!isElectronMode && authKey) {
+            const keyBase64 = uint8ArrayToString(authKey, 'base64');
             deliverKeyToServer(docId, keyBase64, workspaceServerUrl).catch(e => {
                 console.warn(`[App] Failed to deliver key for document ${docId}:`, e);
             });
         }
 
-        const provider = new WebsocketProvider(wsUrl, docId, ydoc);
+        // In browser mode (no Node.js crypto), compute auth token async BEFORE
+        // connecting to avoid a rejected no-auth connection attempt.
+        const provider = new WebsocketProvider(wsUrl, docId, ydoc, !docAuthToken && authKey ? { connect: false } : {});
         
         // Browser auth fallback: if sync token returned null (no Node.js crypto),
-        // compute async via Web Crypto API and reconnect with auth
-        if (!docAuthToken && sessionKey) {
-            computeRoomAuthToken(sessionKey, docId).then(asyncToken => {
+        // compute async via Web Crypto API and connect with auth
+        if (!docAuthToken && authKey) {
+            computeRoomAuthToken(authKey, docId).then(asyncToken => {
                 if (!asyncToken || !ydocsRef.current.has(docId)) return;
                 // Reconstruct full y-websocket URL: serverBase/roomName?auth=TOKEN
                 const serverBase = getWsUrl(workspaceServerUrl, null);
                 provider.url = `${serverBase}/${docId}?auth=${encodeURIComponent(asyncToken)}`;
-                provider.disconnect();
                 provider.connect();
-            }).catch(() => {});
+            }).catch(() => {
+                // Fallback: connect without auth (backward compat with unregistered rooms)
+                provider.connect();
+            });
         }
         
         // CRITICAL: Immediately set awareness with user identity to prevent P2P race condition
@@ -1348,6 +1358,15 @@ function App() {
 
         // Notify sidecar (for persistence) - Electron mode only
         if (isElectronMode && metaSocketRef.current?.readyState === WebSocket.OPEN) {
+            // Send encryption key for this document room so the sidecar can
+            // compute matching HMAC auth tokens for the relay bridge
+            if (authKey) {
+                metaSocketRef.current.send(JSON.stringify({
+                    type: 'set-key',
+                    docName: docId,
+                    payload: uint8ArrayToString(authKey, 'base64'),
+                }));
+            }
             metaSocketRef.current.send(JSON.stringify({ 
                 type: 'create-document', 
                 document 
@@ -1370,7 +1389,7 @@ function App() {
         showToast(`${typeNames[docType] || 'Document'} created`, 'success');
 
         return docId;
-    }, [currentWorkspaceId, showToast, syncAddDocument, workspaceServerUrl, userProfile, userIdentity]);
+    }, [currentWorkspaceId, showToast, syncAddDocument, workspaceServerUrl, userProfile, userIdentity, sessionKey]);
 
     const openDocument = useCallback((docId, name, docType = DOC_TYPES.TEXT) => {
         logBehavior('document', 'open_document', { docType });
@@ -1403,33 +1422,49 @@ function App() {
         }
         {
             const ydoc = new Y.Doc();
+            // FIX: Use workspace key (shared by all members) for room auth tokens,
+            // not the per-browser session key. Matches createDocument() fix.
+            const authKey = getStoredKeyChain(currentWorkspaceId)?.workspaceKey || sessionKey;
             // Pass serverUrl for cross-platform sync (Electron joining remote workspace)
-            const docAuthToken = computeRoomAuthTokenSync(sessionKey, docId);
+            const docAuthToken = computeRoomAuthTokenSync(authKey, docId);
             const wsUrl = getWsUrl(workspaceServerUrl, docAuthToken);
             console.log(`[App] Opening document ${docId} with wsUrl: ${wsUrl}`);
 
             // In web mode, deliver encryption key for this document room to the server
             // before creating the WebSocket provider
-            if (!isElectronMode && sessionKey) {
-                const keyBase64 = uint8ArrayToString(sessionKey, 'base64');
+            if (!isElectronMode && authKey) {
+                const keyBase64 = uint8ArrayToString(authKey, 'base64');
                 deliverKeyToServer(docId, keyBase64, workspaceServerUrl).catch(e => {
                     console.warn(`[App] Failed to deliver key for document ${docId}:`, e);
                 });
             }
 
-            const provider = new WebsocketProvider(wsUrl, docId, ydoc);
+            // In Electron mode, send per-doc key to sidecar for relay auth
+            if (isElectronMode && metaSocketRef.current?.readyState === WebSocket.OPEN && authKey) {
+                metaSocketRef.current.send(JSON.stringify({
+                    type: 'set-key',
+                    docName: docId,
+                    payload: uint8ArrayToString(authKey, 'base64'),
+                }));
+            }
+
+            // In browser mode (no Node.js crypto), compute auth async BEFORE
+            // connecting to avoid a rejected no-auth connection attempt.
+            const provider = new WebsocketProvider(wsUrl, docId, ydoc, !docAuthToken && authKey ? { connect: false } : {});
             
             // Browser auth fallback: if sync token returned null (no Node.js crypto),
-            // compute async via Web Crypto API and reconnect with auth
-            if (!docAuthToken && sessionKey) {
-                computeRoomAuthToken(sessionKey, docId).then(asyncToken => {
+            // compute async via Web Crypto API and connect with auth
+            if (!docAuthToken && authKey) {
+                computeRoomAuthToken(authKey, docId).then(asyncToken => {
                     if (!asyncToken || !ydocsRef.current.has(docId)) return;
                     // Reconstruct full y-websocket URL: serverBase/roomName?auth=TOKEN
                     const serverBase = getWsUrl(workspaceServerUrl, null);
                     provider.url = `${serverBase}/${docId}?auth=${encodeURIComponent(asyncToken)}`;
-                    provider.disconnect();
                     provider.connect();
-                }).catch(() => {});
+                }).catch(() => {
+                    // Fallback: connect without auth (backward compat with unregistered rooms)
+                    provider.connect();
+                });
             }
             
             // CRITICAL: Immediately set awareness with user identity to prevent P2P race condition
@@ -1466,7 +1501,7 @@ function App() {
         }
 
         // Tab was already added via functional updater above
-    }, [workspaceServerUrl, userProfile, userIdentity, sessionKey]);
+    }, [workspaceServerUrl, userProfile, userIdentity, sessionKey, currentWorkspaceId]);
 
     // Create an Inventory System — does NOT create a separate Y.Doc
     // Inventory data lives in the workspace-level Y.Doc (see spec §11.2.5)
