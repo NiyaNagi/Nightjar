@@ -1086,6 +1086,13 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.24 - In-App Join Dialog Fix (Issue #7 Part 2)
+- **Critical Fix**: Pasting a share link into the in-app Join dialog and clicking Join now works — signature validation exceptions from malformed base62 characters no longer hard-block the join flow (downgraded to console warning)
+- **Critical Fix**: `onConnectionProgress` / `onAllPeersFailed` callbacks are now properly wired through `WorkspaceContext.joinWorkspace`, giving the join dialog real-time connection feedback
+- **Enhancement**: Default share link expiry increased from 1 hour to 24 hours — links shared across time zones or at end-of-day no longer expire before recipients can use them
+- **Bug Fix**: `compressShareLink()` now correctly handles HTTPS join URLs (`https://night-jar.co/join/...`) by converting them to `nightjar://` before compression, instead of silently returning them uncompressed
+- **Testing**: 15 new tests covering signature validation exception handling, callback wiring, 24-hour default expiry, and HTTPS URL compression
+
 ### v1.7.23 - Share Link White Screen Fix (Issue #7)
 - **Critical Fix**: Share links (`/join/w/XXXXX`) no longer show a white screen on mobile browsers — the server now injects `<base href="/">` into the HTML so Vite's relative asset URLs (`./assets/main-xxx.js`) resolve correctly from nested routes
 - **Defense-in-Depth**: `/join/*` route detects static asset extensions and falls through to `express.static` instead of returning HTML

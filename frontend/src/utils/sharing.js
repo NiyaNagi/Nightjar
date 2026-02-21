@@ -1013,7 +1013,7 @@ export function generateSignedInviteLink(options) {
     workspaceId,
     encryptionKey,
     permission = 'editor',
-    expiryMinutes = 60, // Default 1 hour
+    expiryMinutes = 1440, // Default 24 hours
     ownerPrivateKey,
     ownerPublicKey,
     hyperswarmPeers = [],
@@ -1173,13 +1173,21 @@ export function isInviteLink(link) {
  * @returns {Promise<string>} Compressed link in format: nightjar://c/{compressedData}
  */
 export async function compressShareLink(link) {
-  if (!link || !link.toLowerCase().startsWith('nightjar://')) {
-    return link;
+  if (!link) return link;
+  
+  // If link is an HTTPS join URL, convert to nightjar:// first so compression works
+  let nightjarLink = link;
+  if (!link.toLowerCase().startsWith('nightjar://')) {
+    if (isJoinUrl(link)) {
+      nightjarLink = joinUrlToNightjarLink(link);
+    } else {
+      return link; // Not a nightjar or join URL — return as-is
+    }
   }
   
   // Extract everything after nightjar:// (case-insensitive slice)
-  const protocolEnd = link.toLowerCase().indexOf('nightjar://') + 'nightjar://'.length;
-  const content = link.slice(protocolEnd);
+  const protocolEnd = nightjarLink.toLowerCase().indexOf('nightjar://') + 'nightjar://'.length;
+  const content = nightjarLink.slice(protocolEnd);
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
   
@@ -1216,8 +1224,9 @@ export async function compressShareLink(link) {
     secureWarn('Compression failed, returning original link:', e);
   }
   
-  // Return original if compression not available or not beneficial
-  return link;
+  // Return nightjar:// link if compression not available or not beneficial
+  // (Use nightjarLink, not link, so HTTPS join URLs get converted)
+  return nightjarLink;
 }
 
 /**

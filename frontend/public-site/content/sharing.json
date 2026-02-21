@@ -19,6 +19,8 @@
     ]},
     { "type": "heading", "text": "How Share Links Work" },
     { "type": "paragraph", "text": "Share links encode the workspace encryption key in the URL fragment (the part after #). This fragment is never sent to any server — it stays in the browser. Only someone with the link can decrypt the workspace." },
+    { "type": "heading", "text": "Link Expiry" },
+    { "type": "paragraph", "text": "Invite links expire after a set time for security. The default expiry is 24 hours. You can choose a shorter expiry (15 minutes, 1 hour, or 4 hours) when generating the link. Expired links cannot be used to join a workspace — the recipient will need to request a new link." },
     { "type": "heading", "text": "Managing Members" },
     { "type": "paragraph", "text": "Workspace owners can view and manage members from Workspace Settings. You can promote or demote members and revoke access." },
     { "type": "tip", "text": "For maximum security, share invite links through an encrypted channel (e.g., Signal, encrypted email)." }

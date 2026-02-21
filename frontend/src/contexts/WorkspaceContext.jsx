@@ -828,7 +828,7 @@ export function WorkspaceProvider({ children }) {
    */
   const joinWorkspace = useCallback(async (shareData) => {
     logBehavior('workspace', 'join_workspace');
-    const { entityId, password, encryptionKey, permission, serverUrl, bootstrapPeers, topicHash, directAddress } = shareData;
+    const { entityId, password, encryptionKey, permission, serverUrl, bootstrapPeers, topicHash, directAddress, onConnectionProgress, onAllPeersFailed } = shareData;
     
     // DEBUG: Log join attempt details
     secureLog(`[WorkspaceContext] ========== JOIN WORKSPACE ==========`);
@@ -978,6 +978,17 @@ export function WorkspaceProvider({ children }) {
       directAddress: directAddress || null,
     };
     
+    // Signal connection progress to caller (e.g. CreateWorkspace join dialog)
+    onConnectionProgress?.({ status: 'connecting', message: 'Joining workspace...' });
+    
+    // Check if sidecar is available for P2P connection
+    const sidecarReady = metaSocket.current?.readyState === WebSocket.OPEN;
+    if (!sidecarReady && !serverUrl) {
+      // No sidecar and no relay server — peer connection will fail
+      secureLog('[WorkspaceContext] No sidecar or relay server available for P2P join');
+      onAllPeersFailed?.();
+    }
+    
     // Notify sidecar (will queue if socket not ready)
     // Send full workspace object so sidecar can persist it
     sendMessage({
@@ -997,6 +1008,9 @@ export function WorkspaceProvider({ children }) {
     setWorkspaces(prev => [...prev, workspace]);
     setCurrentWorkspaceId(entityId);
     secureLog(`[WorkspaceContext] Workspace joined successfully, currentWorkspaceId set to: ${entityId}`);
+    
+    // Signal successful join (workspace created locally, P2P sync in progress)
+    onConnectionProgress?.({ status: 'joined', message: 'Workspace joined, syncing with peers...' });
     
     return workspace;
   }, [sendMessage, updateWorkspace, switchWorkspace]);

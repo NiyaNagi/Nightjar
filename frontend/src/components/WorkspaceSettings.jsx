@@ -71,7 +71,7 @@ export default function WorkspaceSettings({
   const [icon, setIcon] = useState(workspace?.icon || '📁');
   const [color, setColor] = useState(workspace?.color || '#6366f1');
   const [shareLevel, setShareLevel] = useState('viewer');
-  const [expiryMinutes, setExpiryMinutes] = useState(60); // Default 1 hour
+  const [expiryMinutes, setExpiryMinutes] = useState(1440); // Default 24 hours
   const [customRelayUrl, setCustomRelayUrl] = useState('');
   const [relayValidation, setRelayValidation] = useState(null);
   const [isValidatingRelay, setIsValidatingRelay] = useState(false);

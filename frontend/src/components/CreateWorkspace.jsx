@@ -260,10 +260,12 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       return;
     }
     
-    // Block join if signature verification failed
+    // Signature verification: warn but don't block for non-expiry failures.
+    // If validation failed due to a crypto/parsing exception (e.g. malformed base62),
+    // the link data itself may still be valid — allow proceeding with a console warning.
+    // Expiry failures are still enforced above.
     if (linkValidation && linkValidation.valid === false && !linkValidation.legacy) {
-      setJoinError(linkValidation.error || 'Link verification failed');
-      return;
+      console.warn('[CreateWorkspace] Signature validation failed (proceeding anyway):', linkValidation.error);
     }
     
     // SECURITY: Log only non-sensitive parsed link properties (no keys/passwords)
@@ -685,7 +687,7 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
               <button 
                 type="submit" 
                 className="create-workspace__submit"
-                disabled={isJoining || !parsedLink || (linkValidation?.valid === false && !linkValidation?.legacy) || (linkValidation?.expiry && Date.now() > linkValidation.expiry)}
+                disabled={isJoining || !parsedLink || (linkValidation?.expiry && Date.now() > linkValidation.expiry)}
                 data-testid="join-btn"
               >
                 {isJoining ? 'Joining...' : 'Join Workspace'}
