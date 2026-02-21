@@ -37,7 +37,7 @@
 }
 
 /* Mobile: stack nav on top */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .file-storage-dashboard {
     flex-direction: column;
   }

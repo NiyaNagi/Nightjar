@@ -1001,6 +1001,18 @@
         min-width: 32px;
     }
 
+    .collaborator-avatar .avatar-name {
+        max-width: 80px;
+        opacity: 1;
+        margin-left: 4px;
+    }
+
+    .collaborator-avatar .avatar-context {
+        max-width: 60px;
+        opacity: 0.7;
+        margin-left: 2px;
+    }
+
     .tor-menu-item,
     .network-action-btn {
         min-height: 44px;

@@ -242,7 +242,7 @@
   margin-top: 20px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .onboarding-wizard__invite-info {
     flex-direction: column;
   }

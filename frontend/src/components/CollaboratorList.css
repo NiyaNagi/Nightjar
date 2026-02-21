@@ -230,7 +230,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .collaborator-list__item {
     flex-wrap: wrap;
     gap: 6px;

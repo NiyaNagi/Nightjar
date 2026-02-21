@@ -355,7 +355,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .ar-modal {
     width: calc(100vw - 16px);
     max-width: 480px;

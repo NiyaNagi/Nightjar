@@ -1237,7 +1237,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .workspace-settings__panel {
     width: 100vw;
     max-width: 100vw;

@@ -587,7 +587,7 @@
 }
 
 /* Mobile Responsive */
-@media (max-width: 500px) {
+@media (max-width: 480px) {
   .share-dialog {
     width: 100%;
     max-width: none;

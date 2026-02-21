@@ -312,7 +312,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .add-dropdown__menu {
     min-width: unset;
     width: calc(100vw - 24px);

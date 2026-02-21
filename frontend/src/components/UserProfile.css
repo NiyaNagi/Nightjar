@@ -55,7 +55,7 @@
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     z-index: var(--z-popover);
-    max-height: calc(100vh - 80px);
+    max-height: calc(100dvh - 80px);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -568,7 +568,7 @@
     .profile-panel {
         width: calc(100vw - 32px);
         right: -8px;
-        max-height: calc(100vh - 100px);
+        max-height: calc(100dvh - 100px);
     }
     
     .preset-colors {

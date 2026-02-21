@@ -382,6 +382,19 @@
     display: inline;
 }
 
+/* Touch devices: always show presence names */
+@media (pointer: coarse) {
+  .sheet-presence-dot {
+    width: auto;
+    height: auto;
+    border-radius: 12px;
+    padding: 2px 8px;
+  }
+  .sheet-presence-dot .sheet-presence-name {
+    display: inline;
+  }
+}
+
 /* ── Mobile ── */
 @media (max-width: 768px) {
   .sheet-readonly-banner {

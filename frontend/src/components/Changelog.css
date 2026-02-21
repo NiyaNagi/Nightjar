@@ -626,7 +626,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .changelog-panel {
     width: 100vw;
     max-width: 100vw;

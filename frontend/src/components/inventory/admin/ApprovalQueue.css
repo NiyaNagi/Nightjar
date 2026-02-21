@@ -202,7 +202,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .approval-queue {
     padding: 12px;
   }

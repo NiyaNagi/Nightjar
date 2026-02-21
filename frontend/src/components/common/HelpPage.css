@@ -241,9 +241,9 @@
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .help-page-modal {
-    max-height: 100vh;
+    max-height: 100dvh;
     border-radius: 0;
   }
 

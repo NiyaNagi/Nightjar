@@ -51,7 +51,7 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .pmr-pipeline {
     grid-template-columns: 1fr;
   }

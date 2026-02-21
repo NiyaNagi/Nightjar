@@ -156,7 +156,7 @@
   margin-top: 10px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .my-timeline {
     flex-direction: column;
     gap: 6px;

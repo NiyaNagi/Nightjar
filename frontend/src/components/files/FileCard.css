@@ -215,3 +215,10 @@
 .file-fav-btn:hover {
   transform: scale(1.2);
 }
+
+/* Touch devices: make checkbox visible */
+@media (pointer: coarse) {
+  .file-card-checkbox {
+    opacity: 0.8;
+  }
+}

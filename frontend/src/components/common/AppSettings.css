@@ -579,9 +579,9 @@
 }
 
 /* Responsive */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .app-settings-modal {
-    max-height: 100vh;
+    max-height: 100dvh;
     border-radius: 0;
   }
   

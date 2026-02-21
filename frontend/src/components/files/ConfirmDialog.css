@@ -85,7 +85,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .confirm-dialog {
     min-width: unset;
     width: calc(100vw - 32px);

@@ -1,7 +1,7 @@
 .App {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: var(--app-height, 100dvh);
   overflow: hidden;
   background: #121212;
 }
@@ -151,7 +151,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  height: var(--app-height, 100dvh);
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
 }
 
@@ -279,7 +279,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .App-header {
     padding: 8px 12px;
     gap: 8px;

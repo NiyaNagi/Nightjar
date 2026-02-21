@@ -127,7 +127,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .move-dialog {
     width: calc(100vw - 24px);
     max-width: 400px;

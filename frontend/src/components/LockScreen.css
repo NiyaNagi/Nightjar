@@ -170,7 +170,7 @@
 }
 
 /* Responsive */
-@media (max-width: 400px) {
+@media (max-width: 480px) {
     .lock-screen__content {
         padding: 32px 24px;
     }

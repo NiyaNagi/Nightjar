@@ -7,7 +7,7 @@
 .hierarchical-sidebar {
     width: 280px;
     min-width: 280px;
-    height: 100vh;
+    height: var(--app-height, 100dvh);
     background: var(--sidebar-bg, #1a1a2e);
     border-right: 1px solid var(--border-color, #2d2d44);
     display: flex;
@@ -844,8 +844,7 @@
     transform: translateX(0);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
-    height: 100vh;
-    height: 100dvh;
+    height: var(--app-height, 100dvh);
   }
 
   /* When collapsed on mobile, slide completely off-screen */

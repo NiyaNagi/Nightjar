@@ -121,7 +121,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .fs-search-bar {
     max-width: 100%;
   }

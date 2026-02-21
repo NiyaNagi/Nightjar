@@ -76,6 +76,36 @@
     --radius-xl: 16px;
     --radius-full: 9999px;
     
+    /* Spacing scale (4px base) */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    --space-3xl: 48px;
+    
+    /* Typography scale */
+    --text-xs: 0.75rem;    /* 12px */
+    --text-sm: 0.8125rem;  /* 13px */
+    --text-base: 0.875rem; /* 14px */
+    --text-md: 1rem;       /* 16px */
+    --text-lg: 1.125rem;   /* 18px */
+    --text-xl: 1.25rem;    /* 20px */
+    --text-2xl: 1.5rem;    /* 24px */
+    
+    /* Breakpoint reference (can't use vars in media queries, these are canonical values) */
+    /* --bp-phone: 480px; --bp-tablet: 768px; --bp-desktop: 1024px; */
+    
+    /* App height — uses 100dvh with 100vh fallback for older browsers */
+    --app-height: 100dvh;
+    
+    /* Bottom nav height — set to 56px when inventory/files bottom nav is active */
+    --bottom-nav-height: 0px;
+    
+    /* Virtual keyboard height — set by useVirtualKeyboard hook */
+    --keyboard-height: 0px;
+    
     /* Status bar height for positioning */
     --status-bar-height: 28px;
 }
@@ -172,17 +202,11 @@ html {
     border: 0;
 }
 
-/* TODO: [Mobile Step 1] Add overscroll-behavior: none to html to prevent pull-to-refresh / rubber-banding.
-   Also add height: 100dvh fallback alongside 100% for proper mobile viewport handling.
-   Example:
-   html { overscroll-behavior: none; }
-   .app-container { height: 100dvh; height: 100vh; } (dvh with vh fallback)
-*/
-
 html, body, #root {
     height: 100%;
     width: 100%;
     overflow: hidden;
+    overscroll-behavior: none;
 }
 
 body {
@@ -195,7 +219,7 @@ body {
 /* App Layout */
 .app-container {
     display: flex;
-    height: 100vh;
+    height: var(--app-height, 100dvh);
     width: 100vw;
     overflow: hidden;
     /* Safe area padding for mobile devices */

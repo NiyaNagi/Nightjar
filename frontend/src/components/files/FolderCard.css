@@ -145,3 +145,10 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* Touch devices: make checkbox visible */
+@media (pointer: coarse) {
+  .folder-card-checkbox {
+    opacity: 0.8;
+  }
+}

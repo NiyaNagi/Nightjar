@@ -112,7 +112,7 @@
 }
 
 /* Mobile responsive */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .breadcrumbs {
     font-size: 0.8rem;
   }

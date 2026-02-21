@@ -141,7 +141,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .producer-name-mapper {
     padding: 12px;
   }

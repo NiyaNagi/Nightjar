@@ -180,7 +180,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .kicked-modal {
     width: calc(100vw - 24px);
     max-width: 420px;

@@ -100,7 +100,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 400px) {
+@media (max-width: 480px) {
     .pin-input-digit {
         width: 40px;
         height: 48px;

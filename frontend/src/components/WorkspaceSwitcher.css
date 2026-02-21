@@ -459,7 +459,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .workspace-switcher {
     padding: 6px 8px;
   }

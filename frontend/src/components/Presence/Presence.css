@@ -327,7 +327,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .presence-indicator {
     gap: 6px;
     padding: 4px 8px;

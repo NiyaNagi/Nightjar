@@ -99,7 +99,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .us-heatmap {
     padding: 8px;
   }

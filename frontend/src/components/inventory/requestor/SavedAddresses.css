@@ -109,7 +109,7 @@
   padding: 4px 0;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .address-form__row {
     flex-direction: column;
   }

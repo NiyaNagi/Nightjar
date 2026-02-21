@@ -369,7 +369,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .request-detail__grid {
     grid-template-columns: 1fr;
   }

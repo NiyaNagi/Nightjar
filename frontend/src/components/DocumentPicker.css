@@ -465,3 +465,10 @@
     --text-muted: #999;
   }
 }
+
+/* Touch devices: always show hover-gated controls */
+@media (pointer: coarse) {
+  .folder-add-subfolder {
+    opacity: 0.6;
+  }
+}

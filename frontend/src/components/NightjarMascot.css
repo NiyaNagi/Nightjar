@@ -274,7 +274,7 @@
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .nightjar-mascot--large {
     flex-direction: column;
     align-items: center;

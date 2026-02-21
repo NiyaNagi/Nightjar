@@ -201,7 +201,7 @@
   margin-top: 4px;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 768px) {
   .pm-layout {
     flex-direction: column;
   }

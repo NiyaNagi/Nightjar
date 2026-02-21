@@ -561,7 +561,7 @@
 
 @media (max-width: 480px) {
     .settings-panel {
-        max-height: 100vh;
+        max-height: 100dvh;
         border-radius: 0;
     }
     
