@@ -2047,7 +2047,14 @@ app.post(BASE_PATH + '/api/invites/:token/use', (req, res) => {
 // Route must be registered BEFORE the SPA fallback catch-all
 // This ensures /join/* paths serve the SPA rather than returning 404
 // The React app will detect /join/ in the pathname and handle it
-app.get((BASE_PATH || '') + '/join/*', (req, res) => {
+app.get((BASE_PATH || '') + '/join/*', (req, res, next) => {
+  // Safety net: if the request looks like a static asset (e.g. /join/w/assets/main.js
+  // due to relative URL resolution), skip to express.static instead of returning HTML.
+  // The <base> tag in the injected HTML should prevent this, but this is defense-in-depth.
+  const ext = req.path.split('.').pop()?.toLowerCase();
+  if (ext && /^(js|css|map|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|json|wasm)$/.test(ext)) {
+    return next();
+  }
   // Serve the SPA — the React app will handle the share link client-side
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.set('Pragma', 'no-cache');
@@ -2092,18 +2099,45 @@ app.get((BASE_PATH || '') + '/manifest.json', (_req, res) => {
 // index: false prevents express.static from serving the raw index.html for
 // directory requests — the SPA fallback below serves the injected version
 // that includes __NIGHTJAR_BASE_PATH__ so the frontend can resolve asset URLs.
+
+// Defense-in-depth: rewrite asset requests under /join/ sub-paths to root /assets/.
+// When the SPA is served at /join/w/XXXXX with relative URLs (base:"./"), the browser
+// may request /join/w/assets/main.js. The <base> tag prevents this, but older cached
+// pages or edge cases may still hit these paths. Rewrite them to /assets/... so
+// express.static can find the actual files.
+app.use((BASE_PATH || '') + '/join/', (req, res, next) => {
+  // Match /join/.../assets/... and rewrite to /assets/...
+  const assetMatch = req.path.match(/\/assets\/(.*)/);
+  if (assetMatch) {
+    req.url = '/assets/' + assetMatch[1];
+    return express.static(STATIC_PATH, { index: false })(req, res, next);
+  }
+  next();
+});
+
 app.use(BASE_PATH || '/', express.static(STATIC_PATH, { index: false }));
 
-// Read index.html and inject BASE_PATH as a runtime global variable
-// so the frontend knows its deployment path (e.g., '/app') for URL construction
+// Read index.html and inject BASE_PATH + <base> tag as runtime configuration.
+// The <base href> is CRITICAL for nested routes like /join/w/XXXXX:
+//   Without <base>: browser resolves ./assets/main.js → /join/w/assets/main.js (404/HTML!)
+//   With <base href="/">: browser resolves ./assets/main.js → /assets/main.js (correct)
+// This fixes the white-screen bug when clicking share links (Issue #6/#7).
 const indexHtmlPath = join(STATIC_PATH, 'index.html');
 let injectedIndexHtml = null;
 if (existsSync(indexHtmlPath)) {
   let rawHtml = readFileSync(indexHtmlPath, 'utf8');
-  // Inject BASE_PATH before </head> so it's available before any app code runs
+  // Inject <base> tag right after <head> — MUST come before any elements with
+  // relative URLs (link, script, etc.) so the browser resolves them correctly.
+  // For relay (BASE_PATH=""): <base href="/"> → ./assets/x.js resolves to /assets/x.js
+  // For private (BASE_PATH="/app"): <base href="/app/"> → ./assets/x.js → /app/assets/x.js
+  const baseHref = (BASE_PATH || '') + '/';
+  const baseTag = `<base href="${baseHref}">`;
+  rawHtml = rawHtml.replace('<head>', `<head>\n    ${baseTag}`);
+  // Also inject BASE_PATH as a JS global before </head> so the frontend can
+  // construct URLs programmatically (e.g., for API calls, WebSocket connections)
   const basepathScript = `<script>window.__NIGHTJAR_BASE_PATH__="${BASE_PATH || ''}";</script>`;
   injectedIndexHtml = rawHtml.replace('</head>', basepathScript + '</head>');
-  console.log(`[SPA] Injected BASE_PATH="${BASE_PATH || ''}" into index.html`);
+  console.log(`[SPA] Injected <base href="${baseHref}"> and BASE_PATH="${BASE_PATH || ''}" into index.html`);
 } else {
   console.warn(`[SPA] index.html not found at ${indexHtmlPath} — SPA fallback will fail`);
 }

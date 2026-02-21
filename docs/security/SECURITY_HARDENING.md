@@ -16,6 +16,7 @@ The Nightjar security hardening effort addressed **7 categories of vulnerabiliti
 | 6 | E2E encrypted relay messages | 2 | ✅ Complete |
 | 7 | Security documentation | 2 | ✅ Complete |
 | 8 | Relay bridge preference persistence & auto-connect | 3 | ✅ Complete |
+| 9 | SPA base path injection for nested routes | 3 | ✅ Complete |
 
 ---
 
@@ -227,6 +228,7 @@ This document. Provides a comprehensive record of all security fixes, their thre
 | `tests/security-hardening-phase2.test.js` | Fix 4, 6 | Phase 2 (66 tests) |
 | `tests/relay-bridge-auto-connect.test.js` | Fix 8 | v1.7.22 (56 tests) |
 | `tests/share-link-routing-fix.test.js` | Fix 8 (docker) | v1.7.21-22 (22 tests) |
+| `tests/share-link-base-path.test.js` | Fix 9 | v1.7.23 (56 tests) |
 
 ### Phase 2 test breakdown
 
@@ -272,3 +274,25 @@ This document. Provides a comprehensive record of all security fixes, their thre
 - `frontend/src/components/common/AppSettings.jsx` — Default ON in `useState` initializer
 - `frontend/src/components/WorkspaceSettings.jsx` — Electron share links include `srv:wss://night-jar.co`
 - `server/deploy/docker-compose.prod.yml` — Reverted relay to `NIGHTJAR_MODE=relay`, removed persistence and data volume
+
+---
+
+## Fix 9: SPA Base Path Injection for Nested Routes (v1.7.23)
+
+**Threat**: Share links at `/join/w/XXXXX` served the SPA HTML, but Vite builds with `base:'./'` (relative paths). The browser resolved `./assets/main-xxx.js` relative to the current pathname → `/join/w/assets/main-xxx.js` → 404 → white screen. This affected all mobile/PWA users clicking share links.
+
+**Fix**:
+- **`<base href="/">` injection**: The Express server reads `index.html` at startup and injects `<base href="/">` right after `<head>`. This tells the browser to resolve all relative URLs from the root, regardless of the current pathname.
+- **Asset extension safety net**: The `/join/*` route handler now checks if the request path ends with a static asset extension (`.js`, `.css`, `.png`, etc.) and calls `next()` instead of returning HTML.
+- **Rewrite middleware**: A middleware at `/join/` catches `/join/.../assets/...` requests (from stale cached pages without `<base>`) and rewrites `req.url` to `/assets/...` before passing to `express.static`.
+- **Asset 404 guard**: A middleware after `express.static` returns proper 404s for missing files under `/assets/`, preventing the SPA fallback from returning HTML with `text/html` MIME type for `.js` requests (which causes the browser to parse HTML as JavaScript → white screen).
+
+### Security implications
+
+- **No new data exposure**: The `<base>` tag only affects URL resolution in the browser. No server-side behavior or data handling is changed.
+- **`BASE_PATH` honoured**: For the private instance at `/app`, the base href becomes `/app/`, correctly scoping asset resolution to the sub-path.
+- **No bypass risk**: The asset extension safety net and rewrite middleware are defense-in-depth. The `<base>` tag is the primary fix. Even if `<base>` were stripped by a proxy, the fallback layers prevent HTML from being served as JavaScript.
+
+### Files changed
+
+- `server/unified/index.js` — `<base href>` injection, `/join/*` asset safety net, `/join/` rewrite middleware, asset 404 guard

@@ -1086,6 +1086,14 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.23 - Share Link White Screen Fix (Issue #7)
+- **Critical Fix**: Share links (`/join/w/XXXXX`) no longer show a white screen on mobile browsers — the server now injects `<base href="/">` into the HTML so Vite's relative asset URLs (`./assets/main-xxx.js`) resolve correctly from nested routes
+- **Defense-in-Depth**: `/join/*` route detects static asset extensions and falls through to `express.static` instead of returning HTML
+- **Defense-in-Depth**: Rewrite middleware catches `/join/.../assets/...` requests and rewrites them to `/assets/...` for browsers with stale cached pages
+- **Asset 404 Guard**: Missing asset requests under `/assets/` now return proper 404s instead of falling through to the SPA fallback (which returned HTML with `text/html` MIME type for `.js` requests)
+- **PWA Manifest**: Dynamic rewrite ensures `start_url`, `scope`, and icon paths honour `BASE_PATH`
+- **Testing**: 56 new tests covering `<base>` injection, route ordering, asset guards, nginx proxying, Dockerfile integrity, and E2E scenarios
+
 ### v1.7.22 - Relay Bridge Auto-Connect & Cross-Platform Sharing Fix (Issue #6 Part 2)
 - **Critical Fix**: Native→Web document sharing now works end-to-end — Electron users' documents automatically reach the public relay so browser recipients see all content instead of 0 documents
 - **Relay Bridge Default ON**: The relay bridge is now enabled by default (`NIGHTJAR_RELAY_BRIDGE !== 'false'`) — users no longer need to manually enable it in settings for sharing to work

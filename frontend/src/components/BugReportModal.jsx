@@ -369,14 +369,10 @@ export default function BugReportModal({ isOpen, onClose, context }) {
     }
   }, [isOpen, context]);
 
-  // Update title when context changes while modal is already open
-  // (e.g. user switches document). Never touches description.
-  useEffect(() => {
-    if (isOpen && prevIsOpenRef.current) {
-      setTitle(generateDefaultTitle(context));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [context]);
+  // Note: We intentionally do NOT re-generate the title when context changes
+  // while the modal is open. The context prop is an inline object that gets a
+  // new reference on every parent render, which would constantly overwrite
+  // whatever the user has typed. The title is set once on the rising edge above.
 
   const captureScreenshot = useCallback(async () => {
     setScreenshotStatus('capturing');

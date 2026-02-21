@@ -575,14 +575,16 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         saveChatState(chatState);
     }, [chatState]);
 
-    // Drag handlers
+    // Drag handlers (mouse + touch)
     const handleDragStart = useCallback((e) => {
         if (e.target.closest('.chat-input-container') || e.target.closest('.chat-messages') || e.target.closest('.resize-handle')) return;
         
         const rect = chatRef.current.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
         setDragOffset({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
+            x: clientX - rect.left,
+            y: clientY - rect.top
         });
         setIsDragging(true);
         e.preventDefault();
@@ -593,12 +595,15 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         
         setHasDragged(true); // Mark that we actually moved
         
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
         // Get actual element dimensions (different when minimized vs expanded)
         const elementWidth = chatRef.current?.offsetWidth || chatState.size.width;
         const elementHeight = chatRef.current?.offsetHeight || chatState.size.height;
         
-        const newX = Math.max(0, Math.min(window.innerWidth - elementWidth, e.clientX - dragOffset.x));
-        const newY = Math.max(0, Math.min(window.innerHeight - elementHeight, e.clientY - dragOffset.y));
+        const newX = Math.max(0, Math.min(window.innerWidth - elementWidth, clientX - dragOffset.x));
+        const newY = Math.max(0, Math.min(window.innerHeight - elementHeight, clientY - dragOffset.y));
         
         setChatState(prev => ({
             ...prev,
@@ -641,9 +646,15 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         if (isDragging) {
             window.addEventListener('mousemove', handleDrag);
             window.addEventListener('mouseup', handleDragEnd);
+            window.addEventListener('touchmove', handleDrag, { passive: false });
+            window.addEventListener('touchend', handleDragEnd);
+            window.addEventListener('touchcancel', handleDragEnd);
             return () => {
                 window.removeEventListener('mousemove', handleDrag);
                 window.removeEventListener('mouseup', handleDragEnd);
+                window.removeEventListener('touchmove', handleDrag);
+                window.removeEventListener('touchend', handleDragEnd);
+                window.removeEventListener('touchcancel', handleDragEnd);
             };
         }
     }, [isDragging, handleDrag, handleDragEnd]);
@@ -1315,6 +1326,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                 ref={chatRef}
                 className={`chat-minimized ${isDragging ? 'dragging' : ''}`}
                 onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
                 onClick={(e) => {
                     // Only expand if it wasn't a drag
                     if (!hasDragged) {
@@ -1356,6 +1368,7 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
             className={`chat-container ${isDragging ? 'dragging' : ''} ${isResizing ? 'resizing' : ''}`}
             style={chatStyle}
             onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
             data-testid="chat-container"
         >
             <div className="chat-header" data-testid="chat-header">

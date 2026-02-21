@@ -853,4 +853,22 @@
     transform: translateX(-100%);
     box-shadow: none;
   }
+
+  /* Keep the expand button visible on mobile even when sidebar is off-screen */
+  .hierarchical-sidebar--collapsed .hierarchical-sidebar__expand-btn {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: var(--z-overlay, 500);
+    transform: translateX(100%);
+    background: var(--sidebar-bg, #1a1a2e);
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    padding: 10px 12px;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
