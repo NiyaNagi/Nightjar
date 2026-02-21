@@ -101,8 +101,9 @@ class RelayBridge {
    * @param {string} roomName - The room name (e.g., 'workspace-meta:abc123')
    * @param {Y.Doc} ydoc - The local Yjs document
    * @param {string} [relayUrl] - Optional specific relay URL (defaults to first available)
+   * @param {string} [authToken] - Optional HMAC auth token for room authentication
    */
-  async connect(roomName, ydoc, relayUrl = null) {
+  async connect(roomName, ydoc, relayUrl = null, authToken = null) {
     // Already connected?
     if (this.connections.has(roomName)) {
       console.log(`[RelayBridge] Already connected to relay for ${roomName}`);
@@ -131,7 +132,7 @@ class RelayBridge {
         return;
       }
       try {
-        await this._connectToRelay(roomName, ydoc, relay);
+        await this._connectToRelay(roomName, ydoc, relay, authToken);
         this.pending.delete(roomName);
         return;
       } catch (err) {
@@ -153,21 +154,31 @@ class RelayBridge {
     
     // Schedule a background retry so we auto-connect when relay comes online
     if (relays.length > 0) {
-      this._scheduleReconnect(roomName, ydoc, relays[0]);
+      this._scheduleReconnect(roomName, ydoc, relays[0], authToken);
     }
   }
 
   /**
    * Connect to a specific relay
+   * @param {string} roomName
+   * @param {Y.Doc} ydoc
+   * @param {string} relayUrl
+   * @param {string|null} authToken - HMAC auth token for room authentication
    * @private
    */
-  _connectToRelay(roomName, ydoc, relayUrl) {
+  _connectToRelay(roomName, ydoc, relayUrl, authToken = null) {
     return new Promise((resolve, reject) => {
       console.log(`[RelayBridge] Connecting to ${relayUrl} for ${roomName}...`);
       
       // Build WebSocket URL with room name
       // The relay server uses y-websocket protocol: ws://host/roomName
-      const wsUrl = relayUrl.endsWith('/') ? `${relayUrl}${roomName}` : `${relayUrl}/${roomName}`;
+      let wsUrl = relayUrl.endsWith('/') ? `${relayUrl}${roomName}` : `${relayUrl}/${roomName}`;
+      
+      // Append HMAC auth token as query parameter if provided
+      if (authToken) {
+        const separator = wsUrl.includes('?') ? '&' : '?';
+        wsUrl = `${wsUrl}${separator}auth=${encodeURIComponent(authToken)}`;
+      }
       
       // Route through Tor SOCKS proxy if available
       const wsOptions = {};
@@ -197,11 +208,12 @@ class RelayBridge {
         // Reset retry counter on successful connection
         this.retryAttempts.delete(roomName);
         
-        // Store connection
+        // Store connection (include authToken for reconnects)
         this.connections.set(roomName, {
           ws,
           ydoc,
           relayUrl,
+          authToken,
           status: 'connected',
           connectedAt: Date.now(),
         });
@@ -227,11 +239,20 @@ class RelayBridge {
         }
       });
 
-      ws.on('close', () => {
+      ws.on('close', (code, reason) => {
         clearTimeout(connectionTimeout);
         if (connected) {
-          console.log(`[RelayBridge] Connection closed for ${roomName}`);
-          this._handleDisconnect(roomName);
+          const reasonStr = reason ? reason.toString() : '';
+          console.log(`[RelayBridge] Connection closed for ${roomName} (code: ${code}, reason: ${reasonStr})`);
+          
+          // 4403 = auth failure (room_requires_auth or auth_token_mismatch)
+          // Don't reconnect — the token is wrong or missing, retrying won't help
+          if (code === 4403) {
+            console.warn(`[RelayBridge] Auth rejected for ${roomName}: ${reasonStr}. Will not retry.`);
+            this._handleDisconnect(roomName, { skipReconnect: true });
+          } else {
+            this._handleDisconnect(roomName);
+          }
         }
       });
     });
@@ -387,9 +408,11 @@ class RelayBridge {
 
   /**
    * Handle disconnection from relay
+   * @param {string} roomName
+   * @param {object} [options] - Options (e.g., { skipReconnect: true } for auth failures)
    * @private
    */
-  _handleDisconnect(roomName) {
+  _handleDisconnect(roomName, options = {}) {
     const conn = this.connections.get(roomName);
     if (!conn) return;
     
@@ -414,15 +437,21 @@ class RelayBridge {
       this.onStatusChange(roomName, 'disconnected');
     }
     
-    // Schedule reconnect
-    this._scheduleReconnect(roomName, conn.ydoc, conn.relayUrl);
+    // Schedule reconnect unless auth failure (4403) — retrying with wrong token is futile
+    if (!options.skipReconnect) {
+      this._scheduleReconnect(roomName, conn.ydoc, conn.relayUrl, conn.authToken);
+    }
   }
 
   /**
    * Schedule reconnection attempt with exponential backoff
+   * @param {string} roomName
+   * @param {Y.Doc} ydoc
+   * @param {string} relayUrl
+   * @param {string|null} [authToken] - HMAC auth token for room authentication
    * @private
    */
-  _scheduleReconnect(roomName, ydoc, relayUrl) {
+  _scheduleReconnect(roomName, ydoc, relayUrl, authToken = null) {
     // Prevent duplicate reconnect scheduling from rapid disconnects
     if (this.reconnecting.has(roomName)) {
       console.log(`[RelayBridge] Reconnect already scheduled for ${roomName}, skipping duplicate`);
@@ -459,7 +488,7 @@ class RelayBridge {
       if (docs.has(roomName)) {
         const freshDoc = docs.get(roomName);
         console.log(`[RelayBridge] Attempting reconnect for ${roomName} (attempt ${attempt + 1})...`);
-        this.connect(roomName, freshDoc, relayUrl)
+        this.connect(roomName, freshDoc, relayUrl, authToken)
           .then(() => {
             // Reset retry counter on successful connection
             this.retryAttempts.delete(roomName);

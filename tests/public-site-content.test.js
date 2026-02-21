@@ -2,7 +2,7 @@
  * Tests for the shared content JSON files and public site infrastructure.
  *
  * Covers:
- *  - Content JSON schema validation (all 15 section files + index.json)
+ *  - Content JSON schema validation (all 19 section files + index.json)
  *  - Block-type validation within each content file
  *  - Section ordering and uniqueness
  *  - Landing page HTML structure
@@ -23,12 +23,13 @@ const DOCS_DIR = path.join(ROOT, 'frontend', 'public-site', 'docs');
 const LANDING_PAGE = path.join(ROOT, 'frontend', 'public-site', 'index.html');
 const HELP_PAGE_JSX = path.join(ROOT, 'frontend', 'src', 'components', 'common', 'HelpPage.jsx');
 
-const VALID_BLOCK_TYPES = ['heading', 'paragraph', 'list', 'steps', 'tip', 'shortcuts', 'screenshot'];
+const VALID_BLOCK_TYPES = ['heading', 'paragraph', 'list', 'steps', 'tip', 'shortcuts', 'screenshot', 'mermaid', 'code'];
 
 const SECTION_IDS = [
   'getting-started', 'identity', 'workspaces', 'documents', 'editor',
   'kanban', 'collaboration', 'sharing', 'chat', 'files',
   'inventory', 'search', 'shortcuts', 'networking', 'troubleshooting',
+  'self-hosting', 'architecture', 'security-model', 'changelog',
 ];
 
 function readJSON(filePath) {
@@ -156,9 +157,9 @@ describe('Content index.json — Catalog', () => {
     expect(index).toHaveProperty('sections');
   });
 
-  test('sections is an array with 15 entries', () => {
+  test('sections is an array with 19 entries', () => {
     expect(Array.isArray(index.sections)).toBe(true);
-    expect(index.sections.length).toBe(15);
+    expect(index.sections.length).toBe(19);
   });
 
   test('each catalog entry has required fields', () => {
@@ -484,8 +485,15 @@ describe('HelpPage JSX — Shared Content Integration', () => {
     source = fs.readFileSync(HELP_PAGE_JSX, 'utf8');
   });
 
-  test('imports all 15 content JSON files', () => {
-    for (const id of SECTION_IDS) {
+  test('imports the core content JSON files', () => {
+    // HelpPage imports the original 15 core sections; newer content-only sections
+    // (self-hosting, architecture, security-model, changelog) live on the public site only.
+    const HELP_PAGE_SECTIONS = [
+      'getting-started', 'identity', 'workspaces', 'documents', 'editor',
+      'kanban', 'collaboration', 'sharing', 'chat', 'files',
+      'inventory', 'search', 'shortcuts', 'networking', 'troubleshooting',
+    ];
+    for (const id of HELP_PAGE_SECTIONS) {
       expect(source).toContain(`${id}.json`);
     }
   });
@@ -549,20 +557,20 @@ describe('Cross-Reference Integrity', () => {
     }
   });
 
-  test('section count is consistent: 15 JSONs, 15 HTML pages, 15 index entries', () => {
+  test('section count is consistent: 19 JSONs, 19 HTML pages, 19 index entries', () => {
     const index = readJSON(path.join(CONTENT_DIR, 'index.json'));
-    expect(index.sections.length).toBe(15);
-    expect(SECTION_IDS.length).toBe(15);
+    expect(index.sections.length).toBe(19);
+    expect(SECTION_IDS.length).toBe(19);
 
     // Count actual JSON files (exclude index.json)
     const jsonFiles = fs.readdirSync(CONTENT_DIR)
       .filter(f => f.endsWith('.json') && f !== 'index.json');
-    expect(jsonFiles.length).toBe(15);
+    expect(jsonFiles.length).toBe(19);
 
     // Count actual HTML section files (exclude index.html, _template.html, docs.css)
     const htmlFiles = fs.readdirSync(DOCS_DIR)
       .filter(f => f.endsWith('.html') && f !== 'index.html' && f !== '_template.html');
-    expect(htmlFiles.length).toBe(15);
+    expect(htmlFiles.length).toBe(19);
   });
 
   test('landing page and docs wiki both reference NiyaNagi/Nightjar', () => {

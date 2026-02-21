@@ -52,7 +52,7 @@ import { useToast } from './contexts/ToastContext';
 import { logBehavior } from './utils/logger';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
-import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, getAssetUrl } from './utils/websocket';
+import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, computeRoomAuthToken, getAssetUrl } from './utils/websocket';
 import { parseShareLink, clearUrlFragment, isJoinUrl, joinUrlToNightjarLink } from './utils/sharing';
 import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
@@ -1297,6 +1297,19 @@ function App() {
 
         const provider = new WebsocketProvider(wsUrl, docId, ydoc);
         
+        // Browser auth fallback: if sync token returned null (no Node.js crypto),
+        // compute async via Web Crypto API and reconnect with auth
+        if (!docAuthToken && sessionKey) {
+            computeRoomAuthToken(sessionKey, docId).then(asyncToken => {
+                if (!asyncToken || !ydocsRef.current.has(docId)) return;
+                // Reconstruct full y-websocket URL: serverBase/roomName?auth=TOKEN
+                const serverBase = getWsUrl(workspaceServerUrl, null);
+                provider.url = `${serverBase}/${docId}?auth=${encodeURIComponent(asyncToken)}`;
+                provider.disconnect();
+                provider.connect();
+            }).catch(() => {});
+        }
+        
         // CRITICAL: Immediately set awareness with user identity to prevent P2P race condition
         // This ensures publicKey is included in awareness BEFORE any P2P sync happens
         if (provider.awareness && userProfile) {
@@ -1405,6 +1418,19 @@ function App() {
             }
 
             const provider = new WebsocketProvider(wsUrl, docId, ydoc);
+            
+            // Browser auth fallback: if sync token returned null (no Node.js crypto),
+            // compute async via Web Crypto API and reconnect with auth
+            if (!docAuthToken && sessionKey) {
+                computeRoomAuthToken(sessionKey, docId).then(asyncToken => {
+                    if (!asyncToken || !ydocsRef.current.has(docId)) return;
+                    // Reconstruct full y-websocket URL: serverBase/roomName?auth=TOKEN
+                    const serverBase = getWsUrl(workspaceServerUrl, null);
+                    provider.url = `${serverBase}/${docId}?auth=${encodeURIComponent(asyncToken)}`;
+                    provider.disconnect();
+                    provider.connect();
+                }).catch(() => {});
+            }
             
             // CRITICAL: Immediately set awareness with user identity to prevent P2P race condition
             // This ensures publicKey is included in awareness BEFORE any P2P sync happens

@@ -600,8 +600,8 @@ describe('Sidecar – Relay Guards Use relayBridgeEnabled', () => {
       'utf8',
     );
 
-    // Find autoRejoinWorkspaces
-    const rejoinIdx = source.indexOf('autoRejoinWorkspaces');
+    // Find the actual autoRejoinWorkspaces function definition (not a comment reference)
+    const rejoinIdx = source.indexOf('async function autoRejoinWorkspaces');
     expect(rejoinIdx).toBeGreaterThan(-1);
 
     // Check the relay guard within autoRejoinWorkspaces
@@ -653,7 +653,7 @@ describe('Relay-bridge – Backoff Max Retries', () => {
     );
 
     // Find _scheduleReconnect definition (not just call site)
-    const schedIdx = source.indexOf('_scheduleReconnect(roomName, ydoc, relayUrl) {');
+    const schedIdx = source.indexOf('_scheduleReconnect(roomName, ydoc, relayUrl, authToken = null) {');
     expect(schedIdx).toBeGreaterThan(-1);
 
     const schedBlock = source.slice(schedIdx, schedIdx + 1500);

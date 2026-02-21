@@ -229,7 +229,7 @@ describe('PWA manifest and icons', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(FRONTEND_PUBLIC, 'manifest.json'), 'utf-8'));
     expect(manifest.name).toBeTruthy();
     expect(manifest.short_name).toBe('Nightjar');
-    expect(manifest.start_url).toBe('/');
+    expect(manifest.start_url).toBe('./');
     expect(manifest.display).toBe('standalone');
     expect(manifest.background_color).toBeTruthy();
     expect(manifest.theme_color).toBeTruthy();

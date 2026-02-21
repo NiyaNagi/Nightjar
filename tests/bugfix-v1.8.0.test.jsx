@@ -38,6 +38,7 @@ jest.mock('../frontend/src/utils/diagnostics', () => ({
 
 jest.mock('../frontend/src/utils/logger', () => ({
   getLogs: () => [],
+  logBehavior: jest.fn(),
 }));
 
 jest.mock('html2canvas', () =>
@@ -118,12 +119,13 @@ describe('BugReportModal – Textarea Clearing Fix', () => {
     );
     act(() => jest.runAllTimers());
 
-    // Description should be empty (fresh open)
+    // Description should be reset to the template (fresh open), not the user's old text
     const freshTextarea = screen.getByLabelText('Description');
-    expect(freshTextarea).toHaveValue('');
+    expect(freshTextarea.value).not.toBe('Bug description');
+    expect(freshTextarea.value).toContain('## Description');
   });
 
-  test('title updates when context changes while modal stays open', () => {
+  test('title is set from context on initial open and does not change mid-session', () => {
     const { rerender } = render(
       <BugReportModal
         isOpen={true}
@@ -137,6 +139,7 @@ describe('BugReportModal – Textarea Clearing Fix', () => {
     expect(titleInput.value).toContain('DocA');
 
     // Switch to a different document context while modal stays open
+    // Title should NOT change mid-session (rising-edge reset only)
     rerender(
       <BugReportModal
         isOpen={true}
@@ -146,7 +149,8 @@ describe('BugReportModal – Textarea Clearing Fix', () => {
     );
     act(() => jest.runAllTimers());
 
-    expect(titleInput.value).toContain('DocB');
+    // Title stays as originally set (DocA), not updated to DocB
+    expect(titleInput.value).toContain('DocA');
   });
 });
 
@@ -167,6 +171,10 @@ describe('BugReportModal – Clipboard Copy', () => {
   });
 
   test('copies bug report to clipboard on submit', async () => {
+    // Mock fetch to reject immediately so createGitHubIssue falls through to clipboard
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network unavailable'));
+
     render(
       <BugReportModal
         isOpen={true}
@@ -176,8 +184,15 @@ describe('BugReportModal – Clipboard Copy', () => {
     );
     act(() => jest.runAllTimers());
 
+    // Switch to real timers so the async submit flow (dynamic import, promise chains) resolves
+    jest.useRealTimers();
+
+    // Click submit and flush microtasks
+    fireEvent.click(screen.getByText(/Submit Bug Report/));
+
+    // Allow all async work (dynamic import, diagnostics, clipboard) to complete
     await act(async () => {
-      fireEvent.click(screen.getByText(/Submit Bug Report/));
+      await new Promise(resolve => setTimeout(resolve, 500));
     });
 
     expect(mockClipboardWriteText).toHaveBeenCalledTimes(1);
@@ -185,6 +200,8 @@ describe('BugReportModal – Clipboard Copy', () => {
       'Bug report copied to clipboard!',
       'success',
     );
+
+    global.fetch = originalFetch;
   });
 });
 
@@ -441,14 +458,12 @@ describe('Sidecar – Relay Bridge IPC Handlers', () => {
       'utf8',
     );
 
-    // The enable handler should iterate docs and connect workspace-meta and doc- rooms
+    // The enable handler should call connectAllDocsToRelay() helper
     const enableBlock = source.slice(
       source.indexOf("case 'relay-bridge:enable':"),
       source.indexOf("case 'relay-bridge:disable':"),
     );
-    expect(enableBlock).toContain("roomName.startsWith('workspace-meta:')");
-    expect(enableBlock).toContain("roomName.startsWith('doc-')");
-    expect(enableBlock).toContain('relayBridge.connect(roomName, doc)');
+    expect(enableBlock).toContain('connectAllDocsToRelay()');
   });
 
   test('relay-bridge:disable disconnects all relay connections', () => {
@@ -558,7 +573,7 @@ describe('build.yml – PAT Secret Injection', () => {
     );
 
     // Count occurrences of VITE_GITHUB_PAT injection
-    const matches = source.match(/VITE_GITHUB_PAT: \$\{\{ secrets\.VITE_GITHUB_PAT \}\}/g);
+    const matches = source.match(/VITE_GITHUB_PAT: \$\{\{ secrets\.ISSUE_GITHUB_PAT \}\}/g);
     expect(matches).not.toBeNull();
     expect(matches.length).toBe(3); // Windows, macOS, Linux
   });

@@ -117,8 +117,8 @@ describe('Server Invite Cleanup — v1.7.15', () => {
       const joinRouteIdx = serverSource.indexOf("'/join/*'");
       expect(joinRouteIdx).toBeGreaterThan(-1);
       
-      // Check for no-cache headers nearby
-      const routeSection = serverSource.slice(joinRouteIdx, joinRouteIdx + 500);
+      // Check for no-cache headers nearby (800 chars to account for static-asset bypass block)
+      const routeSection = serverSource.slice(joinRouteIdx, joinRouteIdx + 800);
       expect(routeSection).toContain('no-cache');
       expect(routeSection).toContain('no-store');
       expect(routeSection).toContain('must-revalidate');
@@ -126,7 +126,7 @@ describe('Server Invite Cleanup — v1.7.15', () => {
     
     test('serves injectedIndexHtml (not raw index.html)', () => {
       const joinRouteIdx = serverSource.indexOf("'/join/*'");
-      const routeSection = serverSource.slice(joinRouteIdx, joinRouteIdx + 500);
+      const routeSection = serverSource.slice(joinRouteIdx, joinRouteIdx + 800);
       expect(routeSection).toContain('injectedIndexHtml');
     });
     

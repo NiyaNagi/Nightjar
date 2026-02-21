@@ -16,7 +16,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { isElectron } from '../hooks/useEnvironment';
-import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync } from '../utils/websocket';
+import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, computeRoomAuthToken } from '../utils/websocket';
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { toString as uint8ArrayToString } from 'uint8arrays';
 import { META_WS_PORT, WS_RECONNECT_MAX_DELAY, TIMEOUT_LONG, AWARENESS_HEARTBEAT_MS } from '../config/constants';
@@ -319,6 +319,25 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
         provider.disconnect();
       }
     });
+    
+    // Browser auth fallback: computeRoomAuthTokenSync() returns null when
+    // Node.js crypto is unavailable (pure browser mode). In that case, compute
+    // the token asynchronously via Web Crypto API and reconnect the provider
+    // with the auth-bearing URL so the relay server accepts us.
+    if (!ywsAuthToken && authKeyChain?.workspaceKey) {
+      computeRoomAuthToken(authKeyChain.workspaceKey, roomName).then(asyncToken => {
+        if (cleanedUp || !asyncToken) return;
+        console.log(`[WorkspaceSync] Browser auth fallback: computed async auth token, reconnecting...`);
+        // Reconstruct the full y-websocket URL: serverBase/roomName?auth=TOKEN
+        // (getYjsWebSocketUrl returns the base server URL without room name)
+        const serverBase = getYjsWebSocketUrl(serverUrl, null);
+        provider.url = `${serverBase}/${roomName}?auth=${encodeURIComponent(asyncToken)}`;
+        provider.disconnect();
+        provider.connect();
+      }).catch(err => {
+        console.warn(`[WorkspaceSync] Failed to compute async auth token:`, err);
+      });
+    }
     
     provider.on('synced', (synced) => {
       console.log(`[WorkspaceSync] Provider synced:`, synced);

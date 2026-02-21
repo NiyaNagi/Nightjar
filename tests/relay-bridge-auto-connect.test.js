@@ -164,7 +164,7 @@ describe('sidecar: proactive workspace-meta doc creation at startup', () => {
       /async function autoRejoinWorkspaces\(\)\s*\{[\s\S]*?\n\}/
     );
     expect(autoRejoinMatch).toBeTruthy();
-    expect(autoRejoinMatch[0]).toContain('relayBridge.connect(roomName, doc)');
+    expect(autoRejoinMatch[0]).toContain('relayBridge.connect(roomName, doc, null, authToken)');
   });
 });
 
@@ -436,19 +436,19 @@ describe('E2E: Web→Web sharing scenario', () => {
 // ---------------------------------------------------------------------------
 describe('sidecar: doc-added event auto-connects to relay', () => {
   test('doc-added handler connects workspace-meta docs when relay bridge is enabled', () => {
-    // The doc-added listener checks relayBridgeEnabled for workspace-meta
+    // The doc-added listener checks relayBridgeEnabled for workspace-meta, workspace-folders, and doc- prefixes
     expect(sidecarSource).toMatch(
-      /relayBridgeEnabled\s*&&\s*docName\.startsWith\(['"]workspace-meta:/
+      /relayBridgeEnabled\s*&&\s*\(\s*\n?\s*docName\.startsWith\(['"]workspace-meta:/
     );
   });
 
   test('doc-added handler calls relayBridge.connect for workspace-meta docs', () => {
-    // After the check, it should call relayBridge.connect
+    // After the check, it should call relayBridge.connect with auth token
     const docAddedSection = sidecarSource.match(
       /docs\.on\(['"]doc-added['"][\s\S]*?(?=\/\/\s*P2P stack|\/\/\s*---\s*Graceful)/
     );
     expect(docAddedSection).toBeTruthy();
-    expect(docAddedSection[0]).toContain('relayBridge.connect(docName, doc)');
+    expect(docAddedSection[0]).toContain('relayBridge.connect(docName, doc, null, authToken)');
   });
 });
 

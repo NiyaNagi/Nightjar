@@ -545,6 +545,27 @@ function getKeyForDocument(docName) {
     return documentKeys.get(docName) || sessionKey;
 }
 
+/**
+ * Compute an HMAC-SHA256 auth token for relay room authentication.
+ * Must produce the same token as the web client's computeRoomAuthTokenSync()
+ * in frontend/src/utils/roomAuth.js so both sides pass server validation.
+ *
+ * @param {Uint8Array|Buffer} keyBytes - Workspace encryption key
+ * @param {string} roomName - The room name (e.g., 'workspace-meta:abc123')
+ * @returns {string|null} Base64-encoded HMAC-SHA256 token, or null if unavailable
+ */
+function computeRelayAuthToken(keyBytes, roomName) {
+    if (!keyBytes || !roomName) return null;
+    try {
+        const hmac = crypto.createHmac('sha256', Buffer.from(keyBytes));
+        hmac.update(`room-auth:${roomName}`);
+        return hmac.digest('base64');
+    } catch (err) {
+        console.warn('[Sidecar] Failed to compute relay auth token:', err.message);
+        return null;
+    }
+}
+
 // Helper to persist and optionally broadcast document updates
 async function persistUpdate(docName, update, origin) {
     const key = getKeyForDocument(docName);
@@ -722,15 +743,23 @@ async function loadRelayBridgePreference() {
 }
 
 /**
- * Connect ALL active workspace-meta and doc rooms to the relay.
+ * Connect ALL active workspace-meta, workspace-folders, and doc rooms to the relay.
  * Reusable helper called from: relay-bridge:enable, autoRejoinWorkspaces, startup restore.
+ *
+ * TODO: Per-workspace relay URL — workspaces created on a specific server (e.g.,
+ * a self-hosted instance) store a `serverUrl` in their metadata. Currently this
+ * function always routes through the global RELAY_NODES. In the future, look up
+ * each workspace's `serverUrl` and pass it as `relayUrl` so rooms are routed to
+ * the correct relay server instead of the global default.
  */
 async function connectAllDocsToRelay() {
     let connected = 0;
     for (const [roomName, doc] of docs) {
-        if (roomName.startsWith('workspace-meta:') || roomName.startsWith('doc-')) {
+        if (roomName.startsWith('workspace-meta:') || roomName.startsWith('workspace-folders:') || roomName.startsWith('doc-')) {
             try {
-                await relayBridge.connect(roomName, doc);
+                const key = getKeyForDocument(roomName);
+                const authToken = computeRelayAuthToken(key, roomName);
+                await relayBridge.connect(roomName, doc, null, authToken);
                 connected++;
             } catch (connectErr) {
                 console.warn(`[Sidecar] Relay connect for ${roomName} failed:`, connectErr.message);
@@ -1735,6 +1764,34 @@ async function handleMetadataMessage(ws, parsed) {
                             await persistUpdate(sanitizedDocName, update, origin);
                         }
                         pendingUpdates.set(sanitizedDocName, []);
+                    }
+                    
+                    // If this doc is connected to the relay WITHOUT auth (key arrived
+                    // after the initial relay connection), disconnect and reconnect
+                    // with the newly available auth token so both sidecar and web
+                    // clients present matching HMAC tokens to the relay server.
+                    if (relayBridgeEnabled && docs.has(sanitizedDocName)) {
+                        const existingConn = relayBridge.connections.get(sanitizedDocName);
+                        if (existingConn && !existingConn.authToken) {
+                            console.log(`[Sidecar] Key received for ${sanitizedDocName} — reconnecting to relay with auth`);
+                            relayBridge.disconnect(sanitizedDocName);
+                            const authToken = computeRelayAuthToken(key, sanitizedDocName);
+                            const doc = docs.get(sanitizedDocName);
+                            relayBridge.connect(sanitizedDocName, doc, null, authToken).catch(err => {
+                                console.warn(`[Sidecar] Auth-reconnect failed for ${sanitizedDocName}:`, err.message);
+                            });
+                        } else if (!existingConn && (
+                            sanitizedDocName.startsWith('workspace-meta:') ||
+                            sanitizedDocName.startsWith('workspace-folders:') ||
+                            sanitizedDocName.startsWith('doc-')
+                        )) {
+                            // Doc should be on relay but isn't connected yet — connect now with auth
+                            const authToken = computeRelayAuthToken(key, sanitizedDocName);
+                            const doc = docs.get(sanitizedDocName);
+                            relayBridge.connect(sanitizedDocName, doc, null, authToken).catch(err => {
+                                console.warn(`[Sidecar] Relay connect for ${sanitizedDocName} failed:`, err.message);
+                            });
+                        }
                     }
                 } else {
                     // Legacy: global session key (for backward compatibility)
@@ -2932,7 +2989,9 @@ async function handleMetadataMessage(ws, parsed) {
                     const doc = docs.get(roomName);
                     if (doc) {
                         try {
-                            await relayBridge.connect(roomName, doc);
+                            const key = getKeyForDocument(roomName);
+                            const authToken = computeRelayAuthToken(key, roomName);
+                            await relayBridge.connect(roomName, doc, null, authToken);
                             syncSuccess = true;
                             console.log(`[Sidecar] Connected to relay for ${roomName}`);
                         } catch (e) {
@@ -4980,7 +5039,9 @@ async function autoRejoinWorkspaces() {
                         const roomName = `workspace-meta:${ws.id}`;
                         const doc = getOrCreateYDoc(roomName);
                         if (doc) {
-                            relayBridge.connect(roomName, doc).catch(err => {
+                            const key = getKeyForDocument(roomName);
+                            const authToken = computeRelayAuthToken(key, roomName);
+                            relayBridge.connect(roomName, doc, null, authToken).catch(err => {
                                 console.warn(`[Sidecar] Relay connection for ${ws.id.slice(0, 8)}... failed:`, err.message);
                             });
                         }
@@ -5412,11 +5473,18 @@ docs.on('doc-added', async (doc, docName) => {
             console.log(`[Sidecar] No session key yet for new document: ${docName}`);
         }
         
-        // Connect workspace-meta docs to public relay for zero-config cross-platform sharing
-        // This ensures web clients can sync via the relay even if UPnP fails
-        if (relayBridgeEnabled && docName.startsWith('workspace-meta:')) {
+        // Connect workspace-meta, workspace-folders, and doc rooms to public relay
+        // for zero-config cross-platform sharing. This ensures web clients can sync
+        // via the relay even if UPnP fails.
+        if (relayBridgeEnabled && (
+            docName.startsWith('workspace-meta:') ||
+            docName.startsWith('workspace-folders:') ||
+            docName.startsWith('doc-')
+        )) {
             console.log(`[Sidecar] Connecting ${docName} to public relay for cross-platform sharing...`);
-            relayBridge.connect(docName, doc).catch(err => {
+            const key = getKeyForDocument(docName);
+            const authToken = computeRelayAuthToken(key, docName);
+            relayBridge.connect(docName, doc, null, authToken).catch(err => {
                 console.warn(`[Sidecar] Failed to connect ${docName} to relay:`, err.message);
                 // Non-fatal - P2P mesh will still work
             });

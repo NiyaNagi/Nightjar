@@ -621,7 +621,7 @@ describe('Deployment Guide', () => {
   let guideContent;
   
   beforeAll(() => {
-    const guidePath = path.join(__dirname, '..', 'docs', 'RELAY_DEPLOYMENT_GUIDE.md');
+    const guidePath = path.join(__dirname, '..', 'docs', 'guides', 'RELAY_DEPLOYMENT_GUIDE.md');
     if (fs.existsSync(guidePath)) {
       guideContent = fs.readFileSync(guidePath, 'utf8');
     }
