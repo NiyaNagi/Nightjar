@@ -283,13 +283,27 @@ function createWindow() {
     }
 }
 
-// Handle nightjar:// protocol links
+// Handle nightjar:// protocol links and HTTPS /join/ URLs
 function handleProtocolLink(url) {
-    // Validate: must be a string starting with nightjar://
-    if (typeof url !== 'string' || !url.startsWith('nightjar://')) {
-        console.warn('[Protocol] Rejected invalid protocol link (bad prefix)');
+    if (typeof url !== 'string') {
+        console.warn('[Protocol] Rejected invalid protocol link (not a string)');
         return;
     }
+
+    // Convert HTTPS join URLs to nightjar:// format
+    // e.g., https://night-jar.co/join/w/payload#fragment → nightjar://w/payload#fragment
+    if (!url.startsWith('nightjar://')) {
+        const joinIdx = url.indexOf('/join/');
+        if (joinIdx !== -1 && /^https?:\/\//i.test(url)) {
+            const afterJoin = url.slice(joinIdx + '/join/'.length);
+            url = `nightjar://${afterJoin}`;
+            console.log('[Protocol] Converted HTTPS join URL to nightjar:// format');
+        } else {
+            console.warn('[Protocol] Rejected invalid protocol link (bad prefix)');
+            return;
+        }
+    }
+
     // Reject URLs with control characters or excessive length (defense-in-depth)
     if (url.length > 2048 || /[\x00-\x1f\x7f]/.test(url)) {
         console.warn('[Protocol] Rejected protocol link: control chars or length >', 2048);
@@ -305,8 +319,11 @@ function handleProtocolLink(url) {
 app.on('second-instance', (event, commandLine) => {
     // Someone tried to run a second instance, focus our window
     safeFocusWindow();
-    // Protocol link is in commandLine on Windows
-    const protocolLink = commandLine.find(arg => arg.startsWith('nightjar://'));
+    // Protocol link is in commandLine on Windows — check for nightjar:// or HTTPS /join/ URLs
+    const protocolLink = commandLine.find(arg =>
+        arg.startsWith('nightjar://') ||
+        (arg.includes('/join/') && /^https?:\/\//i.test(arg))
+    );
     if (protocolLink) {
         handleProtocolLink(protocolLink);
     }
@@ -382,7 +399,11 @@ app.on('ready', async () => {
     }
     
     // Handle protocol link if app was opened with one (Windows)
-    const protocolLink = process.argv.find(arg => arg.startsWith('nightjar://'));
+    // Check for both nightjar:// and HTTPS /join/ URLs in command line
+    const protocolLink = process.argv.find(arg =>
+        arg.startsWith('nightjar://') ||
+        (arg.includes('/join/') && /^https?:\/\//i.test(arg))
+    );
     if (protocolLink && isWindowUsable()) {
         const deliverLink = () => {
             handleProtocolLink(protocolLink);

@@ -1086,6 +1086,12 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.7.25 - Share Link Reliability Fix (Issue #10)
+- **Critical Fix**: Pasting an invalid or malformed share link into the join dialog now shows an error message instead of silently failing with a disabled Join button
+- **Critical Fix**: Electron deep link handler (`onProtocolLink`) was dead code — clicking a `nightjar://` link while the app was running focused the window but never opened the join dialog; now properly wired up in AppNew.jsx
+- **Bug Fix**: Pending share link could be cleared by a React re-render race before the join dialog consumed it — clearing now respects link freshness via expiry timestamp
+- **Bug Fix**: HTTPS join URLs passed as command-line args to Electron were silently rejected; `handleProtocolLink` now converts them to `nightjar://` format automatically
+
 ### v1.7.24 - In-App Join Dialog Fix (Issue #7 Part 2)
 - **Critical Fix**: Pasting a share link into the in-app Join dialog and clicking Join now works — signature validation exceptions from malformed base62 characters no longer hard-block the join flow (downgraded to console warning)
 - **Critical Fix**: `onConnectionProgress` / `onAllPeersFailed` callbacks are now properly wired through `WorkspaceContext.joinWorkspace`, giving the join dialog real-time connection feedback

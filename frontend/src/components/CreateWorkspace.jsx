@@ -184,8 +184,10 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
       const validation = validateSignedInvite(normalizedLink);
       setLinkValidation(validation);
     } catch (err) {
+      console.error('[CreateWorkspace] Failed to parse share link:', err.message);
       setParsedLink(null);
       setLinkValidation(null);
+      setJoinError(err.message || 'Invalid share link format');
     }
   };
   

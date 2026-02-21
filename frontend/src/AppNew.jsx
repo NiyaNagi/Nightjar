@@ -1104,12 +1104,32 @@ function App() {
     // Supports both:
     //   1. URL fragment: https://host/#p:pass&perm:e&...  (legacy web deploy)
     //   2. Join path:    https://host/join/w/payload#fragment  (clickable HTTPS share links)
+    //   3. Electron IPC: protocol-link event from main process (nightjar:// deep links)
     //
     // On the web, if a /join/ URL is detected, we first show a DeepLinkGate overlay
     // that attempts to open the nightjar:// deep link (for desktop app users). If the
     // deep link fails, the user can "Continue in Browser" to proceed with the web join flow.
     // In Electron, the deep link gate is skipped (protocol handled natively).
     useEffect(() => {
+        // --- Electron IPC: Listen for nightjar:// deep links from the main process ---
+        // When the user clicks a nightjar:// link while the Electron app is running,
+        // the main process sends the link via IPC. Store it and open the join dialog.
+        let cleanupProtocolListener = null;
+        if (isElectron() && window.electronAPI?.onProtocolLink) {
+            cleanupProtocolListener = window.electronAPI.onProtocolLink((link) => {
+                if (!link || typeof link !== 'string') return;
+                console.log('[ShareLink] Received protocol link via IPC:', link.slice(0, 60) + '...');
+                sessionStorage.setItem('pendingShareLink', link);
+                const expMatch = link.match(/exp:(\d+)/);
+                if (expMatch) {
+                    sessionStorage.setItem('pendingShareLinkExpiry', expMatch[1]);
+                }
+                setCreateWorkspaceMode('join');
+                setShowCreateWorkspaceDialog(true);
+                showToast('Share link detected - please review the invitation details', 'info');
+            });
+        }
+
         // Check for clickable HTTPS join URL first (e.g., /join/w/abc123#fragment)
         const joinIdx = window.location.pathname.indexOf('/join/');
         if (joinIdx !== -1) {
@@ -1151,11 +1171,32 @@ function App() {
         }
 
         // Clear any stale pending share link from previous session first
-        // Only process if there's actually a fragment in the current URL
+        // Only process if there's actually a fragment in the current URL.
+        // IMPORTANT: Do NOT clear pendingShareLink if it was recently stored (within 60s)
+        // by the /join/ path above or by an Electron protocol-link event. This prevents
+        // a race condition where a React re-render clears a valid pending link before
+        // the CreateWorkspace dialog can consume it.
         const fragment = window.location.hash.slice(1);
         if (!fragment) {
-            sessionStorage.removeItem('pendingShareLink');
-            sessionStorage.removeItem('pendingShareLinkExpiry');
+            const pendingExpiry = sessionStorage.getItem('pendingShareLinkExpiry');
+            const pendingLink = sessionStorage.getItem('pendingShareLink');
+            // Only clear if there IS a pending link and it's older than 60s (stale from previous session)
+            // or if there's no expiry set (legacy/unknown origin)
+            if (pendingLink && pendingExpiry) {
+                const expiryTs = parseInt(pendingExpiry, 10);
+                // If the expiry is far in the future, the link was stored recently (fresh) — don't clear
+                // A stale link from a previous session will have an expired or nearly-expired timestamp
+                const linkAge = expiryTs - Date.now();
+                if (linkAge < 0) {
+                    // Expired — safe to clear
+                    sessionStorage.removeItem('pendingShareLink');
+                    sessionStorage.removeItem('pendingShareLinkExpiry');
+                }
+                // Otherwise: link is fresh (not yet expired), leave it for CreateWorkspace to consume
+            } else if (pendingLink && !pendingExpiry) {
+                // No expiry means unknown origin — clear it to be safe
+                sessionStorage.removeItem('pendingShareLink');
+            }
             return;
         }
         
@@ -1182,6 +1223,13 @@ function App() {
             
             showToast('Share link detected - please review the invitation details', 'info');
         }
+
+        // Cleanup: remove Electron IPC listener on unmount
+        return () => {
+            if (cleanupProtocolListener) {
+                cleanupProtocolListener();
+            }
+        };
     }, [showToast]);
 
     // --- Document Management ---
