@@ -9,6 +9,8 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import useIsMobile from '../../hooks/useIsMobile';
+import BottomSheet from '../common/BottomSheet';
 import './FileContextMenu.css';
 
 export default function FileContextMenu({
@@ -24,9 +26,10 @@ export default function FileContextMenu({
   selectedFileCount = 0, // number of selected files (not folders) when bulk
 }) {
   const menuRef = useRef(null);
+  const isMobile = useIsMobile(768);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isMobile) return;
 
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
@@ -44,11 +47,11 @@ export default function FileContextMenu({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEsc);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isMobile]);
 
-  // Adjust position to stay within viewport
+  // Adjust position to stay within viewport (desktop only)
   useEffect(() => {
-    if (!isOpen || !menuRef.current) return;
+    if (!isOpen || !menuRef.current || isMobile) return;
     const rect = menuRef.current.getBoundingClientRect();
     const el = menuRef.current;
     
@@ -58,7 +61,7 @@ export default function FileContextMenu({
     if (rect.bottom > window.innerHeight) {
       el.style.top = `${position.y - rect.height}px`;
     }
-  }, [isOpen, position]);
+  }, [isOpen, position, isMobile]);
 
   const handleAction = useCallback((action) => {
     onAction?.(action, target?.item);
@@ -70,6 +73,79 @@ export default function FileContextMenu({
   const isFile = target.type === 'file';
   const isFolder = target.type === 'folder';
 
+  const menuItems = (
+    <>
+      {/* Download — files only (single or bulk) */}
+      {(isFile || (isBulk && selectedFileCount > 0)) && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('download')} role="menuitem" data-testid="ctx-download">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>⬇️</span>
+          {isBulk ? `Download ${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''}` : 'Download'}
+        </button>
+      )}
+      {/* Rename — single item only, editors+ */}
+      {!isBulk && canEdit && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('rename')} role="menuitem" data-testid="ctx-rename">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>✏️</span> Rename
+        </button>
+      )}
+      {canEdit && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('move')} role="menuitem" data-testid="ctx-move">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>📦</span>
+          {isBulk ? `Move ${selectedCount} item${selectedCount !== 1 ? 's' : ''}…` : 'Move to…'}
+        </button>
+      )}
+      <div className={isMobile ? 'bottom-sheet__divider' : 'file-context-divider'} />
+      {/* Tags — files only, editors+ */}
+      {canEdit && (isFile || (isBulk && selectedFileCount > 0)) && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('tags')} role="menuitem" data-testid="ctx-tags">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>🏷️</span>
+          {isBulk ? `Edit Tags (${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''})` : 'Edit Tags'}
+        </button>
+      )}
+      {/* Favorite — files only (bulk or single) */}
+      {(isFile || (isBulk && selectedFileCount > 0)) && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('favorite')} role="menuitem" data-testid="ctx-favorite">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>⭐</span>
+          {isBulk ? `Favorite ${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''}` : 'Toggle Favorite'}
+        </button>
+      )}
+      {/* Properties — single item only */}
+      {!isBulk && isFile && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('details')} role="menuitem" data-testid="ctx-details">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>ℹ️</span> Properties
+        </button>
+      )}
+      {!isBulk && isFolder && (
+        <button className={isMobile ? 'bottom-sheet__action' : 'file-context-item'} onClick={() => handleAction('details')} role="menuitem" data-testid="ctx-folder-details">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>ℹ️</span> Folder Properties
+        </button>
+      )}
+      <div className={isMobile ? 'bottom-sheet__divider' : 'file-context-divider'} />
+      {canEdit && (
+        <button className={isMobile ? 'bottom-sheet__action bottom-sheet__action--danger' : 'file-context-item file-context-item--danger'} onClick={() => handleAction('delete')} role="menuitem" data-testid="ctx-delete">
+          <span className={isMobile ? 'bottom-sheet__action-icon' : 'file-context-icon'}>🗑️</span>
+          {isBulk ? `Delete ${selectedCount} item${selectedCount !== 1 ? 's' : ''}` : 'Delete'}
+        </button>
+      )}
+    </>
+  );
+
+  /* ---- Mobile: render as BottomSheet ---- */
+  if (isMobile) {
+    const itemName = target?.item?.name || (isFile ? 'File' : 'Folder');
+    return (
+      <BottomSheet
+        isOpen={isOpen}
+        onClose={onClose}
+        title={isBulk ? `${selectedCount} items selected` : itemName}
+        snapPoints={[40]}
+      >
+        {menuItems}
+      </BottomSheet>
+    );
+  }
+
+  /* ---- Desktop: positioned dropdown ---- */
   return (
     <div
       ref={menuRef}
@@ -78,58 +154,7 @@ export default function FileContextMenu({
       data-testid="file-context-menu"
       role="menu"
     >
-      {/* Download — files only (single or bulk) */}
-      {(isFile || (isBulk && selectedFileCount > 0)) && (
-        <button className="file-context-item" onClick={() => handleAction('download')} role="menuitem" data-testid="ctx-download">
-          <span className="file-context-icon">⬇️</span>
-          {isBulk ? `Download ${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''}` : 'Download'}
-        </button>
-      )}
-      {/* Rename — single item only, editors+ */}
-      {!isBulk && canEdit && (
-        <button className="file-context-item" onClick={() => handleAction('rename')} role="menuitem" data-testid="ctx-rename">
-          <span className="file-context-icon">✏️</span> Rename
-        </button>
-      )}
-      {canEdit && (
-        <button className="file-context-item" onClick={() => handleAction('move')} role="menuitem" data-testid="ctx-move">
-          <span className="file-context-icon">📦</span>
-          {isBulk ? `Move ${selectedCount} item${selectedCount !== 1 ? 's' : ''}…` : 'Move to…'}
-        </button>
-      )}
-      <div className="file-context-divider" />
-      {/* Tags — files only, editors+ */}
-      {canEdit && (isFile || (isBulk && selectedFileCount > 0)) && (
-        <button className="file-context-item" onClick={() => handleAction('tags')} role="menuitem" data-testid="ctx-tags">
-          <span className="file-context-icon">🏷️</span>
-          {isBulk ? `Edit Tags (${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''})` : 'Edit Tags'}
-        </button>
-      )}
-      {/* Favorite — files only (bulk or single) */}
-      {(isFile || (isBulk && selectedFileCount > 0)) && (
-        <button className="file-context-item" onClick={() => handleAction('favorite')} role="menuitem" data-testid="ctx-favorite">
-          <span className="file-context-icon">⭐</span>
-          {isBulk ? `Favorite ${selectedFileCount} file${selectedFileCount !== 1 ? 's' : ''}` : 'Toggle Favorite'}
-        </button>
-      )}
-      {/* Properties — single item only */}
-      {!isBulk && isFile && (
-        <button className="file-context-item" onClick={() => handleAction('details')} role="menuitem" data-testid="ctx-details">
-          <span className="file-context-icon">ℹ️</span> Properties
-        </button>
-      )}
-      {!isBulk && isFolder && (
-        <button className="file-context-item" onClick={() => handleAction('details')} role="menuitem" data-testid="ctx-folder-details">
-          <span className="file-context-icon">ℹ️</span> Folder Properties
-        </button>
-      )}
-      <div className="file-context-divider" />
-      {canEdit && (
-        <button className="file-context-item file-context-item--danger" onClick={() => handleAction('delete')} role="menuitem" data-testid="ctx-delete">
-          <span className="file-context-icon">🗑️</span>
-          {isBulk ? `Delete ${selectedCount} item${selectedCount !== 1 ? 's' : ''}` : 'Delete'}
-        </button>
-      )}
+      {menuItems}
     </div>
   );
 }

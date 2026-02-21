@@ -242,4 +242,54 @@
       animation: none !important;
     }
   }
+
+  /* -----------------------------------------------------------------------
+     CONTEXT MENUS — convert to bottom-sheet action lists on mobile
+     ----------------------------------------------------------------------- */
+  .context-menu-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.4) !important;
+    z-index: var(--z-modal-backdrop, 900) !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+  }
+
+  .context-menu {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    border-radius: 16px 16px 0 0 !important;
+    animation: modal-slide-up 0.25s cubic-bezier(0.32, 0.72, 0, 1) both !important;
+    padding: 8px 4px env(safe-area-inset-bottom, 16px) !important;
+    background: var(--bg-secondary, #16161e) !important;
+    border: none !important;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4) !important;
+  }
+
+  .context-menu::before {
+    content: '' !important;
+    display: block !important;
+    width: 36px !important;
+    height: 4px !important;
+    background: var(--border-color, #2d2d44) !important;
+    border-radius: 2px !important;
+    margin: 4px auto 12px !important;
+  }
+
+  .context-menu button,
+  .context-menu__item {
+    min-height: 48px !important;
+    font-size: 1rem !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
 }

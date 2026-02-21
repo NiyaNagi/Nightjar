@@ -8,11 +8,14 @@
  * See docs/FILE_STORAGE_SPEC.md §6.5
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import FileTypeIcon from './FileTypeIcon';
 import DistributionBadge from './DistributionBadge';
 import { formatFileSize, getRelativeTime } from '../../utils/fileTypeCategories';
 import './FileCard.css';
+
+/* Long-press delay (ms) — same as HierarchicalSidebar */
+const LONG_PRESS_MS = 500;
 
 export default function FileCard({
   file,
@@ -47,6 +50,43 @@ export default function FileCard({
     onContextMenu?.(e, { type: 'file', item: file });
   }, [file, onContextMenu]);
 
+  /* Long-press → context menu for touch devices */
+  const longPressTimer = useRef(null);
+  const touchMoved = useRef(false);
+
+  const handleTouchStart = useCallback((e) => {
+    touchMoved.current = false;
+    longPressTimer.current = setTimeout(() => {
+      if (!touchMoved.current) {
+        const touch = e.touches?.[0];
+        if (touch) {
+          const synth = new MouseEvent('contextmenu', {
+            bubbles: true, clientX: touch.clientX, clientY: touch.clientY,
+          });
+          Object.defineProperty(synth, 'preventDefault', { value: () => {} });
+          onContextMenu?.(synth, { type: 'file', item: file });
+        }
+      }
+    }, LONG_PRESS_MS);
+  }, [file, onContextMenu]);
+
+  const handleTouchMove = useCallback(() => {
+    touchMoved.current = true;
+    clearTimeout(longPressTimer.current);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    clearTimeout(longPressTimer.current);
+  }, []);
+
+  /* Common touch props for all view modes */
+  const touchProps = {
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+    onTouchCancel: handleTouchEnd,
+  };
+
   const handleFavorite = useCallback((e) => {
     e.stopPropagation();
     onToggleFavorite?.(file.id);
@@ -74,6 +114,7 @@ export default function FileCard({
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
+        {...touchProps}
         draggable
         onDragStart={handleDragStart}
         data-testid={`fs-file-${file.id}`}
@@ -124,6 +165,7 @@ export default function FileCard({
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
+        {...touchProps}
         draggable
         onDragStart={handleDragStart}
         data-testid={`fs-file-${file.id}`}
@@ -164,6 +206,7 @@ export default function FileCard({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      {...touchProps}
       draggable
       onDragStart={handleDragStart}
       data-testid={`fs-file-${file.id}`}

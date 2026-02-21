@@ -7,8 +7,11 @@
  * See docs/FILE_STORAGE_SPEC.md §5.5
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import './FolderCard.css';
+
+/* Long-press delay (ms) */
+const LONG_PRESS_MS = 500;
 
 export default function FolderCard({
   folder,
@@ -37,6 +40,42 @@ export default function FolderCard({
     e.preventDefault();
     onContextMenu?.(e, { type: 'folder', item: folder });
   }, [folder, onContextMenu]);
+
+  /* Long-press → context menu for touch devices */
+  const longPressTimer = useRef(null);
+  const touchMoved = useRef(false);
+
+  const handleTouchStart = useCallback((e) => {
+    touchMoved.current = false;
+    longPressTimer.current = setTimeout(() => {
+      if (!touchMoved.current) {
+        const touch = e.touches?.[0];
+        if (touch) {
+          const synth = new MouseEvent('contextmenu', {
+            bubbles: true, clientX: touch.clientX, clientY: touch.clientY,
+          });
+          Object.defineProperty(synth, 'preventDefault', { value: () => {} });
+          onContextMenu?.(synth, { type: 'folder', item: folder });
+        }
+      }
+    }, LONG_PRESS_MS);
+  }, [folder, onContextMenu]);
+
+  const handleTouchMove = useCallback(() => {
+    touchMoved.current = true;
+    clearTimeout(longPressTimer.current);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    clearTimeout(longPressTimer.current);
+  }, []);
+
+  const touchProps = {
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+    onTouchCancel: handleTouchEnd,
+  };
 
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
@@ -84,6 +123,7 @@ export default function FolderCard({
         className={`folder-compact-row ${isSelected ? 'folder-compact-row--selected' : ''} ${isDragOver ? 'folder-compact-row--drop-target' : ''}`}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        {...touchProps}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -110,6 +150,7 @@ export default function FolderCard({
         className={`folder-table-row ${isSelected ? 'folder-table-row--selected' : ''} ${isDragOver ? 'folder-table-row--drop-target' : ''}`}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        {...touchProps}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -147,6 +188,7 @@ export default function FolderCard({
       className={`folder-card ${isSelected ? 'folder-card--selected' : ''} ${isDragOver ? 'folder-card--drop-target' : ''}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      {...touchProps}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
