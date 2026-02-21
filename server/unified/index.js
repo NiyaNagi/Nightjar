@@ -1409,6 +1409,8 @@ const docCleanupInterval = setInterval(() => {
           persistenceTimers.delete(roomName);
         }
         docAwarenessListeners.delete(roomName);
+        // Clear the auth token so reconnecting clients can re-register
+        roomAuthTokens.delete(`yws:${roomName}`);
 
         cleaned++;
       }
@@ -1537,7 +1539,10 @@ wssYjs.on('connection', (ws, req) => {
     // same room name.
     doc.on('destroy', () => {
       docAwarenessListeners.delete(roomName);
-      console.log(`[Y-WS] Doc destroyed, cleared awareness listener for room: ${roomName.slice(0, 30)}...`);
+      // Clear the auth token so a reconnecting client can re-register
+      // (prevents stale/wrong tokens from persisting after a race condition)
+      roomAuthTokens.delete(`yws:${roomName}`);
+      console.log(`[Y-WS] Doc destroyed, cleared awareness listener and auth token for room: ${roomName.slice(0, 30)}...`);
     });
   }
 });

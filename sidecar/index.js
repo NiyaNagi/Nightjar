@@ -568,8 +568,18 @@ function broadcastStatus() {
 }
 
 // Helper to get encryption key for a document (per-doc key or fallback to session key)
+// Used for LOCAL persistence (encryption/decryption of stored data)
 function getKeyForDocument(docName) {
     return documentKeys.get(docName) || sessionKey;
+}
+
+// Helper to get the encryption key for RELAY AUTH ONLY.
+// Returns the per-doc key if available, or null to signal "defer relay connection".
+// Unlike getKeyForDocument(), this NEVER falls back to sessionKey because
+// sessionKey is per-app-instance and would produce HMAC tokens that don't
+// match tokens from other clients using the shared workspaceKey.
+function getKeyForRelayAuth(docName) {
+    return documentKeys.get(docName) || null;
 }
 
 /**
@@ -903,7 +913,10 @@ async function connectAllDocsToRelay() {
     for (const [roomName, doc] of docs) {
         if (roomName.startsWith('workspace-meta:') || roomName.startsWith('workspace-folders:') || roomName.startsWith('doc-')) {
             try {
-                const key = getKeyForDocument(roomName);
+                // Use relay-specific key lookup — returns null instead of
+                // falling back to sessionKey, which would produce HMAC tokens
+                // that don't match the workspaceKey-based tokens from web clients.
+                const key = getKeyForRelayAuth(roomName);
                 
                 // Skip rooms with no encryption key — the set-key handler will
                 // connect once the frontend delivers the key. Connecting without
@@ -1962,18 +1975,19 @@ async function handleMetadataMessage(ws, parsed) {
                         });
                     }
                     
-                    // If this doc is connected to the relay WITHOUT auth (key arrived
-                    // after the initial relay connection), disconnect and reconnect
-                    // with the newly available auth token so both sidecar and web
-                    // clients present matching HMAC tokens to the relay server.
+                    // If this doc is connected to the relay WITHOUT auth or with a
+                    // STALE auth token (e.g., computed from sessionKey before the
+                    // correct workspaceKey arrived via set-key), disconnect and
+                    // reconnect with the freshly computed auth token.
                     if (relayBridgeEnabled && docs.has(sanitizedDocName)) {
+                        const newAuthToken = computeRelayAuthToken(key, sanitizedDocName);
                         const existingConn = relayBridge.connections.get(sanitizedDocName);
-                        if (existingConn && !existingConn.authToken) {
-                            console.log(`[Sidecar] Key received for ${sanitizedDocName} — reconnecting to relay with auth`);
+                        if (existingConn && existingConn.authToken !== newAuthToken) {
+                            // Auth token changed — reconnect with the correct one
+                            console.log(`[Sidecar] Key changed for ${sanitizedDocName} — reconnecting to relay with updated auth`);
                             relayBridge.disconnect(sanitizedDocName);
-                            const authToken = computeRelayAuthToken(key, sanitizedDocName);
                             const doc = docs.get(sanitizedDocName);
-                            relayBridge.connect(sanitizedDocName, doc, null, authToken).catch(err => {
+                            relayBridge.connect(sanitizedDocName, doc, null, newAuthToken).catch(err => {
                                 console.warn(`[Sidecar] Auth-reconnect failed for ${sanitizedDocName}:`, err.message);
                             });
                         } else if (!existingConn && (
@@ -1982,9 +1996,8 @@ async function handleMetadataMessage(ws, parsed) {
                             sanitizedDocName.startsWith('doc-')
                         )) {
                             // Doc should be on relay but isn't connected yet — connect now with auth
-                            const authToken = computeRelayAuthToken(key, sanitizedDocName);
                             const doc = docs.get(sanitizedDocName);
-                            relayBridge.connect(sanitizedDocName, doc, null, authToken).catch(err => {
+                            relayBridge.connect(sanitizedDocName, doc, null, newAuthToken).catch(err => {
                                 console.warn(`[Sidecar] Relay connect for ${sanitizedDocName} failed:`, err.message);
                             });
                         }
@@ -3208,7 +3221,11 @@ async function handleMetadataMessage(ws, parsed) {
                     const doc = docs.get(roomName);
                     if (doc) {
                         try {
-                            const key = getKeyForDocument(roomName);
+                            const key = getKeyForRelayAuth(roomName);
+                            if (!key) {
+                                console.log(`[Sidecar] Deferring relay sync for ${roomName} — no per-doc key available yet`);
+                                break;
+                            }
                             const authToken = computeRelayAuthToken(key, roomName);
                             await relayBridge.connect(roomName, doc, null, authToken);
                             syncSuccess = true;
@@ -5258,7 +5275,7 @@ async function autoRejoinWorkspaces() {
                         const roomName = `workspace-meta:${ws.id}`;
                         const doc = getOrCreateYDoc(roomName);
                         if (doc) {
-                            const key = getKeyForDocument(roomName);
+                            const key = getKeyForRelayAuth(roomName);
                             
                             // Only connect to relay if we have the encryption key.
                             // Without the key we can't compute auth tokens or deliver
@@ -5720,25 +5737,29 @@ docs.on('doc-added', async (doc, docName) => {
             docName.startsWith('workspace-folders:') ||
             docName.startsWith('doc-')
         )) {
-            const key = getKeyForDocument(docName);
+            // Use relay-specific key lookup — returns null instead of falling
+            // back to sessionKey. Using sessionKey for relay auth causes HMAC
+            // token mismatches because web clients use the shared workspaceKey.
+            // The set-key handler will connect once the correct key arrives.
+            const relayKey = getKeyForRelayAuth(docName);
             
             // Only connect to relay if we have the encryption key.
             // Without the key we can't compute auth tokens or enable persistence.
             // The set-key handler will connect once the frontend delivers the key.
-            if (key) {
+            if (relayKey) {
                 console.log(`[Sidecar] Connecting ${docName} to public relay for cross-platform sharing...`);
-                const authToken = computeRelayAuthToken(key, docName);
+                const authToken = computeRelayAuthToken(relayKey, docName);
                 relayBridge.connect(docName, doc, null, authToken).catch(err => {
                     console.warn(`[Sidecar] Failed to connect ${docName} to relay:`, err.message);
                     // Non-fatal - P2P mesh will still work
                 });
                 
                 // Deliver key to relay for encrypted persistence
-                deliverKeyToAllRelays(docName, key).catch(err => {
+                deliverKeyToAllRelays(docName, relayKey).catch(err => {
                     console.warn(`[Sidecar] Background key delivery failed for ${docName}:`, err.message);
                 });
             } else {
-                console.log(`[Sidecar] Deferring relay connect for ${docName} — no key available yet`);
+                console.log(`[Sidecar] Deferring relay connect for ${docName} — no per-doc key available yet (awaiting set-key)`);
             }
         }
         

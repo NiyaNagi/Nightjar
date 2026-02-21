@@ -1,0 +1,245 @@
+/* =========================================================================
+   Mobile Bottom-Sheet Modal Transform
+   -------------------------------------------------------------------------
+   On touch devices at phone width, ALL modal overlays are converted to
+   bottom-sheet style: content slides up from the bottom, full-width,
+   with rounded top corners.  Zero JS changes required — pure CSS.
+   ========================================================================= */
+
+@media (max-width: 768px) {
+  /* -----------------------------------------------------------------------
+     ANIMATION — slide up from bottom
+     ----------------------------------------------------------------------- */
+  @keyframes modal-slide-up {
+    from { transform: translateY(100%); opacity: 0.8; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  @keyframes modal-slide-down {
+    from { transform: translateY(0);    opacity: 1; }
+    to   { transform: translateY(100%); opacity: 0.8; }
+  }
+
+  /* -----------------------------------------------------------------------
+     OVERLAY — push content to bottom
+     ----------------------------------------------------------------------- */
+  .app-settings-overlay,
+  .help-page-overlay,
+  .create-workspace-overlay,
+  .create-document-overlay,
+  .join-modal-overlay,
+  .settings-overlay,
+  .relay-settings-overlay,
+  .share-dialog-overlay,
+  .edit-properties-modal__overlay,
+  .workspace-settings__overlay,
+  .search-palette__overlay,
+  .bug-report-overlay,
+  .kicked-modal-overlay,
+  .sync-progress-modal-overlay,
+  .recovery-modal-overlay,
+  .peers-list-overlay,
+  .slide-panel__overlay,
+  .confirm-dialog__overlay,
+  .confirm-dialog-overlay,
+  .folder-create-overlay,
+  .move-dialog-overlay,
+  .replace-dialog-overlay,
+  .bulk-tag-overlay,
+  .file-detail-overlay,
+  .file-picker-overlay,
+  .workspace-switcher__confirm-overlay,
+  .create-folder-overlay,
+  .pmr-overlay,
+  .pd-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+
+  /* -----------------------------------------------------------------------
+     MODAL CONTAINERS — full-width bottom-sheet appearance
+     ----------------------------------------------------------------------- */
+  .app-settings-modal,
+  .help-page-modal,
+  .create-workspace,
+  .create-document-modal,
+  .join-modal,
+  .settings-modal,
+  .relay-settings-modal,
+  .share-dialog,
+  .edit-properties-modal,
+  .workspace-settings,
+  .search-palette,
+  .bug-report-modal,
+  .kicked-modal,
+  .sync-progress-modal,
+  .recovery-modal,
+  .peers-list-panel,
+  .slide-panel,
+  .confirm-dialog,
+  .folder-create-dialog,
+  .move-dialog,
+  .replace-dialog,
+  .bulk-tag-dialog,
+  .file-detail-panel,
+  .file-picker-modal,
+  .workspace-switcher__confirm-card,
+  .create-folder-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    margin: 0 !important;
+    border-radius: 16px 16px 0 0 !important;
+    animation: modal-slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1) both !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Shorter modals (confirmations, small dialogs) — cap at 60vh */
+  .confirm-dialog,
+  .replace-dialog,
+  .folder-create-dialog,
+  .workspace-switcher__confirm-card {
+    max-height: 60vh !important;
+    max-height: 60dvh !important;
+  }
+
+  /* Tall modals (settings, share, file picker) — use 95vh for more space */
+  .app-settings-modal,
+  .help-page-modal,
+  .workspace-settings,
+  .share-dialog,
+  .edit-properties-modal,
+  .file-picker-modal,
+  .file-detail-panel {
+    max-height: 95vh !important;
+    max-height: 95dvh !important;
+  }
+
+  /* Slide panels — full-width, come from bottom instead of right */
+  .slide-panel,
+  .file-detail-panel {
+    position: relative !important;
+    right: auto !important;
+    top: auto !important;
+    height: auto !important;
+    max-height: 92dvh !important;
+  }
+
+  /* Peers list panel — same treatment */
+  .peers-list-panel {
+    position: relative !important;
+    right: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: 80dvh !important;
+  }
+
+  /* Search palette — special: starts smaller */
+  .search-palette {
+    max-height: 70dvh !important;
+  }
+
+  /* -----------------------------------------------------------------------
+     HANDLE INDICATOR — visual affordance for draggability
+     Pseudo-element on all bottom-sheet-style modals
+     ----------------------------------------------------------------------- */
+  .app-settings-modal::before,
+  .help-page-modal::before,
+  .create-workspace::before,
+  .create-document-modal::before,
+  .join-modal::before,
+  .settings-modal::before,
+  .relay-settings-modal::before,
+  .share-dialog::before,
+  .edit-properties-modal::before,
+  .workspace-settings::before,
+  .search-palette::before,
+  .bug-report-modal::before,
+  .kicked-modal::before,
+  .sync-progress-modal::before,
+  .recovery-modal::before,
+  .peers-list-panel::before,
+  .slide-panel::before,
+  .confirm-dialog::before,
+  .folder-create-dialog::before,
+  .move-dialog::before,
+  .replace-dialog::before,
+  .bulk-tag-dialog::before,
+  .file-detail-panel::before,
+  .file-picker-modal::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: var(--border-color, #2d2d44);
+    border-radius: 2px;
+    margin: 12px auto 8px;
+    flex-shrink: 0;
+  }
+
+  /* -----------------------------------------------------------------------
+     SAFE-AREA BOTTOM PADDING — for devices with home indicator
+     ----------------------------------------------------------------------- */
+  .app-settings-modal,
+  .help-page-modal,
+  .create-workspace,
+  .create-document-modal,
+  .join-modal,
+  .settings-modal,
+  .relay-settings-modal,
+  .share-dialog,
+  .edit-properties-modal,
+  .workspace-settings,
+  .search-palette,
+  .bug-report-modal,
+  .kicked-modal,
+  .sync-progress-modal,
+  .recovery-modal,
+  .peers-list-panel,
+  .slide-panel,
+  .confirm-dialog,
+  .folder-create-dialog,
+  .move-dialog,
+  .replace-dialog,
+  .bulk-tag-dialog,
+  .file-detail-panel,
+  .file-picker-modal {
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* -----------------------------------------------------------------------
+     REDUCED MOTION — respect user preference
+     ----------------------------------------------------------------------- */
+  @media (prefers-reduced-motion: reduce) {
+    .app-settings-modal,
+    .help-page-modal,
+    .create-workspace,
+    .create-document-modal,
+    .join-modal,
+    .settings-modal,
+    .relay-settings-modal,
+    .share-dialog,
+    .edit-properties-modal,
+    .workspace-settings,
+    .search-palette,
+    .bug-report-modal,
+    .kicked-modal,
+    .sync-progress-modal,
+    .recovery-modal,
+    .peers-list-panel,
+    .slide-panel,
+    .confirm-dialog,
+    .folder-create-dialog,
+    .move-dialog,
+    .replace-dialog,
+    .bulk-tag-dialog,
+    .file-detail-panel,
+    .file-picker-modal {
+      animation: none !important;
+    }
+  }
+}

@@ -1,3 +1,6 @@
+/* Mobile bottom-sheet modal transforms */
+@import './mobile-modals.css';
+
 /* CSS Variables for theming */
 :root {
     /* Safe area insets for mobile devices (notch, home indicator, etc.) */

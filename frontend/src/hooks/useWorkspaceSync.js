@@ -265,11 +265,22 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     // For remote workspaces (serverUrl provided), limit reconnection attempts
     // For local sidecar, allow more retries as it should always be available
     const isRemote = !!serverUrl;
+    
+    // In browser mode, computeRoomAuthTokenSync() returns null because Node.js
+    // crypto is unavailable.  When we know we need to compute the auth token
+    // asynchronously (workspaceKey is available but sync token is null), create
+    // the provider with connect:false so we don't fire an unauthenticated
+    // connection that gets 4403 rejected.  We'll connect after the async token
+    // is ready.
+    const needsAsyncAuth = !ywsAuthToken && !!authKeyChain?.workspaceKey;
+    
     const providerOptions = isRemote ? {
-      connect: true,
+      connect: !needsAsyncAuth,  // defer connection when async auth is needed
       maxBackoffTime: WS_RECONNECT_MAX_DELAY,  // Max reconnect delay between retries
       // y-websocket doesn't have maxAttempts, but we'll handle it via status tracking
-    } : {};
+    } : {
+      connect: !needsAsyncAuth,  // also defer for local sidecar when async auth needed
+    };
     
     const provider = new WebsocketProvider(wsUrl, roomName, ydoc, providerOptions);
     
@@ -322,17 +333,18 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     // Browser auth fallback: computeRoomAuthTokenSync() returns null when
     // Node.js crypto is unavailable (pure browser mode). In that case, compute
-    // the token asynchronously via Web Crypto API and reconnect the provider
-    // with the auth-bearing URL so the relay server accepts us.
-    if (!ywsAuthToken && authKeyChain?.workspaceKey) {
+    // the token asynchronously via Web Crypto API and set the auth-bearing URL.
+    // If we used connect:false above, this is the FIRST connection (no wasted
+    // unauthenticated attempt).  If sync auth was already available, this block
+    // is skipped entirely.
+    if (needsAsyncAuth) {
       computeRoomAuthToken(authKeyChain.workspaceKey, roomName).then(asyncToken => {
         if (cleanedUp || !asyncToken) return;
-        console.log(`[WorkspaceSync] Browser auth fallback: computed async auth token, reconnecting...`);
+        console.log(`[WorkspaceSync] Browser async auth: computed auth token, connecting...`);
         // Reconstruct the full y-websocket URL: serverBase/roomName?auth=TOKEN
         // (getYjsWebSocketUrl returns the base server URL without room name)
         const serverBase = getYjsWebSocketUrl(serverUrl, null);
         provider.url = `${serverBase}/${roomName}?auth=${encodeURIComponent(asyncToken)}`;
-        provider.disconnect();
         provider.connect();
       }).catch(err => {
         console.warn(`[WorkspaceSync] Failed to compute async auth token:`, err);

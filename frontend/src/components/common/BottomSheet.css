@@ -1,0 +1,115 @@
+/* =========================================================================
+   BottomSheet — mobile slide-up panel with drag-to-dismiss
+   ========================================================================= */
+
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: var(--z-modal-backdrop, 900);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* starts off-screen; JS sets translateY */
+  height: var(--app-height, 100dvh);
+  background: var(--bg-secondary, #16161e);
+  border-radius: 16px 16px 0 0;
+  z-index: var(--z-modal, 1000);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+  will-change: transform;
+}
+
+/* Drag handle area — generous touch target */
+.bottom-sheet__handle-area {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.bottom-sheet__handle-area:active {
+  cursor: grabbing;
+}
+
+.bottom-sheet__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-color, #2d2d44);
+}
+
+/* Title bar */
+.bottom-sheet__title {
+  font-size: var(--text-md, 1rem);
+  font-weight: 600;
+  color: var(--text-primary, #e4e4e7);
+  padding: 4px 20px 12px;
+  border-bottom: 1px solid var(--border-color, #2d2d44);
+  flex-shrink: 0;
+}
+
+/* Scrollable content area */
+.bottom-sheet__content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 16px 20px calc(16px + var(--safe-area-inset-bottom, 0px));
+}
+
+/* Action list items (used by context menus) */
+.bottom-sheet__action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 4px;
+  background: none;
+  border: none;
+  color: var(--text-primary, #e4e4e7);
+  font-size: var(--text-md, 1rem);
+  cursor: pointer;
+  border-radius: var(--radius-md, 8px);
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-sheet__action:active {
+  background: var(--hover-bg, #2d2d44);
+}
+
+.bottom-sheet__action--danger {
+  color: var(--error-color, #ef4444);
+}
+
+.bottom-sheet__action-icon {
+  font-size: 1.2rem;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.bottom-sheet__divider {
+  height: 1px;
+  background: var(--border-color, #2d2d44);
+  margin: 4px 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet {
+    transition: none !important;
+  }
+}
