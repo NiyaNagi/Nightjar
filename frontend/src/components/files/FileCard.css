@@ -222,3 +222,15 @@
     opacity: 0.8;
   }
 }
+
+/* Long-press visual feedback */
+.file-card.long-pressing,
+.file-card-row.long-pressing,
+.file-compact-row.long-pressing {
+  animation: long-press-squeeze 500ms ease forwards;
+}
+
+@keyframes long-press-squeeze {
+  0%   { transform: scale(1);    opacity: 1; }
+  100% { transform: scale(0.96); opacity: 0.88; }
+}

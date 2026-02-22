@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './Settings.css';
+import ResponsiveModal from '../common/ResponsiveModal';
 
 /**
  * Tor Settings Component
@@ -176,8 +177,7 @@ export function TorSettings({ isOpen, onClose }) {
   if (!isOpen) return null;
   
   return (
-    <div className="settings-overlay" onClick={onClose}>
-      <div className="settings-modal tor-settings" onClick={e => e.stopPropagation()}>
+    <ResponsiveModal isOpen onClose={onClose} size="medium" className="settings-modal tor-settings">
         <div className="settings-header">
           <h2>🧅 Tor & Privacy Settings</h2>
           <button className="close-button" onClick={onClose}>×</button>
@@ -377,8 +377,7 @@ export function TorSettings({ isOpen, onClose }) {
             </div>
           </section>
         </div>
-      </div>
-    </div>
+    </ResponsiveModal>
   );
 }
 

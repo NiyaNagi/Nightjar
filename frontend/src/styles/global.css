@@ -646,11 +646,23 @@ input:focus {
         flex-direction: column;
     }
 
+    /* Invisible edge-swipe zone to open sidebar from left edge */
+    .sidebar-edge-swipe-zone {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 20px;
+        height: 100%;
+        z-index: 498; /* Just below sidebar-backdrop (499) */
+        touch-action: pan-y;
+    }
+
     .toast {
         right: 12px;
         left: 12px;
         max-width: none;
-        bottom: calc(var(--bottom-nav-height, 0px) + var(--keyboard-height, 0px) + 16px + env(safe-area-inset-bottom, 0px));
+        /* 52px accounts for MobileToolbar height (44px + padding) */
+        bottom: calc(var(--bottom-nav-height, 0px) + var(--keyboard-height, 0px) + 52px + 12px + env(safe-area-inset-bottom, 0px));
     }
 
     .onboarding-welcome h2 {

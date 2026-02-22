@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import './ConfirmDialog.css';
+import ResponsiveModal from './ResponsiveModal';
 
 /**
  * ConfirmDialog - A styled replacement for window.confirm()
@@ -33,11 +34,6 @@ export default function ConfirmDialog({
 
     // Focus trap
     const handleKeyDown = useCallback((e) => {
-        if (e.key === 'Escape') {
-            e.preventDefault();
-            onCancel?.();
-        }
-        
         if (e.key === 'Tab') {
             const focusable = [cancelBtnRef.current, confirmBtnRef.current].filter(Boolean);
             const first = focusable[0];
@@ -70,36 +66,12 @@ export default function ConfirmDialog({
         }
     }, [isOpen, variant]);
 
-    // Prevent body scroll when open
-    useEffect(() => {
-        if (isOpen) {
-            const originalOverflow = document.body.style.overflow;
-            document.body.style.overflow = 'hidden';
-            return () => {
-                document.body.style.overflow = originalOverflow;
-            };
-        }
-    }, [isOpen]);
-
     if (!isOpen) return null;
 
     return (
-        <div 
-            className="confirm-dialog__overlay"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                    onCancel?.();
-                }
-            }}
-            role="presentation"
-        >
+        <ResponsiveModal isOpen onClose={onCancel} size="small" className="confirm-dialog">
             <div
                 ref={dialogRef}
-                className="confirm-dialog"
-                role="alertdialog"
-                aria-modal="true"
-                aria-labelledby="confirm-dialog-title"
-                aria-describedby="confirm-dialog-message"
                 onKeyDown={handleKeyDown}
             >
                 <h3 id="confirm-dialog-title" className="confirm-dialog__title">
@@ -131,7 +103,7 @@ export default function ConfirmDialog({
                     </button>
                 </div>
             </div>
-        </div>
+        </ResponsiveModal>
     );
 }
 

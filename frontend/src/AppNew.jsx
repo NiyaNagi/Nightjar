@@ -38,6 +38,8 @@ import BugReportModal from './components/BugReportModal';
 import { handleIndexResults, clearCache as clearSearchIndexCache } from './services/SearchIndexCache';
 import { useAutoLock } from './hooks/useAutoLock';
 import useVirtualKeyboard from './hooks/useVirtualKeyboard';
+import useIsMobile from './hooks/useIsMobile';
+import { useDrag } from '@use-gesture/react';
 import identityManager from './utils/identityManager';
 import { deleteChangelogForDocument } from './utils/changelogStore';
 import { useAuthorAttribution } from './hooks/useAuthorAttribution';
@@ -357,6 +359,19 @@ function App() {
 
     // --- UI State ---
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const isMobileViewport = useIsMobile();
+    const edgeSwipeRef = useRef(null);
+    
+    // Edge-swipe from left to open sidebar on mobile
+    const bindEdgeSwipe = useDrag(({ movement: [mx], velocity: [vx], direction: [dx], last }) => {
+        if (last) {
+            // Open sidebar if swiped far enough right or with enough velocity
+            if ((mx > 60 || (vx > 0.5 && dx > 0)) && sidebarCollapsed) {
+                setSidebarCollapsed(false);
+            }
+        }
+    }, { axis: 'x', filterTaps: true, enabled: isMobileViewport && sidebarCollapsed });
+    
     const [showCreateWorkspaceDialog, setShowCreateWorkspaceDialog] = useState(false);
     const [createWorkspaceMode, setCreateWorkspaceMode] = useState('create'); // 'create' or 'join'
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -2282,6 +2297,16 @@ function App() {
                     
                     // Help
                     onShowHelp={() => { setHelpSection(null); setShowHelp(true); }}
+                />
+            )}
+
+            {/* Invisible edge-swipe zone to open sidebar on mobile */}
+            {isMobileViewport && sidebarCollapsed && (hasWorkspaces || workspacesLoading) && (
+                <div
+                    {...bindEdgeSwipe()}
+                    ref={edgeSwipeRef}
+                    className="sidebar-edge-swipe-zone"
+                    aria-hidden="true"
                 />
             )}
 

@@ -353,6 +353,8 @@
 .kanban-card.dragging {
     opacity: 0.5;
     transform: rotate(3deg);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+    border: 1px dashed var(--accent-color, #6366f1);
 }
 
 /* Card presence indicator - shows who's editing a card */
@@ -573,7 +575,7 @@
     }
 
     .kanban-card[draggable="true"] {
-        touch-action: none;
+        touch-action: pan-y;
     }
 
     .btn-add-card,

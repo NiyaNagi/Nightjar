@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useRef } from 'react';
+import Platform from '../../utils/platform';
 import FileTypeIcon from './FileTypeIcon';
 import DistributionBadge from './DistributionBadge';
 import { formatFileSize, getRelativeTime } from '../../utils/fileTypeCategories';
@@ -56,10 +57,12 @@ export default function FileCard({
 
   const handleTouchStart = useCallback((e) => {
     touchMoved.current = false;
+    e.currentTarget.classList.add('long-pressing');
     longPressTimer.current = setTimeout(() => {
       if (!touchMoved.current) {
         const touch = e.touches?.[0];
         if (touch) {
+          Platform.haptics.impact('light');
           const synth = new MouseEvent('contextmenu', {
             bubbles: true, clientX: touch.clientX, clientY: touch.clientY,
           });
@@ -70,13 +73,15 @@ export default function FileCard({
     }, LONG_PRESS_MS);
   }, [file, onContextMenu]);
 
-  const handleTouchMove = useCallback(() => {
+  const handleTouchMove = useCallback((e) => {
     touchMoved.current = true;
     clearTimeout(longPressTimer.current);
+    e.currentTarget.classList.remove('long-pressing');
   }, []);
 
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback((e) => {
     clearTimeout(longPressTimer.current);
+    e.currentTarget.classList.remove('long-pressing');
   }, []);
 
   /* Common touch props for all view modes */

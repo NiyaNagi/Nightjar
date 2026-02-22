@@ -16,6 +16,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { isElectron } from '../hooks/useEnvironment';
 import { logBehavior } from '../utils/logger';
 import './RelaySettings.css';
+import ResponsiveModal from './common/ResponsiveModal';
 
 // Default relay settings
 const DEFAULT_SETTINGS = {
@@ -201,14 +202,8 @@ export default function RelaySettings({ isOpen, onClose }) {
   // Web users can't be relays
   if (!isElectron()) {
     return (
-      <div className="relay-settings-overlay" onClick={onClose}>
-        <div 
-          className="relay-settings-modal"
-          onClick={e => e.stopPropagation()}
-          ref={modalRef}
-          role="dialog"
-          aria-labelledby="relay-settings-title"
-        >
+      <ResponsiveModal isOpen onClose={onClose} size="medium" className="relay-settings-modal">
+        <div ref={modalRef}>
           <div className="relay-settings-header">
             <h2 id="relay-settings-title">Relay Settings</h2>
             <button 
@@ -231,19 +226,13 @@ export default function RelaySettings({ isOpen, onClose }) {
             </div>
           </div>
         </div>
-      </div>
+      </ResponsiveModal>
     );
   }
   
   return (
-    <div className="relay-settings-overlay" onClick={onClose}>
-      <div 
-        className="relay-settings-modal"
-        onClick={e => e.stopPropagation()}
-        ref={modalRef}
-        role="dialog"
-        aria-labelledby="relay-settings-title"
-      >
+    <ResponsiveModal isOpen onClose={onClose} size="medium" className="relay-settings-modal">
+      <div ref={modalRef}>
         <div className="relay-settings-header">
           <h2 id="relay-settings-title">🌐 Relay Settings</h2>
           <button 
@@ -418,6 +407,6 @@ export default function RelaySettings({ isOpen, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 }

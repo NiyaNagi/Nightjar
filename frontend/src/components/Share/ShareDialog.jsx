@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ResponsiveModal from '../common/ResponsiveModal';
 import { generateShareLink, parseShareLink, isValidShareLink, copyToClipboard as copyToClipboardUtil, readFromClipboard, createNewDocument } from '../../utils/sharing';
 import { getBasePath } from '../../utils/websocket';
 import { generatePassword, validatePassword } from '../../utils/passwordGenerator';
@@ -292,8 +293,7 @@ export function ShareDialog({
   const showQR = copyFormat === 'message-qr' || copyFormat === 'link-qr';
 
   return (
-    <div className="share-dialog-overlay" onClick={onClose}>
-      <div className="share-dialog" onClick={e => e.stopPropagation()}>
+    <ResponsiveModal isOpen onClose={onClose} size="medium" className="share-dialog">
         <div className="share-dialog-header">
           <h2>📤 Share Document</h2>
           <button className="close-button" onClick={onClose}>×</button>
@@ -557,8 +557,7 @@ export function ShareDialog({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </ResponsiveModal>
   );
 }
 

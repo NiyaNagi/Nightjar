@@ -450,11 +450,54 @@
     background: var(--hover-bg, #2d2d44);
 }
 
+/* Long-press visual feedback */
+.tree-item.long-pressing {
+    animation: long-press-squeeze 500ms ease forwards;
+}
+
+@keyframes long-press-squeeze {
+    0%   { transform: scale(1);    opacity: 1; }
+    100% { transform: scale(0.96); opacity: 0.88; }
+}
+
+/* DnD drag overlay (follows pointer during drag) */
+.tree-item--drag-overlay {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-secondary, #1a1a2e);
+    border: 1px solid var(--accent-color, #6366f1);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    opacity: 0.9;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+/* Root drop zone highlight when item hovered over root area */
+.hierarchical-sidebar__tree--drop-target {
+    background: rgba(99, 102, 241, 0.06);
+    outline: 2px dashed var(--accent-color, #6366f1);
+    outline-offset: -2px;
+    border-radius: 4px;
+}
+
 .tree-item--document {
     cursor: grab;
 }
 
 .tree-item--document:active {
+    cursor: grabbing;
+}
+
+.tree-item--folder {
+    cursor: grab;
+}
+
+.tree-item--folder:active {
     cursor: grabbing;
 }
 
@@ -846,6 +889,12 @@
     z-index: calc(var(--z-overlay, 500) - 1); /* 499 — behind sidebar (500) */
     background: rgba(0, 0, 0, 0.5);
     -webkit-tap-highlight-color: transparent;
+    animation: backdrop-fade-in 0.25s ease forwards;
+  }
+
+  @keyframes backdrop-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 
   .hierarchical-sidebar {
@@ -861,6 +910,9 @@
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
     height: var(--app-height, 100dvh);
     touch-action: pan-y; /* Allow vertical scroll, horizontal reserved for swipe */
+    /* Safe-area padding for notched devices */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /* When collapsed on mobile, slide completely off-screen */

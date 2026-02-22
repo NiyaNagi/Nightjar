@@ -26,7 +26,7 @@
     .mobile-toolbar__scroll {
         display: flex;
         align-items: center;
-        gap: 2px;
+        gap: 4px;
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
@@ -42,14 +42,14 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        min-width: 36px;
-        height: 36px;
+        min-width: 44px;
+        height: 44px;
         padding: 0 8px;
         border: none;
         border-radius: 6px;
         background: transparent;
         color: var(--text-secondary, #aaa);
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         font-weight: 600;
         cursor: pointer;
         flex-shrink: 0;
@@ -60,6 +60,7 @@
     .mobile-toolbar__btn.bold { font-weight: 800; }
     .mobile-toolbar__btn.italic { font-style: italic; }
     .mobile-toolbar__btn.strike { text-decoration: line-through; }
+    .mobile-toolbar__btn.underline { text-decoration: underline; }
 
     .mobile-toolbar__btn:active {
         background: var(--bg-hover, rgba(255, 255, 255, 0.1));
@@ -77,6 +78,64 @@
         background: var(--border-color, #444);
         flex-shrink: 0;
         margin: 0 4px;
+    }
+
+    /* Inline link input — space-efficient single row */
+    .mobile-toolbar__link-input {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+        padding: 2px 0;
+    }
+
+    .mobile-toolbar__link-field {
+        flex: 1;
+        min-width: 0;
+        height: 36px;
+        padding: 0 10px;
+        border: 1px solid var(--border-color, #444);
+        border-radius: 6px;
+        background: var(--bg-primary, #0f0f1a);
+        color: var(--text-primary, #fff);
+        font-size: 14px;
+        outline: none;
+    }
+
+    .mobile-toolbar__link-field:focus {
+        border-color: var(--accent-color, #6366f1);
+    }
+
+    .mobile-toolbar__link-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        height: 36px;
+        border: none;
+        border-radius: 6px;
+        background: var(--accent-color, #6366f1);
+        color: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+        flex-shrink: 0;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-toolbar__link-btn--remove {
+        background: var(--danger-color, #ef4444);
+    }
+
+    /* Hide SelectionToolbar (BubbleMenu) on mobile — MobileToolbar provides all actions */
+    .selection-toolbar,
+    .tippy-box:has(.selection-toolbar) {
+        display: none !important;
+    }
+
+    /* Keyboard dismiss button — slightly muted to distinguish from formatting */
+    .mobile-toolbar__btn.dismiss-kb {
+        color: var(--text-tertiary, #666);
+        font-size: 0.75rem;
     }
 
     /* Compensate for the mobile toolbar height in the editor */

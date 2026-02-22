@@ -9,6 +9,7 @@ import UnifiedPicker from './UnifiedPicker';
 import { ensureContrastWithWhite, createColorGradient } from '../../utils/colorUtils';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import './EditPropertiesModal.css';
+import ResponsiveModal from './ResponsiveModal';
 
 export default function EditPropertiesModal({
     isOpen,
@@ -58,16 +59,8 @@ export default function EditPropertiesModal({
     };
     
     return (
-        <div className="edit-properties-modal__overlay" onClick={onClose} role="presentation">
-            <div
-                ref={modalRef}
-                className="edit-properties-modal"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={handleKeyDown}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="edit-properties-title"
-            >
+        <ResponsiveModal isOpen onClose={onClose} size="small" className="edit-properties-modal">
+            <div ref={modalRef} onKeyDown={handleKeyDown}>
                 <div className="edit-properties-modal__header">
                     <h3 id="edit-properties-title" className="edit-properties-modal__title">
                         Edit {item.type === 'folder' ? 'Folder' : 'Document'} Properties
@@ -192,6 +185,6 @@ export default function EditPropertiesModal({
                     )}
                 </div>
             </div>
-        </div>
+        </ResponsiveModal>
     );
 }

@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import ResponsiveModal from './common/ResponsiveModal';
 import { generateDiagnosticReport, formatDiagnosticReport } from '../utils/diagnostics';
 import { getLogs, logBehavior } from '../utils/logger';
 import { useToast } from '../contexts/ToastContext';
@@ -336,16 +337,10 @@ export default function BugReportModal({ isOpen, onClose, context }) {
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && !isSubmitting) {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isSubmitting, onClose]);
+  // Guarded close handler — prevents dismiss while submitting
+  const handleDismiss = useCallback(() => {
+    if (!isSubmitting) onClose();
+  }, [isSubmitting, onClose]);
 
   // Reset form state only when modal first opens (rising edge)
   useEffect(() => {
@@ -379,14 +374,14 @@ export default function BugReportModal({ isOpen, onClose, context }) {
     try {
       const html2canvasModule = await import('html2canvas');
       const html2canvas = html2canvasModule.default;
-      const overlay = modalRef.current?.closest('.bug-report-overlay');
+      const overlay = modalRef.current?.closest('.responsive-modal__overlay');
       if (overlay) overlay.style.visibility = 'hidden';
 
       const canvas = await html2canvas(document.body, {
         logging: false,
         useCORS: true,
         scale: 1,
-        ignoreElements: (el) => el.classList?.contains('bug-report-overlay'),
+        ignoreElements: (el) => el.classList?.contains('responsive-modal__overlay'),
       });
 
       if (overlay) overlay.style.visibility = 'visible';
@@ -398,7 +393,7 @@ export default function BugReportModal({ isOpen, onClose, context }) {
     } catch (err) {
       console.error('Screenshot capture failed:', err);
       setScreenshotStatus('error');
-      const overlay = modalRef.current?.closest('.bug-report-overlay');
+      const overlay = modalRef.current?.closest('.responsive-modal__overlay');
       if (overlay) overlay.style.visibility = 'visible';
       return false;
     }
@@ -488,15 +483,9 @@ export default function BugReportModal({ isOpen, onClose, context }) {
   if (!isOpen) return null;
 
   return (
-    <div className="bug-report-overlay" onClick={(e) => {
-      if (e.target === e.currentTarget && !isSubmitting) onClose();
-    }}>
+    <ResponsiveModal isOpen onClose={handleDismiss} size="large" className="bug-report-modal">
       <div
-        className="bug-report-modal"
         ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bug-report-title"
       >
         <div className="bug-report-modal__header">
           <h2 id="bug-report-title">🐛 Report a Bug</h2>
@@ -627,6 +616,6 @@ export default function BugReportModal({ isOpen, onClose, context }) {
           </div>
         )}
       </div>
-    </div>
+    </ResponsiveModal>
   );
 }

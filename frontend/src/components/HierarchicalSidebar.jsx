@@ -10,6 +10,9 @@
 
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useDrag } from '@use-gesture/react';
+import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
+import useIsMobile from '../hooks/useIsMobile';
+import Platform from '../utils/platform';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import CreateFolder from './CreateFolder';
 import CreateDocument from './CreateDocument';
@@ -48,52 +51,27 @@ const TreeItem = React.memo(function TreeItem({
     onRenameSubmit, // Submit the rename
     onRenameCancel, // Cancel renaming
     onContextMenu,
-    onDocumentDrop, // Callback when a document is dropped on this folder
+    dragActiveRef, // Ref to check if a DnD drag is in progress
     children,
     collaborators = [],
-    // Long-press support for mobile context menu is handled via internal ref
     workspaceColor, // Color of the workspace for system folders
 }) {
-    const [isDragOver, setIsDragOver] = useState(false);
-    
-    const handleDragOver = (e) => {
-        if (type === 'folder') {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            setIsDragOver(true);
-        }
-    };
-    
-    const handleDragLeave = (e) => {
-        // Only reset if leaving the element itself, not child elements
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-            setIsDragOver(false);
-        }
-    };
-    
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragOver(false);
-        // Handle document drop onto folder
-        const docId = e.dataTransfer.getData('documentId');
-        if (docId && type === 'folder' && onDocumentDrop) {
-            onDocumentDrop(docId, item.id);
-        }
-    };
-    
-    const handleDragStart = (e) => {
-        if (type === 'document') {
-            e.dataTransfer.setData('documentId', item.id);
-            e.dataTransfer.effectAllowed = 'move';
-            // Add visual feedback
-            e.currentTarget.classList.add('tree-item--dragging');
-        }
-    };
-    
-    const handleDragEnd = (e) => {
-        e.currentTarget.classList.remove('tree-item--dragging');
-    };
+    // @dnd-kit DnD hooks — touch-friendly drag-and-drop for all tree items
+    const dndId = `${type}-${item.id}`;
+    const { listeners: dragListeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+        id: dndId,
+        data: { type, item },
+        disabled: isRenaming
+    });
+    const { setNodeRef: setDropRef, isOver: isDragOver } = useDroppable({
+        id: `drop-${item.id}`,
+        data: { acceptType: 'folder', folderId: item.id },
+        disabled: type !== 'folder'
+    });
+    const mergedRef = useCallback((node) => {
+        setDragRef(node);
+        if (type === 'folder') setDropRef(node);
+    }, [setDragRef, setDropRef, type]);
     
     const getIcon = () => {
         if (type === 'folder') {
@@ -203,43 +181,49 @@ const TreeItem = React.memo(function TreeItem({
     return (
         <div className="tree-item-wrapper">
             <div
-                className={`tree-item tree-item--${type} ${isSelected ? 'tree-item--selected' : ''} ${isDragOver ? 'tree-item--drag-over' : ''} ${isRenaming ? 'tree-item--renaming' : ''} ${itemStyle.textColor ? 'tree-item--colored' : ''}`}
+                ref={mergedRef}
+                className={`tree-item tree-item--${type} ${isSelected ? 'tree-item--selected' : ''} ${isDragOver ? 'tree-item--drag-over' : ''} ${isRenaming ? 'tree-item--renaming' : ''} ${isDragging ? 'tree-item--dragging' : ''} ${itemStyle.textColor ? 'tree-item--colored' : ''}`}
                 style={{ 
                     paddingLeft: `${12 + level * 20}px`, 
                     background: itemStyle.background,
-                    ...(itemStyle.textColor ? { '--tree-item-text-color': itemStyle.textColor } : {})
+                    ...(itemStyle.textColor ? { '--tree-item-text-color': itemStyle.textColor } : {}),
+                    ...(isDragging ? { opacity: 0.4 } : {})
                 }}
+                onPointerDown={dragListeners?.onPointerDown}
                 onClick={() => !isRenaming && onSelect(item.id, type)}
                 onDoubleClick={handleDoubleClick}
-                onKeyDown={handleKeyDownItem}
+                onKeyDown={(e) => { handleKeyDownItem(e); dragListeners?.onKeyDown?.(e); }}
                 onContextMenu={(e) => { e.preventDefault(); onContextMenu?.(e, item, type); }}
                 onTouchStart={(e) => {
+                    // Forward to @dnd-kit for touch DnD
+                    dragListeners?.onTouchStart?.(e);
+                    e.currentTarget.classList.add('long-pressing');
                     const touch = e.touches[0];
+                    const el = e.currentTarget;
                     const timer = setTimeout(() => {
-                        // Synthesize a context menu event from the touch position
+                        el.classList.remove('long-pressing');
+                        // Don't show context menu if a drag is in progress
+                        if (dragActiveRef?.current) return;
+                        Platform.haptics.impact('light');
                         const syntheticEvent = { preventDefault: () => {}, clientX: touch.clientX, clientY: touch.clientY };
                         onContextMenu?.(syntheticEvent, item, type);
                     }, 500);
                     e.currentTarget._longPressTimer = timer;
                 }}
                 onTouchEnd={(e) => {
+                    e.currentTarget.classList.remove('long-pressing');
                     if (e.currentTarget._longPressTimer) {
                         clearTimeout(e.currentTarget._longPressTimer);
                         e.currentTarget._longPressTimer = null;
                     }
                 }}
                 onTouchMove={(e) => {
+                    e.currentTarget.classList.remove('long-pressing');
                     if (e.currentTarget._longPressTimer) {
                         clearTimeout(e.currentTarget._longPressTimer);
                         e.currentTarget._longPressTimer = null;
                     }
                 }}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                draggable={type === 'document' && !isRenaming}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
                 role="treeitem"
                 tabIndex={isSelected ? 0 : -1}
                 aria-selected={isSelected}
@@ -352,6 +336,44 @@ const TreeItem = React.memo(function TreeItem({
         </div>
     );
 });
+
+/**
+ * Helper to prevent circular folder nesting
+ */
+function wouldCreateCircularRef(movedFolderId, newParentId, allFolders) {
+    if (!newParentId) return false;
+    if (movedFolderId === newParentId) return true;
+    let currentId = newParentId;
+    const visited = new Set();
+    while (currentId) {
+        if (visited.has(currentId)) break;
+        visited.add(currentId);
+        if (currentId === movedFolderId) return true;
+        const parent = allFolders.find(f => f.id === currentId);
+        currentId = parent?.parentId || null;
+    }
+    return false;
+}
+
+/**
+ * Root drop zone for the tree — accepts items dropped at root level
+ */
+function RootDropZone({ children, className }) {
+    const { setNodeRef, isOver } = useDroppable({
+        id: 'root-drop',
+        data: { type: 'root' }
+    });
+    return (
+        <div
+            ref={setNodeRef}
+            className={`${className} ${isOver ? 'hierarchical-sidebar__tree--drop-target' : ''}`}
+            role="tree"
+            aria-label="Workspace documents and folders"
+        >
+            {children}
+        </div>
+    );
+}
 
 /**
  * Welcome/onboarding component when no workspace exists
@@ -508,7 +530,7 @@ const HierarchicalSidebar = ({
     // Mobile sidebar: swipe-to-close gesture
     const sidebarRef = useRef(null);
     const [swipeX, setSwipeX] = useState(0);
-    const isMobile = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 768px)').matches;
+    const isMobile = useIsMobile();
     
     const bindSwipe = useDrag(({ movement: [mx], velocity: [vx], direction: [dx], cancel, active, last }) => {
         // Only allow leftward swipe (negative x)
@@ -524,6 +546,70 @@ const HierarchicalSidebar = ({
             setSwipeX(0);
         }
     }, { axis: 'x', filterTaps: true, enabled: isMobile && !isCollapsed });
+    
+    // @dnd-kit sensors for touch-friendly tree DnD
+    const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 5 } });
+    const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+    const dndSensors = useSensors(pointerSensor, touchSensor);
+    const [dndActiveItem, setDndActiveItem] = useState(null);
+    const dragActiveRef = useRef(false);
+    
+    const handleDndDragStart = useCallback((event) => {
+        dragActiveRef.current = true;
+        const data = event.active.data.current;
+        setDndActiveItem(data);
+        logBehavior('dnd', 'sidebar_drag_start', { type: data?.type, id: data?.item?.id });
+    }, []);
+    
+    const handleDndDragEnd = useCallback((event) => {
+        dragActiveRef.current = false;
+        setDndActiveItem(null);
+        const { active, over } = event;
+        if (!over || !active) return;
+        
+        const dragData = active.data.current;
+        const dropData = over.data.current;
+        if (!dragData || !dropData) return;
+        
+        const dragType = dragData.type;
+        const dragItem = dragData.item;
+        
+        if (dropData.type === 'root') {
+            // Drop to root level
+            if (dragType === 'document' && dragItem.folderId) {
+                onMoveDocument?.(dragItem.id, null);
+                logBehavior('dnd', 'drop_doc_to_root');
+            } else if (dragType === 'folder' && dragItem.parentId) {
+                updateFolder(dragItem.id, { parentId: null });
+                logBehavior('dnd', 'drop_folder_to_root');
+            }
+        } else if (dropData.acceptType === 'folder') {
+            const targetFolderId = dropData.folderId;
+            if (targetFolderId === dragItem.id) return; // Can't drop on self
+            
+            if (dragType === 'document') {
+                if (dragItem.folderId !== targetFolderId) {
+                    handleDocumentDrop(dragItem.id, targetFolderId);
+                }
+            } else if (dragType === 'folder') {
+                if (!wouldCreateCircularRef(dragItem.id, targetFolderId, folders)) {
+                    updateFolder(dragItem.id, { parentId: targetFolderId });
+                    // Auto-expand the target folder to show the nested folder
+                    setExpandedFolders(prev => {
+                        const next = new Set(prev);
+                        next.add(targetFolderId);
+                        return next;
+                    });
+                    logBehavior('dnd', 'nest_folder_in_folder');
+                }
+            }
+        }
+    }, [onMoveDocument, handleDocumentDrop, updateFolder, folders, setExpandedFolders]);
+    
+    const handleDndDragCancel = useCallback(() => {
+        dragActiveRef.current = false;
+        setDndActiveItem(null);
+    }, []);
     
     // Delete confirmation handler
     const handleRequestDelete = useCallback(async (id, type, name) => {
@@ -663,7 +749,7 @@ const HierarchicalSidebar = ({
     // Check if we have any workspaces
     const hasWorkspaces = workspaces.length > 0;
     
-    // Get folders for current workspace (deduplicated by ID)
+    // Get all folders for current workspace (deduplicated by ID)
     const workspaceFolders = useMemo(() => {
         if (!currentWorkspace) return [];
         const wsFiltered = folders.filter(f => f.workspaceId === currentWorkspace.id && !f.isSystem);
@@ -675,6 +761,16 @@ const HierarchicalSidebar = ({
             return true;
         });
     }, [folders, currentWorkspace]);
+    
+    // Root-level folders (no parent) for top-level rendering
+    const rootFolders = useMemo(() => {
+        return workspaceFolders.filter(f => !f.parentId);
+    }, [workspaceFolders]);
+    
+    // Get subfolders of a specific folder
+    const getSubfolders = useCallback((parentId) => {
+        return workspaceFolders.filter(f => f.parentId === parentId);
+    }, [workspaceFolders]);
     
     // Get documents for current workspace (at root level - no folder)
     const rootDocuments = useMemo(() => {
@@ -721,9 +817,13 @@ const HierarchicalSidebar = ({
         if (type === 'document') {
             logBehavior('navigation', 'select_document_sidebar');
             onSelectDocument?.(id);
+            // Auto-close sidebar on mobile after selecting a document
+            if (isMobile) {
+                onToggleCollapse?.();
+            }
         }
         // Folders don't need special handling - just expand/collapse
-    }, [onSelectDocument]);
+    }, [onSelectDocument, isMobile, onToggleCollapse]);
     
     // Handle document drop onto folder
     const handleDocumentDrop = useCallback((documentId, folderId) => {
@@ -735,23 +835,6 @@ const HierarchicalSidebar = ({
             onMoveDocument(documentId, folderId);
         }
     }, [onMoveDocument, documents]);
-    
-    // Handle document drop onto root (out of folder)
-    const handleDropOnRoot = useCallback((e) => {
-        e.preventDefault();
-        const docId = e.dataTransfer.getData('documentId');
-        if (docId && onMoveDocument) {
-            // Avoid no-op: check if doc is already at root
-            const doc = documents.find(d => d.id === docId);
-            if (doc && !doc.folderId) return;
-            onMoveDocument(docId, null); // null folderId = root
-        }
-    }, [onMoveDocument, documents]);
-    
-    const handleDragOverRoot = useCallback((e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    }, []);
     
     // Workspace handlers
     const handleOpenCreateWorkspace = useCallback(() => {
@@ -839,6 +922,70 @@ const HierarchicalSidebar = ({
     // Has workspace(s) - show full sidebar
     const hasContent = workspaceFolders.length > 0 || rootDocuments.length > 0;
     
+    // Recursive folder tree renderer — supports arbitrary nesting
+    const renderFolderTree = (folderList, level) => {
+        return folderList.map(folder => {
+            const isExpanded = expandedFolders.has(folder.id);
+            const subfolders = getSubfolders(folder.id);
+            const folderDocs = getDocumentsInFolder(folder.id);
+            const hasChildren = subfolders.length > 0 || folderDocs.length > 0;
+            const isFolderRenaming = renamingItem?.id === folder.id && renamingItem?.type === 'folder';
+            
+            return (
+                <TreeItem
+                    key={folder.id}
+                    item={folder}
+                    type="folder"
+                    level={level}
+                    isExpanded={isExpanded}
+                    hasChildren={hasChildren}
+                    onSelect={() => toggleFolder(folder.id)}
+                    onToggle={toggleFolder}
+                    onContextMenu={handleContextMenu}
+                    onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
+                    onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
+                    onRequestEdit={handleRequestEdit}
+                    isRenaming={isFolderRenaming}
+                    renameValue={isFolderRenaming ? renameValue : ''}
+                    onRenameChange={setRenameValue}
+                    onRenameSubmit={handleRenameSubmit}
+                    onRenameCancel={handleRenameCancel}
+                    dragActiveRef={dragActiveRef}
+                    workspaceColor={currentWorkspace?.color}
+                >
+                    {/* Nested subfolders */}
+                    {renderFolderTree(subfolders, level + 1)}
+                    {/* Documents inside this folder */}
+                    {folderDocs.map(doc => {
+                        const isDocRenaming = renamingItem?.id === doc.id && renamingItem?.type === 'document';
+                        return (
+                            <TreeItem
+                                key={doc.id}
+                                item={{...doc, folderColor: folder.color}}
+                                type="document"
+                                level={level + 1}
+                                isSelected={doc.id === activeDocId}
+                                onSelect={handleSelect}
+                                onContextMenu={handleContextMenu}
+                                onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
+                                onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
+                                onRequestEdit={handleRequestEdit}
+                                isRenaming={isDocRenaming}
+                                renameValue={isDocRenaming ? renameValue : ''}
+                                onRenameChange={setRenameValue}
+                                onRenameSubmit={handleRenameSubmit}
+                                onRenameCancel={handleRenameCancel}
+                                collaborators={documentCollaborators[doc.id] || []}
+                                dragActiveRef={dragActiveRef}
+                                workspaceColor={currentWorkspace?.color}
+                            />
+                        );
+                    })}
+                </TreeItem>
+            );
+        });
+    };
+    
     return (
         <>
         {/* Mobile backdrop — visible only on ≤768px via CSS */}
@@ -906,14 +1053,14 @@ const HierarchicalSidebar = ({
                 </IfPermitted>
             </div>
             
-            {/* Tree content - allows dropping docs to root */}
-            <div 
-                className="hierarchical-sidebar__tree"
-                onDragOver={handleDragOverRoot}
-                onDrop={handleDropOnRoot}
-                role="tree"
-                aria-label="Workspace documents and folders"
+            {/* Tree content with @dnd-kit for touch-friendly drag-and-drop */}
+            <DndContext
+                sensors={dndSensors}
+                onDragStart={handleDndDragStart}
+                onDragEnd={handleDndDragEnd}
+                onDragCancel={handleDndDragCancel}
             >
+            <RootDropZone className="hierarchical-sidebar__tree">
                 {!hasContent ? (
                     <EmptyWorkspaceState 
                         workspaceName={currentWorkspace?.name}
@@ -923,62 +1070,8 @@ const HierarchicalSidebar = ({
                     />
                 ) : (
                     <>
-                        {/* Folders with their documents */}
-                        {workspaceFolders.map(folder => {
-                            const isExpanded = expandedFolders.has(folder.id);
-                            const folderDocs = getDocumentsInFolder(folder.id);
-                            const hasChildren = folderDocs.length > 0;
-                            const isFolderRenaming = renamingItem?.id === folder.id && renamingItem?.type === 'folder';
-                            
-                            return (
-                                <TreeItem
-                                    key={folder.id}
-                                    item={folder}
-                                    type="folder"
-                                    isExpanded={isExpanded}
-                                    hasChildren={hasChildren}
-                                    onSelect={() => toggleFolder(folder.id)}
-                                    onToggle={toggleFolder}
-                                    onContextMenu={handleContextMenu}
-                                    onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
-                                    onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
-                                    onRequestEdit={handleRequestEdit}
-                                    isRenaming={isFolderRenaming}
-                                    renameValue={isFolderRenaming ? renameValue : ''}
-                                    onRenameChange={setRenameValue}
-                                    onRenameSubmit={handleRenameSubmit}
-                                    onRenameCancel={handleRenameCancel}
-                                    onDocumentDrop={canCreateInWorkspace ? handleDocumentDrop : undefined}
-                                    workspaceColor={currentWorkspace?.color}
-                                >
-                                    {/* Documents inside this folder */}
-                                    {folderDocs.map(doc => {
-                                        const isDocRenaming = renamingItem?.id === doc.id && renamingItem?.type === 'document';
-                                        return (
-                                            <TreeItem
-                                                key={doc.id}
-                                                item={{...doc, folderColor: folder.color}}
-                                                type="document"
-                                                level={1}
-                                                isSelected={doc.id === activeDocId}
-                                                onSelect={handleSelect}
-                                                onContextMenu={handleContextMenu}
-                                                onRequestDelete={canDeleteInWorkspace ? handleRequestDelete : undefined}
-                                                onRequestRename={canDeleteInWorkspace ? handleRequestRename : undefined}
-                                                onRequestEdit={handleRequestEdit}
-                                                isRenaming={isDocRenaming}
-                                                renameValue={isDocRenaming ? renameValue : ''}
-                                                onRenameChange={setRenameValue}
-                                                onRenameSubmit={handleRenameSubmit}
-                                                onRenameCancel={handleRenameCancel}
-                                                collaborators={documentCollaborators[doc.id] || []}
-                                                workspaceColor={currentWorkspace?.color}
-                                            />
-                                        );
-                                    })}
-                                </TreeItem>
-                            );
-                        })}
+                        {/* Recursive folder tree rendering */}
+                        {renderFolderTree(rootFolders, 0)}
                         
                         {/* Root documents (not in any folder) */}
                         {rootDocuments.map(doc => {
@@ -1000,13 +1093,25 @@ const HierarchicalSidebar = ({
                                     onRenameSubmit={handleRenameSubmit}
                                     onRenameCancel={handleRenameCancel}
                                     collaborators={documentCollaborators[doc.id] || []}
+                                    dragActiveRef={dragActiveRef}
                                     workspaceColor={currentWorkspace?.color}
                                 />
                             );
                         })}
                     </>
                 )}
-            </div>
+            </RootDropZone>
+            <DragOverlay>
+                {dndActiveItem ? (
+                    <div className="tree-item tree-item--drag-overlay">
+                        <span className="tree-item__icon">
+                            {dndActiveItem.item?.icon || (dndActiveItem.type === 'folder' ? '📁' : '📄')}
+                        </span>
+                        <span className="tree-item__name">{dndActiveItem.item?.name}</span>
+                    </div>
+                ) : null}
+            </DragOverlay>
+            </DndContext>
             
             {/* Footer with mascot, app settings and collapse */}
             <div className="hierarchical-sidebar__footer">

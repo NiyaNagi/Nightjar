@@ -23,6 +23,7 @@ import { getBasePath } from '../utils/websocket';
 import { logBehavior } from '../utils/logger';
 import UnifiedPicker from './common/UnifiedPicker';
 import './CreateWorkspace.css';
+import ResponsiveModal from './common/ResponsiveModal';
 
 
 export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSuccess }) {
@@ -435,15 +436,8 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
   };
   
   return (
-    <div className="create-workspace-overlay" onClick={onClose}>
-      <div 
-        ref={modalRef}
-        className="create-workspace" 
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-workspace-title"
-      >
+    <ResponsiveModal isOpen onClose={onClose} size="medium" className="create-workspace">
+      <div ref={modalRef}>
         <div className="create-workspace__header">
           <h2 id="create-workspace-title" className="visually-hidden">
             {activeTab === 'create' ? 'Create Workspace' : 'Join Workspace'}
@@ -706,6 +700,6 @@ export default function CreateWorkspaceDialog({ mode = 'create', onClose, onSucc
           )}
         </div>
       </div>
-    </div>
+    </ResponsiveModal>
   );
 }

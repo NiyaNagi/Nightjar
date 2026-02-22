@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './AppSettings.css';
+import ResponsiveModal from './ResponsiveModal';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useConfirmDialog } from './ConfirmDialog';
 import { useEnvironment, isFeatureAvailable } from '../../hooks/useEnvironment';
@@ -401,9 +402,6 @@ export default function AppSettings({ isOpen, onClose }) {
 
   // Handle keyboard
   const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
-      onClose?.();
-    }
     if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSave();
@@ -527,12 +525,9 @@ export default function AppSettings({ isOpen, onClose }) {
   }, [customRelayUrl, relayBridgeEnabled, handleToggleRelayBridge]);
 
   return (
-    <div 
-      className="app-settings-overlay" 
-      onClick={(e) => e.target === e.currentTarget && onClose?.()}
-      onKeyDown={handleKeyDown}
-    >
-      <div ref={modalRef} className="app-settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <>
+    <ResponsiveModal isOpen onClose={onClose} size="large" className="app-settings-modal">
+      <div ref={modalRef} onKeyDown={handleKeyDown}>
         {/* Header */}
         <div className="app-settings__header">
           <h2 id="settings-title" className="app-settings__title">Settings</h2>
@@ -1417,8 +1412,9 @@ export default function AppSettings({ isOpen, onClose }) {
           </button>
         </div>
       </div>
-      {ConfirmDialogComponent}
-    </div>
+    </ResponsiveModal>
+    {ConfirmDialogComponent}
+    </>
   );
 }
 

@@ -303,7 +303,7 @@ const EditorPane = ({
                     />
                 )}
             </div>
-            {!readOnly && <MobileToolbar editor={editor} />}
+            {!readOnly && <MobileToolbar editor={editor} onAddComment={onAddComment} />}
             {!readOnly && (
                 <input
                     ref={fileInputRef}

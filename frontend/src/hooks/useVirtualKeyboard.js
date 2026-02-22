@@ -20,6 +20,23 @@ export default function useVirtualKeyboard() {
         document.documentElement.style.setProperty('--keyboard-height', `${height}px`);
     }, []);
 
+    // Scroll the cursor/active element into view when keyboard opens
+    const scrollCursorIntoView = useCallback(() => {
+        requestAnimationFrame(() => {
+            // Try TipTap cursor first
+            const cursor = document.querySelector('.ProseMirror .ProseMirror-cursor, .ProseMirror .is-active');
+            if (cursor) {
+                cursor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            // Fallback: scroll the focused element into view
+            const active = document.activeElement;
+            if (active && active !== document.body) {
+                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }, []);
+
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
@@ -31,6 +48,7 @@ export default function useVirtualKeyboard() {
                 const open = height > 0;
                 setState({ isKeyboardOpen: open, keyboardHeight: height });
                 updateCssVar(height);
+                if (open) scrollCursorIntoView();
             };
             navigator.virtualKeyboard.addEventListener('geometrychange', handleGeometryChange);
             return () => {
@@ -54,6 +72,7 @@ export default function useVirtualKeyboard() {
                 const kbHeight = open ? Math.round(heightDiff) : 0;
                 setState({ isKeyboardOpen: open, keyboardHeight: kbHeight });
                 updateCssVar(kbHeight);
+                if (open) scrollCursorIntoView();
             });
         };
 
@@ -63,7 +82,7 @@ export default function useVirtualKeyboard() {
             if (rafId) cancelAnimationFrame(rafId);
             updateCssVar(0);
         };
-    }, [updateCssVar]);
+    }, [updateCssVar, scrollCursorIntoView]);
 
     return state;
 }

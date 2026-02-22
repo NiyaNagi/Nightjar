@@ -17,13 +17,14 @@ import { generateShareLink, generateShareMessage, compressShareLink, generateSig
 import { getStoredKeyChain } from '../utils/keyDerivation';
 import { signData, uint8ToBase62 } from '../utils/identity';
 import { isElectron } from '../hooks/useEnvironment';
-import Platform from '../utils/platform';
+import { Platform } from '../utils/platform';
 import { getBasePath } from '../utils/websocket';
 import { UnifiedPicker } from './common';
 import { useConfirmDialog } from './common/ConfirmDialog';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { logBehavior } from '../utils/logger';
 import './WorkspaceSettings.css';
+import ResponsiveModal from './common/ResponsiveModal';
 
 // Expiry options for signed invites
 const EXPIRY_OPTIONS = [
@@ -150,30 +151,23 @@ export default function WorkspaceSettings({
     return () => { isMountedRef.current = false; };
   }, []);
   
-  // Handle Escape key to close modal
-  useEffect(() => {
-    const handleKeyDown = async (e) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        const hasUnsaved = name !== workspace?.name || icon !== workspace?.icon || color !== workspace?.color;
-        if (hasUnsaved) {
-          const confirmed = await confirm({
-            title: 'Unsaved Changes',
-            message: 'You have unsaved changes. Discard them?',
-            confirmText: 'Discard',
-            cancelText: 'Cancel',
-            variant: 'danger'
-          });
-          if (!confirmed) return;
-        }
-        if (!isMountedRef.current) return;
-        setShowOwnerLeaveConfirm(false);
-        setSelectedNewOwner(null);
-        onClose?.();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+  // Dismiss handler for ResponsiveModal (backdrop click / Escape)
+  const handleDismiss = useCallback(async () => {
+    const hasUnsaved = name !== workspace?.name || icon !== workspace?.icon || color !== workspace?.color;
+    if (hasUnsaved) {
+      const confirmed = await confirm({
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Discard them?',
+        confirmText: 'Discard',
+        cancelText: 'Cancel',
+        variant: 'danger'
+      });
+      if (!confirmed) return;
+    }
+    if (!isMountedRef.current) return;
+    setShowOwnerLeaveConfirm(false);
+    setSelectedNewOwner(null);
+    onClose?.();
   }, [onClose, name, icon, color, workspace, confirm]);
   
   // Load saved custom relay from localStorage
@@ -578,28 +572,9 @@ export default function WorkspaceSettings({
   const canOwnerLeave = isOwner && !isOnlyMember && (otherOwners.length > 0 || nonOwnerMembers.length > 0);
   
   return (
-    <div className="workspace-settings__overlay" role="presentation" onClick={async (e) => {
-      if (e.target !== e.currentTarget) return;
-      const hasUnsaved = name !== workspace.name || icon !== workspace.icon || color !== workspace.color;
-      if (hasUnsaved) {
-        const confirmed = await confirm({
-          title: 'Unsaved Changes',
-          message: 'You have unsaved changes. Discard them?',
-          confirmText: 'Discard',
-          cancelText: 'Cancel',
-          variant: 'danger'
-        });
-        if (!confirmed) return;
-      }
-      onClose?.();
-    }}>
-      <div 
-        className="workspace-settings" 
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="workspace-settings-title"
-      >
+    <>
+    <ResponsiveModal isOpen onClose={handleDismiss} size="large" className="workspace-settings">
+      <div ref={modalRef}>
         <div className="workspace-settings__header">
           <h2 id="workspace-settings-title" className="workspace-settings__title">Workspace Settings</h2>
           <button className="workspace-settings__close" onClick={async () => {
@@ -1261,7 +1236,8 @@ export default function WorkspaceSettings({
         </section>
       </div>
     </div>
+    </ResponsiveModal>
     {ConfirmDialogComponent}
-  </div>
+    </>
   );
 }

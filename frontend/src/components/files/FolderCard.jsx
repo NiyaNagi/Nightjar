@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import Platform from '../../utils/platform';
 import './FolderCard.css';
 
 /* Long-press delay (ms) */
@@ -47,10 +48,12 @@ export default function FolderCard({
 
   const handleTouchStart = useCallback((e) => {
     touchMoved.current = false;
+    e.currentTarget.classList.add('long-pressing');
     longPressTimer.current = setTimeout(() => {
       if (!touchMoved.current) {
         const touch = e.touches?.[0];
         if (touch) {
+          Platform.haptics.impact('light');
           const synth = new MouseEvent('contextmenu', {
             bubbles: true, clientX: touch.clientX, clientY: touch.clientY,
           });
@@ -61,13 +64,15 @@ export default function FolderCard({
     }, LONG_PRESS_MS);
   }, [folder, onContextMenu]);
 
-  const handleTouchMove = useCallback(() => {
+  const handleTouchMove = useCallback((e) => {
     touchMoved.current = true;
     clearTimeout(longPressTimer.current);
+    e.currentTarget.classList.remove('long-pressing');
   }, []);
 
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback((e) => {
     clearTimeout(longPressTimer.current);
+    e.currentTarget.classList.remove('long-pressing');
   }, []);
 
   const touchProps = {
