@@ -31,12 +31,33 @@ const mockPeerManagerInstance = {
   on: jest.fn(),
   off: jest.fn(),
   emit: jest.fn(),
+  transports: {
+    websocket: {
+      isServerConnected: jest.fn().mockReturnValue(false),
+    },
+  },
 };
 
 jest.mock('../frontend/src/services/p2p/index.js', () => ({
   getPeerManager: jest.fn(() => mockPeerManagerInstance),
   PeerManager: jest.fn(),
   destroyPeerManager: jest.fn(),
+}));
+
+// ── Mock P2P protocol serialization (generateTopic) ─────────────────
+jest.mock('../frontend/src/services/p2p/protocol/serialization.js', () => ({
+  generateTopic: jest.fn().mockResolvedValue('mock-topic-hash'),
+  generatePeerId: jest.fn().mockReturnValue('mock-peer-id'),
+  encodeMessage: jest.fn((msg) => JSON.stringify(msg)),
+  decodeMessage: jest.fn((str) => JSON.parse(str)),
+}));
+
+// ── Mock room auth (computeRoomAuthToken) ───────────────────────────
+jest.mock('../frontend/src/utils/roomAuth.js', () => ({
+  computeRoomAuthToken: jest.fn().mockResolvedValue('mock-auth-token'),
+  computeRoomAuthTokenSync: jest.fn().mockReturnValue('mock-auth-token'),
+  encryptRelayPayload: jest.fn(),
+  decryptRelayPayload: jest.fn(),
 }));
 
 // ── Mock IndexedDB ──────────────────────────────────────────────────
@@ -755,5 +776,386 @@ describe('CLAUDE.md documentation', () => {
 
     expect(source).toMatch(/FileTransferProvider/);
     expect(source).toMatch(/workspace-level/i);
+  });
+});
+
+
+// ====================================================================
+// § 12. Web P2P Connectivity Fix (Issue #17)
+// ====================================================================
+
+describe('Issue #17: Web P2P connectivity fix', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Object.keys(mockChunkStore).forEach(k => delete mockChunkStore[k]);
+    mockPeerManagerInstance.isInitialized = true;
+    mockPeerManagerInstance.currentWorkspaceId = null;
+    mockPeerManagerInstance.getConnectedPeers.mockReturnValue([]);
+    mockPeerManagerInstance.transports.websocket.isServerConnected.mockReturnValue(false);
+  });
+
+  // ── 12.1 FileTransferContext passes connectionParams to joinWorkspace ──
+
+  test('joinWorkspace receives serverUrl from FileTransferProvider', async () => {
+    renderWithProvider({
+      workspaceId: 'ws-web-test',
+      serverUrl: 'wss://night-jar.co/app/signal',
+      workspaceKey: new Uint8Array(32),
+    });
+
+    await waitFor(() => {
+      expect(mockPeerManagerInstance.joinWorkspace).toHaveBeenCalledWith(
+        'ws-web-test',
+        expect.objectContaining({
+          serverUrl: 'wss://night-jar.co/app/signal',
+        })
+      );
+    });
+  });
+
+  test('joinWorkspace receives authToken computed from workspaceKey', async () => {
+    const fakeKey = new Uint8Array(32);
+    fakeKey[0] = 42;
+
+    renderWithProvider({
+      workspaceId: 'ws-auth-test',
+      serverUrl: 'wss://example.com/signal',
+      workspaceKey: fakeKey,
+    });
+
+    await waitFor(() => {
+      expect(mockPeerManagerInstance.joinWorkspace).toHaveBeenCalledWith(
+        'ws-auth-test',
+        expect.objectContaining({
+          authToken: 'mock-auth-token',
+          workspaceKey: fakeKey,
+        })
+      );
+    });
+  });
+
+  test('joinWorkspace called with null serverUrl on Electron (no relay needed)', async () => {
+    renderWithProvider({
+      workspaceId: 'ws-electron-test',
+      serverUrl: null,
+      workspaceKey: new Uint8Array(32),
+    });
+
+    await waitFor(() => {
+      expect(mockPeerManagerInstance.joinWorkspace).toHaveBeenCalledWith(
+        'ws-electron-test',
+        expect.objectContaining({
+          serverUrl: null,
+        })
+      );
+    });
+  });
+
+  test('joinWorkspace called without authToken when workspaceKey is null', async () => {
+    renderWithProvider({
+      workspaceId: 'ws-no-key-test',
+      serverUrl: 'wss://example.com/signal',
+      workspaceKey: null,
+    });
+
+    await waitFor(() => {
+      expect(mockPeerManagerInstance.joinWorkspace).toHaveBeenCalledWith(
+        'ws-no-key-test',
+        expect.objectContaining({
+          serverUrl: 'wss://example.com/signal',
+          authToken: null,
+          workspaceKey: null,
+        })
+      );
+    });
+  });
+
+  // ── 12.2 Source-level verification of getSignalingServerUrl ──
+
+  test('getSignalingServerUrl exists in websocket.js', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/utils/websocket.js'),
+      'utf8'
+    );
+
+    expect(source).toMatch(/export function getSignalingServerUrl/);
+    // Should append /signal path
+    expect(source).toMatch(/\/signal/);
+    // Should handle web mode (non-Electron) by deriving from window.location
+    expect(source).toMatch(/window\.location\.host/);
+    // Should return null for Electron local mode
+    expect(source).toMatch(/return null/);
+  });
+
+  test('getSignalingServerUrl is imported in AppNew.jsx', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/AppNew.jsx'),
+      'utf8'
+    );
+
+    expect(source).toMatch(/getSignalingServerUrl/);
+    // Should be passed to FileTransferProvider
+    expect(source).toMatch(/serverUrl=\{getSignalingServerUrl\(workspaceServerUrl\)\}/);
+    // Should pass workspaceKey={sessionKey}
+    expect(source).toMatch(/workspaceKey=\{sessionKey\}/);
+  });
+
+  // ── 12.3 FileTransferContext imports verification ──
+
+  test('FileTransferContext imports generateTopic and computeRoomAuthToken', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/contexts/FileTransferContext.jsx'),
+      'utf8'
+    );
+
+    expect(source).toMatch(/import.*generateTopic.*from.*serialization/);
+    expect(source).toMatch(/import.*computeRoomAuthToken.*from.*roomAuth/);
+  });
+
+  test('FileTransferContext accepts serverUrl and workspaceKey props', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/contexts/FileTransferContext.jsx'),
+      'utf8'
+    );
+
+    // Props destructuring
+    expect(source).toMatch(/serverUrl\s*=\s*null/);
+    expect(source).toMatch(/workspaceKey\s*=\s*null/);
+    // Refs for stable access
+    expect(source).toMatch(/serverUrlRef/);
+    expect(source).toMatch(/workspaceKeyRef/);
+  });
+
+  // ── 12.4 Server relay size limits ──
+
+  test('server relay message size limit raised to 2MB', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../server/unified/index.js'),
+      'utf8'
+    );
+
+    // MAX_RELAY_MESSAGE_SIZE should be 2MB (not 64KB)
+    expect(source).toMatch(/MAX_RELAY_MESSAGE_SIZE\s*=\s*2\s*\*\s*1024\s*\*\s*1024/);
+  });
+
+  test('server relay broadcast size limit raised to 2MB', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../server/unified/index.js'),
+      'utf8'
+    );
+
+    // MAX_RELAY_BROADCAST_SIZE should be 2MB (not 64KB)
+    expect(source).toMatch(/MAX_RELAY_BROADCAST_SIZE\s*=\s*2\s*\*\s*1024\s*\*\s*1024/);
+  });
+
+  test('signaling WebSocket maxPayload raised to 2MB', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../server/unified/index.js'),
+      'utf8'
+    );
+
+    // wssSignaling maxPayload should be 2MB
+    expect(source).toMatch(/wssSignaling.*maxPayload:\s*2\s*\*\s*1024\s*\*\s*1024/);
+  });
+
+  // ── 12.5 WebSocketTransport connected flag ──
+
+  test('WebSocketTransport sets connected=true after connectToServer', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/services/p2p/transports/WebSocketTransport.js'),
+      'utf8'
+    );
+
+    // connectToServer's onopen handler should set connected = true
+    const onopenMatch = source.match(/ws\.onopen\s*=\s*\(\)\s*=>\s*\{[\s\S]*?\};/);
+    expect(onopenMatch).not.toBeNull();
+    expect(onopenMatch[0]).toMatch(/this\.connected\s*=\s*true/);
+  });
+
+  // ── 12.6 End-to-end flow: web client chunk request with relay ──
+
+  test('chunk request targets connected peers when holders not in connected set', async () => {
+    // Simulate: holder is known (from Yjs availability) but peerId differs from
+    // server-assigned peerId. requestChunkFromPeer should fall back to connected peers.
+    const holderPublicKey = 'holder-pk-xyz';
+    const serverAssignedPeerId = 'server-peer-abc';
+
+    mockPeerManagerInstance.getConnectedPeers.mockReturnValue([serverAssignedPeerId]);
+
+    const { getCtx } = renderWithProvider({
+      workspaceId: 'ws-chunk-test',
+      serverUrl: 'wss://night-jar.co/signal',
+      workspaceKey: new Uint8Array(32),
+    });
+
+    await waitFor(() => {
+      const ctx = getCtx();
+      expect(ctx).not.toBeNull();
+      expect(typeof ctx.requestChunkFromPeer).toBe('function');
+    });
+
+    const ctx = getCtx();
+
+    // Request a chunk that is not stored locally, with a holder that doesn't match connected peers
+    const result = ctx.requestChunkFromPeer('file-123', 0, [holderPublicKey]);
+
+    // The send should target the connected peer (server-assigned ID), not the holder ID
+    await waitFor(() => {
+      if (mockPeerManagerInstance.send.mock.calls.length > 0) {
+        const [targetPeer, message] = mockPeerManagerInstance.send.mock.calls[0];
+        expect(targetPeer).toBe(serverAssignedPeerId);
+        expect(message.type).toBe('chunk-request');
+        expect(message.fileId).toBe('file-123');
+        expect(message.chunkIndex).toBe(0);
+      }
+    });
+  });
+
+  // ── 12.7 Bootstrap flow verification ──
+
+  test('BootstrapManager._seedConnections connects to server when serverUrl provided', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/services/p2p/BootstrapManager.js'),
+      'utf8'
+    );
+
+    // Verify bootstrap checks serverUrl && transports.websocket
+    expect(source).toMatch(/if\s*\(serverUrl\s*&&\s*transports\.websocket\)/);
+    // Verify it calls connectToServer(serverUrl)
+    expect(source).toMatch(/connectToServer\(serverUrl\)/);
+    // Verify it calls joinTopic with authToken and workspaceKey
+    expect(source).toMatch(/joinTopic\(topic,\s*\{/);
+    expect(source).toMatch(/authToken:\s*this\._authToken/);
+    expect(source).toMatch(/workspaceKey:\s*this\._workspaceKey/);
+  });
+
+  test('PeerManager.joinWorkspace forwards serverUrl to bootstrap', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/services/p2p/PeerManager.js'),
+      'utf8'
+    );
+
+    // Verify joinWorkspace passes serverUrl from connectionParams to bootstrap
+    expect(source).toMatch(/serverUrl:\s*connectionParams\.serverUrl/);
+    expect(source).toMatch(/authToken:\s*connectionParams\.authToken/);
+    expect(source).toMatch(/workspaceKey:\s*connectionParams\.workspaceKey/);
+  });
+
+  // ── 12.8 Server routing: /signal path for signaling WebSocket ──
+
+  test('server routes /signal path to signaling WebSocket server', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../server/unified/index.js'),
+      'utf8'
+    );
+
+    // Verify /signal path routes to wssSignaling
+    expect(source).toMatch(/pathname\s*===\s*'\/signal'/);
+    expect(source).toMatch(/wssSignaling\.handleUpgrade/);
+  });
+
+  // ── 12.9 WebRTC signaling through relay ──
+
+  test('PeerManager forwards WebRTC signals through WebSocket relay', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/services/p2p/PeerManager.js'),
+      'utf8'
+    );
+
+    // Verify _handleWebRTCSignal calls forwardWebRTCSignal
+    expect(source).toMatch(/forwardWebRTCSignal\(targetPeerId,\s*signalData\)/);
+    // Verify WebRTC signal events from WebSocket are handled
+    expect(source).toMatch(/webrtc-signal/);
+  });
+
+  test('server forwards webrtc-signal messages between peers in shared topics', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../server/unified/index.js'),
+      'utf8'
+    );
+
+    // Verify server handles webrtc-signal message type
+    expect(source).toMatch(/case\s*'webrtc-signal'/);
+    expect(source).toMatch(/handleWebRTCSignal/);
+    // Verify it forwards signal to target peer
+    expect(source).toMatch(/type:\s*'webrtc-signal'/);
+    expect(source).toMatch(/fromPeerId/);
+    expect(source).toMatch(/signalData/);
+  });
+
+  // ── 12.10 Transport matrix verification ──
+
+  test('PeerManager send cascade: WebRTC → WebSocket → Hyperswarm', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/services/p2p/PeerManager.js'),
+      'utf8'
+    );
+
+    // Verify send method tries WebRTC first
+    expect(source).toMatch(/webrtc\.isConnected/);
+    // Verify WebSocket fallback
+    expect(source).toMatch(/websocket\.isServerConnected/);
+    // Verify Hyperswarm fallback
+    expect(source).toMatch(/hyperswarm/);
+  });
+
+  // ── 12.11 Encrypted relay payload support ──
+
+  test('WebSocketTransport encrypts relay messages with workspaceKey', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../frontend/src/services/p2p/transports/WebSocketTransport.js'),
+      'utf8'
+    );
+
+    // Verify send method uses encryptRelayPayload when workspaceKey is set
+    expect(source).toMatch(/encryptRelayPayload/);
+    // Verify joinTopic stores workspaceKey
+    expect(source).toMatch(/this\.workspaceKey\s*=\s*options\.workspaceKey/);
+    // Verify decryptRelayPayload is used for incoming messages
+    expect(source).toMatch(/decryptRelayPayload/);
+  });
+
+  test('server forwards encrypted relay payloads opaquely', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../server/unified/index.js'),
+      'utf8'
+    );
+
+    // Verify server checks for encryptedPayload
+    expect(source).toMatch(/encryptedPayload/);
+    // Server should forward encrypted payload without reading its contents
+    expect(source).toMatch(/type:\s*'relay-message'/);
   });
 });

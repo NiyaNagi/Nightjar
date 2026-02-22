@@ -153,6 +153,45 @@ export function getYjsWebSocketUrl(serverUrl = null, authToken = null) {
 }
 
 /**
+ * Get the WebSocket URL for the P2P signaling/relay server.
+ * Used by PeerManager to establish WebSocket relay connections for:
+ *   - Peer discovery (join-topic, peer-list, peer-joined)
+ *   - WebRTC signaling (offer/answer/ICE candidate relay)
+ *   - Chunk transfer relay (relay-message, relay-broadcast)
+ *
+ * @param {string|null} workspaceServerUrl - Remote server URL for cross-platform workspaces
+ * @returns {string|null} WebSocket URL with /signal path, or null for Electron-local mode
+ */
+export function getSignalingServerUrl(workspaceServerUrl = null) {
+    // If a remote server URL is provided, derive signaling URL from it
+    if (workspaceServerUrl) {
+        const lowerUrl = workspaceServerUrl.toLowerCase();
+        // Reject invalid schemes
+        if (lowerUrl.startsWith('file:')) return null;
+        if (!lowerUrl.startsWith('ws:') && !lowerUrl.startsWith('wss:') &&
+            !lowerUrl.startsWith('http:') && !lowerUrl.startsWith('https:')) return null;
+        const wsUrl = workspaceServerUrl
+            .replace(/^https:/i, 'wss:')
+            .replace(/^http:/i, 'ws:');
+        // Append /signal path (strip trailing slash first)
+        return wsUrl.replace(/\/$/, '') + '/signal';
+    }
+
+    // On web (non-Electron), derive from current host
+    if (!isElectron()) {
+        const protocol = typeof window !== 'undefined' ? window.location.protocol : '';
+        if (protocol === 'file:') return null; // Electron fallback with failed preload
+        const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = (typeof window !== 'undefined' && window.location.host) || 'localhost';
+        const basePath = getBasePath();
+        return `${wsProtocol}//${host}${basePath}/signal`;
+    }
+
+    // Electron local mode — no WebSocket signaling needed (use Hyperswarm/mDNS)
+    return null;
+}
+
+/**
  * Get the WebSocket URL for metadata sync (sidecar)
  * @returns {string | null} Returns null for web (no sidecar)
  */

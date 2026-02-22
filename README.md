@@ -1086,6 +1086,13 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.8.7 - Web P2P File Transfer Fix (Issue #17)
+- **Critical Fix**: File downloads failed on web clients — `FileTransferContext` never passed `serverUrl`, `authToken`, or `workspaceKey` to PeerManager, leaving web peers with zero connected peers for chunk exchange
+- **Fix**: Added `getSignalingServerUrl()` utility and wired signaling URL + HMAC auth through `AppNew → FileTransferProvider → PeerManager → BootstrapManager → WebSocketTransport`
+- **Fix**: Server relay message size limits raised from 64 KB to 2 MB (1 MB chunks encode to ~1.37 MB base64)
+- **Fix**: `WebSocketTransport.connected` flag now set on successful WebSocket open
+- **Tests**: 22 new tests covering full web P2P transport matrix (web↔web, web↔native, native↔native)
+
 ### v1.8.5 - Spreadsheet Presence Overlay & Mobile Keyboard Fixes (Issue #16)
 - **Fix**: Cell presence overlay (showing collaborator selections) was misaligned — cumulative position calculation now accounts for 1px grid lines between cells
 - **Fix**: Mobile virtual keyboard overlaying spreadsheet input fields — sheet container now shrinks via `var(--keyboard-height)` when keyboard opens

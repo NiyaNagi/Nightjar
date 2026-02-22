@@ -56,7 +56,7 @@ import { useToast } from './contexts/ToastContext';
 import { logBehavior } from './utils/logger';
 import { createCollaboratorTracker } from './utils/collaboratorTracking';
 import { useEnvironment, isElectron, isCapacitor, getPlatform } from './hooks/useEnvironment';
-import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, computeRoomAuthToken, getAssetUrl } from './utils/websocket';
+import { getYjsWebSocketUrl, deliverKeyToServer, computeRoomAuthTokenSync, computeRoomAuthToken, getAssetUrl, getSignalingServerUrl } from './utils/websocket';
 import { getStoredKeyChain } from './utils/keyDerivation';
 import { parseShareLink, clearUrlFragment, isJoinUrl, joinUrlToNightjarLink } from './utils/sharing';
 import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
@@ -2228,6 +2228,8 @@ function App() {
             userPublicKey={publicIdentity?.publicKeyBase62}
             yChunkAvailability={yChunkAvailability}
             yStorageFiles={yStorageFiles}
+            serverUrl={getSignalingServerUrl(workspaceServerUrl)}
+            workspaceKey={sessionKey}
         >
         {/* Track which document user has open for presence */}
         <PresenceDocumentTracker activeDocId={activeDocId} />

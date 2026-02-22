@@ -19,6 +19,8 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { getPeerManager } from '../services/p2p/index.js';
+import { generateTopic } from '../services/p2p/protocol/serialization.js';
+import { computeRoomAuthToken } from '../utils/roomAuth.js';
 
 // ── Yjs observation helpers ────────────────────────────────────────────
 
@@ -181,6 +183,8 @@ export function useFileTransferContext() {
  * @param {string} props.userPublicKey
  * @param {import('yjs').Map|null} props.yChunkAvailability - Yjs Map for chunk availability
  * @param {import('yjs').Array|null} props.yStorageFiles - Yjs Array for storage files
+ * @param {string|null} [props.serverUrl] - Signaling/relay server URL (from getSignalingServerUrl)
+ * @param {Uint8Array|null} [props.workspaceKey] - Workspace encryption key (for relay auth & encryption)
  * @param {number} [props.redundancyTarget=5]
  * @param {React.ReactNode} props.children
  */
@@ -189,6 +193,8 @@ export function FileTransferProvider({
   userPublicKey,
   yChunkAvailability,
   yStorageFiles,
+  serverUrl = null,
+  workspaceKey = null,
   redundancyTarget = 5,
   children,
 }) {
@@ -233,6 +239,10 @@ export function FileTransferProvider({
   userPublicKeyRef.current = userPublicKey;
   const redundancyTargetRef = useRef(redundancyTarget);
   redundancyTargetRef.current = redundancyTarget;
+  const serverUrlRef = useRef(serverUrl);
+  serverUrlRef.current = serverUrl;
+  const workspaceKeyRef = useRef(workspaceKey);
+  workspaceKeyRef.current = workspaceKey;
 
   // ── State ──
   const [transferStats, setTransferStats] = useState({
@@ -431,12 +441,35 @@ export function FileTransferProvider({
       }
 
       // Join the workspace so BootstrapManager discovers peers on this topic.
-      // This sends p2p-join-topic to the sidecar via HyperswarmTransport,
-      // causing Hyperswarm peer-joined events to flow back as p2p-peer-connected.
-      if (peerManager.currentWorkspaceId !== workspaceId) {
-        console.log('[FileTransfer] Joining workspace for chunk transfer:', workspaceId.slice(0, 8));
+      // On web: connects to signaling server → joins P2P topic → discovers peers
+      //         → enables WebRTC signaling → chunk transfer via data channels or relay
+      // On Electron: joins Hyperswarm topic via sidecar → peer discovery via DHT
+      const currentServerUrl = serverUrlRef.current;
+      const currentWorkspaceKey = workspaceKeyRef.current;
+      const needsJoin = peerManager.currentWorkspaceId !== workspaceId;
+      // Re-join if we previously joined without a server URL but now have one
+      // (e.g., workspaceKey/serverUrl became available after initial mount)
+      const needsReconnect = !needsJoin && currentServerUrl &&
+        !peerManager.transports?.websocket?.isServerConnected?.();
+      if (needsJoin || needsReconnect) {
+        console.log('[FileTransfer] Joining workspace for chunk transfer:', workspaceId.slice(0, 8),
+          needsReconnect ? '(reconnect with server URL)' : '');
         try {
-          await peerManager.joinWorkspace(workspaceId);
+          // Compute auth token for P2P topic room authentication (Fix 4)
+          let authToken = null;
+          if (currentWorkspaceKey) {
+            try {
+              const topic = await generateTopic(workspaceId);
+              authToken = await computeRoomAuthToken(currentWorkspaceKey, topic);
+            } catch (authErr) {
+              console.warn('[FileTransfer] Auth token computation failed (non-fatal):', authErr.message);
+            }
+          }
+          await peerManager.joinWorkspace(workspaceId, {
+            serverUrl: currentServerUrl,
+            authToken,
+            workspaceKey: currentWorkspaceKey,
+          });
         } catch (err) {
           console.warn('[FileTransfer] joinWorkspace failed (non-fatal):', err.message);
           // Non-fatal — we may still get peers via other transports
@@ -461,7 +494,7 @@ export function FileTransferProvider({
       }
       handlersRegistered.current = false;
     };
-  }, [workspaceId, registerHandlers]);
+  }, [workspaceId, serverUrl, workspaceKey, registerHandlers]);
 
   // ── Request a chunk from peers ──
   const requestChunkFromPeer = useCallback(async (fileId, chunkIndex, holders = []) => {

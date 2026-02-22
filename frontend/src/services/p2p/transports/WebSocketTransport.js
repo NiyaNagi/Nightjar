@@ -38,8 +38,11 @@ export class WebSocketTransport extends BaseTransport {
     
     if (serverUrl) {
       await this.connectToServer(serverUrl);
-      this.connected = true;
+      // connected is set inside connectToServer on success
     }
+    // Mark transport as initialized even without a server connection
+    // (bootstrap can call connectToServer later)
+    this.connected = true;
   }
 
   /**
@@ -91,6 +94,7 @@ export class WebSocketTransport extends BaseTransport {
           this.serverSocket = ws;
           this._setupServerSocket(ws);
           this.reconnectAttempts = 0;
+          this.connected = true;
           console.log('[WebSocketTransport] Connected to server:', wsUrl);
           resolve();
         };

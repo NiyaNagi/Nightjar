@@ -909,7 +909,8 @@ class SignalingServer {
     }
 
     // Guard against oversized relay payloads
-    const MAX_RELAY_MESSAGE_SIZE = 64 * 1024; // 64 KB
+    // Raised from 64KB to 2MB to support file chunk transfer (1MB chunks → ~1.37MB base64)
+    const MAX_RELAY_MESSAGE_SIZE = 2 * 1024 * 1024; // 2 MB
     const dataToCheck = encryptedPayload || JSON.stringify(payload);
     if ((typeof dataToCheck === 'string' ? dataToCheck.length : 0) > MAX_RELAY_MESSAGE_SIZE) {
       this.send(ws, { type: 'error', error: 'relay_payload_too_large', maxBytes: MAX_RELAY_MESSAGE_SIZE });
@@ -970,7 +971,8 @@ class SignalingServer {
     }
 
     // Guard against amplification DoS — reject oversized payloads
-    const MAX_RELAY_BROADCAST_SIZE = 64 * 1024; // 64 KB
+    // Raised from 64KB to 2MB to support file chunk seeding (1MB chunks → ~1.37MB base64)
+    const MAX_RELAY_BROADCAST_SIZE = 2 * 1024 * 1024; // 2 MB
     const dataToCheck = encryptedPayload || JSON.stringify(payload);
     if ((typeof dataToCheck === 'string' ? dataToCheck.length : 0) > MAX_RELAY_BROADCAST_SIZE) {
       this.send(ws, { type: 'error', error: 'broadcast_payload_too_large', maxBytes: MAX_RELAY_BROADCAST_SIZE });
@@ -1352,8 +1354,8 @@ if (!DISABLE_PERSISTENCE) {
   console.log('[Persistence] Disabled - server running in pure relay mode');
 }
 
-// WebSocket server for signaling (WebRTC) - 1MB max payload
-const wssSignaling = new WebSocketServer({ noServer: true, maxPayload: 1 * 1024 * 1024 });
+// WebSocket server for signaling (WebRTC) - 2MB max payload (supports file chunk relay)
+const wssSignaling = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
 wssSignaling.on('connection', (ws, req) => signaling.handleConnection(ws, req));
 
 // WebSocket server for y-websocket (document sync) - 10MB max payload

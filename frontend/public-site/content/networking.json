@@ -8,6 +8,8 @@
     { "type": "heading", "text": "Relay Fallback" },
     { "type": "paragraph", "text": "When direct P2P connections aren't possible (e.g., behind strict NATs or firewalls), Nightjar automatically routes through relay servers. Relays only forward encrypted data — they cannot read it." },
     { "type": "paragraph", "text": "Relay connections are authenticated using HMAC-SHA256 tokens derived from the workspace encryption key. Both the desktop sidecar and web clients compute identical tokens so the relay server can verify that only authorized participants join a room. The first client to present a token registers it (first-write-wins); all subsequent clients must present a matching token or the server rejects them with a 4403 close code." },
+    { "type": "heading", "text": "File Transfer (All Platforms)" },
+    { "type": "paragraph", "text": "File storage transfers work across every combination of web and desktop clients. Files are split into 1 MB chunks, encrypted with XSalsa20-Poly1305, and exchanged peer-to-peer. On web, chunks travel through the relay server (WebSocket) or via WebRTC data channels negotiated through the signaling server. On desktop, Hyperswarm provides a direct DHT-based path in addition to the relay and WebRTC options." },
     { "type": "heading", "text": "Network Settings (Desktop)" },
     { "type": "paragraph", "text": "In the desktop app, go to Settings → Network to configure:" },
     { "type": "list", "items": [
