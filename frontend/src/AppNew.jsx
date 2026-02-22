@@ -60,7 +60,7 @@ import { getStoredKeyChain } from './utils/keyDerivation';
 import { parseShareLink, clearUrlFragment, isJoinUrl, joinUrlToNightjarLink } from './utils/sharing';
 import { META_WS_PORT, CONTENT_DOC_TYPES } from './config/constants';
 import { handleShareLink, isNightjarShareLink } from './utils/linkHandler';
-import Platform from './utils/platform';
+import { NativeBridge } from './utils/platform';
 
 import './styles/global.css';
 import './styles/editor.css';
@@ -1770,7 +1770,7 @@ function App() {
     const copyInviteLink = useCallback(() => {
         if (inviteLink) {
             logBehavior('invite', 'copy_invite_link');
-            Platform.copyToClipboard(inviteLink);
+            NativeBridge.copyToClipboard(inviteLink);
             showToast('Invite link copied!', 'success');
         }
     }, [inviteLink, showToast]);

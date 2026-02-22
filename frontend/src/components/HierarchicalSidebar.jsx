@@ -12,7 +12,7 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useDrag } from '@use-gesture/react';
 import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
 import useIsMobile from '../hooks/useIsMobile';
-import Platform from '../utils/platform';
+import { NativeBridge } from '../utils/platform';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import CreateFolder from './CreateFolder';
 import CreateDocument from './CreateDocument';
@@ -204,7 +204,7 @@ const TreeItem = React.memo(function TreeItem({
                         el.classList.remove('long-pressing');
                         // Don't show context menu if a drag is in progress
                         if (dragActiveRef?.current) return;
-                        Platform.haptics.impact('light');
+                        NativeBridge.haptic('light');
                         const syntheticEvent = { preventDefault: () => {}, clientX: touch.clientX, clientY: touch.clientY };
                         onContextMenu?.(syntheticEvent, item, type);
                     }, 500);
@@ -560,6 +560,17 @@ const HierarchicalSidebar = ({
         setDndActiveItem(data);
         logBehavior('dnd', 'sidebar_drag_start', { type: data?.type, id: data?.item?.id });
     }, []);
+
+    // Handle document drop onto folder — declared here (before handleDndDragEnd) to avoid TDZ
+    const handleDocumentDrop = useCallback((documentId, folderId) => {
+        if (onMoveDocument) {
+            // Avoid no-op: check if doc is already in the target folder
+            const doc = documents.find(d => d.id === documentId);
+            if (doc && doc.folderId === folderId) return;
+            logBehavior('document', 'drag_drop_to_folder');
+            onMoveDocument(documentId, folderId);
+        }
+    }, [onMoveDocument, documents]);
     
     const handleDndDragEnd = useCallback((event) => {
         dragActiveRef.current = false;
@@ -824,17 +835,6 @@ const HierarchicalSidebar = ({
         }
         // Folders don't need special handling - just expand/collapse
     }, [onSelectDocument, isMobile, onToggleCollapse]);
-    
-    // Handle document drop onto folder
-    const handleDocumentDrop = useCallback((documentId, folderId) => {
-        if (onMoveDocument) {
-            // Avoid no-op: check if doc is already in the target folder
-            const doc = documents.find(d => d.id === documentId);
-            if (doc && doc.folderId === folderId) return;
-            logBehavior('document', 'drag_drop_to_folder');
-            onMoveDocument(documentId, folderId);
-        }
-    }, [onMoveDocument, documents]);
     
     // Workspace handlers
     const handleOpenCreateWorkspace = useCallback(() => {

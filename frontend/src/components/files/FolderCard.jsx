@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import Platform from '../../utils/platform';
+import { NativeBridge } from '../../utils/platform';
 import './FolderCard.css';
 
 /* Long-press delay (ms) */
@@ -53,7 +53,7 @@ export default function FolderCard({
       if (!touchMoved.current) {
         const touch = e.touches?.[0];
         if (touch) {
-          Platform.haptics.impact('light');
+          NativeBridge.haptic('light');
           const synth = new MouseEvent('contextmenu', {
             bubbles: true, clientX: touch.clientX, clientY: touch.clientY,
           });

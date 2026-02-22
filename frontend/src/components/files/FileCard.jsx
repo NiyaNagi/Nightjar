@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useRef } from 'react';
-import Platform from '../../utils/platform';
+import { NativeBridge } from '../../utils/platform';
 import FileTypeIcon from './FileTypeIcon';
 import DistributionBadge from './DistributionBadge';
 import { formatFileSize, getRelativeTime } from '../../utils/fileTypeCategories';
@@ -62,7 +62,7 @@ export default function FileCard({
       if (!touchMoved.current) {
         const touch = e.touches?.[0];
         if (touch) {
-          Platform.haptics.impact('light');
+          NativeBridge.haptic('light');
           const synth = new MouseEvent('contextmenu', {
             bubbles: true, clientX: touch.clientX, clientY: touch.clientY,
           });
