@@ -1086,6 +1086,12 @@ npm run test:e2e:smoke      # Quick smoke tests
 
 ## Changelog
 
+### v1.8.3 - Copy Link Fix, ARIA Roles, Test Selector Cleanup
+- **Fix**: Copy Link and Share buttons on the workspace sharing screen were silently doing nothing — `Platform.copyToClipboard/share` don't exist; corrected to `NativeBridge.copyToClipboard/share`
+- **Fix**: `ResponsiveModal` now accepts `role` and `ariaLabelledBy` props; `ConfirmDialog` passes `role="alertdialog"` and `BugReportModal` passes `ariaLabelledBy="bug-report-title"` for proper screen reader semantics
+- **Fix**: Three test files had stale CSS selectors (`.bug-report-overlay`, `.settings-overlay`) and stale assertions (hardcoded `80px`, removed TODO comment) from the `ResponsiveModal` migration — all updated to match current implementation
+- **Testing**: 157 test suites, 5,042 / 5,048 tests passing
+
 ### v1.8.2 - Critical App Launch Crash Fix
 - **Critical Fix**: `ReferenceError: Cannot access 'rt' before initialization` at app launch — `handleDocumentDrop` was referenced in `handleDndDragEnd`'s `useCallback` dependency array before its declaration, causing a Temporal Dead Zone violation that esbuild surfaced as a minified variable name crash
 - **Fix**: Corrected `Platform` default import to `{ NativeBridge }` in four components (`HierarchicalSidebar.jsx`, `FileCard.jsx`, `FolderCard.jsx`, `AppNew.jsx`) — the default export is the bridge object, not the platform detector
