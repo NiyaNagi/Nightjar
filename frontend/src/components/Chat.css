@@ -1025,10 +1025,9 @@
         cursor: default;
     }
 
-    /* Chat bubble clears inventory bottom nav + keyboard */
+    /* Chat bubble hidden on mobile — MobileTabBar controls chat visibility */
     .chat-minimized {
-        bottom: calc(var(--bottom-nav-height, 0px) + 16px + env(safe-area-inset-bottom, 0px));
-        right: 12px;
+        display: none;
     }
 
     /* User search full-width on mobile */

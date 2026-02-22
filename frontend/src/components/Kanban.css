@@ -671,4 +671,30 @@
     .kanban-card {
         padding: 10px;
     }
+
+    /* Pagination dots for mobile columns */
+    .kanban-dots {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0 4px;
+    }
+
+    .kanban-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: none;
+        padding: 0;
+        background: var(--border-color, #444);
+        cursor: pointer;
+        transition: transform 0.2s ease, background 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .kanban-dot--active {
+        transform: scale(1.4);
+        background: var(--dot-color, var(--accent-color, #6366f1));
+    }
 }

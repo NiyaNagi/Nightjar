@@ -255,6 +255,10 @@ export const NativeBridge = {
       } catch (err) {
         // Haptics not available
       }
+    } else if (navigator.vibrate) {
+      // Web fallback — short vibration pulse
+      const ms = type === 'heavy' ? 20 : type === 'medium' ? 15 : 10;
+      navigator.vibrate(ms);
     }
   },
   

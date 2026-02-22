@@ -9,7 +9,7 @@
     .mobile-toolbar {
         display: flex;
         position: fixed;
-        bottom: var(--keyboard-height, 0px);
+        bottom: calc(var(--keyboard-height, 0px) + var(--bottom-nav-height, 0px));
         left: 0;
         right: 0;
         z-index: 100;
@@ -21,6 +21,44 @@
         min-height: 44px;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2);
         transition: bottom 0.15s ease;
+    }
+
+    /* Scroll fade wrapper */
+    .mobile-toolbar__scroll-wrap {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .mobile-toolbar__scroll-wrap::before,
+    .mobile-toolbar__scroll-wrap::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 24px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        z-index: 1;
+    }
+
+    .mobile-toolbar__scroll-wrap::before {
+        left: 0;
+        background: linear-gradient(to right, var(--bg-secondary, #1e1e2e) 0%, transparent 100%);
+    }
+
+    .mobile-toolbar__scroll-wrap::after {
+        right: 0;
+        background: linear-gradient(to left, var(--bg-secondary, #1e1e2e) 0%, transparent 100%);
+    }
+
+    .mobile-toolbar__scroll-wrap.--fade-left::before {
+        opacity: 1;
+    }
+
+    .mobile-toolbar__scroll-wrap.--fade-right::after {
+        opacity: 1;
     }
 
     .mobile-toolbar__scroll {

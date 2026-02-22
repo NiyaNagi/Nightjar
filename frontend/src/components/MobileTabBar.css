@@ -1,0 +1,215 @@
+/* ========== Mobile Bottom Tab Bar ========== */
+/* Hidden on desktop; fixed to bottom on mobile */
+
+.mobile-tab-bar {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-tab-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: var(--z-popover, 200);
+        background: var(--bg-secondary, #1e1e2e);
+        border-top: 1px solid var(--border-color, #333);
+        height: 56px;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        align-items: stretch;
+        justify-content: space-around;
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Hide when keyboard is open (MobileToolbar takes over) */
+    .mobile-tab-bar--hidden {
+        display: none;
+    }
+
+    .mobile-tab-bar__tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        gap: 2px;
+        padding: 4px 0;
+        background: none;
+        border: none;
+        color: var(--text-secondary, #9ca3af);
+        font-size: 0.65rem;
+        font-weight: 500;
+        cursor: pointer;
+        position: relative;
+        transition: color 0.15s ease;
+        min-width: 0;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-tab-bar__tab:active {
+        color: var(--text-primary, #f9fafb);
+    }
+
+    .mobile-tab-bar__tab--active {
+        color: var(--accent-color, #6366f1);
+    }
+
+    .mobile-tab-bar__icon {
+        font-size: 1.25rem;
+        line-height: 1;
+        position: relative;
+    }
+
+    .mobile-tab-bar__label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    /* Unread badge */
+    .mobile-tab-bar__badge {
+        position: absolute;
+        top: -4px;
+        right: -8px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: var(--error-color, #ef4444);
+        color: #fff;
+        font-size: 0.6rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+
+    .mobile-tab-bar__badge--dot {
+        min-width: 8px;
+        height: 8px;
+        padding: 0;
+        top: -2px;
+        right: -4px;
+    }
+
+    /* Connection status dot in tab bar */
+    .mobile-tab-bar__connection-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        position: absolute;
+        bottom: -2px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .mobile-tab-bar__connection-dot--connected {
+        background: var(--success-color, #22c55e);
+    }
+
+    .mobile-tab-bar__connection-dot--disconnected {
+        background: var(--error-color, #ef4444);
+    }
+
+    .mobile-tab-bar__connection-dot--syncing {
+        background: var(--warning-color, #f59e0b);
+        animation: pulse-dot 1.5s ease infinite;
+    }
+
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+
+    /* ── More menu (bottom sheet) ── */
+    .mobile-tab-bar__overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: calc(var(--z-popover, 200) + 1);
+        animation: fadeIn 0.15s ease;
+    }
+
+    .mobile-tab-bar__sheet {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--bg-secondary, #1e1e2e);
+        border-top-left-radius: 16px;
+        border-top-right-radius: 16px;
+        z-index: calc(var(--z-popover, 200) + 2);
+        padding: 8px 0;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        animation: slideUp 0.2s ease;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .mobile-tab-bar__sheet-handle {
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--text-tertiary, #555);
+        margin: 4px auto 12px;
+    }
+
+    .mobile-tab-bar__sheet-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 14px 20px;
+        background: none;
+        border: none;
+        color: var(--text-primary, #f9fafb);
+        font-size: 0.95rem;
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-tab-bar__sheet-item:active {
+        background: var(--hover-bg, rgba(255, 255, 255, 0.05));
+    }
+
+    .mobile-tab-bar__sheet-item--active {
+        color: var(--accent-color, #6366f1);
+    }
+
+    .mobile-tab-bar__sheet-item--danger {
+        color: var(--error-color, #ef4444);
+    }
+
+    .mobile-tab-bar__sheet-icon {
+        font-size: 1.2rem;
+        width: 24px;
+        text-align: center;
+        flex-shrink: 0;
+    }
+
+    .mobile-tab-bar__sheet-label {
+        flex: 1;
+    }
+
+    .mobile-tab-bar__sheet-divider {
+        height: 1px;
+        background: var(--border-color, #333);
+        margin: 4px 16px;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+}

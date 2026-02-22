@@ -1,13 +1,17 @@
 {
+  "id": "nightjar-app",
   "name": "Nightjar – Secure P2P Collaboration",
   "short_name": "Nightjar",
   "description": "Private, peer-to-peer collaborative editing with end-to-end encryption.",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0f0f17",
   "theme_color": "#6366f1",
   "orientation": "any",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "./nightjar-192.png",
@@ -24,6 +28,20 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Document",
+      "short_name": "New Doc",
+      "url": "./?action=new-document",
+      "icons": [{ "src": "./nightjar-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "New Workspace",
+      "short_name": "New Space",
+      "url": "./?action=new-workspace",
+      "icons": [{ "src": "./nightjar-192.png", "sizes": "192x192" }]
     }
   ]
 }

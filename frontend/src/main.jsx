@@ -10,6 +10,23 @@ import { IdentityProvider } from './contexts/IdentityContext'
 import { ToastProvider } from './contexts/ToastContext'
 import PermissionWatcher from './components/PermissionWatcher'
 
+// Register PWA service worker (web only — no-op inside Electron / Capacitor)
+if ('serviceWorker' in navigator && !window.electronAPI) {
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({
+      onRegisteredSW(swUrl, r) {
+        // Check for updates every hour
+        if (r) setInterval(() => r.update(), 60 * 60 * 1000);
+      },
+      onOfflineReady() {
+        console.log('[SW] Offline ready');
+      },
+    });
+  }).catch(() => {
+    // PWA registration unavailable (e.g. dev mode with devOptions.enabled=false)
+  });
+}
+
 // Apply saved theme BEFORE first render to prevent flash of wrong theme
 // (AppSettings module only loads after identity selection, so IdentitySelector
 //  would otherwise always render with the default dark theme)

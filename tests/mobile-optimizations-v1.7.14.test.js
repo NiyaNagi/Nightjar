@@ -316,11 +316,11 @@ describe('TODO tags for deferred work', () => {
     expect(css).toContain('Vite boilerplate');
   });
 
-  test('Chat.css has mobile chat positioning (Mobile Step 3 implemented)', () => {
+  test('Chat.css has mobile chat positioning (Mobile Step 3 → v1.8.1 MobileTabBar override)', () => {
     const css = readCSS('components/Chat.css');
-    // Step 3 is complete: verify the actual mobile chat positioning is in place
-    expect(css).toContain('bottom nav');
+    // v1.8.1: MobileTabBar now controls chat visibility, so .chat-minimized is hidden on mobile
     expect(css).toContain('.chat-minimized');
+    expect(css).toContain('display: none');
   });
 });
 

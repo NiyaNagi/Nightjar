@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import wasm from 'vite-plugin-wasm'
 import topLevelAwait from 'vite-plugin-top-level-await'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -16,6 +17,31 @@ export default defineConfig(({ mode }) => {
     react(),
     wasm(),
     topLevelAwait(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['nightjar-192.png', 'nightjar-512.png', 'nightjar-maskable-512.png'],
+      manifest: false, // Use existing public/manifest.json
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024, // 8 MB — covers large main chunk
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+        ],
+        // Skip Electron-only files
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api/],
+      },
+      devOptions: {
+        enabled: false, // Only enable SW in production builds
+      },
+    }),
   ],
   define: {
     // Polyfill Node.js globals for browser compatibility (needed by Fortune Sheet and bip39)

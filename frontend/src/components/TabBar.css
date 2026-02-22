@@ -14,6 +14,47 @@
     min-width: 0;
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge */
+    position: relative;
+}
+
+/* Scroll fade indicators for tabs overflow */
+.tabs-container-wrap {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.tabs-container-wrap::before,
+.tabs-container-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.tabs-container-wrap::before {
+    left: 0;
+    background: linear-gradient(to right, var(--tab-bar-bg, #16161e), transparent);
+}
+
+.tabs-container-wrap::after {
+    right: 0;
+    background: linear-gradient(to left, var(--tab-bar-bg, #16161e), transparent);
+}
+
+.tabs-container-wrap--fade-left::before {
+    opacity: 1;
+}
+
+.tabs-container-wrap--fade-right::after {
+    opacity: 1;
 }
 
 .tabs-container::-webkit-scrollbar {
@@ -227,8 +268,8 @@
     }
 
     .tab-close {
-        min-width: 32px;
-        min-height: 32px;
+        min-width: 44px;
+        min-height: 44px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -243,14 +284,9 @@
 
 /* ========== Mobile Responsive ========== */
 @media (max-width: 768px) {
+    /* Hide tab-bar-actions on mobile — MobileTabBar replaces them */
     .tab-bar-actions {
-        padding: 0 8px;
-        gap: 4px;
-    }
-
-    .tab-bar-actions .profile-panel {
-        width: min(300px, calc(100vw - 24px));
-        right: -8px;
+        display: none;
     }
 
     .tab {

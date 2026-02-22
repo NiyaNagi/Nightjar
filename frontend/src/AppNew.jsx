@@ -35,6 +35,7 @@ import HelpPage from './components/common/HelpPage';
 import DeepLinkGate from './components/common/DeepLinkGate';
 import SearchPalette from './components/SearchPalette';
 import BugReportModal from './components/BugReportModal';
+import MobileTabBar from './components/MobileTabBar';
 import { handleIndexResults, clearCache as clearSearchIndexCache } from './services/SearchIndexCache';
 import { useAutoLock } from './hooks/useAutoLock';
 import useVirtualKeyboard from './hooks/useVirtualKeyboard';
@@ -395,6 +396,8 @@ function App() {
     const [helpSection, setHelpSection] = useState(null); // Deep-link to specific help section
     const [showSearchPalette, setShowSearchPalette] = useState(false); // Cross-app search palette
     const [showBugReport, setShowBugReport] = useState(false); // Bug report modal
+    const [showChat, setShowChat] = useState(false); // Mobile chat visibility
+    const [chatUnreadCount, setChatUnreadCount] = useState(0); // Chat unread count for MobileTabBar badge
     const [expandedFolders, setExpandedFolders] = useState(new Set()); // Lifted from sidebar for search folder-reveal
     const [showDeepLinkGate, setShowDeepLinkGate] = useState(false); // Deep link attempt overlay
     const [pendingDeepLink, setPendingDeepLink] = useState(null); // nightjar:// link for deep link gate
@@ -2249,6 +2252,10 @@ function App() {
                         // Name-based guessing (e.g. "kanban" / "sheet" in name) was removed
                         // because it caused incorrect type detection for renamed documents.
                         openDocument(docId, doc?.name, docType || DOC_TYPES.TEXT);
+                        // Auto-close sidebar on mobile after selecting a document
+                        if (isMobileViewport) {
+                            setSidebarCollapsed(true);
+                        }
                     }}
                     onCreateDocument={(name, folderId, icon, color) => createDocument(name, folderId, DOC_TYPES.TEXT, icon, color)}
                     onCreateSheet={(name, folderId, icon, color) => createDocument(name || 'Spreadsheet', folderId, DOC_TYPES.SHEET, icon, color)}
@@ -2584,6 +2591,28 @@ function App() {
                     onVerifySyncState={verifySyncState}
                     onForceFullSync={forceFullSync}
                 />
+
+                {/* Mobile bottom tab bar */}
+                <MobileTabBar
+                    onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
+                    sidebarCollapsed={sidebarCollapsed}
+                    onOpenSearch={() => setShowSearchPalette(true)}
+                    onToggleChat={() => setShowChat(prev => !prev)}
+                    showChat={showChat}
+                    chatUnreadCount={chatUnreadCount}
+                    onToggleComments={() => setShowComments(prev => !prev)}
+                    showComments={showComments}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={toggleFullscreen}
+                    onReportBug={() => setShowBugReport(true)}
+                    onShowChangelog={() => setShowChangelog(true)}
+                    userProfile={userProfile}
+                    onProfileChange={setUserProfile}
+                    relayConnected={relayConnected}
+                    activePeers={activePeers}
+                    syncPhase={syncPhase}
+                    activeDocType={activeDocType}
+                />
             </div>
 
             {/* Relay Settings Modal */}
@@ -2620,6 +2649,8 @@ function App() {
                         color: m.color || '#6366f1',
                         icon: m.icon
                     }))}
+                    mobileVisible={showChat}
+                    onUnreadChange={setChatUnreadCount}
                 />
             )}
 

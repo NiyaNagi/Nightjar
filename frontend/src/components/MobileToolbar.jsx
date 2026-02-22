@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { logBehavior } from '../utils/logger';
 import './MobileToolbar.css';
 
@@ -11,6 +11,29 @@ import './MobileToolbar.css';
 const MobileToolbar = ({ editor, onAddComment }) => {
     const [showLinkInput, setShowLinkInput] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
+    const scrollRef = useRef(null);
+    const [fadeLeft, setFadeLeft] = useState(false);
+    const [fadeRight, setFadeRight] = useState(false);
+
+    const updateFadeState = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setFadeLeft(el.scrollLeft > 4);
+        setFadeRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    }, []);
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        updateFadeState();
+        el.addEventListener('scroll', updateFadeState, { passive: true });
+        const ro = new ResizeObserver(updateFadeState);
+        ro.observe(el);
+        return () => {
+            el.removeEventListener('scroll', updateFadeState);
+            ro.disconnect();
+        };
+    }, [updateFadeState, showLinkInput]);
 
     if (!editor) return null;
 
@@ -92,23 +115,25 @@ const MobileToolbar = ({ editor, onAddComment }) => {
                     <button onClick={() => { setShowLinkInput(false); setLinkUrl(''); }} className="mobile-toolbar__link-btn" aria-label="Cancel">←</button>
                 </div>
             ) : (
-                <div className="mobile-toolbar__scroll">
-                    {tools.map((tool, i) =>
-                        tool.sep ? (
-                            <div key={`sep-${i}`} className="mobile-toolbar__sep" />
-                        ) : (
-                            <button
-                                key={tool.ariaLabel}
-                                type="button"
-                                className={`mobile-toolbar__btn ${tool.active ? 'active' : ''} ${tool.className || ''}`}
-                                onClick={tool.action}
-                                aria-label={tool.ariaLabel}
-                                aria-pressed={tool.active || false}
-                            >
-                                {tool.label}
-                            </button>
-                        )
-                    )}
+                <div className={`mobile-toolbar__scroll-wrap${fadeLeft ? ' --fade-left' : ''}${fadeRight ? ' --fade-right' : ''}`}>
+                    <div className="mobile-toolbar__scroll" ref={scrollRef}>
+                        {tools.map((tool, i) =>
+                            tool.sep ? (
+                                <div key={`sep-${i}`} className="mobile-toolbar__sep" />
+                            ) : (
+                                <button
+                                    key={tool.ariaLabel}
+                                    type="button"
+                                    className={`mobile-toolbar__btn ${tool.active ? 'active' : ''} ${tool.className || ''}`}
+                                    onClick={tool.action}
+                                    aria-label={tool.ariaLabel}
+                                    aria-pressed={tool.active || false}
+                                >
+                                    {tool.label}
+                                </button>
+                            )
+                        )}
+                    </div>
                 </div>
             )}
         </div>

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import './TabBar.css';
 import UserProfile from './UserProfile';
 import { createColorGradient, getDominantColor, getTextColorForBackground } from '../utils/colorUtils';
@@ -94,9 +94,35 @@ const TabBar = ({
         return map;
     }, [tabs, documents, folders]);
 
+    // Scroll fade indicators for tabs overflow
+    const tabsContainerRef = useRef(null);
+    const [fadeLeft, setFadeLeft] = useState(false);
+    const [fadeRight, setFadeRight] = useState(false);
+
+    const updateFadeState = useCallback(() => {
+        const el = tabsContainerRef.current;
+        if (!el) return;
+        setFadeLeft(el.scrollLeft > 4);
+        setFadeRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    }, []);
+
+    useEffect(() => {
+        const el = tabsContainerRef.current;
+        if (!el) return;
+        updateFadeState();
+        el.addEventListener('scroll', updateFadeState, { passive: true });
+        const ro = new ResizeObserver(updateFadeState);
+        ro.observe(el);
+        return () => {
+            el.removeEventListener('scroll', updateFadeState);
+            ro.disconnect();
+        };
+    }, [updateFadeState, tabs]);
+
     return (
         <div className="tab-bar">
-            <div className="tabs-container" role="tablist" aria-label="Document tabs">
+            <div className={`tabs-container-wrap${fadeLeft ? ' tabs-container-wrap--fade-left' : ''}${fadeRight ? ' tabs-container-wrap--fade-right' : ''}`}>
+            <div className="tabs-container" role="tablist" aria-label="Document tabs" ref={tabsContainerRef}>
                 {tabs.map((tab, tabIndex) => {
                     // Use pre-computed color from memoized map
                     const { backgroundStyle, textColor, hasColor } = colorMap.get(tab.id) || {};
@@ -159,6 +185,7 @@ const TabBar = ({
                     </div>
                     );
                 })}
+            </div>
             </div>
             
             <div className="tab-bar-actions">

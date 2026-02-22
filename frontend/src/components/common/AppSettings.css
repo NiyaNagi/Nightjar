@@ -596,8 +596,10 @@
   
   .app-settings__nav {
     width: 100%;
-    flex-direction: row;
-    overflow-x: auto;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 40vh;
     border-right: none;
     border-bottom: 1px solid var(--border-color, #374151);
     padding: 8px;
@@ -606,7 +608,6 @@
   }
   
   .app-settings__nav-item {
-    white-space: nowrap;
     flex-shrink: 0;
   }
 }

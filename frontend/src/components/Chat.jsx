@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import './Chat.css';
 import { useNotificationSounds, MESSAGE_TYPES } from '../hooks/useNotificationSounds';
 import { logBehavior } from '../utils/logger';
+import useIsMobile from '../hooks/useIsMobile';
 
 // Load persisted chat state from localStorage with bounds checking
 const loadChatState = () => {
@@ -160,13 +161,14 @@ const renderTextWithMentions = (text, currentUserPublicKey) => {
     return parts;
 };
 
-const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, onTargetUserHandled, userPublicKey, workspaceMembers = [] }) => {
+const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, onTargetUserHandled, userPublicKey, workspaceMembers = [], mobileVisible, onUnreadChange }) => {
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
     const ymessagesRef = useRef(null);
     const inputRef = useRef(null);
+    const isMobileChat = useIsMobile();
     
     // Notification sounds hook
     const { playForMessageType, notifyForMessageType, requestNotificationPermission, settings: notificationSettings } = useNotificationSounds();
@@ -1116,6 +1118,11 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         return total;
     }, [chatTabs, getChannelMentionCount]);
 
+    // Report unread count to parent for MobileTabBar badge
+    React.useEffect(() => {
+        onUnreadChange?.(totalUnread);
+    }, [totalUnread, onUnreadChange]);
+
     const handleKeyDown = (e) => {
         // Handle mention popup navigation
         if (showMentionPopup) {
@@ -1320,8 +1327,17 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
         } : {})
     };
 
+    // On mobile, MobileTabBar controls chat visibility entirely
+    if (isMobileChat && !mobileVisible) {
+        return null;
+    }
+
     if (chatState.isMinimized) {
-        return (
+        // On mobile, skip minimized bubble — show expanded view instead (controlled by mobileVisible above)
+        if (isMobileChat) {
+            // Fall through to expanded chat below
+        } else {
+            return (
             <div 
                 ref={chatRef}
                 className={`chat-minimized ${isDragging ? 'dragging' : ''}`}
@@ -1359,7 +1375,8 @@ const Chat = ({ ydoc, provider, username, userColor, workspaceId, targetUser, on
                     <span className="unread-badge" aria-label={`${totalUnread} unread`}>{totalUnread > 99 ? '99+' : totalUnread}</span>
                 )}
             </div>
-        );
+            );
+        }
     }
 
     return (

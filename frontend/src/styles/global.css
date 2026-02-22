@@ -113,6 +113,13 @@
     --status-bar-height: 28px;
 }
 
+/* On mobile, MobileTabBar provides bottom navigation */
+@media (max-width: 768px) {
+    :root {
+        --bottom-nav-height: 56px;
+    }
+}
+
 /* Light theme */
 :root[data-theme="light"] {
     --bg-primary: #ffffff;
@@ -529,22 +536,22 @@ body {
     color: var(--text-primary);
 }
 
-.toast.success {
+.toast--success {
     border-color: var(--success-color);
     background: var(--success-bg, rgba(34, 197, 94, 0.1));
 }
 
-.toast.error {
+.toast--error {
     border-color: var(--error-color);
     background: var(--error-bg, rgba(239, 68, 68, 0.1));
 }
 
-.toast.info {
+.toast--info {
     border-color: var(--accent-color);
     background: var(--accent-alpha, rgba(99, 102, 241, 0.1));
 }
 
-.toast.warning {
+.toast--warning {
     border-color: var(--warning-color);
     background: var(--warning-bg, rgba(245, 158, 11, 0.1));
 }
@@ -651,7 +658,7 @@ input:focus {
         position: fixed;
         top: 0;
         left: 0;
-        width: 20px;
+        width: 40px;
         height: 100%;
         z-index: 498; /* Just below sidebar-backdrop (499) */
         touch-action: pan-y;

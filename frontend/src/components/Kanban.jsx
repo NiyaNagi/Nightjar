@@ -20,6 +20,7 @@ import KanbanCardEditor from './KanbanCardEditor';
 import SimpleMarkdown from './SimpleMarkdown';
 import { useConfirmDialog } from './common/ConfirmDialog';
 import { UnifiedPicker } from './common';
+import useIsMobile from '../hooks/useIsMobile';
 import { logBehavior } from '../utils/logger';
 import './Kanban.css';
 
@@ -44,6 +45,27 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
     const syncTimeoutRef = useRef(null);
     const { confirm, ConfirmDialogComponent } = useConfirmDialog();
     const editCancelledRef = useRef(false); // Track Escape cancel to prevent onBlur race
+    const boardRef = useRef(null);
+    const [activeColumnIndex, setActiveColumnIndex] = useState(0);
+    const isMobileNarrow = useIsMobile(480);
+
+    // Track active column index from scroll position (mobile dots)
+    const handleBoardScroll = useCallback(() => {
+        const el = boardRef.current;
+        if (!el || !isMobileNarrow) return;
+        const colWidth = el.firstElementChild?.offsetWidth || 1;
+        const gap = 8; // matches CSS gap at ≤480px
+        const idx = Math.round(el.scrollLeft / (colWidth + gap));
+        setActiveColumnIndex(Math.max(0, Math.min(idx, columns.length - 1)));
+    }, [isMobileNarrow, columns.length]);
+
+    // Scroll to a specific column when dot is tapped
+    const scrollToColumn = useCallback((idx) => {
+        const el = boardRef.current;
+        if (!el) return;
+        const child = el.children[idx];
+        if (child) child.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }, []);
 
     // Initialize Yjs map for kanban data with sync awareness
     useEffect(() => {
@@ -628,7 +650,7 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                 onDragOver={handleDndOver}
                 onDragEnd={handleDndEnd}
             >
-            <div className="kanban-board" data-testid="kanban-board">
+            <div className="kanban-board" data-testid="kanban-board" ref={boardRef} onScroll={handleBoardScroll}>
                 <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
                 {columns.map((column) => (
                     <SortableKanbanColumn key={column.id} column={column} disabled={readOnly}>
@@ -816,6 +838,22 @@ const Kanban = ({ ydoc, provider, userColor, userHandle, userPublicKey, readOnly
                     </div>
                 )}
             </div>
+
+            {/* Pagination dots for mobile — visible only at ≤480px */}
+            {isMobileNarrow && columns.length > 1 && (
+                <div className="kanban-dots" data-testid="kanban-dots">
+                    {columns.map((col, idx) => (
+                        <button
+                            key={col.id}
+                            type="button"
+                            className={`kanban-dot${idx === activeColumnIndex ? ' kanban-dot--active' : ''}`}
+                            style={{ '--dot-color': col.color || '#6366f1' }}
+                            onClick={() => scrollToColumn(idx)}
+                            aria-label={`Go to ${col.name} column`}
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* @dnd-kit drag overlay — shows preview while dragging */}
             <DragOverlay>
