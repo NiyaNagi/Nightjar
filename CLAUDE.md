@@ -202,7 +202,7 @@ When user says "release", perform the full release process:
 
 ```bash
 npm run version:bump:patch
-npm run release:notes
+npm run release:notes  # outputs to docs/release-notes/
 git add -A
 git commit -m "chore: release v{version} - {summary}"
 git tag v{version}
@@ -224,11 +224,11 @@ git push origin main --tags
    ```bash
    npm run release:notes
    ```
-   This creates `RELEASE_NOTES_v{version}.md` from git commit history.
+   This creates `docs/release-notes/RELEASE_NOTES_v{version}.md` from git commit history.
 
 3. **Commit version bump and release notes**:
    ```bash
-   git add package.json RELEASE_NOTES_*.md
+   git add package.json docs/release-notes/RELEASE_NOTES_*.md
    git commit -m "chore: bump version to v{version}"
    ```
 
@@ -284,7 +284,7 @@ release: v{VERSION} — {short summary of all changes}
 ```
 
 ### 5. RELEASE_NOTES_v{VERSION}.md File
-Save a full release notes markdown file to the repo root (see format below).
+Save a full release notes markdown file to `docs/release-notes/` (see format below).
 
 ## Release Notes — How to Gather Changes
 

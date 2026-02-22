@@ -264,7 +264,7 @@ function main() {
     if (args.includes('--stdout')) {
         console.log(markdown);
     } else {
-        const outputFile = getArg('--output') || `RELEASE_NOTES_v${version}.md`;
+        const outputFile = getArg('--output') || `docs/release-notes/RELEASE_NOTES_v${version}.md`;
         fs.writeFileSync(outputFile, markdown);
         console.log(`✅ Release notes written to ${outputFile}`);
     }
