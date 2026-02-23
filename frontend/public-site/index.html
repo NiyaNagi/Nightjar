@@ -112,21 +112,21 @@
 
     /* ── Hero Mascot Bubble ── */
     .hero-mascot {
-      display: flex; flex-direction: column; align-items: center;
+      display: flex; flex-direction: column-reverse; align-items: center;
       cursor: pointer; user-select: none; margin-bottom: 24px;
-      position: relative; /* positioning context for the bubble */
+      position: relative;
     }
     .hero-mascot:focus { outline: none; }
     .hero-mascot .hero-logo { margin-bottom: 0; transition: transform 0.15s ease; }
     .hero-mascot:hover .hero-logo { transform: scale(1.04); }
     .mascot-bubble {
-      position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
-      max-width: 300px; min-width: 160px;
+      position: relative;
+      max-width: 300px; min-width: 160px; width: max-content;
       padding: 12px 20px; margin-bottom: 6px;
       background: var(--bg-card); border: 2px solid var(--text);
       border-radius: 16px; text-align: center; cursor: pointer;
       white-space: normal;
-      animation: bubbleAppear 0.25s ease-out;
+      animation: bubbleAppear 0.25s ease-out forwards;
       transition: background 0.15s;
       z-index: 1;
     }
