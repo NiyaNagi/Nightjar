@@ -12,6 +12,26 @@
     },
     {
       "type": "heading",
+      "text": "v1.8.10 — Fix File Sharing Auth & Mobile Reconnect Loop (Issues #18, #19)"
+    },
+    {
+      "type": "paragraph",
+      "text": "Root cause fix for file sharing between devices and workspace data persistence on mobile. FileTransferProvider was using a per-browser random key instead of the shared workspace key for HMAC auth, causing auth_token_mismatch and 0 peers. Additionally, y-websocket infinite reconnect loops on mobile (Issue #19) are stopped via 4403 detection and a rapid-disconnect circuit breaker."
+    },
+    {
+      "type": "list",
+      "items": [
+        "Fix: FileTransferProvider now uses shared workspace key (not per-browser sessionKey) for P2P auth",
+        "Fix: y-websocket 4403 close code now stops reconnect loop (was cycling every 100ms forever)",
+        "Fix: Rapid-disconnect circuit breaker kills provider after 5 fast reconnect cycles",
+        "Fix: Retry limits now apply to ALL workspaces including mobile PWA (removed isRemote guard)",
+        "Fix: WebSocketTransport.joinTopic() now properly rejects on server auth errors",
+        "Fix: BootstrapManager passes auth credentials to bootstrap peers",
+        "Tests: 20 new tests; 164 suites, 5,264 tests passing"
+      ]
+    },
+    {
+      "type": "heading",
       "text": "v1.8.9 — Share Link Race Fix & File Download Retry (Issue #18)"
     },
     {

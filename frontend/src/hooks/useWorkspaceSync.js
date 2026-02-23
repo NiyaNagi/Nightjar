@@ -289,6 +289,15 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     // Limit retries: 5 for remote servers, 10 for local sidecar (was 30)
     const maxFailures = isRemote ? 5 : 10;
     
+    // Fix: Rapid-disconnect circuit breaker (defense-in-depth for Issue #19).
+    // y-websocket resets its backoff counter on every successful TCP open, so
+    // when the server accepts TCP then immediately closes (e.g., 4403 auth),
+    // backoff stays at 100ms forever.  Track rapid disconnects and break out.
+    let rapidDisconnects = 0;
+    let lastConnectedAt = 0;
+    const RAPID_DISCONNECT_THRESHOLD_MS = 2000; // disconnect < 2s after connect = "rapid"
+    const MAX_RAPID_DISCONNECTS = 5;
+    
     // DEBUG: Track WebSocket events
     provider.on('status', (event) => {
       console.log(`[WorkspaceSync] Provider status changed:`, event.status);
@@ -299,18 +308,36 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
       } else if (event.status === 'connected') {
         // Connected but not synced yet - awaiting peers or metadata
         setSyncPhase('awaiting-peers');
+        lastConnectedAt = Date.now();
       } else if (event.status === 'disconnected') {
         // Only mark as failed if we haven't synced yet
         if (!providerRef.current?.synced) {
           setSyncPhase(prev => prev === 'complete' ? 'complete' : 'failed');
           setSyncProgress(prev => ({ ...prev, error: 'Connection lost' }));
         }
+        // Rapid-disconnect detection: if we disconnected within threshold of
+        // last connect, this is a rapid cycle (e.g., server 4403 rejection).
+        if (lastConnectedAt > 0 && (Date.now() - lastConnectedAt) < RAPID_DISCONNECT_THRESHOLD_MS) {
+          rapidDisconnects++;
+          console.warn(`[WorkspaceSync] Rapid disconnect detected (${rapidDisconnects}/${MAX_RAPID_DISCONNECTS})`);
+          if (rapidDisconnects >= MAX_RAPID_DISCONNECTS) {
+            console.error(`[WorkspaceSync] Too many rapid disconnects (${rapidDisconnects}), stopping reconnection`);
+            provider.disconnect();
+            setSyncPhase('failed');
+            setSyncProgress(prev => ({ ...prev, error: 'Connection unstable — server may be rejecting authentication' }));
+          }
+        } else {
+          // Slow disconnect (normal network issue) — reset counter
+          rapidDisconnects = 0;
+        }
       }
       
-      // Track failures for remote workspaces
-      if (event.status === 'connecting' && connectionFailures > 0 && isRemote) {
+      // Track failures for remote workspaces AND local workspaces.
+      // (Previously only tracked remote, but mobile PWA users accessing
+      // through the server URL can hit loops on local workspaces too.)
+      if (event.status === 'connecting' && connectionFailures > 0) {
         if (connectionFailures >= maxFailures) {
-          console.warn(`[WorkspaceSync] Remote server unreachable after ${maxFailures} attempts, stopping reconnection`);
+          console.warn(`[WorkspaceSync] Server unreachable after ${maxFailures} attempts, stopping reconnection`);
           setSyncPhase('failed');
           setSyncProgress(prev => ({ ...prev, error: `Server unreachable after ${maxFailures} attempts` }));
           provider.disconnect();
@@ -323,8 +350,8 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     provider.on('connection-error', (event) => {
       console.error(`[WorkspaceSync] Connection error:`, event);
       connectionFailures++;
-      if (connectionFailures >= maxFailures && isRemote) {
-        console.warn(`[WorkspaceSync] Remote server unreachable, stopping reconnection`);
+      if (connectionFailures >= maxFailures) {
+        console.warn(`[WorkspaceSync] Server unreachable after ${connectionFailures} connection errors, stopping reconnection`);
         setSyncPhase('failed');
         setSyncProgress(prev => ({ ...prev, error: 'Server unreachable' }));
         provider.disconnect();
@@ -361,6 +388,18 @@ export function useWorkspaceSync(workspaceId, initialWorkspaceInfo = null, userP
     
     provider.on('connection-close', (event) => {
       console.log(`[WorkspaceSync] Connection closed:`, event);
+      // Fix: Stop reconnecting on 4403 auth rejection.
+      // y-websocket's built-in backoff resets wsUnsuccessfulReconnects on every
+      // successful TCP handshake (onopen), so when the server accepts the TCP
+      // connection then immediately closes with 4403, the backoff stays at
+      // 2^0*100 = 100ms — creating an infinite rapid-reconnect loop.
+      // Detect this and destroy the provider to break the loop.
+      if (event?.code === 4403) {
+        console.warn(`[WorkspaceSync] Server rejected auth (4403: ${event.reason || 'auth_failed'}), stopping reconnection`);
+        provider.disconnect();
+        setSyncPhase('failed');
+        setSyncProgress(prev => ({ ...prev, error: `Authentication rejected: ${event.reason || 'invalid token'}` }));
+      }
     });
     
     // Set user awareness for workspace-level presence (used by Chat)

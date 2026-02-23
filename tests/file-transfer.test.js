@@ -900,8 +900,9 @@ describe('Issue #17: Web P2P connectivity fix', () => {
     expect(source).toMatch(/getSignalingServerUrl/);
     // Should be passed to FileTransferProvider
     expect(source).toMatch(/serverUrl=\{getSignalingServerUrl\(workspaceServerUrl\)\}/);
-    // Should pass workspaceKey={sessionKey}
-    expect(source).toMatch(/workspaceKey=\{sessionKey\}/);
+    // Should pass shared workspaceKey (from keychain), falling back to sessionKey
+    // Fix 1 (v1.8.10): Changed from sessionKey to getStoredKeyChain()?.workspaceKey || sessionKey
+    expect(source).toMatch(/workspaceKey=\{getStoredKeyChain\(currentWorkspaceId\)\?\.workspaceKey \|\| sessionKey\}/);
   });
 
   // ── 12.3 FileTransferContext imports verification ──

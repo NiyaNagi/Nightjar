@@ -126,6 +126,10 @@ export class WebSocketTransport extends BaseTransport {
       switch (message.type) {
         case MessageTypes.PEER_LIST:
           this.emit('peers-discovered', { peers: message.peers || [] });
+          // Resolve pending joinTopic promise — server accepted us
+          if (this._joinTopicResolve) {
+            this._joinTopicResolve();
+          }
           break;
           
         case MessageTypes.PEER_ANNOUNCE:
@@ -145,6 +149,18 @@ export class WebSocketTransport extends BaseTransport {
           
         case MessageTypes.PONG:
           // Calculate latency if needed
+          break;
+
+        case 'error':
+          // Server-side error response (e.g., auth_token_mismatch, room_requires_auth)
+          console.warn('[WebSocketTransport] Server error:', message.error);
+          this.emit('server-error', { error: message.error });
+          // If we have a pending joinTopic promise, reject it
+          if (this._joinTopicReject) {
+            this._joinTopicReject(message.error);
+            this._joinTopicResolve = null;
+            this._joinTopicReject = null;
+          }
           break;
           
         case 'peer-joined':
@@ -381,7 +397,9 @@ export class WebSocketTransport extends BaseTransport {
   }
 
   /**
-   * Join a topic/room on the server
+   * Join a topic/room on the server.
+   * Returns a promise that rejects if the server responds with an auth error,
+   * resolves when peer-list is received or after a timeout (treat as success).
    */
   async joinTopic(topic, options = {}) {
     this.currentTopic = topic;
@@ -393,18 +411,42 @@ export class WebSocketTransport extends BaseTransport {
     if (options.workspaceKey) {
       this.workspaceKey = options.workspaceKey;
     }
-    if (this.isServerConnected()) {
-      const msg = {
-        type: 'join-topic',
-        topic,
-        peerId: this.localPeerId,
-      };
-      // Include HMAC auth token if available
-      if (this.currentAuthToken) {
-        msg.authToken = this.currentAuthToken;
-      }
-      await this.sendToServer(msg);
+    if (!this.isServerConnected()) return;
+
+    const msg = {
+      type: 'join-topic',
+      topic,
+      peerId: this.localPeerId,
+    };
+    // Include HMAC auth token if available
+    if (this.currentAuthToken) {
+      msg.authToken = this.currentAuthToken;
     }
+
+    // Wait for server response (peer-list = success, error = reject)
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this._joinTopicResolve = null;
+        this._joinTopicReject = null;
+        // Timeout is non-fatal: topic may have joined but no peers present
+        resolve();
+      }, 5000);
+
+      this._joinTopicResolve = () => {
+        clearTimeout(timeout);
+        this._joinTopicResolve = null;
+        this._joinTopicReject = null;
+        resolve();
+      };
+      this._joinTopicReject = (error) => {
+        clearTimeout(timeout);
+        this._joinTopicResolve = null;
+        this._joinTopicReject = null;
+        reject(new Error(`Topic join rejected: ${error}`));
+      };
+
+      this.sendToServer(msg);
+    });
   }
 
   /**

@@ -142,7 +142,12 @@ export class BootstrapManager extends EventEmitter {
           })
           .then(() => true)
           .catch((e) => {
-            console.warn('[Bootstrap] WebSocket connection failed:', e.message);
+            // Distinguish TCP failures from auth rejections for diagnostics
+            const isAuthError = e.message?.includes('Topic join rejected');
+            console.warn(`[Bootstrap] WebSocket ${isAuthError ? 'topic auth rejected' : 'connection failed'}:`, e.message);
+            if (isAuthError) {
+              this.emit('auth-rejected', { error: e.message });
+            }
             return false;
           })
       );
@@ -214,7 +219,11 @@ export class BootstrapManager extends EventEmitter {
     await this.peerManager.transports.websocket.connectToServer(url);
     
     if (this.currentTopic) {
-      await this.peerManager.transports.websocket.joinTopic(this.currentTopic);
+      // Pass auth credentials so bootstrap peers can authenticate too
+      await this.peerManager.transports.websocket.joinTopic(this.currentTopic, {
+        authToken: this._authToken,
+        workspaceKey: this._workspaceKey,
+      });
     }
   }
 

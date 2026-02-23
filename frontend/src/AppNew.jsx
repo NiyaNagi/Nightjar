@@ -2340,7 +2340,7 @@ function App() {
             yChunkAvailability={yChunkAvailability}
             yStorageFiles={yStorageFiles}
             serverUrl={getSignalingServerUrl(workspaceServerUrl)}
-            workspaceKey={sessionKey}
+            workspaceKey={getStoredKeyChain(currentWorkspaceId)?.workspaceKey || sessionKey}
         >
         {/* Track which document user has open for presence */}
         <PresenceDocumentTracker activeDocId={activeDocId} />

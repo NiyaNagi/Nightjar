@@ -167,6 +167,12 @@ export class PeerManager extends EventEmitter {
       this.transports.webrtc.handleSignal(event.fromPeerId, event.signalData);
     });
 
+    // Forward server-level errors (e.g., auth_token_mismatch on join-topic)
+    this.transports.websocket.on('server-error', (event) => {
+      console.warn('[PeerManager] Server error:', event.error);
+      this.emit('server-error', event);
+    });
+
     // Handle Hyperswarm peer discoveries - these are already-connected
     // remote peers at the sidecar level, so register them as connected
     // (not just "announced") so getConnectedPeers() includes them.
