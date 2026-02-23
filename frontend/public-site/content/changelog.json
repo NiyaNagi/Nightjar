@@ -12,6 +12,23 @@
     },
     {
       "type": "heading",
+      "text": "v1.8.14 — Fix File Download on Mobile (Issue #21)"
+    },
+    {
+      "type": "paragraph",
+      "text": "File downloads from desktop to mobile failed with 'Connected peers: 0'. Root cause: the signaling server returned unknown_type for the identity message, and the client's error handler blindly rejected the pending joinTopic promise — killing peer discovery before it started."
+    },
+    {
+      "type": "list",
+      "items": [
+        "Fix: Server now handles 'identity' and 'pong' messages silently (no more unknown_type errors)",
+        "Fix: Client only rejects joinTopic for topic-fatal errors (auth_token_mismatch, room_requires_auth, etc.)",
+        "Fix: Identity message deferred until after joinTopic on reconnect (eliminates race condition)",
+        "Tests: 40 new tests; 165 suites, 5,310 tests passing"
+      ]
+    },
+    {
+      "type": "heading",
       "text": "v1.8.11 — Workspace Data Persistence on Mobile"
     },
     {

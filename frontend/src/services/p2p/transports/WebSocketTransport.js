@@ -151,17 +151,24 @@ export class WebSocketTransport extends BaseTransport {
           // Calculate latency if needed
           break;
 
-        case 'error':
-          // Server-side error response (e.g., auth_token_mismatch, room_requires_auth)
+        case 'error': {
+          // Server-side error response
           console.warn('[WebSocketTransport] Server error:', message.error);
           this.emit('server-error', { error: message.error });
-          // If we have a pending joinTopic promise, reject it
-          if (this._joinTopicReject) {
+          // Only reject joinTopic for topic/auth-related errors.
+          // Unrelated errors (e.g., 'unknown_type' from an 'identity' msg)
+          // must NOT kill the pending joinTopic promise.
+          const TOPIC_FATAL_ERRORS = new Set([
+            'auth_token_mismatch', 'room_requires_auth',
+            'topic_full', 'server_room_limit', 'too_many_topics',
+          ]);
+          if (this._joinTopicReject && TOPIC_FATAL_ERRORS.has(message.error)) {
             this._joinTopicReject(message.error);
             this._joinTopicResolve = null;
             this._joinTopicReject = null;
           }
           break;
+        }
           
         case 'peer-joined':
           this._onPeerConnected(message.peerId, message);
@@ -197,19 +204,33 @@ export class WebSocketTransport extends BaseTransport {
 
     // Start ping interval
     this._startPingInterval();
-    
-    // Send identity
-    if (this.identity) {
+
+    // Rejoin topic FIRST if we had one (identity is deferred until after
+    // joinTopic to prevent the identity response from racing with it).
+    if (this.currentTopic) {
+      this.joinTopic(this.currentTopic).then(() => {
+        this._sendIdentity();
+      }).catch(() => {
+        // joinTopic failed (auth error) — still send identity for
+        // server-side bookkeeping, it won't hurt.
+        this._sendIdentity();
+      });
+    } else {
+      // No topic to join — send identity immediately
+      this._sendIdentity();
+    }
+  }
+
+  /**
+   * Send identity message to server (display name, color, etc.)
+   */
+  _sendIdentity() {
+    if (this.identity && this.isServerConnected()) {
       this.sendToServer({
         type: MessageTypes.IDENTITY,
         peerId: this.localPeerId,
         ...this.identity,
       });
-    }
-
-    // Rejoin topic if we had one
-    if (this.currentTopic) {
-      this.joinTopic(this.currentTopic);
     }
   }
 

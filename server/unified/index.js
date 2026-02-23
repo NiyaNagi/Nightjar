@@ -582,6 +582,18 @@ class SignalingServer {
       case 'relay-broadcast':
         this.handleRelayBroadcast(ws, info, msg);
         break;
+
+      // P2P client identity announcement — store display info, no error
+      case 'identity':
+        if (msg.peerId) {
+          info.peerId = msg.peerId;
+          if (msg.displayName) info.displayName = msg.displayName;
+        }
+        break;
+
+      // Application-level pong (heartbeat reply) — no-op
+      case 'pong':
+        break;
         
       default:
         this.send(ws, { type: 'error', error: 'unknown_type' });
