@@ -910,9 +910,9 @@
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
     height: var(--app-height, 100dvh);
     touch-action: pan-y; /* Allow vertical scroll, horizontal reserved for swipe */
-    /* Safe-area padding for notched devices */
+    /* Safe-area padding for notched devices + bottom nav bar */
     padding-left: env(safe-area-inset-left, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: calc(var(--bottom-nav-height, 0px) + env(safe-area-inset-bottom, 0px));
   }
 
   /* When collapsed on mobile, slide completely off-screen */

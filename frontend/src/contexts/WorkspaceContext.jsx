@@ -411,20 +411,28 @@ export function WorkspaceProvider({ children }) {
           }
         };
         
-        restoreAllKeychains();
-        
-        if (storedWorkspaces.length > 0) {
-          // Restore last selected workspace (identity-scoped)
-          const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
-          const lastWorkspaceId = localStorage.getItem(currentWsKey);
-          setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
-        }
+        // FIX (Issue #23): Restore keychains BEFORE setting currentWorkspaceId.
+        // Without this, FileTransferProvider renders with currentWorkspaceId set
+        // but getStoredKeyChain() returns null (keychains not restored yet),
+        // causing it to compute a bogus P2P auth token from the random sessionKey
+        // fallback.  That token poisons the server's first-write-wins auth map
+        // and permanently blocks the real token (auth_token_mismatch).
+        restoreAllKeychains().finally(() => {
+          if (storedWorkspaces.length > 0) {
+            // Restore last selected workspace (identity-scoped)
+            const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
+            const lastWorkspaceId = localStorage.getItem(currentWsKey);
+            setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
+          }
+          setLoading(false);
+          setConnected(true); // Mark as "connected" even in web mode
+        });
       } catch (e) {
         secureError('[WorkspaceContext] Failed to load from localStorage:', e);
+        setLoading(false);
+        setConnected(true);
       }
       
-      setLoading(false);
-      setConnected(true); // Mark as "connected" even in web mode
       return;
     }
     
@@ -446,16 +454,24 @@ export function WorkspaceProvider({ children }) {
           const rawWorkspaces = stored ? JSON.parse(stored) : [];
           const storedWorkspaces = decryptAllWorkspaceSecrets(rawWorkspaces);
           setWorkspaces(storedWorkspaces);
-          if (storedWorkspaces.length > 0) {
-            const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
-            const lastWorkspaceId = localStorage.getItem(currentWsKey);
-            setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
-          }
+          // FIX (Issue #23): Restore keychains before setting currentWorkspaceId
+          (async () => {
+            for (const ws of storedWorkspaces) {
+              try { await restoreKeyChain(ws); } catch(e) { /* logged inside */ }
+            }
+            if (storedWorkspaces.length > 0) {
+              const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
+              const lastWorkspaceId = localStorage.getItem(currentWsKey);
+              setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
+            }
+            setLoading(false);
+            setConnected(true); // Mark as "connected" in offline mode
+          })();
         } catch (e) {
           secureError('[WorkspaceContext] Failed to load fallback:', e);
+          setLoading(false);
+          setConnected(true);
         }
-        setLoading(false);
-        setConnected(true); // Mark as "connected" in offline mode
         return;
       }
       
@@ -590,16 +606,23 @@ export function WorkspaceProvider({ children }) {
           const storedWorkspaces = decryptAllWorkspaceSecrets(rawWorkspaces);
           setWorkspaces(storedWorkspaces);
           
-          if (storedWorkspaces.length > 0) {
-            const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
-            const lastWorkspaceId = localStorage.getItem(currentWsKey);
-            setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
-          }
+          // FIX (Issue #23): Restore keychains before setting currentWorkspaceId
+          (async () => {
+            for (const ws of storedWorkspaces) {
+              try { await restoreKeyChain(ws); } catch(e) { /* logged inside */ }
+            }
+            if (storedWorkspaces.length > 0) {
+              const currentWsKey = getIdentityScopedStorageKey('nahma-current-workspace');
+              const lastWorkspaceId = localStorage.getItem(currentWsKey);
+              setCurrentWorkspaceId(lastWorkspaceId || storedWorkspaces[0].id);
+            }
+            setLoading(false);
+            secureLog('[WorkspaceContext] Finished loading workspaces for new identity');
+          })();
         } catch (e) {
           secureError('[WorkspaceContext] Failed to load workspaces for new identity:', e);
+          setLoading(false);
         }
-        setLoading(false);
-        secureLog('[WorkspaceContext] Finished loading workspaces for new identity');
       }
     };
     

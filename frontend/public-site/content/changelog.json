@@ -12,6 +12,24 @@
     },
     {
       "type": "heading",
+      "text": "v1.8.15 — Fix P2P Auth Token Mismatch on Mobile (Issue #23)"
+    },
+    {
+      "type": "paragraph",
+      "text": "File downloads from native desktop to mobile web failed with auth_token_mismatch. Root cause: on page reload, FileTransferProvider mounted before the in-memory keychain was restored from persisted workspace data. It fell back to a random per-browser sessionKey, producing a bogus HMAC that poisoned the server's first-write-wins auth token map."
+    },
+    {
+      "type": "list",
+      "items": [
+        "Fix: FileTransferProvider workspaceKey prop no longer falls back to random sessionKey (passes null instead)",
+        "Fix: FileTransferContext defers P2P topic join until real workspace key is available",
+        "Fix: PeerManager resets currentWorkspaceId on bootstrap failure (enables clean retry)",
+        "Fix: WorkspaceContext defers setCurrentWorkspaceId until all keychains are restored from storage",
+        "Tests: 39 new tests; 166 suites, 5,349 tests passing"
+      ]
+    },
+    {
+      "type": "heading",
       "text": "v1.8.14 — Fix File Download on Mobile (Issue #21)"
     },
     {

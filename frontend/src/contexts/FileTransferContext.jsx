@@ -446,35 +446,45 @@ export function FileTransferProvider({
       // On Electron: joins Hyperswarm topic via sidecar → peer discovery via DHT
       const currentServerUrl = serverUrlRef.current;
       const currentWorkspaceKey = workspaceKeyRef.current;
-      const needsJoin = peerManager.currentWorkspaceId !== workspaceId;
-      // Re-join if we previously joined without a server URL but now have one
-      // (e.g., workspaceKey/serverUrl became available after initial mount)
-      const needsReconnect = !needsJoin && currentServerUrl &&
-        !peerManager.transports?.websocket?.isServerConnected?.();
-      if (needsJoin || needsReconnect) {
-        console.log('[FileTransfer] Joining workspace for chunk transfer:', workspaceId.slice(0, 8),
-          needsReconnect ? '(reconnect with server URL)' : '');
-        try {
-          // Compute auth token for P2P topic room authentication (Fix 4)
-          let authToken = null;
-          if (currentWorkspaceKey) {
+
+      // FIX (Issue #23): Don't attempt to join the P2P topic until the real
+      // workspace key is available.  Without this guard the component may render
+      // before the keychain has been restored (async on page reload) and compute
+      // a bogus HMAC from a random per-browser sessionKey.  That bogus token
+      // poisons the server's first-write-wins auth map, permanently blocking
+      // the correct token from being accepted (auth_token_mismatch).
+      if (!currentWorkspaceKey) {
+        console.log('[FileTransfer] Deferring P2P join — workspace key not yet available');
+        // Effect will re-run once the workspaceKey prop changes to the real key
+      } else {
+        const needsJoin = peerManager.currentWorkspaceId !== workspaceId;
+        // Re-join if we previously joined without a server URL but now have one
+        // (e.g., workspaceKey/serverUrl became available after initial mount)
+        const needsReconnect = !needsJoin && currentServerUrl &&
+          !peerManager.transports?.websocket?.isServerConnected?.();
+        if (needsJoin || needsReconnect) {
+          console.log('[FileTransfer] Joining workspace for chunk transfer:', workspaceId.slice(0, 8),
+            needsReconnect ? '(reconnect with server URL)' : '');
+          try {
+            // Compute auth token for P2P topic room authentication (Fix 4)
+            let authToken = null;
             try {
               const topic = await generateTopic(workspaceId);
               authToken = await computeRoomAuthToken(currentWorkspaceKey, topic);
             } catch (authErr) {
               console.warn('[FileTransfer] Auth token computation failed (non-fatal):', authErr.message);
             }
+            await peerManager.joinWorkspace(workspaceId, {
+              serverUrl: currentServerUrl,
+              authToken,
+              workspaceKey: currentWorkspaceKey,
+            });
+          } catch (err) {
+            console.warn('[FileTransfer] joinWorkspace failed (non-fatal):', err.message);
+            // Non-fatal — we may still get peers via other transports
           }
-          await peerManager.joinWorkspace(workspaceId, {
-            serverUrl: currentServerUrl,
-            authToken,
-            workspaceKey: currentWorkspaceKey,
-          });
-        } catch (err) {
-          console.warn('[FileTransfer] joinWorkspace failed (non-fatal):', err.message);
-          // Non-fatal — we may still get peers via other transports
+          if (cancelled) return;
         }
-        if (cancelled) return;
       }
 
       // Register chunk message handlers

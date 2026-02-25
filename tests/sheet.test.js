@@ -124,12 +124,12 @@ describe('Sheet Component', () => {
   });
 
   describe('Yjs Integration', () => {
-    test('creates sheet-data map in Yjs', async () => {
+    test('creates sheet-meta map in Yjs', async () => {
       render(<Sheet ydoc={ydoc} provider={mockProvider} />);
       
       await waitFor(() => {
-        const ysheet = ydoc.getMap('sheet-data');
-        expect(ysheet.get('sheets')).toBeDefined();
+        const ymeta = ydoc.getMap('sheet-meta');
+        expect(ymeta.size).toBeGreaterThan(0);
       });
     });
 
@@ -137,13 +137,14 @@ describe('Sheet Component', () => {
       render(<Sheet ydoc={ydoc} provider={mockProvider} />);
       
       await waitFor(() => {
-        const ysheet = ydoc.getMap('sheet-data');
-        const sheets = ysheet.get('sheets');
-        expect(sheets).toBeDefined();
-        expect(sheets.length).toBe(1);
-        expect(sheets[0].name).toBe('Sheet1');
-        expect(sheets[0].row).toBe(100);
-        expect(sheets[0].column).toBe(26);
+        const ymeta = ydoc.getMap('sheet-meta');
+        expect(ymeta.size).toBe(1);
+        const firstId = [...ymeta.keys()][0];
+        const meta = ymeta.get(firstId);
+        expect(meta).toBeDefined();
+        expect(meta.name).toBe('Sheet1');
+        expect(meta.row).toBe(100);
+        expect(meta.column).toBe(26);
       });
     });
 
@@ -182,10 +183,9 @@ describe('Sheet Component', () => {
       fireEvent.click(screen.getByTestId('trigger-change'));
 
       await waitFor(() => {
-        const ysheet = ydoc.getMap('sheet-data');
-        const sheets = ysheet.get('sheets');
-        // Should have updated with test data
-        expect(sheets).toBeDefined();
+        const ymeta = ydoc.getMap('sheet-meta');
+        // Should have written sheet metadata after the change
+        expect(ymeta.size).toBeGreaterThan(0);
       });
     });
 
@@ -258,11 +258,12 @@ describe('Sheet Default Configuration', () => {
     render(<Sheet ydoc={ydoc} provider={mockProvider} />);
     
     await waitFor(() => {
-      const ysheet = ydoc.getMap('sheet-data');
-      const sheets = ysheet.get('sheets');
-      expect(sheets).toBeDefined();
-      expect(sheets[0].column).toBe(26);
-      expect(sheets[0].row).toBe(100);
+      const ymeta = ydoc.getMap('sheet-meta');
+      expect(ymeta.size).toBeGreaterThan(0);
+      const firstId = [...ymeta.keys()][0];
+      const meta = ymeta.get(firstId);
+      expect(meta.column).toBe(26);
+      expect(meta.row).toBe(100);
     }, { timeout: 3000 });
 
     ydoc.destroy();

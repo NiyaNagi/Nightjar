@@ -851,23 +851,19 @@ describe('Issue #17: Web P2P connectivity fix', () => {
     });
   });
 
-  test('joinWorkspace called without authToken when workspaceKey is null', async () => {
+  test('joinWorkspace is deferred when workspaceKey is null', async () => {
     renderWithProvider({
       workspaceId: 'ws-no-key-test',
       serverUrl: 'wss://example.com/signal',
       workspaceKey: null,
     });
 
-    await waitFor(() => {
-      expect(mockPeerManagerInstance.joinWorkspace).toHaveBeenCalledWith(
-        'ws-no-key-test',
-        expect.objectContaining({
-          serverUrl: 'wss://example.com/signal',
-          authToken: null,
-          workspaceKey: null,
-        })
-      );
-    });
+    // Wait a tick for any async effects to settle
+    await new Promise(r => setTimeout(r, 50));
+
+    // Issue #23 fix: when workspaceKey is not yet available, joinWorkspace must NOT
+    // be called (to prevent poisoning the server auth map with a bogus token).
+    expect(mockPeerManagerInstance.joinWorkspace).not.toHaveBeenCalled();
   });
 
   // ── 12.2 Source-level verification of getSignalingServerUrl ──
@@ -900,9 +896,9 @@ describe('Issue #17: Web P2P connectivity fix', () => {
     expect(source).toMatch(/getSignalingServerUrl/);
     // Should be passed to FileTransferProvider
     expect(source).toMatch(/serverUrl=\{getSignalingServerUrl\(workspaceServerUrl\)\}/);
-    // Should pass shared workspaceKey (from keychain), falling back to sessionKey
-    // Fix 1 (v1.8.10): Changed from sessionKey to getStoredKeyChain()?.workspaceKey || sessionKey
-    expect(source).toMatch(/workspaceKey=\{getStoredKeyChain\(currentWorkspaceId\)\?\.workspaceKey \|\| sessionKey\}/);
+    // Should pass shared workspaceKey (from keychain), falling back to null so
+    // FileTransferContext defers joining until the real key is available (Issue #23)
+    expect(source).toMatch(/workspaceKey=\{getStoredKeyChain\(currentWorkspaceId\)\?\.workspaceKey \|\| null\}/);
   });
 
   // ── 12.3 FileTransferContext imports verification ──

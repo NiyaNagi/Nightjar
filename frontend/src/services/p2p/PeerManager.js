@@ -263,15 +263,25 @@ export class PeerManager extends EventEmitter {
     this.currentWorkspaceId = workspaceId;
     this.currentTopic = connectionParams.topic || await generateTopic(workspaceId);
 
-    // Start bootstrap process (passes authToken and workspaceKey for Fix 4 & 6)
-    await this.bootstrapManager.bootstrap({
-      workspaceId,
-      topic: this.currentTopic,
-      serverUrl: connectionParams.serverUrl,
-      bootstrapPeers: connectionParams.bootstrapPeers,
-      authToken: connectionParams.authToken,
-      workspaceKey: connectionParams.workspaceKey,
-    });
+    try {
+      // Start bootstrap process (passes authToken and workspaceKey for Fix 4 & 6)
+      await this.bootstrapManager.bootstrap({
+        workspaceId,
+        topic: this.currentTopic,
+        serverUrl: connectionParams.serverUrl,
+        bootstrapPeers: connectionParams.bootstrapPeers,
+        authToken: connectionParams.authToken,
+        workspaceKey: connectionParams.workspaceKey,
+      });
+    } catch (err) {
+      // FIX (Issue #23): Reset workspace state on bootstrap failure so that
+      // subsequent join attempts (e.g. after the correct workspace key becomes
+      // available) are not blocked by needsJoin === false in FileTransferContext.
+      console.warn('[PeerManager] Bootstrap failed, resetting workspace state:', err.message);
+      this.currentWorkspaceId = null;
+      this.currentTopic = null;
+      throw err;
+    }
 
     this.emit('workspace-joined', { 
       workspaceId, 

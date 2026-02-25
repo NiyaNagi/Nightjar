@@ -105,6 +105,10 @@ const DEFAULT_SHEET = {
 // optional 1-based index for multi-sheet support (defaults to 1).
 const generateSheetId = (index = 1) => `sheet_${index}`;
 
+// Tag for Yjs transactions initiated by this client.
+// Observers check this origin to skip echoes of our own saves.
+const SHEET_SYNC_ORIGIN = 'nightjar-sheet-save';
+
 /**
  * Sheet Component
  * @param {Object} props
@@ -124,16 +128,13 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
     const [toolbarPosition, setToolbarPosition] = useState(null);   // For toolbar positioning
     const workbookRef = useRef(null);
     const containerRef = useRef(null);
-    const ysheetRef = useRef(null);
+    // Cell-level CRDT refs (replace old blob-based ysheetRef)
+    const ycellsRef = useRef(null);  // ydoc.getMap('sheet-cells') — one entry per cell
+    const ymetaRef = useRef(null);   // ydoc.getMap('sheet-meta') — one entry per sheet
     const hasSyncedRef = useRef(false);
     const debouncedSaveRef = useRef(null);
-    const lastSavedVersion = useRef(null);      // Version we last saved - to detect our own echoes
-    const lastLoadedVersion = useRef(null);     // Version we last loaded from Yjs - to avoid redundant loads
     const hasReceivedFirstData = useRef(false); // Track if we've received initial data from Yjs
     const onChangeCountRef = useRef(0);         // Count onChange calls to skip the first one after mount
-    const isReceivingRemoteUpdate = useRef(false); // Track when we're applying a remote update (to skip saving)
-    const pendingRemoteUpdateTimeout = useRef(null); // Timeout to clear the remote update flag
-    const dirtyDuringProtection = useRef(false); // True if local edits happened during the remote update protection window
     const dataRef = useRef(null); // Always holds latest data for stale-closure-safe reads
     
     // Custom presence overlays (Fortune Sheet's API is unreliable)
@@ -495,204 +496,6 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
         };
     }, [computePresenceOverlays]);
 
-    // Initialize Yjs map for sheet data
-    useEffect(() => {
-        if (!ydoc) {
-            console.log('[Sheet] No ydoc, skipping init');
-            return;
-        }
-
-        console.log('[Sheet] Initializing with ydoc:', ydoc.clientID);
-        const ysheet = ydoc.getMap('sheet-data');
-        ysheetRef.current = ysheet;
-
-        // Clean up legacy Y.Array ops and Y.Map pendingOps from older versions.
-        // The op-based sync path (Y.Array 'sheet-ops') has been removed because
-        // Fortune Sheet's applyOp swallows Immer errors internally, causing
-        // opsAppliedThisCycle to be a false positive which blocked the reliable
-        // full-sheet setData fallback path.  See GitHub issue #16.
-        if (ysheet.has('pendingOps')) {
-            ydoc.transact(() => { ysheet.delete('pendingOps'); });
-            console.log('[Sheet] Cleaned up legacy pendingOps key from Y.Map');
-        }
-        const yOps = ydoc.getArray('sheet-ops');
-        if (yOps.length > 0) {
-            ydoc.transact(() => { yOps.delete(0, yOps.length); });
-            console.log('[Sheet] Cleaned up', yOps.length, 'stale ops from legacy Y.Array');
-        }
-
-        // Handler for remote changes (full-sheet data path)
-        // This is the SOLE sync mechanism for spreadsheets.  The old op-based
-        // path (Y.Array 'sheet-ops') was removed because Fortune Sheet's
-        // applyOp swallows Immer errors, causing a false-positive that blocked
-        // this reliable setData path.  See GitHub issue #16.
-        const updateFromYjs = () => {
-            const storedData = ysheet.get('sheets');
-            const storedVersion = ysheet.get('version') || null;
-            
-            console.log('[Sheet] updateFromYjs - version:', storedVersion, 'lastSaved:', lastSavedVersion.current, 'lastLoaded:', lastLoadedVersion.current, 'sheetCount:', storedData?.length);
-            
-            // Skip if this is our own save echoing back
-            if (storedVersion === lastSavedVersion.current && lastSavedVersion.current !== null) {
-                console.log('[Sheet] updateFromYjs skipped - our own save (version match)');
-                return;
-            }
-            
-            // Skip if we've already loaded this version (avoid redundant loads from observe + observeDeep)
-            if (storedVersion === lastLoadedVersion.current && lastLoadedVersion.current !== null) {
-                console.log('[Sheet] updateFromYjs skipped - already loaded this version');
-                return;
-            }
-
-            if (storedData) {
-                try {
-                    let sheets = JSON.parse(JSON.stringify(storedData));
-                    
-                    // Convert celldata → 2D data array for sheets missing it.
-                    // Remote data arrives as celldata-only from Yjs, but Fortune
-                    // Sheet needs the 2D data array after initial initialization.
-                    sheets = convertCelldataToData(sheets);
-                    
-                    // Fortune Sheet uses 'data' (2D array) after initialization, not 'celldata'
-                    const cellCount = sheets[0]?.celldata?.length || 0;
-                    const dataRows = sheets[0]?.data?.length || 0;
-                    const nonEmptyCells = sheets[0]?.data?.flat().filter(c => c !== null && c !== undefined).length || 0;
-                    console.log('[Sheet] Loaded', sheets.length, 'sheets from Yjs, celldata:', cellCount, 'data rows:', dataRows, 'non-empty cells:', nonEmptyCells);
-                    
-                    // Check if this is a genuinely new remote update (not initial load or our save)
-                    const isNewRemoteUpdate = lastLoadedVersion.current !== null && storedVersion !== lastLoadedVersion.current;
-                    
-                    // Mark that we've received data - used to determine when to start saving
-                    if (!hasReceivedFirstData.current) {
-                        hasReceivedFirstData.current = true;
-                        // Reset onChange counter - we'll skip the first onChange after receiving data
-                        onChangeCountRef.current = 0;
-                        console.log('[Sheet] First data received from Yjs, will skip first onChange');
-                    }
-                    
-                    // Only set protection flag for NEW remote updates (not initial load)
-                    // This prevents Fortune Sheet's onChange from overwriting remote data
-                    if (isNewRemoteUpdate) {
-                        console.log('[Sheet] New remote update detected, enabling protection');
-                        isReceivingRemoteUpdate.current = true;
-                        dirtyDuringProtection.current = false;
-                        
-                        // Cancel pending debounced saves during protection window
-                        if (debouncedSaveRef.current) {
-                            debouncedSaveRef.current.cancel();
-                        }
-                        
-                        // Clear any pending timeout
-                        if (pendingRemoteUpdateTimeout.current) {
-                            clearTimeout(pendingRemoteUpdateTimeout.current);
-                        }
-                        
-                        // Clear the flag after a delay that exceeds the debounce delay (300ms)
-                        // Then save the LIVE workbook state if any local edits happened during the window
-                        pendingRemoteUpdateTimeout.current = setTimeout(() => {
-                            isReceivingRemoteUpdate.current = false;
-                            console.log('[Sheet] Remote update window closed, saves enabled');
-                            // If any local edits happened during the protection window,
-                            // capture the latest live state from the workbook (not a stale snapshot)
-                            if (dirtyDuringProtection.current) {
-                                console.log('[Sheet] Saving dirty state after protection window');
-                                dirtyDuringProtection.current = false;
-                                // Use debouncedSaveRef (ref-stable) to avoid stale closure over saveToYjs
-                                const liveData = workbookRef.current?.getAllSheets?.() || dataRef.current;
-                                if (liveData && debouncedSaveRef.current) {
-                                    debouncedSaveRef.current(liveData);
-                                }
-                            }
-                        }, 350);
-                    }
-                    
-                    // Update lastLoadedVersion BEFORE setData
-                    lastLoadedVersion.current = storedVersion;
-                    
-                    setData(sheets);
-                    setIsInitialized(true);
-                    hasSyncedRef.current = true;
-                } catch (e) {
-                    console.error('[Sheet] Failed to parse Yjs data:', e);
-                }
-            } else if (hasSyncedRef.current) {
-                // Only initialize with default if we've synced and there's truly no data
-                const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
-                ydoc.transact(() => {
-                    ysheet.set('sheets', defaultSheets);
-                });
-                setData(defaultSheets);
-                setIsInitialized(true);
-            }
-        };
-
-        ysheet.observeDeep(updateFromYjs);
-        updateFromYjs();
-
-        return () => {
-            console.log('[Sheet] Cleanup - unobserving ysheet');
-            ysheet.unobserveDeep(updateFromYjs);
-            // Clear any pending timeout
-            if (pendingRemoteUpdateTimeout.current) {
-                clearTimeout(pendingRemoteUpdateTimeout.current);
-            }
-        };
-    }, [ydoc]);
-
-    // Wait for provider sync before initializing with defaults
-    useEffect(() => {
-        if (!provider) return;
-
-        const handleSync = (isSynced) => {
-            if (isSynced && !hasSyncedRef.current) {
-                hasSyncedRef.current = true;
-                // Check if we need to initialize with defaults after sync
-                if (ysheetRef.current && !ysheetRef.current.get('sheets')) {
-                    const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
-                    ydoc.transact(() => {
-                        ysheetRef.current.set('sheets', defaultSheets);
-                    });
-                    setData(defaultSheets);
-                    setIsInitialized(true);
-                }
-            }
-        };
-
-        // Check if already synced
-        if (provider.synced) {
-            handleSync(true);
-        }
-
-        provider.on('sync', handleSync);
-        
-        // Fallback: Initialize with defaults after timeout if provider never syncs
-        // This handles the case when sidecar is down or connection fails
-        const fallbackTimeout = setTimeout(() => {
-            if (!isInitialized && !hasSyncedRef.current) {
-                console.log('[Sheet] Provider sync timeout, initializing with defaults');
-                hasSyncedRef.current = true;
-                if (ysheetRef.current && !ysheetRef.current.get('sheets')) {
-                    const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
-                    ydoc.transact(() => {
-                        ysheetRef.current.set('sheets', defaultSheets);
-                    });
-                    setData(defaultSheets);
-                    setIsInitialized(true);
-                } else if (!dataRef.current) {
-                    // Even if ysheetRef is not ready, initialize local state
-                    const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
-                    setData(defaultSheets);
-                    setIsInitialized(true);
-                }
-            }
-        }, 3000); // 3 second fallback
-        
-        return () => {
-            provider.off('sync', handleSync);
-            clearTimeout(fallbackTimeout);
-        };
-    }, [provider, isInitialized]);
-
     // Helper to convert Fortune Sheet's 2D data array to celldata sparse format
     const convertDataToCelldata = useCallback((sheets) => {
         return sheets.map(sheet => {
@@ -743,40 +546,299 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
         });
     }, []);
 
-    // Save to Yjs - debounced for full sheet data, immediate for ops
-    const saveToYjs = useCallback((sheets) => {
-        if (!ysheetRef.current || !ydoc) return;
-        
-        try {
-            // Use getAllSheets() to get the complete data if workbook ref is available
-            let dataToSave = sheets;
-            if (workbookRef.current?.getAllSheets) {
-                dataToSave = workbookRef.current.getAllSheets();
-                console.log('[Sheet] Using getAllSheets() for complete data');
+    // Build Fortune Sheet data from the cell-level Y.Maps.
+    // Returns an array of sheet objects (with 2D data array) or null if empty.
+    const buildSheetsFromYMap = useCallback((ycells, ymeta) => {
+        // Group cells by sheet ID
+        const sheetCells = new Map(); // sheetId → Map('r:c' → value)
+        for (const [key, value] of ycells.entries()) {
+            const colonIdx1 = key.indexOf(':');
+            const colonIdx2 = key.indexOf(':', colonIdx1 + 1);
+            if (colonIdx1 === -1 || colonIdx2 === -1) continue;
+            const sheetId = key.slice(0, colonIdx1);
+            const r = parseInt(key.slice(colonIdx1 + 1, colonIdx2), 10);
+            const c = parseInt(key.slice(colonIdx2 + 1), 10);
+            if (!sheetCells.has(sheetId)) sheetCells.set(sheetId, new Map());
+            sheetCells.get(sheetId).set(`${r}:${c}`, value);
+        }
+
+        const allSheetIds = new Set([...ymeta.keys(), ...sheetCells.keys()]);
+        if (allSheetIds.size === 0) return null;
+
+        const sheets = [];
+        for (const sheetId of allSheetIds) {
+            const meta = ymeta.get(sheetId) || {};
+            const rows = meta.row || 100;
+            const cols = meta.column || 26;
+
+            const celldata = [];
+            const cells = sheetCells.get(sheetId) || new Map();
+            for (const [rc, value] of cells.entries()) {
+                const colonIdx = rc.indexOf(':');
+                const r = parseInt(rc.slice(0, colonIdx), 10);
+                const c = parseInt(rc.slice(colonIdx + 1), 10);
+                if (value !== null && value !== undefined) {
+                    celldata.push({ r, c, v: value });
+                }
             }
-            
-            // Convert data (2D array) to celldata (sparse array) for proper persistence
-            const convertedData = convertDataToCelldata(dataToSave);
-            
-            // Debug: log what we're saving
-            const cellCount = convertedData?.[0]?.celldata?.length || 0;
-            
-            // Use composite version to avoid collisions between peers
-            // TODO: Migrate to cell-level CRDT (Yjs Y.Map per cell) to eliminate
-            // the JSON-blob full-sheet replacement strategy. This would give true
-            // conflict-free merging at the cell granularity and remove the need
-            // for the remote-update protection window entirely.
-            const newVersion = `${ydoc.clientID}-${Date.now()}`;
-            lastSavedVersion.current = newVersion;
-            
-            console.log('[Sheet] saveToYjs - saving', cellCount, 'cells, version:', newVersion);
-            
-            // Store the full sheet data in a transaction
-            ydoc.transact(() => {
-                ysheetRef.current.set('sheets', JSON.parse(JSON.stringify(convertedData)));
-                ysheetRef.current.set('version', newVersion);
+
+            sheets.push({
+                id: sheetId,
+                name: meta.name || sheetId,
+                order: meta.order || 0,
+                row: rows,
+                column: cols,
+                status: meta.status || 1,
+                celldata,
+                config: meta.config || {},
             });
-            
+        }
+
+        sheets.sort((a, b) => (a.order || 0) - (b.order || 0));
+        return convertCelldataToData(sheets);
+    }, [convertCelldataToData]);
+
+    // Initialize Yjs cell-level sync
+    useEffect(() => {
+        if (!ydoc) {
+            console.log('[Sheet] No ydoc, skipping init');
+            return;
+        }
+
+        console.log('[Sheet] Initializing with ydoc:', ydoc.clientID);
+
+        const ycells = ydoc.getMap('sheet-cells');
+        const ymeta = ydoc.getMap('sheet-meta');
+        ycellsRef.current = ycells;
+        ymetaRef.current = ymeta;
+
+        // Clean up legacy Y.Array ops from older versions (no longer used)
+        const yOps = ydoc.getArray('sheet-ops');
+        if (yOps.length > 0) {
+            ydoc.transact(() => { yOps.delete(0, yOps.length); }, SHEET_SYNC_ORIGIN);
+            console.log('[Sheet] Cleaned up', yOps.length, 'stale ops from legacy Y.Array');
+        }
+
+        // One-time migration: convert legacy blob storage to cell-level Y.Map entries.
+        // Runs only if sheet-cells is empty (new format) but sheet-data has blob (old format).
+        const ylegacy = ydoc.getMap('sheet-data');
+        const legacyBlob = ylegacy.get('sheets');
+        if (legacyBlob && ycells.size === 0) {
+            console.log('[Sheet] Migrating legacy blob to cell-level Y.Map');
+            try {
+                const legacySheets = JSON.parse(JSON.stringify(legacyBlob));
+                ydoc.transact(() => {
+                    for (const sheet of legacySheets) {
+                        const sheetId = sheet.id || generateSheetId();
+                        ymeta.set(sheetId, {
+                            name: sheet.name || 'Sheet1',
+                            order: sheet.order || 0,
+                            status: sheet.status || 1,
+                            row: sheet.row || 100,
+                            column: sheet.column || 26,
+                            config: sheet.config || {},
+                        });
+                        const cells = sheet.celldata || [];
+                        for (const cell of cells) {
+                            if (cell && cell.r != null && cell.c != null) {
+                                ycells.set(`${sheetId}:${cell.r}:${cell.c}`, cell.v);
+                            }
+                        }
+                    }
+                }, SHEET_SYNC_ORIGIN);
+                console.log('[Sheet] Legacy migration complete:', legacySheets.length, 'sheets migrated');
+            } catch (e) {
+                console.error('[Sheet] Legacy migration failed:', e);
+            }
+        }
+
+        // Observer for remote cell/meta changes.
+        // Skips writes tagged with SHEET_SYNC_ORIGIN (our own saves) to prevent echo.
+        // With cell-level diffs there is no protection window needed — if FortuneSheet
+        // fires onChange after setData(), saveToYjs computes a zero-length diff and exits.
+        const handleRemoteChange = (event) => {
+            if (event.transaction.origin === SHEET_SYNC_ORIGIN) return; // our own write, ignore
+            console.log('[Sheet] Remote cell/meta change received from peer');
+            const sheets = buildSheetsFromYMap(ycells, ymeta);
+            if (sheets) {
+                hasReceivedFirstData.current = true;
+                onChangeCountRef.current = 0;
+                setData(sheets);
+                setIsInitialized(true);
+                hasSyncedRef.current = true;
+            }
+        };
+
+        ycells.observe(handleRemoteChange);
+        ymeta.observe(handleRemoteChange);
+
+        // Initial synchronous load from Y.Maps (populated if peers already shared data)
+        const initialSheets = buildSheetsFromYMap(ycells, ymeta);
+        if (initialSheets) {
+            console.log('[Sheet] Loaded', initialSheets.length, 'sheets from Y.Maps on init');
+            hasReceivedFirstData.current = true;
+            onChangeCountRef.current = 0;
+            setData(initialSheets);
+            setIsInitialized(true);
+            hasSyncedRef.current = true;
+        }
+
+        return () => {
+            console.log('[Sheet] Cleanup - unobserving ycells/ymeta');
+            ycells.unobserve(handleRemoteChange);
+            ymeta.unobserve(handleRemoteChange);
+        };
+    }, [ydoc, buildSheetsFromYMap]);
+
+    // Wait for provider sync before initializing with defaults
+    useEffect(() => {
+        if (!provider) return;
+
+        const handleSync = (isSynced) => {
+            if (isSynced && !hasSyncedRef.current) {
+                hasSyncedRef.current = true;
+                const ycells = ycellsRef.current;
+                const ymeta = ymetaRef.current;
+                if (!ycells || !ymeta) return;
+                const sheets = buildSheetsFromYMap(ycells, ymeta);
+                if (sheets) {
+                    hasReceivedFirstData.current = true;
+                    onChangeCountRef.current = 0;
+                    setData(sheets);
+                    setIsInitialized(true);
+                } else {
+                    // Provider synced but sheet is brand new — write default metadata
+                    const defaultId = generateSheetId();
+                    ydoc && ydoc.transact(() => {
+                        ymeta.set(defaultId, {
+                            name: DEFAULT_SHEET.name,
+                            order: 0,
+                            status: 1,
+                            row: DEFAULT_SHEET.row,
+                            column: DEFAULT_SHEET.column,
+                            config: {},
+                        });
+                    }, SHEET_SYNC_ORIGIN);
+                    const defaultSheets = [{ ...DEFAULT_SHEET, id: defaultId }];
+                    setData(defaultSheets);
+                    setIsInitialized(true);
+                }
+            }
+        };
+
+        if (provider.synced) {
+            handleSync(true);
+        }
+
+        provider.on('sync', handleSync);
+
+        // Fallback: initialize with defaults if provider never syncs (sidecar down, etc.)
+        const fallbackTimeout = setTimeout(() => {
+            if (!isInitialized && !hasSyncedRef.current) {
+                console.log('[Sheet] Provider sync timeout, initializing with defaults');
+                hasSyncedRef.current = true;
+                const ycells = ycellsRef.current;
+                const ymeta = ymetaRef.current;
+                if (ycells && ymeta) {
+                    const sheets = buildSheetsFromYMap(ycells, ymeta);
+                    if (sheets) {
+                        hasReceivedFirstData.current = true;
+                        onChangeCountRef.current = 0;
+                        setData(sheets);
+                        setIsInitialized(true);
+                        return;
+                    }
+                }
+                // Truly no data — fall back to empty sheet
+                const defaultSheets = [{ ...DEFAULT_SHEET, id: generateSheetId() }];
+                setData(defaultSheets);
+                setIsInitialized(true);
+            }
+        }, 3000);
+
+        return () => {
+            provider.off('sync', handleSync);
+            clearTimeout(fallbackTimeout);
+        };
+    }, [provider, isInitialized, buildSheetsFromYMap, ydoc]);
+
+    // Save to Yjs — cell-level CRDT diff.
+    // Only writes cells that actually changed vs the current Y.Map state.
+    // If FortuneSheet fires onChange after we applied remote data, the diff
+    // will be empty (remote data is already in the Y.Map) → nothing is written.
+    // This eliminates the echo-overwrite race condition entirely.
+    const saveToYjs = useCallback((sheets) => {
+        if (!ydoc) return;
+        const ycells = ycellsRef.current;
+        const ymeta = ymetaRef.current;
+        if (!ycells || !ymeta) return;
+
+        try {
+            // Prefer getAllSheets() which always returns the live workbook state
+            // (avoids the stale-closure problem where debounced `sheets` arg is old)
+            const allSheets = workbookRef.current?.getAllSheets
+                ? workbookRef.current.getAllSheets()
+                : sheets;
+            if (!allSheets || !Array.isArray(allSheets)) return;
+
+            const converted = convertDataToCelldata(allSheets);
+
+            const cellChanges = [];  // { key, value?, action: 'set'|'delete' }
+            const metaChanges = [];
+            const newCellKeys = new Set();
+
+            for (const sheet of converted) {
+                const sheetId = sheet.id || generateSheetId();
+
+                // Sheet metadata
+                const existingMeta = ymeta.get(sheetId);
+                const newMeta = {
+                    name: sheet.name || 'Sheet1',
+                    order: sheet.order || 0,
+                    status: sheet.status || 1,
+                    row: sheet.row || 100,
+                    column: sheet.column || 26,
+                    config: sheet.config || {},
+                };
+                if (JSON.stringify(existingMeta) !== JSON.stringify(newMeta)) {
+                    metaChanges.push({ key: sheetId, value: newMeta });
+                }
+
+                // Cell data
+                for (const cell of (sheet.celldata || [])) {
+                    const key = `${sheetId}:${cell.r}:${cell.c}`;
+                    newCellKeys.add(key);
+                    const existing = ycells.get(key);
+                    if (JSON.stringify(existing) !== JSON.stringify(cell.v)) {
+                        cellChanges.push({ key, value: cell.v, action: 'set' });
+                    }
+                }
+            }
+
+            // Find deleted cells (in Yjs but not in the new data)
+            const sheetIds = converted.map(s => s.id || generateSheetId());
+            for (const key of ycells.keys()) {
+                const colonIdx = key.indexOf(':');
+                const sheetId = colonIdx !== -1 ? key.slice(0, colonIdx) : key;
+                if (sheetIds.includes(sheetId) && !newCellKeys.has(key)) {
+                    cellChanges.push({ key, action: 'delete' });
+                }
+            }
+
+            const totalChanges = cellChanges.length + metaChanges.length;
+            if (totalChanges === 0) return; // Nothing changed — skip (prevents echo writes)
+
+            const totalCells = converted[0]?.celldata?.length || 0;
+            console.log('[Sheet] saveToYjs -', cellChanges.length, 'cell changes,', metaChanges.length, 'meta changes, total cells:', totalCells);
+
+            ydoc.transact(() => {
+                for (const m of metaChanges) ymeta.set(m.key, m.value);
+                for (const c of cellChanges) {
+                    if (c.action === 'set') ycells.set(c.key, c.value);
+                    else ycells.delete(c.key);
+                }
+            }, SHEET_SYNC_ORIGIN);
+
             console.log('[Sheet] Saved sheet data to Yjs');
         } catch (e) {
             console.error('[Sheet] Failed to save to Yjs:', e);
@@ -800,127 +862,101 @@ export default function Sheet({ ydoc, provider, userColor, userHandle, userPubli
         };
     }, [debouncedSaveToYjs, debouncedReportStats]);
 
-    // Flush pending saves on unmount and force save current state
+    // Flush pending saves on unmount — write any unsaved cells to Yjs
     useEffect(() => {
-        // Capture the ydoc and ysheet at setup time so cleanup can verify they still match
         const capturedYdoc = ydoc;
-        const capturedYsheet = ydoc ? ydoc.getMap('sheet-data') : null;
+        const capturedYcells = ydoc ? ydoc.getMap('sheet-cells') : null;
+        const capturedYmeta = ydoc ? ydoc.getMap('sheet-meta') : null;
         return () => {
             console.log('[Sheet] Unmounting - saving current state');
-            // Guard: only save if the current ysheetRef still points to the same
-            // Yjs map we set up with. If the document switched, ysheetRef will
-            // point to the new doc's map, and we must NOT write stale data into it.
-            if (ysheetRef.current !== capturedYsheet) {
+            // Guard: only save if the refs still point to the same maps we set up with.
+            // If the document switched, ycellsRef points to the new doc's map and we
+            // must NOT write stale data into it.
+            if (ycellsRef.current !== capturedYcells) {
                 console.warn('[Sheet] Unmount save skipped - ydoc has changed since setup');
                 debouncedSaveRef.current?.cancel();
                 return;
             }
-            // Try to save using workbook ref first (most accurate)
-            if (workbookRef.current?.getAllSheets && capturedYsheet && capturedYdoc) {
-                try {
-                    const finalData = workbookRef.current.getAllSheets();
-                    // Convert data to celldata for persistence
-                    const convertedData = finalData.map(sheet => {
-                        const newSheet = { ...sheet };
-                        if (sheet.data && Array.isArray(sheet.data)) {
-                            const celldata = [];
-                            sheet.data.forEach((row, r) => {
-                                if (row && Array.isArray(row)) {
-                                    row.forEach((cell, c) => {
-                                        if (cell !== null && cell !== undefined) {
-                                            celldata.push({ r, c, v: cell });
-                                        }
-                                    });
-                                }
-                            });
-                            newSheet.celldata = celldata;
-                            delete newSheet.data;
-                            console.log('[Sheet] Unmount - converted', celldata.length, 'cells');
-                        }
-                        return newSheet;
-                    });
-                    console.log('[Sheet] Final save on unmount, sheets:', convertedData?.length);
-                    capturedYdoc.transact(() => {
-                        capturedYsheet.set('sheets', JSON.parse(JSON.stringify(convertedData)));
-                        capturedYsheet.set('version', `${capturedYdoc.clientID}-${Date.now()}`);
-                    });
-                    console.log('[Sheet] Final state saved to Yjs');
-                } catch (e) {
-                    console.error('[Sheet] Failed to save final state:', e);
-                }
-            } else if (dataRef.current && capturedYsheet && capturedYdoc) {
-                // Fallback: workbook ref unavailable, save from latest data ref
-                try {
-                    const fallbackData = dataRef.current.map(sheet => {
-                        const newSheet = { ...sheet };
-                        if (sheet.data && Array.isArray(sheet.data)) {
-                            const celldata = [];
-                            sheet.data.forEach((row, r) => {
-                                if (row && Array.isArray(row)) {
-                                    row.forEach((cell, c) => {
-                                        if (cell !== null && cell !== undefined) {
-                                            celldata.push({ r, c, v: cell });
-                                        }
-                                    });
-                                }
-                            });
-                            newSheet.celldata = celldata;
-                            delete newSheet.data;
-                        }
-                        return newSheet;
-                    });
-                    console.log('[Sheet] Unmount fallback save from dataRef, sheets:', fallbackData?.length);
-                    capturedYdoc.transact(() => {
-                        capturedYsheet.set('sheets', JSON.parse(JSON.stringify(fallbackData)));
-                        capturedYsheet.set('version', `${capturedYdoc.clientID}-${Date.now()}`);
-                    });
-                } catch (e) {
-                    console.error('[Sheet] Failed fallback save from dataRef:', e);
-                }
-            }
-            // Cancel any pending debounced saves to prevent overwriting the fresh unmount save
             debouncedSaveRef.current?.cancel();
-        };
-    }, [ydoc]);
+            if (!capturedYcells || !capturedYmeta || !capturedYdoc) return;
 
-    // Handle sheet data changes
+            try {
+                const finalData = workbookRef.current?.getAllSheets
+                    ? workbookRef.current.getAllSheets()
+                    : dataRef.current;
+                if (!finalData) return;
+
+                const converted = convertDataToCelldata(finalData);
+                const newCellKeys = new Set();
+
+                capturedYdoc.transact(() => {
+                    for (const sheet of converted) {
+                        const sheetId = sheet.id || generateSheetId();
+                        capturedYmeta.set(sheetId, {
+                            name: sheet.name || 'Sheet1',
+                            order: sheet.order || 0,
+                            status: sheet.status || 1,
+                            row: sheet.row || 100,
+                            column: sheet.column || 26,
+                            config: sheet.config || {},
+                        });
+                        for (const cell of (sheet.celldata || [])) {
+                            const key = `${sheetId}:${cell.r}:${cell.c}`;
+                            newCellKeys.add(key);
+                            capturedYcells.set(key, cell.v);
+                        }
+                    }
+                    // Delete cells no longer present
+                    const sheetIds = converted.map(s => s.id || generateSheetId());
+                    for (const key of capturedYcells.keys()) {
+                        const colonIdx = key.indexOf(':');
+                        const sheetId = colonIdx !== -1 ? key.slice(0, colonIdx) : key;
+                        if (sheetIds.includes(sheetId) && !newCellKeys.has(key)) {
+                            capturedYcells.delete(key);
+                        }
+                    }
+                }, SHEET_SYNC_ORIGIN);
+                console.log('[Sheet] Final state saved to Yjs on unmount');
+            } catch (e) {
+                console.error('[Sheet] Failed to save final state on unmount:', e);
+            }
+        };
+    }, [ydoc, convertDataToCelldata]);
+
+    // Handle sheet data changes from FortuneSheet.
+    // With cell-level diff saves, there is no longer any need for a
+    // 'remote update protection window' — if FortuneSheet fires onChange
+    // after we applied remote data via setData, saveToYjs computes a zero-
+    // length diff (remote data already in Y.Map) and returns immediately.
     const handleChange = useCallback((newData) => {
         // Guard against null/undefined data from Fortune Sheet
         if (!newData || !Array.isArray(newData)) {
             console.warn('[Sheet] handleChange received invalid data, ignoring:', newData);
             return;
         }
-        
+
         // Increment onChange counter
         onChangeCountRef.current++;
-        
-        // Debug: check if data has the expected structure
+
         if (newData?.[0]) {
             console.log('[Sheet] handleChange #' + onChangeCountRef.current + ' - sheets:', newData.length);
-            
-            // Skip the FIRST onChange after receiving data from Yjs
-            // Fortune Sheet fires onChange with empty/stale data when it first renders with existing data
+
+            // Skip the FIRST onChange after receiving data from Yjs.
+            // FortuneSheet fires onChange when it first renders with existing data;
+            // the diff-based saveToYjs would also return 0 here, but skipping
+            // avoids the unnecessary getAllSheets() call and log noise.
             if (onChangeCountRef.current === 1 && hasReceivedFirstData.current) {
                 console.log('[Sheet] Skipping first onChange after data load (Fortune Sheet init event)');
                 setData(newData);
                 return;
             }
-            
+
             // Report stats via debounced calculator (avoids O(cells) on every keystroke)
             debouncedReportStats(newData);
-            
-            // During the remote update protection window, mark dirty so the
-            // latest live workbook state is saved when the window closes.
-            // This replaces the old stale-snapshot queue approach.
-            if (isReceivingRemoteUpdate.current) {
-                console.log('[Sheet] Marking dirty during protection window (will save live state when window closes)');
-                dirtyDuringProtection.current = true;
-                setData(newData);
-                return;
-            }
         }
+
         setData(newData);
-        // Save via debounced function for full data sync
+        // Diff-based save: writes only changed cells; returns early if nothing changed.
         debouncedSaveToYjs(newData);
     }, [debouncedSaveToYjs, debouncedReportStats]);
 
